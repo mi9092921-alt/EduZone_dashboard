@@ -8,6 +8,8 @@
     "build": "turbo build",
     "lint": "turbo lint",
     "test": "turbo test",
+    "test:coverage": "turbo test -- --coverage",
+    "test:e2e": "pnpm --filter @eduzone/admin test:e2e",
     "typecheck": "turbo typecheck",
     "clean": "turbo clean",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\""

@@ -17,7 +17,7 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v3
         with:
-          version: 9
+          version: 10.32.1
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -40,6 +40,9 @@ jobs:
 
       - name: Test (Vitest)
         run: pnpm turbo test -- --coverage
+
+      - name: Production build
+        run: pnpm turbo build
 
       - name: Supabase DB Lint
         run: supabase db lint
