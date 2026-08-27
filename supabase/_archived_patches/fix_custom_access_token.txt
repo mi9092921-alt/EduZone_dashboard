@@ -1,0 +1,57 @@
+// إصلاح الدالة: حذف سطر {claims,role} والاكتفاء بـ primary_role لمنطق التطبيق، وإضافة coalesce(v_token_ver, 1) لمعالجة null بأمان.
+
+
+CREATE OR REPLACE FUNCTION public.custom_access_token(event jsonb)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_user_id uuid := (event ->> 'user_id')::uuid;
+  v_tenant_id uuid;
+  v_primary_role text;
+  v_deleted_at timestamptz;
+  v_region_id text;
+  v_is_admin boolean := false;
+  v_token_ver integer;
+BEGIN
+  -- SEC-06: Fail closed for missing profile or inactive status
+  SELECT tenant_id, primary_role, deleted_at, region_id, token_version
+  INTO v_tenant_id, v_primary_role, v_deleted_at, v_region_id, v_token_ver
+  FROM public.users
+  WHERE id = v_user_id
+    AND deleted_at IS NULL
+    AND account_status = 'active';
+
+  IF v_tenant_id IS NULL THEN
+    RAISE EXCEPTION 'USER_NOT_PROVISIONED_OR_INACTIVE';
+  END IF;
+
+  SELECT coalesce(
+    v_primary_role IN ('admin', 'super_admin')
+    OR EXISTS (
+      SELECT 1
+      FROM public.user_roles ur
+      JOIN public.roles r ON r.id = ur.role_id
+      WHERE ur.user_id = v_user_id
+        AND ur.tenant_id = v_tenant_id
+        AND ur.is_active
+        AND (ur.expires_at IS NULL OR ur.expires_at > pg_catalog.now())
+        AND r.name IN ('admin', 'super_admin')
+    ),
+    false
+  )
+  INTO v_is_admin;
+
+  event := jsonb_set(event, '{claims,tenant_id}', to_jsonb(v_tenant_id), true);
+  event := jsonb_set(event, '{claims,primary_role}', to_jsonb(v_primary_role), true);
+  -- ملاحظة: لا نلمس {claims,role} إطلاقاً حتى يبقى 'authenticated' لـ PostgREST
+  event := jsonb_set(event, '{claims,region_id}', to_jsonb(v_region_id), true);
+  event := jsonb_set(event, '{claims,is_admin}', to_jsonb(v_is_admin), true);
+  event := jsonb_set(event, '{claims,token_version}', to_jsonb(coalesce(v_token_ver, 1)), true);
+  event := jsonb_set(event, '{claims,account_status}', to_jsonb('active'::text), true);
+
+  RETURN event;
+END;
+$function$;

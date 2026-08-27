@@ -1,0 +1,3 @@
+-- AUTO-GENERATED FROM CANONICAL SOURCE
+-- Source of truth: ../../Eduzone_schema_v13.sql
+-- Normalization pass #3 ownership rules applied.

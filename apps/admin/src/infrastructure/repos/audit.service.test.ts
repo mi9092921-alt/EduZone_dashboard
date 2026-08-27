@@ -1,0 +1,107 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import {
+  getActivityLogs,
+  getActivityLogsForVerification,
+  getAuditChainState,
+  flushActivityLogs,
+  getQueuedActivities,
+} from './audit.service';
+import { container } from '@/container';
+
+// Mock the container
+vi.mock('@/container', () => ({
+  container: {
+    supabase: {
+      rpc: vi.fn(),
+      from: vi.fn(),
+    },
+  },
+}));
+
+describe('audit.service', () => {
+  const mockFrom = container.supabase.from as any;
+  const mockRpc = container.supabase.rpc as any;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const setupQuery = (resolvedValue: any) => {
+    const mockQuery = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      gte: vi.fn().mockReturnThis(),
+      lte: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      range: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue(resolvedValue),
+      then: vi.fn().mockImplementation((cb) => cb(resolvedValue)),
+    };
+    return mockQuery;
+  };
+
+  it('getActivityLogs filters and paginates', async () => {
+    const q = setupQuery({ data: [{ id: 'l1' }], count: 1, error: null });
+    mockFrom.mockReturnValue(q);
+    
+    const res = await getActivityLogs({}, 1, 10);
+    expect(res.data).toHaveLength(1);
+    expect(q.range).toHaveBeenCalledWith(0, 9);
+  });
+
+  it('flushActivityLogs handles success', async () => {
+    const mockQuery = {
+      single: vi.fn().mockResolvedValue({ data: 42, error: null }),
+    };
+    mockRpc.mockReturnValue(mockQuery);
+
+    const flushed = await flushActivityLogs(100);
+    expect(mockRpc).toHaveBeenCalledWith('flush_activity_logs', { p_batch_size: 100 });
+    expect(flushed).toBe(42);
+  });
+
+  it('getActivityLogsForVerification', async () => {
+    const q = setupQuery({ data: [{ id: 'l1' }], error: null });
+    mockFrom.mockReturnValue(q);
+    const res = await getActivityLogsForVerification('2023-01-01', '2023-12-31');
+    expect(res).toHaveLength(1);
+    expect(q.gte).toHaveBeenCalledWith('created_at', '2023-01-01');
+    expect(q.lte).toHaveBeenCalledWith('created_at', '2023-12-31');
+    expect(mockFrom).toHaveBeenCalledWith('activity_logs');
+  });
+
+  it('getAuditChainState returns single row', async () => {
+    const q = setupQuery({ data: { last_seq: 100 }, error: null });
+    mockFrom.mockReturnValue(q);
+    const res = await getAuditChainState();
+    expect(res.last_seq).toBe(100);
+    expect(mockFrom).toHaveBeenCalledWith('audit_chain_state');
+    expect(q.eq).toHaveBeenCalledWith('id', 1);
+  });
+
+  it('flushActivityLogs handles lock contention', async () => {
+    const mockQuery = {
+      single: vi.fn().mockResolvedValue({ error: { message: 'could not obtain lock', code: '55P03' } }),
+    };
+    mockRpc.mockReturnValue(mockQuery);
+    
+    let errorThrown = false;
+    try {
+      await flushActivityLogs();
+    } catch (err: any) {
+      errorThrown = true;
+      expect(err.code).toBe('LOCK_CONTENTION');
+    }
+    expect(errorThrown).toBe(true);
+  });
+
+  it('getQueuedActivities returns unflushed rows', async () => {
+    const q = setupQuery({ data: [{ id: 'q1' }], error: null });
+    mockFrom.mockReturnValue(q);
+    const res = await getQueuedActivities();
+    expect(res).toHaveLength(1);
+    expect(q.eq).toHaveBeenCalledWith('flushed', false);
+    expect(mockFrom).toHaveBeenCalledWith('activity_log_queue');
+  });
+});

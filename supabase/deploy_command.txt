@@ -1,0 +1,6 @@
+powershell -ExecutionPolicy Bypass -File supabase\deploy_functions.ps1
+
+
+
+node supabase\deploy_schema.js
+

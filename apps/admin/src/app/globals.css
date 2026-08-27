@@ -1,0 +1,293 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  --radius-2xl: 1rem;
+  --radius-xl: 0.75rem;
+  --radius-lg: 0.5rem;
+  --radius-md: 0.375rem;
+  --radius-sm: 0.25rem;
+
+  --spacing-1: 0.25rem;
+  --spacing-2: 0.5rem;
+  --spacing-3: 0.75rem;
+  --spacing-4: 1rem;
+  --spacing-6: 1.5rem;
+  --spacing-8: 2rem;
+  --spacing-12: 3rem;
+  --spacing-16: 4rem;
+
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+
+  @keyframes accordion-down {
+    from {
+      height: 0;
+    }
+
+    to {
+      height: var(--radix-accordion-content-height);
+    }
+  }
+
+  @keyframes accordion-up {
+    from {
+      height: var(--radix-accordion-content-height);
+    }
+
+    to {
+      height: 0;
+    }
+  }
+}
+
+/* ===== FAANG-Level Design Tokens ===== */
+:root {
+  color-scheme: light;
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+
+  /* MUI Theme Bridge Variables */
+  --mui-background: #F8FAFC;
+  --mui-paper: #FFFFFF;
+
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 84% 4.9%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 84% 4.9%;
+
+  --primary: 221.2 83.2% 53.3%;
+  --primary-foreground: 210 40% 98%;
+
+  --secondary: 210 40% 96.1%;
+  --secondary-foreground: 222.2 47.4% 11.2%;
+
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+
+  --accent: 210 40% 96.1%;
+  --accent-foreground: 222.2 47.4% 11.2%;
+
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 40% 98%;
+
+  --border: 214.3 32% 82%;
+  --input: 214.3 31.8% 91.4%;
+  --ring: 221.2 83.2% 53.3%;
+
+  --radius: 0.75rem;
+
+  /* Layout Tokens */
+  --sidebar-width: 16rem;
+  /* 256px */
+  --header-height: 4rem;
+  /* 64px */
+  --container-width: 1600px;
+
+  /* Z-Index Weights */
+  --z-sidebar: 40;
+  --z-header: 30;
+  --z-dropdown: 50;
+  --z-modal: 60;
+  --z-toast: 70;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --background: 223 49% 7%;      /* Level 0: Pure Deep Space (#090E1A) */
+  --foreground: 210 40% 98%;
+
+  /* MUI Theme Bridge Variables - Synchronized with EduZone Dark Theme */
+  --mui-background: #090E1A;
+  --mui-paper: #161F30;
+
+  --card: 220 37% 14%;           /* Level 2: Elevated Surface (#161F30) */
+  --card-foreground: 210 40% 98%;
+
+  --popover: 221 39% 11%;        /* Level 1: Sidebar/Topbar Tone (#111827) */
+  --popover-foreground: 210 40% 98%;
+
+  --primary: 221.2 83.2% 45%;
+  --primary-foreground: 210 40% 98%;
+
+  --secondary: 221 39% 11%;      /* Level 1 Alignment */
+  --secondary-foreground: 210 40% 98%;
+
+  --muted: 221 39% 11%;          /* Level 1 Alignment */
+  --muted-foreground: 215 20.2% 75%;    /* Brighter for small text readability */
+
+  --accent: 217.2 32.6% 17.5%;
+  --accent-foreground: 210 40% 98%;
+
+  --destructive: 0 84% 60%;      /* Brighter red for dark mode visibility */
+  --destructive-foreground: 210 40% 98%;
+
+  --border: 217.2 32.6% 22.5%;   /* Slightly lighter borders for better definition */
+  --input: 217.2 32.6% 17.5%;
+  --ring: 224.3 76.3% 48%;
+
+  /* Subtle Refinement: Inner Glow for Dark Surfaces */
+  --inner-glow: inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+}
+
+/* Fix MUI Dark Mode Elevation Gradients overriding Tailwind background cards */
+html[data-theme="dark"] .MuiPaper-root,
+html[data-theme="dark"] .MuiMenu-paper,
+html[data-theme="dark"] .MuiPopover-paper {
+  background-image: none !important;
+}
+
+html,
+body,
+#root,
+#__next {
+  height: 100%;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased overflow-hidden min-h-[100dvh];
+    line-height: 1.6;
+  }
+
+  main {
+    min-height: calc(100vh - var(--header-height, 64px));
+  }
+}
+
+/* Global Transitions */
+@utility transition-faang {
+  @apply transition-[opacity,transform,background-color,border-color] duration-150 ease-out;
+}
+
+/* Container Utility */
+@utility container-faang {
+  @apply mx-auto w-full px-4 sm:px-6 md:px-8 py-6 space-y-6 max-w-[1240px] xl:max-w-[1400px];
+}
+
+/* Inner Glow Shadow Utility */
+@utility shadow-inner-glow {
+  box-shadow: var(--inner-glow);
+}
+
+/* Typography Hierarchy */
+@utility text-title {
+  @apply text-2xl font-semibold tracking-tight;
+}
+
+@utility text-section {
+  @apply text-lg font-medium tracking-tight;
+}
+
+@utility text-body-muted {
+  @apply text-sm text-muted-foreground;
+}
+
+/* Scrollbar Refinement */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-muted-foreground/20 rounded-full transition-faang;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-muted-foreground/40;
+}
+
+/* Scroll Lock Classes */
+@utility no-scroll {
+  overflow: hidden;
+}
+
+.content-scroll {
+  @apply flex-1 min-h-0 overflow-y-auto;
+}
+/* ── RTL Layout Comprehensive Fixes ─────────────────────────── */
+
+/* Date Input Bidi Fix */
+[dir='rtl'] input[type='date'] {
+  direction: ltr !important;
+  text-align: end;
+}
+
+[dir='rtl'] input[type='date']::-webkit-datetime-edit {
+  direction: ltr !important;
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: flex-end !important;
+}
+
+/* Sidebar: flip margin from left to right in RTL */
+[dir='rtl'] .sidebar-offset {
+  margin-right: var(--sidebar-width);
+  margin-left: 0;
+}
+
+/* DataGrid / Table headers should align right in RTL */
+[dir='rtl'] th,
+[dir='rtl'] td {
+  text-align: right;
+}
+
+/* Pagination arrows: reverse direction in RTL */
+[dir='rtl'] .pagination-prev svg {
+  transform: scaleX(-1);
+}
+[dir='rtl'] .pagination-next svg {
+  transform: scaleX(-1);
+}
+
+/* Stat cards: numbers use Arabic-Indic via font-feature or Intl.NumberFormat */
+[dir='rtl'] .font-mono {
+  font-family: "JetBrains Mono", "Cairo", ui-monospace, monospace;
+}
+
+/* Drawer: slide from left in LTR, from right in RTL */
+[dir='rtl'] [data-drawer-side='right'] {
+  left: 0;
+  right: auto;
+}
+
+/* Scrollbar: position on left side for RTL */
+[dir='rtl'] .custom-scrollbar {
+  direction: ltr;
+}
+[dir='rtl'] .custom-scrollbar > * {
+  direction: rtl;
+}

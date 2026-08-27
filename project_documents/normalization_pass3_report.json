@@ -1,0 +1,31 @@
+{
+  "missing_objects": {
+    "tables": [],
+    "views": [],
+    "mviews": [],
+    "functions": [],
+    "triggers": [],
+    "policies": [],
+    "indexes": [],
+    "partitions": [],
+    "fk_constraints": []
+  },
+  "extra_objects": {
+    "tables": [],
+    "views": [],
+    "mviews": [],
+    "functions": [],
+    "triggers": [],
+    "policies": [],
+    "indexes": [],
+    "partitions": [],
+    "fk_constraints": []
+  },
+  "duplicate_objects": {},
+  "misclassified_objects": [],
+  "fk_coverage": {
+    "canonical_total": 38,
+    "covered_in_03_04": 38,
+    "missing": []
+  }
+}
