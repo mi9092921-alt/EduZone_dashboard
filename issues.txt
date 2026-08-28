@@ -1,75 +1,4 @@
-Response Errors
-
-
-58
-Jun 5, 2026, 08:00pm
-Jun 5, 2026, 09:00pm
-Request	Count
-POST
-400
-/rest/v1/rpc/bind_device_for_current_user
-12
-POST
-400
-/rest/v1/activity_log_queue?columns="activity_type","user_id","tenant_id","details","device_id","risk_level","user_snapshot","created_at"
-12
-POST
-400
-/rest/v1/rpc/get_user_stats_summary
-7
-GET
-401
-/rest/v1/users?select=account_status,primary_role,last_login&deleted_at=is.null&tenant_id=eq.11111111-0000-0000-0000-000000000001
-7
-GET
-401
-/rest/v1/settings_kv?select=key,value&key=in.("latest_version","min_app_version","force_update","update_message","store_link_android","store_link_ios","support_link")
-4
-GET
-401
-/rest/v1/settings_kv?select=value&key=eq.app_locked
-4
-POST
-400
-/rest/v1/rpc/control_user_account
-3
-GET
-401
-/rest/v1/users?select=id,primary_role,tenant_id,token_version&id=eq.aaaaaaaa-0000-0000-0000-000000000001&deleted_at=is.null
-1
-GET
-401
-/rest/v1/settings_kv?select=value&key=eq.maintenance_mode
-1
-HEAD
-401
-/rest/v1/courses?select=id&deleted_at=is.null&status=eq.published
-1
-
- 
-
-======================================================================================================================================================================================
-
-
-
-Memory usage
-408.38 MB
-
-
-0 MB
-143.05 MB
-286.1 MB
-429.15 MB
-572.2 MB
-
-Jun 5, 2026, 01:00am
-Jun 6, 2026, 01:00am
-
-Used
-
-Cache + Buffers
-
-Free avg 20 mg
+ قاعدة البيانات مشتركة بين تطبيق الطالب وداشبورد الادمين والمعلمين وسوبر ادمين 
 
 
 
@@ -77,7 +6,21 @@ Free avg 20 mg
 
 
 
+والاهم
+###قاعدة البيانات في مرحلة التطوير، لذا يجب تطبيق كافة الإصلاحات والتعديلات مباشرة على الملفات المرجعية الأساسية لمخطط القاعدة داخل المجلد `supabase/schema/` من الجذور، ويمنع منعاً باتاً إنشاء أي ملفات هجرة (migrations) أو رقع (patches) أو حلول مؤقتة.
+##المتطلبات الأساسية المطلوبة:
+1. إصلاح الثغرات الأمنية من الجذور:
+2. توحيد وتأمين جميع جداول الميزات داخل المخطط الرئيسي:
+3. حظر ملفات SQL الخارجية وأرشفتها:
 
+* توحيد كافة ملفات SQL الفعالة حصرياً داخل `supabase/schema/`.
+* عدم حذف أي ملف SQL خارجي أو مسودة أو ملف ثانوي بل أرقامها ونقلها بالكامل إلى مجلد النسخ الاحتياطية `supabase/_archived_patches/`.
+
+4. لا اريد ملفات جديدة داخل `supabase/schema/`.
+
+```
+
+```
 
 
 

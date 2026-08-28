@@ -64,122 +64,42 @@ export async function GET(request: Request) {
     if (purgeErr) throw new Error(`process_cache_purges failed: ${purgeErr.message}`);
     results['jobs_processed'] = processedJobs;
 
-    // 5. Fan-out pending Notification jobs to user_notifications rows in TypeScript
+    // 5. Fan-out pending Notification jobs to user_notifications + push_deliveries rows.
+    //
+    // BUG-NOTIF-01: this used to be a hand-rolled TypeScript reimplementation of
+    // internal.process_notification_fanout_jobs() that (a) called the `dequeue_job`
+    // RPC with a parameter named `p_lock_duration_seconds`, while the actual SQL
+    // function parameter is `p_lock_ttl_seconds` — PostgREST cannot resolve a
+    // function overload for an unknown named parameter, so every single call
+    // failed, the error was swallowed into
+    // `results.notification_fanout_jobs_processed = 'Worker error'`, and the
+    // route still returned `success: true`, masking the failure; and (b) even if
+    // the dequeue had worked, it only ever inserted `user_notifications` rows and
+    // never created `push_deliveries` / `notification_push` job rows, so push
+    // notifications could never fire even for the notifications that did land in
+    // a student's in-app inbox.
+    //
+    // Net effect: any audience-targeted broadcast ('all'/'students'/'teachers'/
+    // 'admins') was queued in internal.job_queue by the `fanout_notification`
+    // trigger, but never dequeued — so it never reached a single student, in-app
+    // or via push. (Notifications sent to explicit target_user_ids were not
+    // affected: send_notification() inserts those directly into
+    // user_notifications.)
+    //
+    // Fix: delegate to the canonical SQL worker, which fans out user_notifications
+    // *and* push_deliveries/notification_push rows atomically per job, and is
+    // granted to service_role (see BUG-NOTIF-01 in 10_permissions.sql).
     const fanoutWorkerId = crypto.randomUUID();
-    let fanoutCount = 0;
+    const { data: fanoutProcessed, error: fanoutErr } = await supabaseAdmin.rpc(
+      'process_notification_fanout_jobs',
+      { p_limit: 500, p_worker_id: fanoutWorkerId },
+    );
 
-    const supabaseInternal = getSupabaseAdmin().schema('internal');
-
-    try {
-      const { data: jobs, error: dequeueErr } = await supabaseAdmin.rpc('dequeue_job', {
-        p_worker_id: fanoutWorkerId,
-        p_job_types: ['notification_fanout'],
-        p_lock_duration_seconds: 300,
-      });
-
-      if (dequeueErr) {
-        throw new Error(`dequeue_job for fanout failed: ${dequeueErr.message}`);
-      }
-
-      const activeJobs = (jobs || []) as any[];
-      const jobsToProcess = activeJobs.slice(0, 500);
-
-      for (const job of jobsToProcess) {
-        const notifId = job.payload?.notification_id;
-        const tenantId = job.payload?.tenant_id;
-        const audience = job.payload?.target_audience;
-
-        if (!notifId || !tenantId) {
-          await supabaseInternal
-            .from('job_queue')
-            .update({
-              status: 'failed',
-              error_message: 'Invalid payload: missing notification_id or tenant_id',
-              finished_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', job.id);
-          continue;
-        }
-
-        try {
-          let query = supabaseAdmin
-            .from('users')
-            .select('id, primary_role')
-            .eq('tenant_id', tenantId)
-            .is('deleted_at', null)
-            .eq('account_status', 'active');
-
-          if (audience === 'students') {
-            query = query.eq('primary_role', 'student');
-          } else if (audience === 'teachers') {
-            query = query.eq('primary_role', 'teacher');
-          } else if (audience === 'admins') {
-            query = query.in('primary_role', ['admin', 'super_admin']);
-          }
-
-          const { data: users, error: usersErr } = await query;
-          if (usersErr) throw usersErr;
-
-          if (users && users.length > 0) {
-            const { data: existingNotifs } = await supabaseAdmin
-              .from('user_notifications')
-              .select('user_id')
-              .eq('notification_id', notifId);
-
-            const existingUserIds = new Set((existingNotifs || []).map((un: any) => un.user_id));
-
-            const insertRows = users
-              .filter(u => !existingUserIds.has(u.id))
-              .map(u => ({
-                user_id: u.id,
-                notification_id: notifId,
-                tenant_id: tenantId,
-                is_read: false
-              }));
-
-            if (insertRows.length > 0) {
-              const { error: insertErr } = await supabaseAdmin
-                .from('user_notifications')
-                .insert(insertRows);
-
-              if (insertErr) throw insertErr;
-            }
-          }
-
-          await supabaseInternal
-            .from('job_queue')
-            .update({
-              status: 'done',
-              finished_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', job.id);
-
-          fanoutCount++;
-        } catch (jobErr: any) {
-          console.error(`[CRON_ROUTINE_FANOUT_JOB_ERROR] Job ID ${job.id} failed:`, jobErr);
-          const attempts = (job.attempts || 0) + 1;
-          const maxAttempts = job.max_attempts || 3;
-
-          await supabaseInternal
-            .from('job_queue')
-            .update({
-              status: attempts >= maxAttempts ? 'failed' : 'pending',
-              error_message: jobErr.message,
-              locked_by_worker_id: null,
-              locked_at: null,
-              lock_expires_at: null,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', job.id);
-        }
-      }
-
-      results['notification_fanout_jobs_processed'] = fanoutCount;
-    } catch (fanoutErr: any) {
+    if (fanoutErr) {
       console.error('[CRON_ROUTINE_FANOUT_ERROR]', fanoutErr);
-      results['notification_fanout_jobs_processed'] = 'Worker error';
+      results['notification_fanout_jobs_processed'] = `Worker error: ${fanoutErr.message}`;
+    } else {
+      results['notification_fanout_jobs_processed'] = fanoutProcessed ?? 0;
     }
 
     return NextResponse.json({

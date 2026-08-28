@@ -382,6 +382,20 @@ REVOKE ALL ON FUNCTION internal.invoke_notification_push_worker()
   FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION internal.invoke_notification_push_worker() TO service_role;
 
+-- BUG-NOTIF-01 FIX: public.process_notification_fanout_jobs() was defined
+-- (07_functions.sql) as the single source of truth for turning a queued
+-- 'notification_fanout' job into user_notifications + push_deliveries rows,
+-- and GET /api/cron/routine is documented to call it every tick -- but it was
+-- never granted to service_role, so even after the route is fixed to call it
+-- (instead of the removed hand-rolled TS reimplementation), the RPC would
+-- fail with PERMISSION_DENIED / "permission denied for function" and
+-- audience-targeted notifications ('all'/'students'/'teachers'/'admins')
+-- would silently never reach any student's inbox.
+REVOKE ALL ON FUNCTION public.process_notification_fanout_jobs(integer, text)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.process_notification_fanout_jobs(integer, text)
+  TO service_role;
+
 REVOKE ALL ON FUNCTION public.record_current_user_activity(boolean, text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.record_current_user_activity(boolean, text) TO authenticated, service_role;
 
