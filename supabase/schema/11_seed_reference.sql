@@ -272,7 +272,7 @@ INSERT INTO auth.users (
    '{"provider":"email","providers":["email"]}', '{}',
    false, '','','',''),
 
-  -- Test Tenant Admin Test1234! Admin@12345
+  -- Test tenant admin fixture (password is represented only by its hash)
   ('22222222-2222-2222-2222-222222222222',
    '00000000-0000-0000-0000-000000000000',
    'admin@test.eduzone.local',

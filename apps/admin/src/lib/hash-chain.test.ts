@@ -37,7 +37,7 @@ describe('verifyHashChain', () => {
       prev_hash: log1.entry_hash,
       entry_hash: ''
     };
-    log2.entry_hash = await sha256(`2log2SYSTEMSYSTEM_CRONnull${log1.entry_hash}`);
+    log2.entry_hash = await sha256(`2log2systemSYSTEM_CRONnull${log1.entry_hash}`);
 
     const logs = [log1, log2] as any;
     

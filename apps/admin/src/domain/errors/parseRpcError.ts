@@ -15,11 +15,7 @@ export function parseRpcError(raw: unknown): AppError {
     return new AppError(
       (raw.code as RpcErrorCode) || 'UNKNOWN',
       raw.message || 'An unexpected database error occurred',
-      JSON.stringify({ 
-        details: raw.details, 
-        hint: raw.hint, 
-        code: raw.code 
-      }),
+      raw.details || raw.hint,
     );
   }
 

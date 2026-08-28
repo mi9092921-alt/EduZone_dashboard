@@ -76,6 +76,7 @@ export async function verifyHashChain(
 
   let prevHash = genesisHash;
   let count = 0;
+  const verifiedIds = new Set<string>();
 
   // Walk the linked list by following prev_hash → entry_hash links
   while (byPrevHash.has(prevHash)) {
@@ -105,10 +106,6 @@ export async function verifyHashChain(
     // pointer is consistent (i.e. prev_hash === prevHash, which is guaranteed
     // by the map key).  This still detects real tampering: a broken prev_hash
     // would mean no candidate appears in byPrevHash.get(prevHash) at all.
-    if (!matched && candidates.length > 0) {
-      matched = candidates[0]!;
-    }
-
     if (!matched) {
       return {
         valid: false,
@@ -118,6 +115,7 @@ export async function verifyHashChain(
     }
 
     prevHash = matched.entry_hash;
+    verifiedIds.add(matched.id);
     count++;
 
     if (onProgress && count % 50 === 0) {
@@ -126,6 +124,18 @@ export async function verifyHashChain(
   }
 
   onProgress?.(100);
+
+  // Every supplied entry must belong to the verified chain. An orphaned row
+  // (including a row whose prev_hash points to another genesis) must not make
+  // the result appear valid merely because the reachable prefix was intact.
+  if (count !== logs.length) {
+    const failed = logs.find((log) => !verifiedIds.has(log.id));
+    return {
+      valid: false,
+      entriesVerified: count,
+      ...(failed ? { failedAtSeq: failed.seq } : {}),
+    };
+  }
 
   return {
     valid: true,
