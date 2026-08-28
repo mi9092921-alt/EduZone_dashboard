@@ -87,6 +87,34 @@ BEGIN
   );
 END $$;
 
+-- Check 4b: Admin dashboard access gate allows staff roles
+DO $$
+DECLARE
+  v_definition text;
+  v_staff_gate boolean;
+BEGIN
+  SELECT pg_get_functiondef(p.oid)
+    INTO v_definition
+  FROM pg_proc p
+  JOIN pg_namespace n ON n.oid = p.pronamespace
+  WHERE n.nspname = 'public'
+    AND p.proname = 'check_user_access'
+    AND p.pronargs = 0;
+
+  v_staff_gate := v_definition IS NOT NULL
+    AND position('v_user.primary_role = ''student''' IN lower(v_definition)) > 0
+    AND position('v_user.primary_role <> ''student''' IN lower(v_definition)) = 0;
+
+  INSERT INTO validation_results VALUES (
+    'Admin Access Gate Allows Staff Roles',
+    CASE WHEN v_staff_gate THEN 'PASS' ELSE 'FAIL' END,
+    CASE WHEN v_staff_gate
+      THEN 'check_user_access rejects students without rejecting staff roles'
+      ELSE 'CRITICAL: deployed function still contains the student-only access gate'
+    END
+  );
+END $$;
+
 -- Check 5: check_user_access Grants
 DO $$
 DECLARE
