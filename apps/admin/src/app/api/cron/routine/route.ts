@@ -1,23 +1,37 @@
 import { NextResponse } from 'next/server';
+import { timingSafeEqual } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 
-// Initialize Supabase Admin client to bypass RLS securely inside the worker
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+function hasValidCronSecret(request: Request): boolean {
+  const configuredSecret = process.env.CRON_SECRET;
+  const authorization = request.headers.get('authorization');
+  const presentedSecret = authorization?.startsWith('Bearer ')
+    ? authorization.slice('Bearer '.length)
+    : '';
+
+  if (!configuredSecret || !presentedSecret) return false;
+
+  const expected = Buffer.from(configuredSecret);
+  const actual = Buffer.from(presentedSecret);
+  return expected.length === actual.length && timingSafeEqual(expected, actual);
+}
+
+function getSupabaseAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceRoleKey) {
+    throw new Error('Cron worker is not configured');
+  }
+  return createClient(url, serviceRoleKey);
+}
 
 export async function GET(request: Request) {
-  // Security Verification: Ensure the request comes from Vercel Cron or holds a valid secret key
-  const authHeader = request.headers.get('authorization');
-  if (
-    authHeader !== `Bearer ${process.env.CRON_SECRET}` && 
-    process.env.NODE_ENV === 'production'
-  ) {
+  if (!hasValidCronSecret(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const results: Record<string, any> = {};
+  const supabaseAdmin = getSupabaseAdmin();
+  const results: Record<string, unknown> = {};
 
   try {
     // 1. Manage Partitions
@@ -54,11 +68,7 @@ export async function GET(request: Request) {
     const fanoutWorkerId = crypto.randomUUID();
     let fanoutCount = 0;
 
-    const supabaseInternal = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { db: { schema: 'internal' } }
-    );
+    const supabaseInternal = getSupabaseAdmin().schema('internal');
 
     try {
       const { data: jobs, error: dequeueErr } = await supabaseAdmin.rpc('dequeue_job', {
@@ -168,7 +178,8 @@ export async function GET(request: Request) {
 
       results['notification_fanout_jobs_processed'] = fanoutCount;
     } catch (fanoutErr: any) {
-      results['notification_fanout_jobs_processed'] = `Error: ${fanoutErr.message}`;
+      console.error('[CRON_ROUTINE_FANOUT_ERROR]', fanoutErr);
+      results['notification_fanout_jobs_processed'] = 'Worker error';
     }
 
     return NextResponse.json({
@@ -181,7 +192,7 @@ export async function GET(request: Request) {
     // Return 500 to signal a cron failure out to Next.js Error Monitoring (e.g. Sentry)
     return NextResponse.json({
       success: false,
-      error: err.message,
+      error: 'Cron worker failed',
       timestamp: new Date().toISOString()
     }, { status: 500 });
   }
