@@ -28,7 +28,7 @@ export function useSessionCheck() {
 
     const checkSession = async () => {
       try {
-        const { data: accessResult, error } = await supabase.rpc('check_user_access');
+        const { data: accessResult, error } = await supabase.rpc('check_dashboard_access');
         const browserSessionId = getBrowserSessionId();
         const sessionResult = browserSessionId
           ? await recordCurrentSessionAction(browserSessionId)

@@ -66,88 +66,139 @@ BEGIN
   );
 END $$;
 
--- Check 4: check_user_access RPC Exists
+-- Check 4: check_student_app_access / check_dashboard_access RPCs Exist
+-- (replaces the old single check_user_access RPC)
 DO $$
 DECLARE
+  v_fn text;
   v_exists boolean;
 BEGIN
-  SELECT EXISTS(
-    SELECT 1 FROM information_schema.routines 
-    WHERE routine_name = 'check_user_access' 
-      AND routine_schema = 'public'
-  ) INTO v_exists;
-  
-  INSERT INTO validation_results VALUES (
-    'check_user_access RPC Exists',
-    CASE WHEN v_exists THEN 'PASS' ELSE 'FAIL' END,
-    CASE WHEN v_exists 
-      THEN 'RPC is available'
-      ELSE 'CRITICAL: RPC missing - auth hydration will fail'
-    END
-  );
+  FOREACH v_fn IN ARRAY ARRAY['check_student_app_access', 'check_dashboard_access']
+  LOOP
+    SELECT EXISTS(
+      SELECT 1 FROM information_schema.routines
+      WHERE routine_name = v_fn
+        AND routine_schema = 'public'
+    ) INTO v_exists;
+
+    INSERT INTO validation_results VALUES (
+      v_fn || ' RPC Exists',
+      CASE WHEN v_exists THEN 'PASS' ELSE 'FAIL' END,
+      CASE WHEN v_exists
+        THEN 'RPC is available'
+        ELSE 'CRITICAL: RPC missing - auth hydration will fail'
+      END
+    );
+  END LOOP;
 END $$;
 
--- Check 4b: Admin dashboard access gate allows staff roles
+-- Check 4b: Dashboard access gate allows staff roles
+-- (replaces the previous check, which inspected check_user_access's
+-- definition text for a hard-coded student-only clause; that function no
+-- longer exists. Staff access now goes through the dedicated
+-- check_dashboard_access() gate, and student-only access is enforced
+-- separately by check_student_app_access(), so the two can no longer
+-- collide.)
 DO $$
 DECLARE
-  v_definition text;
-  v_staff_gate boolean;
+  v_dashboard_def text;
+  v_student_def text;
+  v_dashboard_allows_staff boolean;
+  v_student_is_student_only boolean;
 BEGIN
   SELECT pg_get_functiondef(p.oid)
-    INTO v_definition
+    INTO v_dashboard_def
   FROM pg_proc p
   JOIN pg_namespace n ON n.oid = p.pronamespace
   WHERE n.nspname = 'public'
-    AND p.proname = 'check_user_access'
+    AND p.proname = 'check_dashboard_access'
     AND p.pronargs = 0;
 
-  v_staff_gate := v_definition IS NOT NULL
-    AND position('v_user.primary_role = ''student''' IN lower(v_definition)) > 0
-    AND position('v_user.primary_role <> ''student''' IN lower(v_definition)) = 0;
+  SELECT pg_get_functiondef(p.oid)
+    INTO v_student_def
+  FROM pg_proc p
+  JOIN pg_namespace n ON n.oid = p.pronamespace
+  WHERE n.nspname = 'public'
+    AND p.proname = 'check_student_app_access'
+    AND p.pronargs = 0;
+
+  v_dashboard_allows_staff := v_dashboard_def IS NOT NULL
+    AND position('admin' IN lower(v_dashboard_def)) > 0
+    AND position('teacher' IN lower(v_dashboard_def)) > 0
+    AND position('super_admin' IN lower(v_dashboard_def)) > 0;
+
+  v_student_is_student_only := v_student_def IS NOT NULL
+    AND position('v_role <> ''student''' IN lower(v_student_def)) > 0;
 
   INSERT INTO validation_results VALUES (
-    'Admin Access Gate Allows Staff Roles',
-    CASE WHEN v_staff_gate THEN 'PASS' ELSE 'FAIL' END,
-    CASE WHEN v_staff_gate
-      THEN 'check_user_access rejects students without rejecting staff roles'
-      ELSE 'CRITICAL: deployed function still contains the student-only access gate'
+    'Dashboard Access Gate Allows Staff Roles',
+    CASE WHEN v_dashboard_allows_staff AND v_student_is_student_only
+      THEN 'PASS' ELSE 'FAIL' END,
+    CASE WHEN v_dashboard_allows_staff AND v_student_is_student_only
+      THEN 'check_dashboard_access allows admin/teacher/super_admin while check_student_app_access stays student-only'
+      ELSE 'CRITICAL: dashboard/student access gates are missing or no longer role-scoped as expected'
     END
   );
 END $$;
 
--- Check 5: check_user_access Grants
+-- Check 5: check_student_app_access / check_dashboard_access Grants
 DO $$
 DECLARE
+  v_fn text;
   v_authenticated_grant boolean;
   v_anon_grant boolean;
 BEGIN
+  FOREACH v_fn IN ARRAY ARRAY['check_student_app_access', 'check_dashboard_access']
+  LOOP
+    SELECT EXISTS(
+      SELECT 1 FROM information_schema.role_routine_grants
+      WHERE routine_name = v_fn
+        AND grantee = 'authenticated'
+    ) INTO v_authenticated_grant;
+
+    SELECT EXISTS(
+      SELECT 1 FROM information_schema.role_routine_grants
+      WHERE routine_name = v_fn
+        AND grantee = 'anon'
+    ) INTO v_anon_grant;
+
+    INSERT INTO validation_results VALUES (
+      v_fn || ' Permissions',
+      CASE
+        WHEN v_authenticated_grant AND NOT v_anon_grant THEN 'PASS'
+        WHEN NOT v_anon_grant THEN 'WARN'
+        ELSE 'FAIL'
+      END,
+      CASE
+        WHEN v_authenticated_grant AND NOT v_anon_grant
+          THEN 'authenticated: GRANT, anon: REVOKE (correct)'
+        WHEN v_authenticated_grant AND v_anon_grant
+          THEN 'WARNING: anon has access to ' || v_fn || ' (should be revoked)'
+        WHEN NOT v_authenticated_grant
+          THEN 'CRITICAL: authenticated cannot execute ' || v_fn
+        ELSE 'anon only has access (incorrect)'
+      END
+    );
+  END LOOP;
+END $$;
+
+-- Check 6: check_user_access has been fully removed (no dangling gate)
+DO $$
+DECLARE
+  v_still_exists boolean;
+BEGIN
   SELECT EXISTS(
-    SELECT 1 FROM information_schema.role_routine_grants
+    SELECT 1 FROM information_schema.routines
     WHERE routine_name = 'check_user_access'
-      AND grantee = 'authenticated'
-  ) INTO v_authenticated_grant;
-  
-  SELECT EXISTS(
-    SELECT 1 FROM information_schema.role_routine_grants
-    WHERE routine_name = 'check_user_access'
-      AND grantee = 'anon'
-  ) INTO v_anon_grant;
-  
+      AND routine_schema = 'public'
+  ) INTO v_still_exists;
+
   INSERT INTO validation_results VALUES (
-    'check_user_access Permissions',
-    CASE 
-      WHEN v_authenticated_grant AND NOT v_anon_grant THEN 'PASS'
-      WHEN NOT v_anon_grant THEN 'WARN'
-      ELSE 'FAIL'
-    END,
-    CASE 
-      WHEN v_authenticated_grant AND NOT v_anon_grant 
-        THEN 'authenticated: GRANT, anon: REVOKE (correct)'
-      WHEN v_authenticated_grant AND v_anon_grant
-        THEN 'WARNING: anon has access to check_user_access (should be revoked)'
-      WHEN NOT v_authenticated_grant
-        THEN 'CRITICAL: authenticated cannot execute check_user_access'
-      ELSE 'anon only has access (incorrect)'
+    'check_user_access Removed',
+    CASE WHEN v_still_exists THEN 'FAIL' ELSE 'PASS' END,
+    CASE WHEN v_still_exists
+      THEN 'CRITICAL: legacy check_user_access() still deployed alongside the new gates'
+      ELSE 'Legacy gate fully removed'
     END
   );
 END $$;

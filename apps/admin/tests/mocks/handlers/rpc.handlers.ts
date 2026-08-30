@@ -9,8 +9,8 @@ export const SUPABASE_URL   = 'http://127.0.0.1:54321'; // local dev fallback
 // ── RPC handlers ─────────────────────────────────────────────────
 export const rpcHandlers = [
 
-  // ── check_user_access — happy path ──────────────────────────────
-  http.post('*/rest/v1/rpc/check_user_access', () =>
+  // ── check_dashboard_access — happy path ──────────────────────────
+  http.post('*/rest/v1/rpc/check_dashboard_access', () =>
     HttpResponse.json({ allowed: true, role: 'admin', tenant_id: MOCK_TENANT_ID }),
   ),
 

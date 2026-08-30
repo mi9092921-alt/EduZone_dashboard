@@ -47,7 +47,7 @@ describe('Authentication Flow (Staging)', () => {
     cy.url().should('include', '/login');
   });
 
-  it('Shows Session Invalidated warning banner if redirected via check_user_access', () => {
+  it('Shows Session Invalidated warning banner if redirected via check_dashboard_access', () => {
     cy.visit('/login?reason=session_invalidated');
     // Verify an alert box or toast appears specifying the session was invalidated
     cy.contains(/Session Invalidated|Logged out automatically/i, { timeout: 5000 }).should('be.visible');

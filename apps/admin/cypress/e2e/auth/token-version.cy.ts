@@ -8,13 +8,13 @@ describe('Token Version Validation Flow (Staging)', () => {
     cy.logout();
   });
 
-  it('Forces standard logout when token_version mismatch is detected in check_user_access', () => {
+  it('Forces standard logout when token_version mismatch is detected in check_dashboard_access', () => {
     // Visit a protected page
     cy.visit('/users');
     cy.get('[data-cy="page-header"]').should('contain.text', 'Users');
 
     // Setup an intercept to mock a token_version mismatch error from the database check
-    cy.intercept('POST', '**/rest/v1/rpc/check_user_access', {
+    cy.intercept('POST', '**/rest/v1/rpc/check_dashboard_access', {
       statusCode: 200,
       body: { 
         status: 'version_mismatch',
@@ -22,7 +22,7 @@ describe('Token Version Validation Flow (Staging)', () => {
       }
     }).as('checkAccessMismatch');
 
-    // Trigger a refresh or navigation that calls check_user_access
+    // Trigger a refresh or navigation that calls check_dashboard_access
     // Usually navigating or polling triggers it
     cy.visit('/users/admins');
 

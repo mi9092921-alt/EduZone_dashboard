@@ -52,7 +52,7 @@ export function LoginPage() {
         return;
       }
 
-      const { data: accessResult, error: accessError } = await supabase.rpc('check_user_access');
+      const { data: accessResult, error: accessError } = await supabase.rpc('check_dashboard_access');
       if (accessError) {
         setError('Failed to verify account access. Please try again.');
         return;

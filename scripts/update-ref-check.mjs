@@ -16,7 +16,7 @@ const frontendFunctions = [
     'admin_get_job_counts',
     'admin_retry_job',
     'log_activity_async',
-    'check_user_access',
+    'check_dashboard_access',
     'get_users_paginated'
 ];
 

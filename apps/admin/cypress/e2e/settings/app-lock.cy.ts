@@ -26,8 +26,8 @@ describe('Global App Lock Flow (Cloud Safe)', () => {
     cy.contains(/App locked successfully/i, { timeout: 5000 }).should('be.visible');
   });
 
-  it('Displays Global Lock Screen if check_user_access returns app_locked', () => {
-    cy.intercept('POST', '**/rest/v1/rpc/check_user_access', {
+  it('Displays Global Lock Screen if check_dashboard_access returns app_locked', () => {
+    cy.intercept('POST', '**/rest/v1/rpc/check_dashboard_access', {
       statusCode: 200,
       body: { status: 'app_locked', error: 'Cypress Lockdown active' }
     }).as('checkAccessLocked');

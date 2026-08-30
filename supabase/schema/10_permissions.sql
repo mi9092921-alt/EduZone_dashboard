@@ -288,8 +288,14 @@ GRANT EXECUTE ON FUNCTION public.immutable_tsvector(text) TO authenticated, anon
 -- Note: For functions with parameters, use full signature or rely on default privileges
 -- Most functions with complex signatures are already blocked by ALTER DEFAULT PRIVILEGES above
 
-REVOKE EXECUTE ON FUNCTION public.check_user_access() FROM anon;
-GRANT EXECUTE ON FUNCTION public.check_user_access() TO authenticated, service_role;
+-- check_user_access() was split into two role-scoped gates (see
+-- 07_functions.sql): check_student_app_access() for the student app and
+-- check_dashboard_access() for the admin/teacher/super_admin dashboard.
+REVOKE EXECUTE ON FUNCTION public.check_student_app_access() FROM anon;
+GRANT EXECUTE ON FUNCTION public.check_student_app_access() TO authenticated, service_role;
+
+REVOKE EXECUTE ON FUNCTION public.check_dashboard_access() FROM anon;
+GRANT EXECUTE ON FUNCTION public.check_dashboard_access() TO authenticated, service_role;
 
 REVOKE EXECUTE ON FUNCTION public.assert_tenant() FROM anon;
 GRANT EXECUTE ON FUNCTION public.assert_tenant() TO authenticated, service_role;

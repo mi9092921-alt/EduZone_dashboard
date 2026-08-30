@@ -50,10 +50,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // v13: Use the SECURITY DEFINER RPC to bypass RLS token_version validation.
         // Direct SELECT on users fails if JWT lacks token_version/tenant_id custom claims.
         const { data: accessResult, error: accessError } = await supabase
-          .rpc('check_user_access');
+          .rpc('check_dashboard_access');
 
         if (accessError) {
-          console.error('[AuthProvider] check_user_access RPC failed:', {
+          console.error('[AuthProvider] check_dashboard_access RPC failed:', {
             message: accessError.message,
             code: accessError.code,
             details: accessError.details,

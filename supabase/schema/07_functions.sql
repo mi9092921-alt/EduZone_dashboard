@@ -6219,7 +6219,17 @@ END;
 $$;
 
 -- AUTHZ-STUDENT-01: student-only application access is decided server-side.
-CREATE OR REPLACE FUNCTION public.check_user_access()
+-- ============================================================================
+-- Session Gate — internal session-health primitive (NOT directly callable)
+-- ============================================================================
+-- Generic session-health checks only: uid present, account not deleted,
+-- account_status = active, token_version valid. Returns the caller's
+-- primary_role but makes NO authorization decision — role-specific app
+-- gates (check_student_app_access / check_dashboard_access below) build
+-- their allow/deny decision on top of this. Never grant EXECUTE on this
+-- to any client-facing role; it exists purely so the two gates below can
+-- share one implementation of "is this a healthy session".
+CREATE OR REPLACE FUNCTION public._session_status()
 RETURNS jsonb
 LANGUAGE plpgsql
 STABLE
@@ -6228,8 +6238,6 @@ AS $$
 DECLARE
   v_uid uuid := auth.uid();
   v_user public.users%ROWTYPE;
-  v_maintenance_excluded_roles text[] := ARRAY[]::text[];
-  v_maintenance_excluded_users uuid[] := ARRAY[]::uuid[];
 BEGIN
   IF v_uid IS NULL THEN
     RETURN jsonb_build_object('allowed', false, 'reason', 'unauthenticated');
@@ -6270,12 +6278,47 @@ BEGIN
     );
   END IF;
 
-  IF v_user.primary_role <> 'student' THEN
+  RETURN jsonb_build_object(
+    'allowed', true,
+    'tenant_id', v_user.tenant_id,
+    'role', v_user.primary_role,
+    'token_version', v_user.token_version
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public._session_status() FROM PUBLIC, authenticated, anon;
+
+-- ============================================================================
+-- Student App Gate — replaces the old public.check_user_access()
+-- ============================================================================
+-- Wraps _session_status() and additionally requires primary_role = 'student'.
+-- This is the RPC the student app (EduZone_App) must call instead of the
+-- removed check_user_access().
+CREATE OR REPLACE FUNCTION public.check_student_app_access()
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_session jsonb := public._session_status();
+  v_role text := v_session ->> 'role';
+  v_tenant_id text := v_session ->> 'tenant_id';
+  v_token_version text := v_session ->> 'token_version';
+  v_maintenance_excluded_roles text[] := ARRAY[]::text[];
+  v_maintenance_excluded_users uuid[] := ARRAY[]::uuid[];
+BEGIN
+  IF NOT coalesce((v_session ->> 'allowed')::boolean, false) THEN
+    RETURN v_session;
+  END IF;
+
+  IF v_role <> 'student' THEN
     RETURN jsonb_build_object(
       'allowed', false,
       'reason', 'unauthenticated',
-      'role', v_user.primary_role,
-      'token_version', v_user.token_version
+      'role', v_role,
+      'token_version', v_token_version
     );
   END IF;
 
@@ -6301,15 +6344,15 @@ BEGIN
       ) AS value;
 
     IF NOT (
-      v_user.primary_role = ANY(v_maintenance_excluded_roles)
-      OR v_user.id = ANY(v_maintenance_excluded_users)
+      v_role = ANY(v_maintenance_excluded_roles)
+      OR auth.uid() = ANY(v_maintenance_excluded_users)
     ) THEN
       RETURN jsonb_build_object(
         'allowed', false,
         'reason', 'maintenance_mode',
         'message', public.get_setting('maintenance_message') #>> '{}',
         'ends_at', public.get_setting('maintenance_ends_at') #>> '{}',
-        'token_version', v_user.token_version
+        'token_version', v_token_version
       );
     END IF;
   END IF;
@@ -6319,18 +6362,116 @@ BEGIN
       'allowed', false,
       'reason', 'app_locked',
       'message', public.get_setting('app_lock_message') #>> '{}',
-      'token_version', v_user.token_version
+      'token_version', v_token_version
     );
   END IF;
 
   RETURN jsonb_build_object(
     'allowed', true,
-    'tenant_id', v_user.tenant_id,
-    'role', v_user.primary_role,
-    'token_version', v_user.token_version
+    'tenant_id', v_tenant_id,
+    'role', v_role,
+    'token_version', v_token_version
   );
 END;
 $$;
+
+REVOKE EXECUTE ON FUNCTION public.check_student_app_access() FROM anon;
+GRANT EXECUTE ON FUNCTION public.check_student_app_access() TO authenticated;
+
+-- ============================================================================
+-- Dashboard Gate — replaces the old public.check_user_access()
+-- ============================================================================
+-- Wraps _session_status() and additionally requires primary_role to be one
+-- of admin/teacher/super_admin. This is the RPC the dashboard
+-- (EduZone_dashboard) must call instead of the removed check_user_access().
+CREATE OR REPLACE FUNCTION public.check_dashboard_access()
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_session jsonb := public._session_status();
+  v_role text := v_session ->> 'role';
+  v_tenant_id text := v_session ->> 'tenant_id';
+  v_token_version text := v_session ->> 'token_version';
+  v_maintenance_excluded_roles text[] := ARRAY[]::text[];
+  v_maintenance_excluded_users uuid[] := ARRAY[]::uuid[];
+BEGIN
+  IF NOT coalesce((v_session ->> 'allowed')::boolean, false) THEN
+    RETURN v_session;
+  END IF;
+
+  IF v_role IS NULL OR NOT (v_role = ANY (ARRAY['admin', 'teacher', 'super_admin'])) THEN
+    RETURN jsonb_build_object(
+      'allowed', false,
+      'reason', 'unauthenticated',
+      'role', v_role,
+      'token_version', v_token_version
+    );
+  END IF;
+
+  IF coalesce((public.get_setting('maintenance_mode') #>> '{}')::boolean, false) THEN
+    SELECT coalesce(array_agg(value), ARRAY[]::text[])
+      INTO v_maintenance_excluded_roles
+      FROM jsonb_array_elements_text(
+        CASE
+          WHEN jsonb_typeof(public.get_setting('maintenance_excluded_roles')) = 'array'
+          THEN public.get_setting('maintenance_excluded_roles')
+          ELSE '[]'::jsonb
+        END
+      ) AS value;
+
+    SELECT coalesce(array_agg(value::uuid), ARRAY[]::uuid[])
+      INTO v_maintenance_excluded_users
+      FROM jsonb_array_elements_text(
+        CASE
+          WHEN jsonb_typeof(public.get_setting('maintenance_excluded_users')) = 'array'
+          THEN public.get_setting('maintenance_excluded_users')
+          ELSE '[]'::jsonb
+        END
+      ) AS value;
+
+    IF NOT (
+      v_role = ANY(v_maintenance_excluded_roles)
+      OR auth.uid() = ANY(v_maintenance_excluded_users)
+    ) THEN
+      RETURN jsonb_build_object(
+        'allowed', false,
+        'reason', 'maintenance_mode',
+        'message', public.get_setting('maintenance_message') #>> '{}',
+        'ends_at', public.get_setting('maintenance_ends_at') #>> '{}',
+        'token_version', v_token_version
+      );
+    END IF;
+  END IF;
+
+  IF coalesce((public.get_setting('app_locked') #>> '{}')::boolean, false) THEN
+    RETURN jsonb_build_object(
+      'allowed', false,
+      'reason', 'app_locked',
+      'message', public.get_setting('app_lock_message') #>> '{}',
+      'token_version', v_token_version
+    );
+  END IF;
+
+  RETURN jsonb_build_object(
+    'allowed', true,
+    'tenant_id', v_tenant_id,
+    'role', v_role,
+    'token_version', v_token_version
+  );
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.check_dashboard_access() FROM anon;
+GRANT EXECUTE ON FUNCTION public.check_dashboard_access() TO authenticated;
+
+-- public.check_user_access() has been fully replaced by the two gates above
+-- (check_student_app_access / check_dashboard_access) and every known
+-- call site in both EduZone_App and EduZone_dashboard has been migrated
+-- to call the correct one directly.
+DROP FUNCTION IF EXISTS public.check_user_access();
 
 -- ============================================================================
 -- Feature Flags — canonical deterministic evaluation engine
