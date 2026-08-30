@@ -6218,9 +6218,7 @@ BEGIN
 END;
 $$;
 
--- AUTHZ-ADMIN-01: the admin dashboard admits active staff accounts only.
--- Students must not be able to use the admin dashboard, while teachers,
--- admins, and super-admins have role-specific access enforced by RLS/policy.
+-- AUTHZ-STUDENT-01: student-only application access is decided server-side.
 CREATE OR REPLACE FUNCTION public.check_user_access()
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -6272,10 +6270,10 @@ BEGIN
     );
   END IF;
 
-  IF v_user.primary_role = 'student' THEN
+  IF v_user.primary_role <> 'student' THEN
     RETURN jsonb_build_object(
       'allowed', false,
-      'reason', 'unauthorized',
+      'reason', 'unauthenticated',
       'role', v_user.primary_role,
       'token_version', v_user.token_version
     );
