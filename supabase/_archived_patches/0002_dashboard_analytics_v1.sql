@@ -1,3 +1,21 @@
+-- ============================================================================
+-- ARCHIVED: 2026-08-30T23:10:44Z
+-- Original path: apps/admin/src/adapters/db/dashboard_analytics.sql
+-- Reason: stray SQL living outside supabase/schema/ (app-source tree),
+--   never referenced by any application code (verified via repo-wide grep),
+--   and fully superseded by the canonical schema:
+--     * private.mv_user_stats        -> supabase/schema/06_views.sql
+--     * private.mv_course_stats      -> supabase/schema/06_views.sql (evolved further: mv_course_stats_tenant, public.vw_course_stats)
+--     * private.mv_daily_activity    -> renamed/evolved to private.mv_daily_activity_30d in supabase/schema/06_views.sql
+--     * get_dashboard_stats(uuid)    -> supabase/schema/07_functions.sql
+--                                       (canonical version adds an explicit is_admin_with_session_validation() permission
+--                                        check, a private.dashboard_stats_cache read path, and a narrower
+--                                        SET search_path = public, pg_temp; this file's version has no permission
+--                                        check and a broader search_path of public, private)
+-- Action: archived verbatim per instruction (no deletion of external SQL).
+-- Do not apply this file. It is not part of the deployment chain.
+-- ============================================================================
+
 -- ══════════════════════════════════════════════════════
 -- EduZone Admin Dashboard — Analytics & Stats v1.0
 -- Materialized Views + Highly Optimized RPCs

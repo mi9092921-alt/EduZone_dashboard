@@ -1,4 +1,22 @@
 -- ============================================================================
+-- ARCHIVED: 2026-08-30T23:10:44Z
+-- Original path: apps/admin/src/infrastructure/patches/v13_security_patch.sql
+-- Reason: stray SQL living outside supabase/schema/ (app-source tree),
+--   never referenced by any application code (verified via repo-wide grep),
+--   and fully superseded by the canonical schema:
+--     * access_rules_admin        -> supabase/schema/09_rls.sql (hardened: tenant-scoped, no cross-tenant super-admin bypass)
+--     * user_access_rules_admin   -> supabase/schema/09_rls.sql (hardened)
+--     * courses_select            -> superseded by courses_select_merged / courses_select_policy in 09_rls.sql
+--                                    (this file's version, if reapplied, would OR-widen authenticated access and
+--                                     reintroduce the cross-tenant leak documented at 09_rls.sql courses_select_policy)
+--     * users_select              -> superseded by users_select_merged in 09_rls.sql
+--     * audit_access_rule_change  -> supabase/schema/07_functions.sql + trigger tr_audit_access_rules in 08_triggers.sql
+--     * user_access_cache.computed_at column -> already present in supabase/schema/03_tables.sql
+-- Action: archived verbatim per instruction (no deletion of external SQL).
+-- Do not apply this file. It is not part of the deployment chain.
+-- ============================================================================
+
+-- ============================================================================
 -- EduZone v13 Security Hardening Patch
 -- Resolves RLS blockers for Super Admins on access gating tables.
 -- ============================================================================
