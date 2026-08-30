@@ -91,8 +91,8 @@ export async function verifyHashChain(
   // Build prev_hash → candidates[] map.
   // Multiple logs can share the same prev_hash when duplicate flush runs
   // restarted from the same genesis.  We resolve the correct next link by
-  // computing the hash and comparing to entry_hash, then fall back to
-  // linkage-only if serialisation differs.
+  // computing the hash and comparing to entry_hash (see the sole tamper
+  // check below — there is no linkage-only fallback).
   const byPrevHash = new Map<string, ActivityLog[]>();
   for (const log of logs) {
     const key = log.prev_hash ?? '';
@@ -106,6 +106,19 @@ export async function verifyHashChain(
 
   let prevHash = genesisHash;
   let count = 0;
+  const verifiedIds = new Set<string>();
+
+  if (!byPrevHash.has(genesisHash)) {
+    // No fetched log's prev_hash links back to the claimed genesis at all —
+    // the chain's starting point itself is broken/tampered. Previously this
+    // fell through to the loop-not-entered case below, which incorrectly
+    // reported `{ valid: true, entriesVerified: 0 }`.
+    return {
+      valid: false,
+      entriesVerified: 0,
+      failedAtSeq: Math.min(...logs.map((log) => log.seq)),
+    };
+  }
 
   // Walk the linked list by following prev_hash → entry_hash links
   while (byPrevHash.has(prevHash)) {
@@ -134,16 +147,6 @@ export async function verifyHashChain(
         matched = log;
         break;
       }
-    }
-
-    // ── Fallback: chain-linkage check ────────────────────────────────────
-    // If no candidate passed hash re-computation (possible due to jsonb::text
-    // serialisation differences), accept the first candidate whose prev_hash
-    // pointer is consistent (i.e. prev_hash === prevHash, which is guaranteed
-    // by the map key).  This still detects real tampering: a broken prev_hash
-    // would mean no candidate appears in byPrevHash.get(prevHash) at all.
-    if (!matched && candidates.length > 0) {
-      matched = candidates[0]!;
     }
 
     if (!matched) {

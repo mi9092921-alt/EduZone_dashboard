@@ -108,7 +108,18 @@ export async function GET(request: Request) {
         throw new Error(`dequeue_job for fanout failed: ${dequeueErr.message}`);
       }
 
-      const activeJobs = (jobs || []) as any[];
+      interface FanoutJob {
+        id: string;
+        attempts: number | null;
+        max_attempts: number | null;
+        payload: {
+          notification_id?: string;
+          tenant_id?: string;
+          target_audience?: 'all' | 'students' | 'teachers' | 'admins';
+        } | null;
+      }
+
+      const activeJobs = (jobs || []) as FanoutJob[];
       const jobsToProcess = activeJobs.slice(0, 500);
 
       for (const job of jobsToProcess) {
@@ -154,7 +165,7 @@ export async function GET(request: Request) {
               .select('user_id')
               .eq('notification_id', notifId);
 
-            const existingUserIds = new Set((existingNotifs || []).map((un: any) => un.user_id));
+            const existingUserIds = new Set((existingNotifs || []).map((un: { user_id: string }) => un.user_id));
 
             const insertRows = users
               .filter(u => !existingUserIds.has(u.id))
@@ -184,7 +195,7 @@ export async function GET(request: Request) {
             .eq('id', job.id);
 
           fanoutCount++;
-        } catch (jobErr: any) {
+        } catch (jobErr: unknown) {
           console.error(`[CRON_ROUTINE_FANOUT_JOB_ERROR] Job ID ${job.id} failed:`, jobErr);
           const attempts = (job.attempts || 0) + 1;
           const maxAttempts = job.max_attempts || 3;
@@ -193,7 +204,7 @@ export async function GET(request: Request) {
             .from('job_queue')
             .update({
               status: attempts >= maxAttempts ? 'failed' : 'pending',
-              error_message: jobErr.message,
+              error_message: getErrorMessage(jobErr),
               locked_by_worker_id: null,
               locked_at: null,
               lock_expires_at: null,
@@ -204,11 +215,9 @@ export async function GET(request: Request) {
       }
 
       results['notification_fanout_jobs_processed'] = fanoutCount;
-    } catch (fanoutErr: any) {
+    } catch (fanoutErr: unknown) {
       console.error('[CRON_ROUTINE_FANOUT_ERROR]', fanoutErr);
-      results['notification_fanout_jobs_processed'] = `Worker error: ${fanoutErr.message}`;
-    } else {
-      results['notification_fanout_jobs_processed'] = fanoutProcessed ?? 0;
+      results['notification_fanout_jobs_processed'] = `Worker error: ${getErrorMessage(fanoutErr)}`;
     }
 
     return NextResponse.json({
