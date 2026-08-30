@@ -1,7 +1,8 @@
 'use client';
 
-import React from 'react';
 import { Snackbar, Alert, Box } from '@mui/material';
+import React from 'react';
+
 import { useToastStore } from '@/adapters/stores/toast.store';
 
 /**

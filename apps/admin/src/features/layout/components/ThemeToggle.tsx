@@ -1,9 +1,10 @@
 'use client';
 
-import { useTheme } from 'next-themes';
-import { Button } from '@/components/ui/Button';
 import { LightMode, DarkMode } from '@mui/icons-material';
+import { useTheme } from 'next-themes';
 import { useEffect, useState } from 'react';
+
+import { Button } from '@/components/ui/Button';
 
 export function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme();

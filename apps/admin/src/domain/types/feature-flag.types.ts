@@ -5,9 +5,8 @@
 
 import type { FeatureFlag as BaseFeatureFlag } from '@eduzone/types';
 
-export interface FeatureFlag extends BaseFeatureFlag {
-  // Sync with v13
-}
+// Sync with v13
+export type FeatureFlag = BaseFeatureFlag;
 
 export interface FeatureFlagRole {
   flag_id: string;
@@ -53,9 +52,20 @@ export interface UpdateFeatureFlagInput {
   metadata?: Record<string, unknown>;
 }
 
+interface FeatureFlagDbRow {
+  id: string;
+  key: string;
+  description?: string | null;
+  is_enabled: boolean;
+  rollout_pct: number;
+  metadata?: { label?: string; starts_at?: string | null; ends_at?: string | null } | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // Helper to map DB row to frontend FeatureFlag type
-export function mapDbRowToFeatureFlag(row: any): FeatureFlag {
-  if (!row) return row;
+export function mapDbRowToFeatureFlag(row: FeatureFlagDbRow | null): FeatureFlag {
+  if (!row) return row as unknown as FeatureFlag;
   const metadata = row.metadata || {};
   
   // Friendly default label from key
@@ -67,10 +77,10 @@ export function mapDbRowToFeatureFlag(row: any): FeatureFlag {
   return {
     id: row.id,
     key: row.key,
-    description: row.description,
+    description: row.description ?? null,
     is_enabled: row.is_enabled,
     rollout_pct: row.rollout_pct,
-    metadata: row.metadata,
+    metadata: metadata as Record<string, unknown>,
     created_at: row.created_at,
     updated_at: row.updated_at,
     label: metadata.label || defaultLabel,
@@ -80,10 +90,13 @@ export function mapDbRowToFeatureFlag(row: any): FeatureFlag {
 }
 
 // Helper to prepare the insert/update payload (moves label, starts_at, ends_at into metadata)
-export function prepareFeatureFlagPayload(input: any, existingMetadata: any = {}) {
+export function prepareFeatureFlagPayload(
+  input: CreateFeatureFlagInput | UpdateFeatureFlagInput,
+  existingMetadata: Record<string, unknown> = {},
+) {
   const { label, starts_at, ends_at, ...rest } = input;
   
-  const mergedMetadata = {
+  const mergedMetadata: Record<string, unknown> = {
     ...existingMetadata,
     ...(rest.metadata || {}),
   };

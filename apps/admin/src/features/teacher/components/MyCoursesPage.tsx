@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
-import { useRouter } from '@/i18n/routing';
+import { Add, PlayCircleOutline, People, School, Upload } from '@mui/icons-material';
 import {
   Box,
   Typography,
@@ -14,13 +13,16 @@ import {
   Tabs,
   Tab,
 } from '@mui/material';
-import { Add, PlayCircleOutline, People, School, Upload } from '@mui/icons-material';
+import { useTranslations } from 'next-intl';
+import { useState, useCallback } from 'react';
+
+
 import { useTeacherCourses } from '@/adapters/queries/teacher.queries';
-import { useCreateCourse, useCreateSection, useCreateLesson } from '@/adapters/mutations/courses.mutations';
+import type { CourseFilters, CourseStatus } from '@/domain/types/course.types';
 import { CreateCourseDialog } from '@/features/courses/components/CreateCourseDialog';
 import { ImportCourseDialog } from '@/features/courses/components/ImportCourseDialog';
-import type { CourseFilters, CourseStatus } from '@/domain/types/course.types';
-import { useTranslations } from 'next-intl';
+import { useRouter } from '@/i18n/routing';
+
 
 const getStatusColors = (status: string, opacity: string = '1A') => {
   switch (status) {
@@ -220,7 +222,7 @@ export function MyCoursesPage() {
                   )}
                   <Box sx={{ position: 'absolute', top: 12, left: 12 }}>
                     <Chip
-                      label={t(course.status as any)}
+                      label={t(course.status as Parameters<typeof t>[0])}
                       size="small"
                       sx={{
                         fontWeight: 700,

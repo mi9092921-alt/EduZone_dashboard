@@ -1,7 +1,12 @@
 'use client';
 
-import { useState } from 'react';
-import { useTranslations } from 'next-intl';
+import {
+  Build,
+  NavigateNext,
+  NavigateBefore,
+  Check,
+  Warning,
+} from '@mui/icons-material';
 import {
   Box,
   Typography,
@@ -18,22 +23,18 @@ import {
   Autocomplete,
   CircularProgress,
 } from '@mui/material';
-import {
-  Build,
-  NavigateNext,
-  NavigateBefore,
-  Check,
-  Warning,
-} from '@mui/icons-material';
-import { useRoles } from '@/adapters/queries/settings.queries';
+import { useTranslations } from 'next-intl';
+import { useState } from 'react';
+
 import {
   useEnableMaintenanceMode,
   useDisableMaintenanceMode,
 } from '@/adapters/mutations/settings.mutations';
+import { useRoles } from '@/adapters/queries/settings.queries';
 import { parseRpcError } from '@/domain/errors';
-import type { SettingsByCategory } from '@/domain/types/settings.types';
+import type { MaintenanceModeParams, SettingsByCategory } from '@/domain/types/settings.types';
 
-const getSteps = (t: any) => [
+const getSteps = (t: ReturnType<typeof useTranslations>) => [
   t('steps.status'),
   t('steps.message'),
   t('steps.deadline'),
@@ -89,7 +90,7 @@ export function MaintenanceWizard({ settings }: MaintenanceWizardProps) {
   const handleSubmit = async () => {
     try {
       if (enabled) {
-        const payload: any = {
+        const payload: MaintenanceModeParams = {
           message,
           ends_at: endsAt ? new Date(endsAt).toISOString() : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
         };
@@ -279,8 +280,8 @@ export function MaintenanceWizard({ settings }: MaintenanceWizardProps) {
                 return (
                   <TextField 
                     {...restParams} 
-                    size={size as any}
-                    InputLabelProps={InputLabelProps as any} 
+                    size={(size ?? 'medium') as NonNullable<React.ComponentProps<typeof TextField>['size']>}
+                    InputLabelProps={(InputLabelProps ?? {}) as NonNullable<React.ComponentProps<typeof TextField>['InputLabelProps']>}
                     label={t('label_roles')} 
                   />
                 );

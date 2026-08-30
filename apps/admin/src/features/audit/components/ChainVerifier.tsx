@@ -1,6 +1,5 @@
 'use client';
 
-import { useState, useCallback } from 'react';
 import {
   VerifiedUser,
   ErrorOutline,
@@ -8,11 +7,13 @@ import {
 } from '@mui/icons-material';
 import { LinearProgress, Tooltip } from '@mui/material';
 import { useTranslations } from 'next-intl';
-import { Button } from '@/components/ui/Button';
-import { verifyHashChain } from '@/lib/hash-chain';
-import { getActivityLogsForVerification } from '@/infrastructure/repos/audit.service';
+import { useState, useCallback } from 'react';
+
 import { useAuditChainState } from '@/adapters/queries/audit.queries';
+import { Button } from '@/components/ui/Button';
 import type { VerificationResult } from '@/domain/types/audit.types';
+import { getActivityLogsForVerification } from '@/infrastructure/repos/audit.service';
+import { verifyHashChain } from '@/lib/hash-chain';
 
 interface ChainVerifierProps {
   dateFrom?: string | undefined;

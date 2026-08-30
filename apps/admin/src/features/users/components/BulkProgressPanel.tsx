@@ -1,7 +1,5 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import {
   CheckCircle,
   Warning,
@@ -11,11 +9,14 @@ import {
   Close,
 } from '@mui/icons-material';
 import { LinearProgress } from '@mui/material';
-import { Button } from '@/components/ui/Button';
-import { subscribeToBulkProgress, getBulkJobProgress } from '@/infrastructure/repos/bulk.service';
+import { useQueryClient } from '@tanstack/react-query';
+import { useState, useEffect, useRef, useCallback } from 'react';
+
 import { useCancelBulkJob } from '@/adapters/mutations/bulk.mutations';
 import { queryKeys } from '@/adapters/queries/keys';
+import { Button } from '@/components/ui/Button';
 import type { BulkAction, BulkProgress } from '@/domain/types/bulk.types';
+import { subscribeToBulkProgress, getBulkJobProgress } from '@/infrastructure/repos/bulk.service';
 import { cn } from '@/lib/utils';
 
 interface BulkProgressPanelProps {

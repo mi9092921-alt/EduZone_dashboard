@@ -1,7 +1,14 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { useTranslations } from 'next-intl';
+import {
+  Edit,
+  Save,
+  Close,
+  Lock,
+  Build,
+  Refresh,
+  ContentCopy,
+} from '@mui/icons-material';
 import {
   Box,
   Typography,
@@ -25,28 +32,23 @@ import {
   useTheme,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import { useToastStore } from '@/adapters/stores/toast.store';
-import { Card, CardContent, StatsCard, StatsCardContent, StatsCardIcon } from '@/components/ui/Card';
-import {
-  Edit,
-  Save,
-  Close,
-  Lock,
-  LockOpen,
-  Build,
-  Refresh,
-  ContentCopy,
-} from '@mui/icons-material';
-import { PermissionGate } from '../../layout/components/PermissionGate';
-import { useSettingsByCategory } from '@/adapters/queries/settings.queries';
-import { useSetSetting } from '@/adapters/mutations/settings.mutations';
-import { parseRpcError } from '@/domain/errors';
-import type { SettingKv, SettingCategory } from '@/domain/types/settings.types';
-import { MaintenanceWizard } from './MaintenanceWizard';
-import { AppLockControl } from './AppLockControl';
-import { AccessRulesManager } from './AccessRulesManager';
+import { useTranslations } from 'next-intl';
+import { useState, useCallback } from 'react';
 
-const getCategoryTabs = (t: any) => [
+import { PermissionGate } from '../../layout/components/PermissionGate';
+
+import { AccessRulesManager } from './AccessRulesManager';
+import { AppLockControl } from './AppLockControl';
+import { MaintenanceWizard } from './MaintenanceWizard';
+
+import { useSetSetting } from '@/adapters/mutations/settings.mutations';
+import { useSettingsByCategory } from '@/adapters/queries/settings.queries';
+import { useToastStore } from '@/adapters/stores/toast.store';
+import { parseRpcError } from '@/domain/errors';
+import type { SettingKv } from '@/domain/types/settings.types';
+
+
+const getCategoryTabs = (t: ReturnType<typeof useTranslations>) => [
   { key: 'security', label: t('tabs.security'), icon: <Lock sx={{ fontSize: 18 }} /> },
   { key: 'maintenance', label: t('tabs.maintenance'), icon: <Build sx={{ fontSize: 18 }} /> },
   { key: 'limits', label: t('tabs.limits'), icon: <Refresh sx={{ fontSize: 18 }} /> },

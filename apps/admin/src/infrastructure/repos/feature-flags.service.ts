@@ -1,4 +1,3 @@
-import { container } from '@/container';
 import {
   getAllFeatureFlagsAction,
   getFeatureFlagByIdAction,
@@ -12,6 +11,7 @@ import {
   removeUserOverrideAction,
   getAllRolesAction,
 } from '@/application/actions/admin.actions';
+import { container } from '@/container';
 import type {
   FeatureFlag,
   FeatureFlagDetail,
@@ -326,7 +326,7 @@ export async function getAllRoles(): Promise<{ id: string; name: string; key: st
 
   if (error) throw error;
   
-  return (data ?? []).map((r: any) => ({
+  return (data ?? []).map((r: { id: string; name: string; label: string | null }) => ({
     id: r.id,
     name: r.label || r.name,
     key: r.name,

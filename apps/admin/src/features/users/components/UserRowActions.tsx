@@ -12,14 +12,15 @@ import {
   Warning,
   DeleteForever,
 } from '@mui/icons-material';
-import type { User, AccountAction } from '@/domain/types/user.types';
+import { useTranslations } from 'next-intl';
+
 import {
   Dropdown,
   DropdownItem,
   DropdownSeparator,
 } from '@/components/ui/Dropdown';
+import type { User, AccountAction } from '@/domain/types/user.types';
 
-import { useTranslations } from 'next-intl';
 
 interface UserRowActionsProps {
   user: User;

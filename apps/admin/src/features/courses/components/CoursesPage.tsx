@@ -1,23 +1,25 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { useRouter } from '@/i18n/routing';
 import { Add, Upload } from '@mui/icons-material';
-import type { Course, CourseFilters, CourseStatus } from '@/domain/types/course.types';
-import { useCourses } from '@/adapters/queries/courses.queries';
-import { useUpdateCourse, useDeleteCourse } from '@/adapters/mutations/courses.mutations';
-import { CourseStatsCards } from './CourseStatsCards';
+import { useTranslations } from 'next-intl';
+import { useState, useCallback } from 'react';
+
+import { CourseBulkActionBar, type CourseBulkAction } from './CourseBulkActionBar';
 import { CourseFiltersBar } from './CourseFiltersBar';
 import { CoursesTable } from './CoursesTable';
-import { CourseBulkActionBar, type CourseBulkAction } from './CourseBulkActionBar';
+import { CourseStatsCards } from './CourseStatsCards';
 import { CreateCourseDialog } from './CreateCourseDialog';
 import { DeleteCourseDialog } from './DeleteCourseDialog';
 import { ImportCourseDialog } from './ImportCourseDialog';
-import { Button } from '@/components/ui/Button';
-import { useTranslations } from 'next-intl';
+
+import { useUpdateCourse, useDeleteCourse } from '@/adapters/mutations/courses.mutations';
+import { useCourses } from '@/adapters/queries/courses.queries';
 import { useToast } from '@/adapters/stores/toast.store';
-import { getCourseById } from '@/infrastructure/repos/courses.service';
+import { Button } from '@/components/ui/Button';
+import type { Course, CourseFilters, CourseStatus } from '@/domain/types/course.types';
 import { formatVideoUrl } from '@/domain/video.utils';
+import { useRouter } from '@/i18n/routing';
+import { getCourseById } from '@/infrastructure/repos/courses.service';
 
 export function CoursesPage() {
   const router = useRouter();
@@ -167,7 +169,7 @@ export function CoursesPage() {
         }
         showToast(t('export_started'), 'info');
       }
-    } catch (err) {
+    } catch {
       showToast(t('bulk_action_failed'), 'error');
     } finally {
       setIsBulkPending(false);

@@ -1,22 +1,23 @@
 'use client';
 
-import { useState, useCallback } from 'react';
 import {
   Search,
   ExpandMore,
   ExpandLess,
-  ChevronLeft,
-  ChevronRight,
   ContentCopy,
   LinkOutlined,
 } from '@mui/icons-material';
 import { Tooltip } from '@mui/material';
 import { useTranslations } from 'next-intl';
-import { useActivityLogs } from '@/adapters/queries/audit.queries';
+import { useState, useCallback } from 'react';
+
+
 import { ChainVerifier } from './ChainVerifier';
+
+import { useActivityLogs } from '@/adapters/queries/audit.queries';
+import { TablePagination } from '@/components/ui/TablePagination';
 import type { AuditFilters, ActivityLog, RiskLevel } from '@/domain/types/audit.types';
 import { cn } from '@/lib/utils';
-import { TablePagination } from '@/components/ui/TablePagination';
 
 const RISK_CHIPS: Record<RiskLevel, { bg: string; text: string }> = {
   low: { bg: 'bg-muted', text: 'text-muted-foreground' },
@@ -49,7 +50,6 @@ export function AuditLogsTab() {
   const { data, isLoading, isFetching } = useActivityLogs(filters, page, pageSize);
   const logs = data?.data ?? [];
   const totalCount = data?.count ?? 0;
-  const totalPages = data?.totalPages ?? 1;
 
   const handleSearch = useCallback(() => {
     setFilters((prev) => ({ ...prev, user_id: searchInput || undefined }));
@@ -361,7 +361,7 @@ function MultiSelect({
   options: string[];
   selected: string[];
   onChange: (v: string[]) => void;
-  t: any;
+  t: ReturnType<typeof useTranslations>;
   mode: 'activity' | 'risk';
 }) {
   const [open, setOpen] = useState(false);
@@ -430,7 +430,6 @@ function MultiSelect({
 
 // ── Chip ────────────────────────────────────────────────────
 function Chip({ label, onDelete }: { label: string; onDelete: () => void }) {
-  const t = useTranslations('audit');
   return (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-muted text-xs font-medium text-foreground">
       {label}

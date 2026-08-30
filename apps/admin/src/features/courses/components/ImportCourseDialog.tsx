@@ -1,19 +1,56 @@
 'use client';
 
-import { useState, useRef } from 'react';
-import { useCreateCourse, useCreateSection, useCreateLessons } from '@/adapters/mutations/courses.mutations';
-import { useRouter } from '@/i18n/routing';
-import { useToast } from '@/adapters/stores/toast.store';
+import { Upload, ContentCopy, CheckCircle, ErrorOutline, HelpOutline } from '@mui/icons-material';
 import { useTranslations, useLocale } from 'next-intl';
+import { useState, useRef } from 'react';
 
-import { Modal } from '@/components/ui/Modal';
+import { useCreateCourse, useCreateSection, useCreateLessons } from '@/adapters/mutations/courses.mutations';
+import { useToast } from '@/adapters/stores/toast.store';
 import { Button } from '@/components/ui/Button';
 import { Label } from '@/components/ui/Label';
-import { Upload, ContentCopy, CheckCircle, ErrorOutline, HelpOutline } from '@mui/icons-material';
+import { Modal } from '@/components/ui/Modal';
+import { getErrorMessage } from '@/domain/errors';
+import type { CourseStatus } from '@/domain/types/course.types';
+import { useRouter } from '@/i18n/routing';
+
 
 interface ImportCourseDialogProps {
   open: boolean;
   onClose: () => void;
+}
+
+/** Raw shape of user-uploaded/pasted course-import JSON, before validation. */
+interface RawImportLesson {
+  title?: string;
+  video_url?: string;
+  order_index?: number;
+  order?: number;
+  duration_sec?: number;
+  duration?: number;
+  is_preview?: boolean;
+}
+
+interface RawImportSection {
+  title?: string;
+  order_index?: number;
+  order?: number;
+  lessons?: RawImportLesson[];
+}
+
+interface RawImportCourse {
+  title: string;
+  description?: string;
+  category?: string;
+  level?: string;
+  price?: number;
+  thumbnail_url?: string;
+  status?: string;
+  slug?: string;
+}
+
+interface RawImportData {
+  course: RawImportCourse;
+  sections?: RawImportSection[];
 }
 
 interface ValidationResult {
@@ -69,7 +106,7 @@ export function ImportCourseDialog({ open, onClose }: ImportCourseDialogProps) {
   const [jsonText, setJsonText] = useState('');
   const [dragActive, setDragActive] = useState(false);
   const [validation, setValidation] = useState<ValidationResult | null>(null);
-  const [parsedData, setParsedData] = useState<any>(null);
+  const [parsedData, setParsedData] = useState<RawImportData | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [importStatus, setImportStatus] = useState('');
   const [showSchema, setShowSchema] = useState(false);
@@ -116,7 +153,7 @@ export function ImportCourseDialog({ open, onClose }: ImportCourseDialogProps) {
 
       let totalLessons = 0;
       if (data.sections && Array.isArray(data.sections)) {
-        data.sections.forEach((sec: any, sIdx: number) => {
+        data.sections.forEach((sec: RawImportSection, sIdx: number) => {
           if (!sec.title) {
             errors.push(t('import_course.error_section_missing_title', { index: sIdx + 1 }));
           }
@@ -125,7 +162,7 @@ export function ImportCourseDialog({ open, onClose }: ImportCourseDialogProps) {
               errors.push(t('import_course.error_lessons_not_array', { title: sec.title || (sIdx + 1) }));
             } else {
               totalLessons += sec.lessons.length;
-              sec.lessons.forEach((les: any, lIdx: number) => {
+              sec.lessons.forEach((les: RawImportLesson, lIdx: number) => {
                 if (!les.title) {
                   errors.push(t('import_course.error_lesson_missing_title', { index: lIdx + 1, title: sec.title || (sIdx + 1) }));
                 }
@@ -152,7 +189,7 @@ export function ImportCourseDialog({ open, onClose }: ImportCourseDialogProps) {
           lessonsCount: totalLessons
         }
       };
-    } catch (e) {
+    } catch {
       return { isValid: false, errors: [t('import_course.error_invalid_json_format')] };
     }
   };
@@ -174,7 +211,7 @@ export function ImportCourseDialog({ open, onClose }: ImportCourseDialogProps) {
       setJsonText(text);
       const res = validateCourseJSON(text);
       setValidation(res);
-    } catch (err) {
+    } catch {
       setValidation({ isValid: false, errors: [t('import_course.error_cannot_read_file')] });
     }
   };
@@ -225,15 +262,16 @@ export function ImportCourseDialog({ open, onClose }: ImportCourseDialogProps) {
         category: parsedData.course.category || '',
         level: parsedData.course.level || 'beginner',
         price: parsedData.course.price || 0,
-        thumbnail_url: parsedData.course.thumbnail_url || undefined,
-        status: parsedData.course.status || 'draft',
-        slug: parsedData.course.slug || undefined,
+        status: (parsedData.course.status || 'draft') as CourseStatus,
+        ...(parsedData.course.thumbnail_url && { thumbnail_url: parsedData.course.thumbnail_url }),
+        ...(parsedData.course.slug && { slug: parsedData.course.slug }),
       });
 
       // 2. Create Sections and Lessons
       if (parsedData.sections && Array.isArray(parsedData.sections)) {
         for (let sIdx = 0; sIdx < parsedData.sections.length; sIdx++) {
           const sec = parsedData.sections[sIdx];
+          if (!sec) continue;
           setImportStatus(t('import_course.status_inserting_section', {
             title: sec.title || (sIdx + 1),
             current: sIdx + 1,
@@ -249,7 +287,7 @@ export function ImportCourseDialog({ open, onClose }: ImportCourseDialogProps) {
           });
 
           if (sec.lessons && Array.isArray(sec.lessons)) {
-            const lessonsData = sec.lessons.map((les: any, lIdx: number) => ({
+            const lessonsData = sec.lessons.map((les: RawImportLesson, lIdx: number) => ({
               title: les.title || `Lesson ${lIdx + 1}`,
               video_url: les.video_url || '',
               order_index: les.order_index ?? les.order ?? lIdx,
@@ -275,9 +313,9 @@ export function ImportCourseDialog({ open, onClose }: ImportCourseDialogProps) {
         router.push(`/courses/${newCourse.id}`);
       }, 800);
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      showToast(err.message || t('import_course.toast_import_error'), 'error');
+      showToast(getErrorMessage(err) || t('import_course.toast_import_error'), 'error');
       setImportStatus('');
       setIsImporting(false);
     }

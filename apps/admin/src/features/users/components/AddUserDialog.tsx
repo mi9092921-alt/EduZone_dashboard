@@ -1,28 +1,24 @@
 'use client';
 
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { CreateUserInput, createUserSchema } from '@/domain/schemas/user.schema';
+
 import { useCreateUser } from '@/adapters/mutations/users.mutations';
-import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
+import { Modal } from '@/components/ui/Modal';
 import { Select, SelectItem } from '@/components/ui/Select';
-import { useTranslations } from 'next-intl';
+import { getErrorMessage } from '@/domain/errors';
+import { createUserSchema, type CreateUserInput } from '@/domain/schemas/user.schema';
+
 
 interface AddUserDialogProps {
   open: boolean;
   onClose: () => void;
 }
-
-const ROLE_OPTIONS = [
-  { value: 'student', label: 'Student' },
-  { value: 'teacher', label: 'Teacher' },
-  { value: 'admin', label: 'Admin' },
-  { value: 'super_admin', label: 'Super Admin' },
-];
 
 export function AddUserDialog({ open, onClose }: AddUserDialogProps) {
   const t = useTranslations('users');
@@ -54,7 +50,7 @@ export function AddUserDialog({ open, onClose }: AddUserDialogProps) {
     },
   });
 
-  const onSubmit = async (data: any) => {
+  const onSubmit = async (data: CreateUserInput) => {
     setError(null);
     try {
       const result = await createUser.mutateAsync(data);
@@ -64,8 +60,8 @@ export function AddUserDialog({ open, onClose }: AddUserDialogProps) {
       }
       reset();
       onClose();
-    } catch (err: any) {
-      setError(err.message || t('failed_create_user'));
+    } catch (err: unknown) {
+      setError(getErrorMessage(err) || t('failed_create_user'));
     }
   };
 

@@ -1,9 +1,9 @@
 'use client';
 
-import { AdminShell } from '@/features/layout';
-import { CoursesPage } from '@/features/courses';
-import { MyCoursesPage } from '@/features/teacher';
 import { useAuthUser } from '@/adapters/stores/auth.store';
+import { CoursesPage } from '@/features/courses';
+import { AdminShell } from '@/features/layout';
+import { MyCoursesPage } from '@/features/teacher';
 
 export default function CoursesRoute() {
   const user = useAuthUser();

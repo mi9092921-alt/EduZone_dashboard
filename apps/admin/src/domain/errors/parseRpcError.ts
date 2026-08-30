@@ -1,5 +1,5 @@
-import type { RpcErrorCode } from './codes';
 import { AppError } from './AppError';
+import type { RpcErrorCode } from './codes';
 
 /**
  * Parse any raw error (Supabase PostgrestError, generic Error, unknown)

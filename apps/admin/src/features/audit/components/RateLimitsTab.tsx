@@ -1,6 +1,5 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
 import {
   Block,
   TrendingUp,
@@ -10,10 +9,11 @@ import {
 } from '@mui/icons-material';
 import { Tooltip } from '@mui/material';
 import { useTranslations } from 'next-intl';
-import { Button } from '@/components/ui/Button';
-import { Switch } from '@/components/ui/Switch';
-import { useActiveBlocks, useRateLimitRules, useTopOffenders } from '@/adapters/queries/rate-limits.queries';
+import { useState, useEffect, useMemo } from 'react';
+
 import { useToggleRateLimitRule, useClearBlock } from '@/adapters/mutations/rate-limits.mutations';
+import { useActiveBlocks, useRateLimitRules, useTopOffenders } from '@/adapters/queries/rate-limits.queries';
+import { Switch } from '@/components/ui/Switch';
 import type { RateLimitRule, RateLimitWithEmail, TopOffender } from '@/domain/types/rate-limit.types';
 import { cn } from '@/lib/utils';
 

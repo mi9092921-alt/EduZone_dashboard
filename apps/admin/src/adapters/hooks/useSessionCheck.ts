@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-import { container } from '@/container';
-import { useAuthStore } from '@/adapters/stores/auth.store';
 import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useRef } from 'react';
+
+import { useAuthStore } from '@/adapters/stores/auth.store';
 import { recordCurrentSessionAction } from '@/application/actions/session.actions';
+import { container } from '@/container';
 import { clearBrowserSessionId, getBrowserSessionId } from '@/infrastructure/auth/browserSession';
 
 /**

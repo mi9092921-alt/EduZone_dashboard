@@ -1,5 +1,13 @@
+// @vitest-environment node
+//
+// notifications.service.ts is isomorphic (typeof window !== 'undefined' picks
+// the server-action branch); these tests target the container.supabase
+// branch, which requires no global `window` (jsdom, the default unit-test
+// environment, defines one).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
 import { getNotifications, sendNotification, deleteNotification } from './notifications.service';
+
 import { container } from '@/container';
 
 // Mock the container and supabase client
@@ -12,6 +20,22 @@ vi.mock('@/container', () => ({
   },
 }));
 
+/**
+ * Supabase's real query builder is "thenable" — you can `await` it after any
+ * number of chained filter/order calls, not just after a fixed final method.
+ * This mock mirrors that so it doesn't need to hard-code an exact call
+ * sequence (select -> is -> eq? -> order -> range).
+ */
+function createThenableChain(result: unknown) {
+  const chain: any = {};
+  const methods = ['select', 'eq', 'is', 'order', 'range', 'limit', 'update'];
+  for (const method of methods) {
+    chain[method] = vi.fn(() => chain);
+  }
+  chain.then = (resolve: (v: unknown) => void) => resolve(result);
+  return chain;
+}
+
 describe('Notifications Service', () => {
   const mockSupabase = container.supabase;
 
@@ -21,35 +45,35 @@ describe('Notifications Service', () => {
 
   describe('getNotifications', () => {
     it('should fetch notifications with correct range and order', async () => {
-      const mockData = [{ id: '1', title: 'Test' }];
-      const mockSelect = vi.fn().mockReturnThis();
-      const mockOrder = vi.fn().mockReturnThis();
-      const mockRange = vi.fn().mockResolvedValue({ data: mockData, error: null, count: 1 } as any);
-
-      vi.mocked(mockSupabase.from).mockReturnValue({
-        select: mockSelect,
-        order: mockOrder,
-        range: mockRange,
-      } as any);
+      const mockData = [{ id: '1', title: 'Test', target_audience: 'students' }];
+      let paginatedChain: any;
+      // First call: the paginated `notifications` query. Second call: the
+      // unpaginated stats query (getNotifications fetches both).
+      vi.mocked(mockSupabase.from).mockImplementationOnce(() => {
+        paginatedChain = createThenableChain({ data: mockData, error: null, count: 1 });
+        return paginatedChain;
+      }).mockImplementationOnce(() =>
+        createThenableChain({ data: mockData, error: null }),
+      );
 
       // Service uses 1-indexed pages: page=1 → from=0, to=9
       const result = await getNotifications(1, 10);
 
       expect(mockSupabase.from).toHaveBeenCalledWith('notifications');
-      expect(mockSelect).toHaveBeenCalledWith('*', { count: 'exact' });
-      expect(mockOrder).toHaveBeenCalledWith('created_at', { ascending: false });
-      expect(mockRange).toHaveBeenCalledWith(0, 9);
-      expect(result).toEqual({ data: mockData, count: 1 });
+      expect(paginatedChain.select).toHaveBeenCalledWith('*', { count: 'exact' });
+      expect(paginatedChain.order).toHaveBeenCalledWith('created_at', { ascending: false });
+      expect(paginatedChain.range).toHaveBeenCalledWith(0, 9);
+      expect(result.data).toEqual(mockData);
+      expect(result.count).toBe(1);
+      expect(result.stats).toEqual({ all: 1, students: 1, teachers: 0, admins: 0 });
     });
 
     it('should throw error if supabase fails', async () => {
-      vi.mocked(mockSupabase.from).mockReturnValue({
-        select: vi.fn().mockReturnThis(),
-        order: vi.fn().mockReturnThis(),
-        range: vi.fn().mockResolvedValue({ data: null, error: { code: 'PGRST116', message: 'DB Error' } } as any),
-      } as any);
+      vi.mocked(mockSupabase.from).mockReturnValue(
+        createThenableChain({ data: null, error: { code: 'PGRST116', message: 'DB Error' } }),
+      );
 
-      await expect(getNotifications(0, 10)).rejects.toThrow('DB Error');
+      await expect(getNotifications(1, 10)).rejects.toThrow('DB Error');
     });
   });
 

@@ -1,8 +1,16 @@
 'use server';
 
-import { createClient } from '@supabase/supabase-js';
-import { createServerClient } from '@/infrastructure/supabase/server';
 import type { AccessRule, PaginatedResult } from '@eduzone/types';
+import { createClient } from '@supabase/supabase-js';
+
+import type { SendNotificationInput } from '@/adapters/mutations/notifications.mutations';
+import type { Notification, UserNotification, TargetAudience } from '@/adapters/queries/notifications.queries';
+import type {
+  CourseWithStats,
+  MvCourseStats,
+} from '@/domain/types/analytics.types';
+import type { ActivityLogQueueEntry } from '@/domain/types/audit.types';
+import type { CourseStats } from '@/domain/types/course.types';
 import type {
   FeatureFlag,
   FeatureFlagDetail,
@@ -16,19 +24,12 @@ import {
   prepareFeatureFlagPayload,
 } from '@/domain/types/feature-flag.types';
 import type { Job, JobFilters, JobStatusCounts } from '@/domain/types/job.types';
-import type { Notification, UserNotification, TargetAudience } from '@/adapters/queries/notifications.queries';
-import type { SendNotificationInput } from '@/adapters/mutations/notifications.mutations';
-import type { ActivityLogQueueEntry } from '@/domain/types/audit.types';
 import type {
   RateLimitRule,
   RateLimitWithEmail,
   TopOffender,
 } from '@/domain/types/rate-limit.types';
-import type { CourseStats } from '@/domain/types/course.types';
-import type {
-  CourseWithStats,
-  MvCourseStats,
-} from '@/domain/types/analytics.types';
+import { createServerClient } from '@/infrastructure/supabase/server';
 
 function createAdminClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -313,7 +314,7 @@ export async function toggleFeatureFlagAction(id: string, enabled: boolean): Pro
   if (error) throw error;
 }
 
-export async function addRoleOverrideAction(flagId: string, roleId: string, isExclude = false): Promise<void> {
+export async function addRoleOverrideAction(flagId: string, roleId: string, _isExclude = false): Promise<void> {
   const { tenantId: userTenantId } = await requirePermission('feature_flags.manage');
   const admin = createAdminClient();
 
@@ -343,7 +344,7 @@ export async function removeRoleOverrideAction(flagId: string, roleId: string): 
   if (error) throw error;
 }
 
-export async function addUserOverrideAction(flagId: string, userId: string, isExclude = false): Promise<void> {
+export async function addUserOverrideAction(flagId: string, userId: string, _isExclude = false): Promise<void> {
   const { tenantId: userTenantId } = await requirePermission('feature_flags.manage');
   const admin = createAdminClient();
 
@@ -383,7 +384,7 @@ export async function getAllRolesAction(): Promise<{ id: string; name: string; k
   const admin = createAdminClient();
   const { data, error } = await admin.from('roles').select('id, name, label').order('name');
   if (error) throw error;
-  return (data ?? []).map((r: any) => ({ id: r.id, name: r.label || r.name, key: r.name }));
+  return (data ?? []).map((r: { id: string; name: string; label: string | null }) => ({ id: r.id, name: r.label || r.name, key: r.name }));
 }
 
 export async function getJobsAction(
@@ -403,11 +404,31 @@ export async function getJobsAction(
   });
   if (error) throw error;
 
-  const results = (data ?? []) as any[];
-  const total = results.length > 0 ? Number(results[0].full_count) : 0;
+  interface AdminGetJobsRow {
+    full_count: number | string;
+    id: string;
+    tenant_id: string | null;
+    job_type: Job['job_type'];
+    payload: Job['payload'];
+    status: Job['status'];
+    priority: number;
+    attempts: number;
+    max_attempts: number;
+    locked_by: string | null;
+    locked_at: string | null;
+    lock_expires_at: string | null;
+    run_at: string;
+    started_at: string | null;
+    completed_at: string | null;
+    error_msg: string | null;
+    created_at: string;
+  }
+
+  const results = (data ?? []) as AdminGetJobsRow[];
+  const total = results.length > 0 ? Number(results[0]!.full_count) : 0;
 
   // Remap SQL column aliases → Job domain field names
-  const jobs: Job[] = results.map(({ full_count: _, ...row }: any): Job => ({
+  const jobs: Job[] = results.map(({ full_count: _, ...row }): Job => ({
     id: row.id,
     tenant_id: row.tenant_id ?? null,
     job_type: row.job_type,
@@ -607,7 +628,14 @@ export async function getMyNotificationsAction(
     if (countError) throw countError;
 
     return {
-      data: (data ?? []).map((row: any) => ({
+      data: (data ?? []).map((row: {
+        id: string;
+        user_id: string;
+        notification_id: string;
+        is_read: boolean;
+        created_at: string;
+        notifications?: { title: string; body: string } | null;
+      }) => ({
         ...row,
         title: row.notifications?.title ?? '',
         body: row.notifications?.body ?? '',

@@ -7,9 +7,8 @@ import type { Tenant as BaseTenant } from '@eduzone/types';
 export type TenantPlan = 'free' | 'starter' | 'pro' | 'enterprise';
 export type TenantStatus = 'active' | 'suspended' | 'deleted';
 
-export interface Tenant extends BaseTenant {
-  // Counters removed from table in v13; use dashboard_stats_cache if needed
-}
+// Counters removed from table in v13; use dashboard_stats_cache if needed
+export type Tenant = BaseTenant;
 
 export interface TenantFilters {
   search?: string | undefined;

@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom';
 import { beforeAll, afterEach, afterAll } from 'vitest';
+
 import { server } from './tests/mocks/server';
 
 // MSW — intercept all network requests in unit/integration tests.

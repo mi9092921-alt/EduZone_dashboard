@@ -10,8 +10,19 @@ import type {
  * No UI, no React — pure async functions.
  */
 
+interface SettingKvRow {
+  key: string;
+  value: unknown;
+  category: 'general' | 'security' | 'maintenance' | 'limits';
+  description?: string | null;
+  is_public?: boolean;
+  version?: number;
+  updated_by?: string | null;
+  updated_at: string;
+}
+
 // Helper to map DB row to frontend type SettingKv
-function mapDbRowToSetting(row: any): SettingKv {
+function mapDbRowToSetting(row: SettingKvRow): SettingKv {
   let valueType: 'string' | 'integer' | 'boolean' | 'json' = 'string';
   let valueStr = '';
 
@@ -41,11 +52,11 @@ function mapDbRowToSetting(row: any): SettingKv {
     value_type: valueType,
     category: row.category,
     label: label,
-    description: row.description,
-    is_public: row.is_public,
+    description: row.description ?? null,
+    is_public: row.is_public ?? false,
     is_encrypted: false,
-    version: row.version,
-    updated_by: row.updated_by,
+    version: row.version ?? 1,
+    updated_by: row.updated_by ?? null,
     created_at: row.updated_at,
     updated_at: row.updated_at,
   };
@@ -113,12 +124,12 @@ export async function setSetting(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('ADMIN_ONLY');
 
-  let parsedValue: any = value;
+  let parsedValue: unknown = value;
   if (valueType === 'boolean') {
     parsedValue = (value === 'true' || value === '1' || value === 'yes');
   } else if (valueType === 'integer') {
-    parsedValue = parseInt(value, 10);
-    if (isNaN(parsedValue)) parsedValue = 0;
+    const intVal = parseInt(value, 10);
+    parsedValue = isNaN(intVal) ? 0 : intVal;
   } else if (valueType === 'json') {
     try {
       parsedValue = JSON.parse(value);
@@ -150,13 +161,13 @@ export async function createSetting(setting: Partial<SettingKv> & { key: string;
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('ADMIN_ONLY');
 
-  let parsedValue: any = setting.value;
+  let parsedValue: unknown = setting.value;
   const valueType = setting.value_type;
   if (valueType === 'boolean') {
     parsedValue = (setting.value === 'true' || setting.value === '1');
   } else if (valueType === 'integer') {
-    parsedValue = parseInt(setting.value, 10);
-    if (isNaN(parsedValue)) parsedValue = 0;
+    const intVal = parseInt(setting.value, 10);
+    parsedValue = isNaN(intVal) ? 0 : intVal;
   } else if (valueType === 'json') {
     try {
       parsedValue = JSON.parse(setting.value);
@@ -203,7 +214,7 @@ export async function deleteSetting(key: string): Promise<void> {
 export async function enableMaintenanceMode(params: MaintenanceModeParams): Promise<void> {
   const { supabase } = container;
 
-  const settings: Array<{ key: string; value: any; category: string }> = [
+  const settings: Array<{ key: string; value: unknown; category: string }> = [
     { key: 'maintenance_mode', value: true, category: 'maintenance' },
     { key: 'maintenance_message', value: params.message, category: 'maintenance' },
     { key: 'maintenance_ends_at', value: params.ends_at, category: 'maintenance' },

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
 import {
   getJobs,
   getJobStatusCounts,
@@ -6,164 +7,103 @@ import {
   cancelJob,
   releaseStaleJobs,
 } from './jobs.service';
-import { container } from '@/container';
 
-vi.mock('@/container', () => ({
-  container: {
-    supabase: {
-      rpc: vi.fn(),
-      from: vi.fn(),
-    },
-  },
+import {
+  getJobsAction,
+  getJobStatusCountsAction,
+  retryJobAction,
+  cancelJobAction,
+  releaseStaleJobsAction,
+} from '@/application/actions/admin.actions';
+
+// jobs.service is a thin delegator to the admin server actions (which run the
+// privileged, service-role RPC calls behind an auth/permission check). These
+// tests verify the delegation contract: correct action called with correct
+// args, and the result/error passed through unchanged. The RPC/pagination
+// logic itself lives in admin.actions.ts.
+vi.mock('@/application/actions/admin.actions', () => ({
+  getJobsAction: vi.fn(),
+  getJobStatusCountsAction: vi.fn(),
+  retryJobAction: vi.fn(),
+  cancelJobAction: vi.fn(),
+  releaseStaleJobsAction: vi.fn(),
 }));
 
 describe('jobs.service', () => {
-  const mockRpc = container.supabase.rpc as any;
-  const mockFrom = container.supabase.from as any;
-
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  // ── getJobs ────────────────────────────────────────────────
   describe('getJobs', () => {
-    it('returns paginated jobs', async () => {
-      mockRpc.mockResolvedValue({
-        data: [{ id: 'j1', job_type: 'bulk_lock', full_count: 5 }],
-        error: null,
-      });
+    it('delegates to getJobsAction with filters/page/pageSize', async () => {
+      const paginated = { data: [{ id: 'j1' }], count: 1, page: 1, pageSize: 10, totalPages: 1 };
+      (getJobsAction as any).mockResolvedValue(paginated);
 
-      const result = await getJobs({}, 1, 10);
-      expect(result.data).toHaveLength(1);
-      expect(result.count).toBe(5);
-      expect(result.totalPages).toBe(1);
-      expect(mockRpc).toHaveBeenCalledWith('admin_get_jobs', expect.objectContaining({
-        p_page: 1,
-        p_page_size: 10,
-      }));
+      const result = await getJobs({ status: 'failed' }, 1, 10);
+      expect(getJobsAction).toHaveBeenCalledWith({ status: 'failed' }, 1, 10);
+      expect(result).toBe(paginated);
     });
 
-    it('applies status filter', async () => {
-      mockRpc.mockResolvedValue({ data: [], error: null });
-
-      await getJobs({ status: 'failed' }, 1, 10);
-      expect(mockRpc).toHaveBeenCalledWith('admin_get_jobs', expect.objectContaining({
-        p_status: 'failed',
-      }));
-    });
-
-    it('applies job_type filter', async () => {
-      mockRpc.mockResolvedValue({ data: [], error: null });
-
-      await getJobs({ job_type: 'bulk_export' }, 1, 10);
-      expect(mockRpc).toHaveBeenCalledWith('admin_get_jobs', expect.objectContaining({
-        p_job_type: 'bulk_export',
-      }));
-    });
-
-    it('applies dateFrom filter', async () => {
-      mockRpc.mockResolvedValue({ data: [], error: null });
-
-      await getJobs({ dateFrom: '2026-01-01' }, 1, 10);
-      expect(mockRpc).toHaveBeenCalledWith('admin_get_jobs', expect.objectContaining({
-        p_date_from: '2026-01-01',
-      }));
-    });
-
-    it('calculates pagination correctly', async () => {
-      // 45 total results across 3 pages of 20
-      const rows = Array.from({ length: 20 }, (_, i) => ({ id: `j${i}`, full_count: 45 }));
-      mockRpc.mockResolvedValue({ data: rows, error: null });
-
-      const result = await getJobs({}, 2, 20);
-      expect(result.totalPages).toBe(3);
-      expect(result.count).toBe(45);
-    });
-
-    it('throws on error', async () => {
-      mockRpc.mockResolvedValue({ data: null, error: { message: 'fail' } });
-
-      await expect(getJobs({}, 1, 10)).rejects.toBeDefined();
+    it('propagates errors from the action', async () => {
+      (getJobsAction as any).mockRejectedValue(new Error('fail'));
+      await expect(getJobs({}, 1, 10)).rejects.toThrow('fail');
     });
   });
 
-  // ── getJobStatusCounts ─────────────────────────────────────
   describe('getJobStatusCounts', () => {
-    it('returns counts for all statuses', async () => {
-      mockRpc.mockReturnValue({
-        single: vi.fn().mockResolvedValue({
-          data: { pending: 5, processing: 2, done: 100, failed: 3, dead: 1 },
-          error: null,
-        }),
-      });
+    it('delegates to getJobStatusCountsAction', async () => {
+      const counts = { pending: 5, processing: 2, done: 100, failed: 3, dead: 1 };
+      (getJobStatusCountsAction as any).mockResolvedValue(counts);
 
       const result = await getJobStatusCounts();
-      expect(result.pending).toBeDefined();
-      expect(result.processing).toBeDefined();
-      expect(result.done).toBeDefined();
-      expect(result.failed).toBeDefined();
-      expect(result.dead).toBeDefined();
-      expect(mockRpc).toHaveBeenCalledWith('admin_get_job_counts');
+      expect(getJobStatusCountsAction).toHaveBeenCalledWith();
+      expect(result).toBe(counts);
     });
   });
 
-  // ── retryJob ───────────────────────────────────────────────
   describe('retryJob', () => {
-    it('calls admin_retry_job RPC', async () => {
-      mockRpc.mockResolvedValue({ error: null });
-
+    it('delegates to retryJobAction with the job id', async () => {
+      (retryJobAction as any).mockResolvedValue(undefined);
       await retryJob('j1');
-      expect(mockRpc).toHaveBeenCalledWith('admin_retry_job', { p_id: 'j1' });
+      expect(retryJobAction).toHaveBeenCalledWith('j1');
     });
 
-    it('throws on RPC error', async () => {
-      mockRpc.mockResolvedValue({ error: { message: 'fail' } });
-      await expect(retryJob('j1')).rejects.toBeDefined();
+    it('propagates errors from the action', async () => {
+      (retryJobAction as any).mockRejectedValue(new Error('fail'));
+      await expect(retryJob('j1')).rejects.toThrow('fail');
     });
   });
 
-  // ── cancelJob ──────────────────────────────────────────────
   describe('cancelJob', () => {
-    it('calls admin_cancel_job RPC', async () => {
-      mockRpc.mockResolvedValue({ error: null });
-
+    it('delegates to cancelJobAction with the job id', async () => {
+      (cancelJobAction as any).mockResolvedValue(undefined);
       await cancelJob('j1');
-      expect(mockRpc).toHaveBeenCalledWith('admin_cancel_job', { p_id: 'j1' });
+      expect(cancelJobAction).toHaveBeenCalledWith('j1');
     });
 
-    it('throws on RPC error', async () => {
-      mockRpc.mockResolvedValue({ error: { message: 'cancelled' } });
-      await expect(cancelJob('j1')).rejects.toBeDefined();
+    it('propagates errors from the action', async () => {
+      (cancelJobAction as any).mockRejectedValue(new Error('cancelled'));
+      await expect(cancelJob('j1')).rejects.toThrow('cancelled');
     });
   });
 
-  // ── releaseStaleJobs ───────────────────────────────────────
   describe('releaseStaleJobs', () => {
-    it('calls RPC and returns released count', async () => {
-      mockRpc.mockReturnValue({
-        single: vi.fn().mockResolvedValue({ data: 7, error: null }),
-      });
-
+    it('delegates to releaseStaleJobsAction and returns the released count', async () => {
+      (releaseStaleJobsAction as any).mockResolvedValue(7);
       const result = await releaseStaleJobs();
+      expect(releaseStaleJobsAction).toHaveBeenCalledWith();
       expect(result).toBe(7);
-      expect(mockRpc).toHaveBeenCalledWith('release_stale_job_locks');
     });
 
     it('returns 0 when no stale jobs', async () => {
-      mockRpc.mockReturnValue({
-        single: vi.fn().mockResolvedValue({ data: null, error: null }),
-      });
-
+      (releaseStaleJobsAction as any).mockResolvedValue(0);
       const result = await releaseStaleJobs();
       expect(result).toBe(0);
     });
 
-    it('throws on RPC error', async () => {
-      mockRpc.mockReturnValue({
-        single: vi.fn().mockResolvedValue({ data: null, error: { message: 'RPC failed' } }),
-      });
-
-      await expect(releaseStaleJobs()).rejects.toEqual({ message: 'RPC failed' });
+    it('propagates errors from the action', async () => {
+      (releaseStaleJobsAction as any).mockRejectedValue(new Error('RPC failed'));
+      await expect(releaseStaleJobs()).rejects.toThrow('RPC failed');
     });
   });
 });

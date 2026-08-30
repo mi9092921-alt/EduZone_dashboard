@@ -1,10 +1,12 @@
 'use client';
 
-import { Box, Typography, Button, Chip, Alert, FormControlLabel, Switch } from '@mui/material';
 import { Publish, Archive } from '@mui/icons-material';
+import { Box, Typography, Button, Chip, Alert } from '@mui/material';
+import { useTranslations } from 'next-intl';
+
 import { useUpdateCourse } from '@/adapters/mutations/courses.mutations';
 import type { CourseDetail } from '@/domain/types/course.types';
-import { useTranslations } from 'next-intl';
+
 
 interface CourseSettingsTabProps {
   course: CourseDetail;

@@ -1,6 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { http, HttpResponse } from 'msw';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
 import { server } from '../../../tests/mocks/server';
+
 import { container } from '@/container';
 
 // ── Mock the container ────────────────────────────────────────────
@@ -23,7 +25,8 @@ vi.mock('@/container', () => ({
   },
 }));
 
-// ── Import AFTER mocks ────────────────────────────────────────────
+// ── Import AFTER mocks (vi.mock is hoisted regardless; kept here for readability) ──
+// eslint-disable-next-line import/order
 import {
   dryRunBulkAction,
   submitBulkAction,

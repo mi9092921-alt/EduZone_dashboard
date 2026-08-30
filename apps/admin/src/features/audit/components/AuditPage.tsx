@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import {
   Security,
   Speed,
@@ -8,24 +7,26 @@ import {
   Stream,
 } from '@mui/icons-material';
 import { Tooltip } from '@mui/material';
-import { Button } from '@/components/ui/Button';
-import { useFlushActivityLogs } from '@/adapters/mutations/audit.mutations';
-import { AuditLogsTab } from './AuditLogsTab';
-import { RateLimitsTab } from './RateLimitsTab';
-import { LiveActivityStream } from './LiveActivityStream';
 import { useTranslations } from 'next-intl';
+import { useState } from 'react';
+
+import { AuditLogsTab } from './AuditLogsTab';
+import { LiveActivityStream } from './LiveActivityStream';
+import { RateLimitsTab } from './RateLimitsTab';
+
+import { useFlushActivityLogs } from '@/adapters/mutations/audit.mutations';
+import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 
 type Tab = 'audit' | 'rateLimits';
 
 export function AuditPage() {
   const t = useTranslations('audit');
-  const tCommon = useTranslations('common');
   const [tab, setTab] = useState<Tab>('audit');
   const [streamOpen, setStreamOpen] = useState(false);
 
   const flush = useFlushActivityLogs();
-  const [flushResult, setFlushResult] = useState<{ key: string; params?: any } | null>(null);
+  const [flushResult, setFlushResult] = useState<{ key: string; params?: { count: number } } | null>(null);
 
   const handleFlush = async () => {
     setFlushResult(null);
@@ -33,8 +34,9 @@ export function AuditPage() {
       const count = await flush.mutateAsync(200);
       setFlushResult({ key: 'status_flushed', params: { count } });
       setTimeout(() => setFlushResult(null), 5000);
-    } catch (err: any) {
-      if (err?.code === 'LOCK_CONTENTION') {
+    } catch (err: unknown) {
+      const code = (err as { code?: string } | null)?.code;
+      if (code === 'LOCK_CONTENTION') {
         setFlushResult({ key: 'status_lock_contention' });
       } else {
         setFlushResult({ key: 'status_flush_failed' });

@@ -5,7 +5,6 @@ import {
   Settings,
   Flag,
   Warning,
-  CreditCard,
   PieChart,
   Security,
   WorkOutline,
@@ -13,6 +12,7 @@ import {
   History,
 } from '@mui/icons-material';
 import type { ElementType } from 'react';
+
 import type { PrimaryRole } from '@/adapters/stores/auth.store';
 
 export interface NavItem {

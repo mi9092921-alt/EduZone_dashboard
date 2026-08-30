@@ -2,7 +2,7 @@
  * Simplified utility for conditionally joining classNames.
  * Replacement for clsx + tailwind-merge to avoid new dependencies.
  */
-export function cn(...inputs: (string | boolean | undefined | null | { [key: string]: any })[]) {
+export function cn(...inputs: (string | boolean | undefined | null | { [key: string]: boolean | undefined | null })[]) {
   return inputs
     .filter(Boolean)
     .map((input) => {
@@ -19,7 +19,7 @@ export function cn(...inputs: (string | boolean | undefined | null | { [key: str
     .trim();
 }
 
-export function downloadJson(data: any, fileName: string) {
+export function downloadJson(data: unknown, fileName: string) {
   const jsonString = JSON.stringify(data, null, 2);
   const blob = new Blob([jsonString], { type: 'application/json' });
   const url = URL.createObjectURL(blob);

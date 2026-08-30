@@ -1,9 +1,10 @@
 'use client';
 
-import { useSystemHealth } from '@/adapters/queries/analytics.queries';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Memory, Dns, ErrorOutline, WarningAmber } from '@mui/icons-material';
 import { useTranslations } from 'next-intl';
+
+import { useSystemHealth } from '@/adapters/queries/analytics.queries';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 
 export function QueueHealthPanel() {
   const t = useTranslations('common');

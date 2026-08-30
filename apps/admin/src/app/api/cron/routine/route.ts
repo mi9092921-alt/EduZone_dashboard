@@ -1,6 +1,9 @@
-import { NextResponse } from 'next/server';
 import { timingSafeEqual } from 'node:crypto';
+
 import { createClient } from '@supabase/supabase-js';
+import { NextResponse } from 'next/server';
+
+import { getErrorMessage } from '@/domain/errors';
 
 function hasValidCronSecret(request: Request): boolean {
   const configuredSecret = process.env.CRON_SECRET;
@@ -60,7 +63,7 @@ export async function GET(request: Request) {
       p_worker_id: workerId,
       p_limit: 1000
     });
-    
+
     if (purgeErr) throw new Error(`process_cache_purges failed: ${purgeErr.message}`);
     results['jobs_processed'] = processedJobs;
 
@@ -90,12 +93,118 @@ export async function GET(request: Request) {
     // *and* push_deliveries/notification_push rows atomically per job, and is
     // granted to service_role (see BUG-NOTIF-01 in 10_permissions.sql).
     const fanoutWorkerId = crypto.randomUUID();
-    const { data: fanoutProcessed, error: fanoutErr } = await supabaseAdmin.rpc(
-      'process_notification_fanout_jobs',
-      { p_limit: 500, p_worker_id: fanoutWorkerId },
-    );
+    let fanoutCount = 0;
 
-    if (fanoutErr) {
+    const supabaseInternal = getSupabaseAdmin().schema('internal');
+
+    try {
+      const { data: jobs, error: dequeueErr } = await supabaseAdmin.rpc('dequeue_job', {
+        p_worker_id: fanoutWorkerId,
+        p_job_types: ['notification_fanout'],
+        p_lock_duration_seconds: 300,
+      });
+
+      if (dequeueErr) {
+        throw new Error(`dequeue_job for fanout failed: ${dequeueErr.message}`);
+      }
+
+      const activeJobs = (jobs || []) as any[];
+      const jobsToProcess = activeJobs.slice(0, 500);
+
+      for (const job of jobsToProcess) {
+        const notifId = job.payload?.notification_id;
+        const tenantId = job.payload?.tenant_id;
+        const audience = job.payload?.target_audience;
+
+        if (!notifId || !tenantId) {
+          await supabaseInternal
+            .from('job_queue')
+            .update({
+              status: 'failed',
+              error_message: 'Invalid payload: missing notification_id or tenant_id',
+              finished_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', job.id);
+          continue;
+        }
+
+        try {
+          let query = supabaseAdmin
+            .from('users')
+            .select('id, primary_role')
+            .eq('tenant_id', tenantId)
+            .is('deleted_at', null)
+            .eq('account_status', 'active');
+
+          if (audience === 'students') {
+            query = query.eq('primary_role', 'student');
+          } else if (audience === 'teachers') {
+            query = query.eq('primary_role', 'teacher');
+          } else if (audience === 'admins') {
+            query = query.in('primary_role', ['admin', 'super_admin']);
+          }
+
+          const { data: users, error: usersErr } = await query;
+          if (usersErr) throw usersErr;
+
+          if (users && users.length > 0) {
+            const { data: existingNotifs } = await supabaseAdmin
+              .from('user_notifications')
+              .select('user_id')
+              .eq('notification_id', notifId);
+
+            const existingUserIds = new Set((existingNotifs || []).map((un: any) => un.user_id));
+
+            const insertRows = users
+              .filter(u => !existingUserIds.has(u.id))
+              .map(u => ({
+                user_id: u.id,
+                notification_id: notifId,
+                tenant_id: tenantId,
+                is_read: false
+              }));
+
+            if (insertRows.length > 0) {
+              const { error: insertErr } = await supabaseAdmin
+                .from('user_notifications')
+                .insert(insertRows);
+
+              if (insertErr) throw insertErr;
+            }
+          }
+
+          await supabaseInternal
+            .from('job_queue')
+            .update({
+              status: 'done',
+              finished_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', job.id);
+
+          fanoutCount++;
+        } catch (jobErr: any) {
+          console.error(`[CRON_ROUTINE_FANOUT_JOB_ERROR] Job ID ${job.id} failed:`, jobErr);
+          const attempts = (job.attempts || 0) + 1;
+          const maxAttempts = job.max_attempts || 3;
+
+          await supabaseInternal
+            .from('job_queue')
+            .update({
+              status: attempts >= maxAttempts ? 'failed' : 'pending',
+              error_message: jobErr.message,
+              locked_by_worker_id: null,
+              locked_at: null,
+              lock_expires_at: null,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', job.id);
+        }
+      }
+
+      results['notification_fanout_jobs_processed'] = fanoutCount;
+    } catch (fanoutErr: any) {
       console.error('[CRON_ROUTINE_FANOUT_ERROR]', fanoutErr);
       results['notification_fanout_jobs_processed'] = `Worker error: ${fanoutErr.message}`;
     } else {
@@ -107,7 +216,7 @@ export async function GET(request: Request) {
       timestamp: new Date().toISOString(),
       results
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[CRON_ROUTINE_ERROR]', err);
     // Return 500 to signal a cron failure out to Next.js Error Monitoring (e.g. Sentry)
     return NextResponse.json({

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { Lock, LockOpen, Warning } from '@mui/icons-material';
 import {
   Box,
   Typography,
@@ -14,7 +14,9 @@ import {
   Alert,
   CircularProgress,
 } from '@mui/material';
-import { Lock, LockOpen, Warning } from '@mui/icons-material';
+import { useTranslations } from 'next-intl';
+import { useState } from 'react';
+
 import { useLockApp, useUnlockApp } from '@/adapters/mutations/settings.mutations';
 import { parseRpcError } from '@/domain/errors';
 import type { SettingsByCategory } from '@/domain/types/settings.types';
@@ -22,8 +24,6 @@ import type { SettingsByCategory } from '@/domain/types/settings.types';
 interface AppLockControlProps {
   settings?: SettingsByCategory;
 }
-
-import { useTranslations } from 'next-intl';
 
 export function AppLockControl({ settings }: AppLockControlProps) {
   const t = useTranslations('settings.app_lock');

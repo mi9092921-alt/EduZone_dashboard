@@ -1,9 +1,9 @@
 'use client';
 
-import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { Box, Button, Container, Typography, Paper } from '@mui/material';
 import { ErrorOutline as AlertCircle, Refresh } from '@mui/icons-material';
+import { Box, Button, Container, Typography, Paper } from '@mui/material';
 import { useTranslations } from 'next-intl';
+import React, { Component, ErrorInfo, ReactNode } from 'react';
 
 interface Props {
   children?: ReactNode;

@@ -1,8 +1,8 @@
 'use client';
 
+import { WifiOff } from '@mui/icons-material';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
-import { WifiOff } from '@mui/icons-material';
 
 /**
  * Banner that appears when the user loses internet connection.

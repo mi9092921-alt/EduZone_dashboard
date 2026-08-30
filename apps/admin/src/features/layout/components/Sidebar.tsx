@@ -1,23 +1,23 @@
 'use client';
 
-import React, { useMemo } from 'react';
-import { Tooltip } from '@mui/material';
-import { AdminPanelSettings } from '@mui/icons-material';
-import { usePathname, Link } from '@/i18n/routing';
-
-import { useAuthUser } from '@/adapters/stores/auth.store';
-import { cn } from '@/lib/utils';
-import { useTranslations } from 'next-intl';
-
-import { NAV_ITEMS } from '@/config/nav.config';
-import type { PrimaryRole } from '@/adapters/stores/auth.store';
-
+import { AdminPanelSettings, Menu as MenuIcon } from '@mui/icons-material';
+import { Zoom, Tooltip } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import { Zoom } from '@mui/material';
+import type { TransitionProps } from '@mui/material/transitions';
+import { AnimatePresence, motion } from 'framer-motion';
+import { useTranslations } from 'next-intl';
+import React, { useMemo } from 'react';
+
+import { useLayout } from '../hooks/useLayout';
+
+import type { PrimaryRole } from '@/adapters/stores/auth.store';
+import { useAuthUser } from '@/adapters/stores/auth.store';
+import { NAV_ITEMS } from '@/config/nav.config';
+import { usePathname, Link } from '@/i18n/routing';
+import { cn } from '@/lib/utils';
 
 const SIDEBAR_WIDTH = '220px';
 const COLLAPSED_WIDTH = '80px';
-const MOBILE_DRAWER_CLASS = 'w-[220px]';
 
 interface SidebarContentProps {
   isMobile: boolean;
@@ -27,8 +27,6 @@ interface SidebarContentProps {
   setSidebarOpen: (open: boolean) => void;
   isCollapsed?: boolean;
 }
-
-import { ChevronLeft, Menu as MenuIcon } from '@mui/icons-material';
 
 function SidebarInnerContent({
   isMobile,
@@ -122,7 +120,7 @@ function SidebarInnerContent({
               title={t(item.label)} 
               placement={isRtl ? "left" : "right"} 
               arrow 
-              TransitionComponent={Zoom as any}
+              TransitionComponent={Zoom as React.JSXElementConstructor<TransitionProps & { children: React.ReactElement }>}
             >
               <div>{buttonContent}</div>
             </Tooltip>
@@ -151,9 +149,6 @@ function SidebarInnerContent({
     </div>
   );
 }
-
-import { motion, AnimatePresence } from 'framer-motion';
-import { useLayout } from '../hooks/useLayout';
 
 export function Sidebar() {
   const pathname = usePathname();

@@ -1,29 +1,31 @@
 'use client';
 
 import {
-  Menu,
-  MenuItem,
-  Divider,
-} from '@mui/material';
-import {
   Menu as MenuIcon,
   Logout,
   Person,
   DarkMode,
 } from '@mui/icons-material';
-import { useState, useMemo } from 'react';
-import { useRouter, usePathname } from '@/i18n/routing';
-
-import { useAuthUser, useAuthStore } from '@/adapters/stores/auth.store';
-import { createBrowserClient } from '@/infrastructure/supabase/client';
+import {
+  Menu,
+  MenuItem,
+  Divider,
+} from '@mui/material';
 import { useTranslations, useLocale } from 'next-intl';
-import { useLayout } from '../hooks/useLayout';
 import { useTheme } from 'next-themes';
+import { useState, useMemo } from 'react';
+
+import { useLayout } from '../hooks/useLayout';
+
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { NotificationBell } from './NotificationBell';
-import { cn } from '@/lib/utils';
+
+import { useAuthUser, useAuthStore } from '@/adapters/stores/auth.store';
 import { NAV_ITEMS } from '@/config/nav.config';
+import { useRouter, usePathname } from '@/i18n/routing';
 import { clearBrowserSessionId } from '@/infrastructure/auth/browserSession';
+import { createBrowserClient } from '@/infrastructure/supabase/client';
+import { cn } from '@/lib/utils';
 
 export function Topbar() {
   const t = useTranslations('common');

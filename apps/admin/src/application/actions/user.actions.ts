@@ -1,9 +1,11 @@
 'use server';
 
 import { createClient } from '@supabase/supabase-js';
+
+import { getErrorMessage } from '@/domain/errors';
 import { CreateUserInput, createUserSchema } from '@/domain/schemas/user.schema';
-import { createServerClient } from '@/infrastructure/supabase/server';
 import type { AccountAction } from '@/domain/types/user.types';
+import { createServerClient } from '@/infrastructure/supabase/server';
 
 // ── Helper: build a service-role admin client ────────────────────────────────
 function createAdminClient() {
@@ -199,9 +201,9 @@ export async function createUserAction(data: CreateUserInput) {
     }
 
     return { success: true, userId: authData.user.id };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('createUserAction error:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: getErrorMessage(error) };
   }
 }
 
@@ -239,9 +241,9 @@ export async function deleteUserAction(userId: string) {
     }
 
     return { success: true };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('deleteUserAction error:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: getErrorMessage(error) };
   }
 }
 
@@ -275,7 +277,7 @@ export async function controlUserAccountAction(
 
     if (error) {
       console.error(`[controlUserAccountAction] ${action} on ${userId} failed:`, error);
-      return { success: false, error: error.message };
+      return { success: false, error: getErrorMessage(error) };
     }
 
     const result = data as { status?: string; until?: string } | null;
@@ -284,9 +286,9 @@ export async function controlUserAccountAction(
       ...(result?.status !== undefined && { accountStatus: result.status }),
       ...(result?.until !== undefined && { until: result.until }),
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('controlUserAccountAction error:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: getErrorMessage(error) };
   }
 }
 
@@ -319,13 +321,13 @@ export async function terminateUserSessionsAction(
         `[terminateUserSessionsAction] terminate sessions for ${userId} failed:`,
         error,
       );
-      return { success: false, error: error.message };
+      return { success: false, error: getErrorMessage(error) };
     }
 
     return { success: true, count: (data as number | null) ?? 0 };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('terminateUserSessionsAction error:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: getErrorMessage(error) };
   }
 }
 
@@ -351,12 +353,12 @@ export async function issueWarningAction(
 
     if (error) {
       console.error(`[issueWarningAction] warning for ${userId} failed:`, error);
-      return { success: false, error: error.message };
+      return { success: false, error: getErrorMessage(error) };
     }
 
     return { success: true, warningId: data as string };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('issueWarningAction error:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: getErrorMessage(error) };
   }
 }

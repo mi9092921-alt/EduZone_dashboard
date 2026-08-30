@@ -1,7 +1,8 @@
 'use server';
 
-import { headers } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
+import { headers } from 'next/headers';
+
 import { createServerClient } from '@/infrastructure/supabase/server';
 
 function createAdminClient() {

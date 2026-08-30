@@ -27,8 +27,8 @@ Cypress.Commands.add('loginAs', (role: AppRole) => {
       const supabase = createClient(supabaseUrl, supabaseKey);
 
       cy.wrap(supabase.auth.signInWithPassword({ email, password }), { log: false })
-        .then((res: any) => {
-          const { data, error } = res;
+        .then((res: unknown) => {
+          const { data, error } = res as Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>;
           if (error) throw error;
           
           const sessionKey = `sb-${new URL(supabaseUrl).hostname.split('.')[0]}-auth-token`;

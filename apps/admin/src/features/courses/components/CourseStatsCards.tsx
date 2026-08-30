@@ -1,10 +1,12 @@
 'use client';
 
 import { School, Publish, EditNote, Archive } from '@mui/icons-material';
-import { useCoursesOverviewStats } from '@/adapters/queries/courses.queries';
-import { Card, CardContent, StatsCard, StatsCardContent, StatsCardIcon } from '@/components/ui/Card';
-import { useTranslations } from 'next-intl';
 import { Typography, Box } from '@mui/material';
+import { useTranslations } from 'next-intl';
+
+import { useCoursesOverviewStats } from '@/adapters/queries/courses.queries';
+import { StatsCard, StatsCardContent, StatsCardIcon } from '@/components/ui/Card';
+
 
 export function CourseStatsCards() {
   const t = useTranslations('common');

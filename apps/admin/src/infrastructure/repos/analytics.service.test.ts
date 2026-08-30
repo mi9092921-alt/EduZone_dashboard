@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
 import {
   getUserStats,
   getCourseStats,
@@ -6,6 +7,7 @@ import {
   getUserRegistrationTrend,
   getGeographicDistribution,
 } from './analytics.service';
+
 import { container } from '@/container';
 
 vi.mock('@/container', () => ({
@@ -15,6 +17,10 @@ vi.mock('@/container', () => ({
       rpc: vi.fn(),
     },
   },
+}));
+
+vi.mock('@/application/actions/admin.actions', () => ({
+  getAnalyticsCourseStatsAction: vi.fn(),
 }));
 
 describe('analytics.service', () => {
@@ -55,27 +61,18 @@ describe('analytics.service', () => {
     expect(res.active_users).toBe(0);
   });
 
-  it('getCourseStats returns MV and fetches titles', async () => {
-    mockFrom.mockImplementation((table: string) => {
-      if (table === 'vw_course_stats') {
-        return setupQuery({ data: [{ course_id: 'c1', enrolled: 50 }], error: null });
-      }
-      if (table === 'courses') {
-        return setupQuery({ data: [{ id: 'c1', title: 'React' }], error: null });
-      }
-      return setupQuery({});
-    });
+  it('getCourseStats returns action data', async () => {
+    const { getAnalyticsCourseStatsAction } = await import('@/application/actions/admin.actions');
+    const stats = [{ course_id: 'c1', title: 'React', enrolled: 50 }];
+    (getAnalyticsCourseStatsAction as any).mockResolvedValue(stats);
 
     const res = await getCourseStats();
-    expect(res).toHaveLength(1);
-    expect(res[0]!.title).toBe('React');
+    expect(res).toEqual(stats);
   });
 
-  it('getCourseStats returns empty when stats view unavailable', async () => {
-    mockFrom.mockImplementation((table: string) => {
-      if (table === 'vw_course_stats') return setupQuery({ data: null, error: null });
-      return setupQuery({});
-    });
+  it('getCourseStats returns empty when the action throws', async () => {
+    const { getAnalyticsCourseStatsAction } = await import('@/application/actions/admin.actions');
+    (getAnalyticsCourseStatsAction as any).mockRejectedValue(new Error('unavailable'));
 
     const res = await getCourseStats('t1');
     expect(res).toEqual([]);

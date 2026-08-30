@@ -1,39 +1,42 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from '@/i18n/routing';
-import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { updateCourseSchema, type UpdateCourseFormInput } from '@/domain/schemas/course.schema';
-import { useUpdateCourse } from '@/adapters/mutations/courses.mutations';
-import type { CourseDetail } from '@/domain/types/course.types';
-import { DeleteCourseDialog } from './DeleteCourseDialog';
 import { Save, DeleteOutline } from '@mui/icons-material';
-import { useToast } from '@/adapters/stores/toast.store';
-import { Input } from '@/components/ui/Input';
-import { Label } from '@/components/ui/Label';
-import { Select, SelectItem } from '@/components/ui/Select';
-import { Button } from '@/components/ui/Button';
-import { Switch } from '@/components/ui/Switch';
-import { cn } from '@/lib/utils';
+import { Add, Close, ImportContacts, PlaylistAddCheck } from '@mui/icons-material';
 import { useTranslations } from 'next-intl';
+import { useEffect, useState } from 'react';
+import { useForm, Controller } from 'react-hook-form';
+
+import { DeleteCourseDialog } from './DeleteCourseDialog';
+
+import { useUpdateCourse } from '@/adapters/mutations/courses.mutations';
+import {
+  useSaveLearningObjectives,
+  useSavePrerequisites,
+} from '@/adapters/mutations/courses.mutations';
 import {
   useCourseLearningObjectives,
   useCoursePrerequisites,
   useCoursePrerequisiteOptions,
 } from '@/adapters/queries/courses.queries';
-import {
-  useSaveLearningObjectives,
-  useSavePrerequisites,
-} from '@/adapters/mutations/courses.mutations';
-import { Add, Close, ImportContacts, PlaylistAddCheck } from '@mui/icons-material';
+import { useToast } from '@/adapters/stores/toast.store';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Label } from '@/components/ui/Label';
+import { Select, SelectItem } from '@/components/ui/Select';
+import { Switch } from '@/components/ui/Switch';
+import { updateCourseSchema, type UpdateCourseFormInput } from '@/domain/schemas/course.schema';
+import type { CourseDetail } from '@/domain/types/course.types';
+import { useRouter } from '@/i18n/routing';
+import { cn } from '@/lib/utils';
+
 
 interface CourseInfoFormProps {
   course: CourseDetail;
   hideTeacherSelect?: boolean;
 }
 
-export function CourseInfoForm({ course, hideTeacherSelect }: CourseInfoFormProps) {
+export function CourseInfoForm({ course, hideTeacherSelect: _hideTeacherSelect }: CourseInfoFormProps) {
   const t = useTranslations('common');
   const router = useRouter();
   const updateMutation = useUpdateCourse();
@@ -133,16 +136,16 @@ export function CourseInfoForm({ course, hideTeacherSelect }: CourseInfoFormProp
   const onSubmit = async (data: UpdateCourseFormInput) => {
     const payload: Parameters<typeof updateMutation.mutateAsync>[0]['data'] = {};
     if (data.title !== undefined) payload.title = data.title;
-    if (data.description !== undefined) payload.description = data.description || (null as any);
-    if (data.category !== undefined) payload.category = data.category || (null as any);
-    if (data.level !== undefined) payload.level = data.level as any;
+    if (data.description !== undefined) payload.description = data.description || null;
+    if (data.category !== undefined) payload.category = data.category || null;
+    if (data.level !== undefined) payload.level = data.level;
     if (data.price !== undefined) {
       payload.price = data.is_free ? 0 : data.price;
     }
-    if (data.slug !== undefined) payload.slug = data.slug || (null as any);
-    if (data.thumbnail_url !== undefined) payload.thumbnail_url = data.thumbnail_url || (null as any);
-    if (data.teacher_id !== undefined) payload.teacher_id = data.teacher_id || (null as any);
-    if (data.status !== undefined) payload.status = data.status as any;
+    if (data.slug !== undefined) payload.slug = data.slug || null;
+    if (data.thumbnail_url !== undefined) payload.thumbnail_url = data.thumbnail_url || null;
+    if (data.teacher_id !== undefined) payload.teacher_id = data.teacher_id || null;
+    if (data.status !== undefined) payload.status = data.status;
 
     try {
       await updateMutation.mutateAsync({ id: course.id, data: payload });

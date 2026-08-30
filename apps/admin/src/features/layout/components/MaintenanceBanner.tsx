@@ -1,8 +1,9 @@
 'use client';
 
-import { useSetting } from '@/adapters/queries/settings.queries';
 import { Engineering } from '@mui/icons-material';
 import { useTranslations } from 'next-intl';
+
+import { useSetting } from '@/adapters/queries/settings.queries';
 
 /**
  * Banner that appears when maintenance mode is active.

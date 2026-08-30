@@ -1,5 +1,8 @@
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
+
 import { queryKeys } from './keys';
+
+import type { UserFilters } from '@/domain/types/user.types';
 import {
   getUsers,
   getUserById,
@@ -10,7 +13,6 @@ import {
   getUserRoles,
   getUserStats,
 } from '@/infrastructure/repos/users.service';
-import type { UserFilters } from '@/domain/types/user.types';
 
 /**
  * React Query hooks for all user data.

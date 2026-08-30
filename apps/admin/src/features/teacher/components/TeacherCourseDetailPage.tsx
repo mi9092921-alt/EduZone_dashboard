@@ -1,8 +1,12 @@
 'use client';
 
-import { useState } from 'react';
-import { useParams } from 'next/navigation';
-import { useRouter } from '@/i18n/routing';
+import {
+  ArrowBack,
+  MenuBook,
+  People,
+  BarChart,
+  Settings,
+} from '@mui/icons-material';
 import {
   Box,
   Typography,
@@ -15,19 +19,20 @@ import {
   Fade,
   Divider,
 } from '@mui/material';
-import {
-  ArrowBack,
-  MenuBook,
-  People,
-  BarChart,
-  Settings,
-} from '@mui/icons-material';
-import { useCourseById } from '@/adapters/queries/courses.queries';
-import { StudentProgressPage } from './StudentProgressPage';
-import { CourseAnalyticsPage } from './CourseAnalyticsPage';
-import { CurriculumBuilder } from '@/features/courses/components/CurriculumBuilder';
-import { CourseInfoForm } from '@/features/courses/components/CourseInfoForm';
+import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+import { useState } from 'react';
+
+
+
+import { CourseAnalyticsPage } from './CourseAnalyticsPage';
+import { StudentProgressPage } from './StudentProgressPage';
+
+import { useCourseById } from '@/adapters/queries/courses.queries';
+import { CourseInfoForm } from '@/features/courses/components/CourseInfoForm';
+import { CurriculumBuilder } from '@/features/courses/components/CurriculumBuilder';
+import { useRouter } from '@/i18n/routing';
+
 
 export function TeacherCourseDetailPage() {
   const t = useTranslations('common');
@@ -62,7 +67,7 @@ export function TeacherCourseDetailPage() {
     );
   }
 
-  const handleTabChange = (_: any, newValue: number) => {
+  const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
   };
 

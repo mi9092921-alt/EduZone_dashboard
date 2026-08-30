@@ -1,6 +1,7 @@
 'use client';
 
 import { QueryClient } from '@tanstack/react-query';
+
 import { parseRpcError, SESSION_INVALIDATING_CODES } from '@/domain/errors';
 
 /**

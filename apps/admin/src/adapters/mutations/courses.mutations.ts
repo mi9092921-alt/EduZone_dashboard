@@ -1,5 +1,13 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+
 import { queryKeys } from '@/adapters/queries/keys';
+import { container } from '@/container';
+import type {
+  CreateCourseInput,
+  UpdateCourseInput,
+  CreateSectionInput,
+  CreateLessonInput,
+} from '@/domain/types/course.types';
 import {
   createCourse,
   updateCourse,
@@ -18,13 +26,6 @@ import {
   saveLearningObjectives,
   savePrerequisites,
 } from '@/infrastructure/repos/courses.service';
-import { container } from '@/container';
-import type {
-  CreateCourseInput,
-  UpdateCourseInput,
-  CreateSectionInput,
-  CreateLessonInput,
-} from '@/domain/types/course.types';
 
 /**
  * Mutation hooks for course management actions.

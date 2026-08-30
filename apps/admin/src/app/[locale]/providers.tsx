@@ -1,12 +1,15 @@
 'use client';
 
-import { QueryClientProvider } from '@tanstack/react-query';
 
 import { AppRouterCacheProvider } from '@mui/material-nextjs/v15-appRouter';
-import { getQueryClient } from '@/infrastructure/rpc/globalQueryClient';
+import { QueryClientProvider } from '@tanstack/react-query';
+
+
 import { EduZoneThemeProvider } from './ThemeProvider';
-import { AuthProvider } from '@/features/auth';
+
 import { Toast } from '@/components/ui/Toast';
+import { AuthProvider } from '@/features/auth';
+import { getQueryClient } from '@/infrastructure/rpc/globalQueryClient';
 
 /**
  * Global Providers — wraps the entire app.

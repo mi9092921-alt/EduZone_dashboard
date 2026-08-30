@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { parseRpcError } from './parseRpcError';
+
 import { AppError } from './AppError';
+import { parseRpcError } from './parseRpcError';
 
 describe('parseRpcError', () => {
   it('should return the same AppError if passed an AppError', () => {

@@ -3,9 +3,6 @@
  * `courses`, `sections`, `lessons`, `enrollments`, `vw_course_stats` tables.
  */
 
-import type { PaginatedResult } from './user.types';
-export type { PaginatedResult };
-
 import type {
   Course as BaseCourse,
   CourseStatus,
@@ -14,6 +11,9 @@ import type {
   LessonContent as BaseLessonContent,
   Enrollment as BaseEnrollment,
 } from '@eduzone/types';
+
+import type { PaginatedResult } from './user.types';
+export type { PaginatedResult };
 
 export type { CourseStatus };
 
@@ -26,9 +26,8 @@ export type EnrollmentStatus = 'active' | 'revoked' | 'expired' | 'completed';
 // ── Lesson Content ───────────────────────────────────────────────
 export type VideoProvider = 'youtube' | 's3' | 'bunny' | 'mux' | 'vimeo';
 
-export interface LessonContent extends BaseLessonContent {
-  // Sync with v13
-}
+// Sync with v13
+export type LessonContent = BaseLessonContent;
 
 // ── Lesson ───────────────────────────────────────────────────────
 export interface Lesson extends BaseLesson {
@@ -133,8 +132,13 @@ export interface CreateCourseInput {
   status?: CourseStatus;
 }
 
-export interface UpdateCourseInput extends Partial<CreateCourseInput> {
+export interface UpdateCourseInput extends Omit<Partial<CreateCourseInput>, 'description' | 'category' | 'slug' | 'thumbnail_url' | 'teacher_id'> {
   status?: CourseStatus;
+  description?: string | null;
+  category?: string | null;
+  slug?: string | null;
+  thumbnail_url?: string | null;
+  teacher_id?: string | null;
 }
 
 export interface CreateSectionInput {

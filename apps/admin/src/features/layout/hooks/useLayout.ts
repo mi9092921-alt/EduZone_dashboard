@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+
 import { useUiStore } from '@/adapters/stores/ui.store';
 
 // Breakpoints matching Tailwind md (768px) and lg (1024px)

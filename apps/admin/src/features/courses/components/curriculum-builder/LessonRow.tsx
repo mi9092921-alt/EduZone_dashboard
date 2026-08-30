@@ -1,6 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import {
+  Edit,
+  Delete,
+  DragIndicator,
+  OndemandVideo,
+  Description,
+} from '@mui/icons-material';
 import {
   Box,
   Typography,
@@ -12,23 +20,18 @@ import {
   useTheme,
   alpha,
 } from '@mui/material';
-import {
-  Edit,
-  Delete,
-  DragIndicator,
-  OndemandVideo,
-  Description,
-} from '@mui/icons-material';
-import type { Lesson } from '@/domain/types/course.types';
+import { useTranslations } from 'next-intl';
+import { useState, useEffect } from 'react';
+
 import {
   useUpdateLesson,
   useDeleteLesson,
 } from '@/adapters/mutations/courses.mutations';
-import { useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import { useTranslations } from 'next-intl';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useToast } from '@/adapters/stores/toast.store';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { getErrorMessage } from '@/domain/errors';
+import type { Lesson } from '@/domain/types/course.types';
+import { formatVideoUrl, isValidVideoUrl } from '@/domain/video.utils';
 
 // ── Helpers ─────────────────────────────────────────────
 // ── Helpers ─────────────────────────────────────────────
@@ -50,8 +53,6 @@ function formatDuration(sec: number | null): string {
   }
   return `${mins}:${String(secs).padStart(2, '0')}`;
 }
-
-import { formatVideoUrl, isValidVideoUrl } from '@/domain/video.utils';
 
 // ══════════════════════════════════════════════════
 // LESSON ROW
@@ -127,13 +128,13 @@ export function LessonRow({
         },
       });
       setEditing(false);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[LessonRow handleSave] Error:', err);
-      setUrlError(err.message || 'An error occurred while saving the lesson.');
+      setUrlError(getErrorMessage(err) || 'An error occurred while saving the lesson.');
     }
   };
 
-  const handleTogglePreview = async (e?: any) => {
+  const handleTogglePreview = async (e?: React.SyntheticEvent) => {
     if (e?.stopPropagation) e.stopPropagation();
     const newValue = !localPreview;
     setLocalPreview(newValue); // Optimistic update
@@ -149,7 +150,7 @@ export function LessonRow({
     }
   };
 
-  const handleTogglePublish = async (e?: any) => {
+  const handleTogglePublish = async (e?: React.SyntheticEvent) => {
     if (e?.stopPropagation) e.stopPropagation();
     const newValue = !localPublished;
     setLocalPublished(newValue); // Optimistic update
@@ -299,8 +300,8 @@ export function LessonRow({
             width: 36,
             height: 36,
             borderRadius: 2,
-            backgroundColor: (lesson.content?.video_path || (Array.isArray(lesson.content) && (lesson.content as any)[0]?.video_path)) ? alpha(theme.palette.primary.main, 0.1) : alpha(theme.palette.success.main, 0.1),
-            color: (lesson.content?.video_path || (Array.isArray(lesson.content) && (lesson.content as any)[0]?.video_path)) ? 'primary.main' : 'success.main',
+            backgroundColor: (lesson.content?.video_path || (Array.isArray(lesson.content) && lesson.content[0]?.video_path)) ? alpha(theme.palette.primary.main, 0.1) : alpha(theme.palette.success.main, 0.1),
+            color: (lesson.content?.video_path || (Array.isArray(lesson.content) && lesson.content[0]?.video_path)) ? 'primary.main' : 'success.main',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -324,7 +325,7 @@ export function LessonRow({
             {index + 1}. {lesson.title}
           </Typography>
           <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 500 }}>
-            {(lesson.content?.video_path || (Array.isArray(lesson.content) && (lesson.content as any)[0]?.video_path)) ? t('lesson_type_video') : t('lesson_type_content')}
+            {(lesson.content?.video_path || (Array.isArray(lesson.content) && lesson.content[0]?.video_path)) ? t('lesson_type_video') : t('lesson_type_content')}
             {lesson.duration_sec ? ` • ${formatDuration(lesson.duration_sec)}` : ''}
             {localPreview && (
               <Box

@@ -1,18 +1,12 @@
 'use client';
 
-import { useState, useCallback } from 'react';
 import { Add } from '@mui/icons-material';
-import type { User, UserFilters, AccountAction } from '@/domain/types/user.types';
-import type { BulkAction } from '@/domain/types/bulk.types';
-import { useUsers } from '@/adapters/queries/users.queries';
-import { useMutateUserAccount } from '@/adapters/mutations/users.mutations';
-import { UserStatsCards } from './UserStatsCards';
-import { UserFiltersBar } from './UserFiltersBar';
-import { UsersTable } from './UsersTable';
-import { UserProfileDrawer } from './UserProfileDrawer';
-import { BulkActionBar } from './BulkActionBar';
-import { BulkProgressPanel } from './BulkProgressPanel';
-import { downloadJson } from '@/lib/utils';
+import { useTranslations } from 'next-intl';
+import { useState, useCallback } from 'react';
+
+
+
+
 import {
   LockUserDialog,
   SuspendUserDialog,
@@ -23,8 +17,20 @@ import {
   DeleteUserDialog,
 } from './ActionDialogs';
 import { AddUserDialog } from './AddUserDialog';
+import { BulkActionBar } from './BulkActionBar';
+import { BulkProgressPanel } from './BulkProgressPanel';
+import { UserFiltersBar } from './UserFiltersBar';
+import { UserProfileDrawer } from './UserProfileDrawer';
+import { UsersTable } from './UsersTable';
+import { UserStatsCards } from './UserStatsCards';
+
+import { useMutateUserAccount } from '@/adapters/mutations/users.mutations';
+import { useUsers } from '@/adapters/queries/users.queries';
 import { Button } from '@/components/ui/Button';
-import { useTranslations } from 'next-intl';
+import type { BulkAction } from '@/domain/types/bulk.types';
+import type { User, UserFilters, AccountAction } from '@/domain/types/user.types';
+import { downloadJson } from '@/lib/utils';
+
 
 type DialogType =
   | 'lock'

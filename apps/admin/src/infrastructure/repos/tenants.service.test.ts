@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
 import {
   getTenants,
   getTenantById,
@@ -8,6 +9,7 @@ import {
   deleteTenant,
   getTenantAuditLogs,
 } from './tenants.service';
+
 import { container } from '@/container';
 
 vi.mock('@/container', () => ({
@@ -22,10 +24,15 @@ vi.mock('@/container', () => ({
   },
 }));
 
+vi.mock('@/application/actions/tenants.actions', () => ({
+  createTenantAction: vi.fn(),
+  updateTenantAction: vi.fn(),
+  suspendTenantAction: vi.fn(),
+  deleteTenantAction: vi.fn(),
+}));
+
 describe('tenants.service', () => {
   const mockFrom = container.supabase.from as any;
-  const mockRpc = container.supabase.rpc as any;
-  const mockAuth = container.supabase.auth.getUser as any;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -137,100 +144,59 @@ describe('tenants.service', () => {
 
   // ── createTenant ───────────────────────────────────────────
   describe('createTenant', () => {
-    it('creates tenant with defaults', async () => {
-      // First call: slug check, Second call: insert
-      const slugCheckQuery = setupQuery({ count: 0, error: null });
-      const insertQuery = setupQuery({ data: { id: 't-new', slug: 'new-school' }, error: null });
+    it('delegates to createTenantAction', async () => {
+      const { createTenantAction } = await import('@/application/actions/tenants.actions');
+      const tenant = { id: 't-new', slug: 'new-school' };
+      (createTenantAction as any).mockResolvedValue(tenant);
 
-      let callCount = 0;
-      mockFrom.mockImplementation(() => {
-        callCount++;
-        return callCount === 1 ? slugCheckQuery : insertQuery;
-      });
-
-      const result = await createTenant({ slug: 'new-school', name: 'New School' });
-      expect(result.slug).toBe('new-school');
+      const input = { slug: 'new-school', name: 'New School' };
+      const result = await createTenant(input as any);
+      expect(createTenantAction).toHaveBeenCalledWith(input);
+      expect(result).toBe(tenant);
     });
 
-    it('throws SLUG_TAKEN when slug exists', async () => {
-      const slugCheckQuery = setupQuery({ count: 1, error: null });
-      // Make select().eq().is() resolve with count: 1
-      slugCheckQuery.select.mockReturnValue({
-        ...slugCheckQuery,
-        eq: vi.fn().mockReturnValue({
-          is: vi.fn().mockResolvedValue({ count: 1, error: null }),
-        }),
-      });
-      mockFrom.mockReturnValue(slugCheckQuery);
-
-      // Need to restructure mock for the slug uniqueness check
-      const q = {
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        is: vi.fn().mockResolvedValue({ count: 1, error: null }),
-      };
-      mockFrom.mockReturnValue(q);
+    it('propagates SLUG_TAKEN from the action', async () => {
+      const { createTenantAction } = await import('@/application/actions/tenants.actions');
+      (createTenantAction as any).mockRejectedValue(new Error('SLUG_TAKEN'));
 
       await expect(
-        createTenant({ slug: 'existing', name: 'Existing' }),
+        createTenant({ slug: 'existing', name: 'Existing' } as any),
       ).rejects.toThrow('SLUG_TAKEN');
     });
   });
 
   // ── updateTenant ───────────────────────────────────────────
   describe('updateTenant', () => {
-    it('updates tenant fields', async () => {
-      const q = setupQuery({ data: { id: 't1', name: 'Updated' }, error: null });
-      mockFrom.mockReturnValue(q);
+    it('delegates to updateTenantAction', async () => {
+      const { updateTenantAction } = await import('@/application/actions/tenants.actions');
+      const tenant = { id: 't1', name: 'Updated' };
+      (updateTenantAction as any).mockResolvedValue(tenant);
 
       const result = await updateTenant('t1', { name: 'Updated' });
-      expect(result.name).toBe('Updated');
-      expect(q.update).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'Updated' }),
-      );
+      expect(updateTenantAction).toHaveBeenCalledWith('t1', { name: 'Updated' });
+      expect(result).toBe(tenant);
     });
   });
 
   // ── suspendTenant ──────────────────────────────────────────
   describe('suspendTenant', () => {
-    it('suspends tenant and logs activity', async () => {
-      const q = setupQuery({ error: null });
-      mockFrom.mockReturnValue(q);
-      mockAuth.mockResolvedValue({ data: { user: { id: 'admin1' } } });
-      mockRpc.mockReturnValue(setupQuery({ error: null }));
+    it('delegates to suspendTenantAction with id and reason', async () => {
+      const { suspendTenantAction } = await import('@/application/actions/tenants.actions');
+      (suspendTenantAction as any).mockResolvedValue(undefined);
 
       await suspendTenant('t1', 'violation');
-      expect(q.update).toHaveBeenCalledWith(
-        expect.objectContaining({ status: 'suspended' }),
-      );
-      expect(mockRpc).toHaveBeenCalledWith(
-        'log_activity_async',
-        expect.objectContaining({ p_type: 'tenant_suspended' }),
-      );
-    });
-
-    it('still suspends even without authenticated user', async () => {
-      const q = setupQuery({ error: null });
-      mockFrom.mockReturnValue(q);
-      mockAuth.mockResolvedValue({ data: { user: null } });
-
-      await suspendTenant('t1', 'test');
-      expect(q.update).toHaveBeenCalled();
-      expect(mockRpc).not.toHaveBeenCalled();
+      expect(suspendTenantAction).toHaveBeenCalledWith('t1', 'violation');
     });
   });
 
   // ── deleteTenant ───────────────────────────────────────────
   describe('deleteTenant', () => {
-    it('soft deletes tenant', async () => {
-      const q = setupQuery({ error: null });
-      mockFrom.mockReturnValue(q);
+    it('delegates to deleteTenantAction', async () => {
+      const { deleteTenantAction } = await import('@/application/actions/tenants.actions');
+      (deleteTenantAction as any).mockResolvedValue(undefined);
 
       await deleteTenant('t1');
-      expect(q.update).toHaveBeenCalledWith(
-        expect.objectContaining({ status: 'deleted' }),
-      );
-      expect(q.eq).toHaveBeenCalledWith('id', 't1');
+      expect(deleteTenantAction).toHaveBeenCalledWith('t1');
     });
   });
 

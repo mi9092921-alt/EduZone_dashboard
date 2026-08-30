@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { test, expect } from '@playwright/test';
 
 test.describe('Accessibility Audits', () => {
   test('dashboard should have no detectable a11y violations', async ({ page }) => {

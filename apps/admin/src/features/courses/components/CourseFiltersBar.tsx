@@ -1,12 +1,13 @@
 'use client';
 
 import { Search, Close, FilterList } from '@mui/icons-material';
-import { useState, useCallback, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
-import type { CourseFilters, CourseStatus } from '@/domain/types/course.types';
+import { useState, useCallback, useEffect } from 'react';
+
+import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select, SelectItem } from '@/components/ui/Select';
-import { Button } from '@/components/ui/Button';
+import type { CourseFilters } from '@/domain/types/course.types';
 
 interface CourseFiltersBarProps {
   filters: CourseFilters;
@@ -17,7 +18,7 @@ interface CourseFiltersBarProps {
 export function CourseFiltersBar({
   filters,
   onFiltersChange,
-  totalCount,
+  totalCount: _totalCount,
 }: CourseFiltersBarProps) {
   const t = useTranslations('common');
 
@@ -71,12 +72,12 @@ export function CourseFiltersBar({
     onFiltersChange({});
   }, [onFiltersChange]);
 
-  const updateFilter = (key: keyof CourseFilters, value: any) => {
+  const updateFilter = <K extends keyof CourseFilters>(key: K, value: CourseFilters[K] | '' | undefined) => {
     const newFilters = { ...filters };
     if (value === '' || value === undefined) {
       delete newFilters[key];
     } else {
-      (newFilters as any)[key] = value;
+      newFilters[key] = value;
     }
     onFiltersChange(newFilters);
   };
@@ -110,7 +111,7 @@ export function CourseFiltersBar({
           <Select
             className="h-10 text-xs font-medium"
             value={filters.status ?? ''}
-            onValueChange={(val) => updateFilter('status', val)}
+            onValueChange={(val) => updateFilter('status', val as CourseFilters['status'] | '')}
           >
             {STATUS_OPTIONS.map((opt) => (
               <SelectItem key={opt.value} value={opt.value}>

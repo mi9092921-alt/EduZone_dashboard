@@ -1,6 +1,15 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import {
+  ReportProblem,
+  CheckCircle,
+  Warning as WarningIcon,
+  Error as ErrorIcon,
+  Info,
+  Download,
+  FilterList,
+  TrendingDown,
+} from '@mui/icons-material';
 import {
   Box,
   Typography,
@@ -25,30 +34,22 @@ import {
   IconButton,
   useTheme,
 } from '@mui/material';
+import { alpha, type Theme } from '@mui/material/styles';
+import { useTranslations, useLocale } from 'next-intl';
+import { useState, useCallback } from 'react';
+
+import { useIssueWarning } from '@/adapters/mutations/warnings.mutations';
+import { useTeacherWarnings, useTeacherStudents } from '@/adapters/queries/teacher.queries';
+import { useAuthUser } from '@/adapters/stores/auth.store';
 import { useToastStore } from '@/adapters/stores/toast.store';
 import {
-  CardContent,
   StatsCard,
   StatsCardContent,
   StatsCardIcon
 } from '@/components/ui/Card';
 import { TablePagination } from '@/components/ui/TablePagination';
-import {
-  ReportProblem,
-  CheckCircle,
-  Warning as WarningIcon,
-  Error as ErrorIcon,
-  Info,
-  Download,
-  FilterList,
-  TrendingDown,
-} from '@mui/icons-material';
-import { useTeacherWarnings, useTeacherStudents } from '@/adapters/queries/teacher.queries';
-import { useIssueWarning } from '@/adapters/mutations/warnings.mutations';
-import { useAuthUser } from '@/adapters/stores/auth.store';
 import type { WarningSeverity, WarningFilters } from '@/domain/types/warning.types';
-import { useTranslations, useLocale } from 'next-intl';
-import { alpha, type Theme } from '@mui/material/styles';
+
 
 function getSeverityTokens(severity: WarningSeverity, theme: Theme) {
   switch (severity) {
@@ -122,7 +123,7 @@ export function WarningsPage() {
         setActionTaken('');
         setSeverity(2);
         showToast(t('status_success'), 'success');
-      } catch (err) {
+      } catch {
         showToast(t('status_error'), 'error');
       }
     },
@@ -287,7 +288,7 @@ export function WarningsPage() {
                         >
                           {btn.icon}
                           <Typography variant="caption" sx={{ fontWeight: 700, color: severity === btn.value ? btn.color : 'text.secondary', fontSize: '0.65rem' }}>
-                            {t(`severity_${btn.value}` as any)}
+                            {t(`severity_${btn.value}` as Parameters<typeof t>[0])}
                           </Typography>
                         </Box>
                       ))}
@@ -435,7 +436,7 @@ export function WarningsPage() {
                               label={
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
                                   <Box sx={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: sevColors.dot }} />
-                                  {t(`severity_${row.severity}` as any)}
+                                  {t(`severity_${row.severity}` as Parameters<typeof t>[0])}
                                 </Box>
                               }
                               sx={{

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { useUiStore, useSidebarOpen, useIsOnline } from './ui.store';
+
+import { useUiStore } from './ui.store';
 
 describe('ui.store', () => {
   const initialStore = useUiStore.getState();

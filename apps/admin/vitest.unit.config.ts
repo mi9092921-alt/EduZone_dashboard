@@ -1,7 +1,8 @@
-import { defineConfig } from 'vitest/config';
-import react from '@vitejs/plugin-react';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import react from '@vitejs/plugin-react';
+import { defineConfig } from 'vitest/config';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -27,10 +28,9 @@ export default defineConfig({
     pool: 'threads',
     testTimeout: 10000,
     hookTimeout: 10000,
-  },
-  poolOptions: {
-    threads: {
-      singleThread: true,
-    },
+    // Vitest 4 removed poolOptions.threads.singleThread; fileParallelism: false
+    // is the current equivalent (forces a single worker), which is what keeps
+    // this unit-test process from spawning extra threads/workers.
+    fileParallelism: false,
   },
 });

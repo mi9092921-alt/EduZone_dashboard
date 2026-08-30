@@ -1,16 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { School, Lock, ErrorOutline as AlertCircle } from '@mui/icons-material';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { School, Visibility, VisibilityOff, Lock, ErrorOutline as AlertCircle } from '@mui/icons-material';
-import { createBrowserClient } from '@/infrastructure/supabase/client';
+import { useState } from 'react';
+
 import { useAuthStore } from '@/adapters/stores/auth.store';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
+import { recordCurrentSessionAction } from '@/application/actions/session.actions';
 import { Button } from '@/components/ui/Button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
-import { recordCurrentSessionAction } from '@/application/actions/session.actions';
 import { getBrowserSessionId } from '@/infrastructure/auth/browserSession';
+import { createBrowserClient } from '@/infrastructure/supabase/client';
 
 export function LoginPage() {
   const router = useRouter();

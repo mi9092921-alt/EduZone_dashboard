@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
 import {
   getActivityLogs,
   getActivityLogsForVerification,
@@ -6,6 +7,7 @@ import {
   flushActivityLogs,
   getQueuedActivities,
 } from './audit.service';
+
 import { container } from '@/container';
 
 // Mock the container
@@ -16,6 +18,10 @@ vi.mock('@/container', () => ({
       from: vi.fn(),
     },
   },
+}));
+
+vi.mock('@/application/actions/admin.actions', () => ({
+  getQueuedActivitiesAction: vi.fn(),
 }));
 
 describe('audit.service', () => {
@@ -96,12 +102,13 @@ describe('audit.service', () => {
     expect(errorThrown).toBe(true);
   });
 
-  it('getQueuedActivities returns unflushed rows', async () => {
-    const q = setupQuery({ data: [{ id: 'q1' }], error: null });
-    mockFrom.mockReturnValue(q);
-    const res = await getQueuedActivities();
-    expect(res).toHaveLength(1);
-    expect(q.eq).toHaveBeenCalledWith('flushed', false);
-    expect(mockFrom).toHaveBeenCalledWith('activity_log_queue');
+  it('getQueuedActivities delegates to getQueuedActivitiesAction', async () => {
+    const { getQueuedActivitiesAction } = await import('@/application/actions/admin.actions');
+    const rows = [{ id: 'q1' }];
+    (getQueuedActivitiesAction as any).mockResolvedValue(rows);
+
+    const res = await getQueuedActivities(50);
+    expect(getQueuedActivitiesAction).toHaveBeenCalledWith(50);
+    expect(res).toBe(rows);
   });
 });

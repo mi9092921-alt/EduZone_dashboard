@@ -1,7 +1,8 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
 import { ChevronLeft, ChevronRight } from '@mui/icons-material';
+import { useTranslations } from 'next-intl';
+
 import { Button } from '@/components/ui/Button';
 import { Select, SelectItem } from '@/components/ui/Select';
 

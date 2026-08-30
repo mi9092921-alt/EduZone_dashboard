@@ -1,39 +1,5 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import {
-  Box,
-  Typography,
-  Button,
-  IconButton,
-  TextField,
-  Switch,
-  Collapse,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Stack,
-  useTheme,
-  useMediaQuery,
-} from '@mui/material';
-import {
-  Add,
-  ExpandMore,
-  ExpandLess,
-  Edit,
-  Delete,
-  DragIndicator,
-  UploadFile,
-} from '@mui/icons-material';
-import type { Section, Lesson } from '@/domain/types/course.types';
-import {
-  useUpdateSection,
-  useDeleteSection,
-  useCreateLesson,
-  useCreateLessons,
-  useReorderLessons,
-} from '@/adapters/mutations/courses.mutations';
 import {
   DndContext,
   closestCenter,
@@ -52,12 +18,41 @@ import {
 } from '@dnd-kit/sortable';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import {
+  Add,
+  ExpandMore,
+  ExpandLess,
+  Edit,
+  Delete,
+  DragIndicator,
+  UploadFile,
+} from '@mui/icons-material';
+import {
+  Box,
+  Typography,
+  Button,
+  IconButton,
+  TextField,
+  Switch,
+  Collapse,
+  Stack,
+} from '@mui/material';
 import { useTranslations } from 'next-intl';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { useToast } from '@/adapters/stores/toast.store';
-import { LessonRow } from './LessonRow';
-import { ImportLessonsDialog } from './ImportLessonsDialog';
+import { useState, useEffect } from 'react';
 
+import { ImportLessonsDialog } from './ImportLessonsDialog';
+import { LessonRow } from './LessonRow';
+
+import {
+  useUpdateSection,
+  useDeleteSection,
+  useCreateLesson,
+  useReorderLessons,
+} from '@/adapters/mutations/courses.mutations';
+import { useToast } from '@/adapters/stores/toast.store';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { getErrorMessage } from '@/domain/errors';
+import type { Section, Lesson } from '@/domain/types/course.types';
 import { isValidVideoUrl } from '@/domain/video.utils';
 
 // ══════════════════════════════════════════════════
@@ -72,8 +67,6 @@ export function SectionCard({
   courseId: string;
   index: number;
 }) {
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const t = useTranslations('common');
   const { showToast } = useToast();
 
@@ -94,7 +87,6 @@ export function SectionCard({
   const updateSection = useUpdateSection();
   const deleteSection = useDeleteSection();
   const createLesson = useCreateLesson();
-  const createLessonsBulk = useCreateLessons();
   const reorderLessons = useReorderLessons();
 
   const [importingJson, setImportingJson] = useState(false);
@@ -134,7 +126,7 @@ export function SectionCard({
     const newLessons = arrayMove(localLessons, oldIndex, newIndex);
     setLocalLessons(newLessons);
 
-    const updates = newLessons.map((l: any, idx: number) => ({ id: l.id, order_index: idx }));
+    const updates = newLessons.map((l: Lesson, idx: number) => ({ id: l.id, order_index: idx }));
     await reorderLessons.mutateAsync({ courseId, updates });
   };
 
@@ -143,7 +135,7 @@ export function SectionCard({
     setEditingTitle(false);
   };
 
-  const handleTogglePublish = async (e?: any) => {
+  const handleTogglePublish = async (e?: React.SyntheticEvent) => {
     if (e?.stopPropagation) e.stopPropagation();
     const newValue = !localPublished;
     setLocalPublished(newValue);
@@ -196,9 +188,9 @@ export function SectionCard({
       setNewLessonUrl('');
       setNewLessonIsPreview(false);
       setAddingLesson(false);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[handleAddLesson] Error:', err);
-      setUrlError(err.message || 'An error occurred while adding the lesson.');
+      setUrlError(getErrorMessage(err) || 'An error occurred while adding the lesson.');
     }
   };
 

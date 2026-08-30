@@ -1,6 +1,5 @@
 'use client';
 
-import React, { useState } from 'react';
 import {
   Lock,
   LockOpen,
@@ -13,16 +12,19 @@ import {
   DeleteForever,
 } from '@mui/icons-material';
 import { Tooltip } from '@mui/material';
-import { Button } from '@/components/ui/Button';
+import { useTranslations } from 'next-intl';
+import React, { useState } from 'react';
+
+import { useSubmitBulkAction } from '@/adapters/mutations/bulk.mutations';
+import { useToastStore } from '@/adapters/stores/toast.store';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
-import { useSubmitBulkAction } from '@/adapters/mutations/bulk.mutations';
 import type { BulkAction } from '@/domain/types/bulk.types';
 import type { UserFilters } from '@/domain/types/user.types';
 import { cn } from '@/lib/utils';
-import { useTranslations } from 'next-intl';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { useToastStore } from '@/adapters/stores/toast.store';
+
+
 
 interface BulkActionBarProps {
   selectedCount: number;
@@ -61,7 +63,7 @@ export function BulkActionBar({
   const [pendingAction, setPendingAction] = useState<BulkAction | null>(null);
   const [estimatedCount, setEstimatedCount] = useState<number>(0);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [dryRunning, setDryRunning] = useState(false);
+  const [dryRunning, _setDryRunning] = useState(false);
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -124,7 +126,7 @@ export function BulkActionBar({
         <div className="flex items-center gap-1 flex-wrap flex-1">
           {ACTIONS.map((action) => {
             const Icon = action.icon;
-            const label = t(action.labelKey as any);
+            const label = t(action.labelKey as Parameters<typeof t>[0]);
             return (
               <Tooltip key={action.id} title={label}>
                 <button
@@ -166,14 +168,14 @@ export function BulkActionBar({
           open={showConfirm && !!pendingAction}
           onClose={handleCancel}
           onConfirm={handleConfirm}
-          title={t(`bulk_confirm_title_${pendingAction}` as any)}
+          title={t(`bulk_confirm_title_${pendingAction}` as Parameters<typeof t>[0])}
           description={t('bulk_confirm_desc', { count: estimatedCount })}
-          confirmLabel={t(`bulk_confirm_btn_${pendingAction}` as any)}
+          confirmLabel={t(`bulk_confirm_btn_${pendingAction}` as Parameters<typeof t>[0])}
           confirmColor={pendingAction === 'ban' || pendingAction === 'delete' ? 'error' : 'warning'}
           isLoading={submitBulk.isPending}
           error={error}
           icon={pendingAction ? ACTIONS.find(a => a.id === pendingAction)?.icon && 
-            React.createElement(ACTIONS.find(a => a.id === pendingAction)!.icon as any, { sx: { fontSize: 22 } }) : null}
+            React.createElement(ACTIONS.find(a => a.id === pendingAction)!.icon, { sx: { fontSize: 22 } }) : null}
         >
           {pendingAction !== 'export' && pendingAction !== 'unlock' && (
             <div className="space-y-2 pt-2">

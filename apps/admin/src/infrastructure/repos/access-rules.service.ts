@@ -1,11 +1,12 @@
-import { container } from '@/container';
+import type { AccessRule, PaginatedResult } from '@eduzone/types';
+
 import {
   getAccessRulesAction,
   upsertAccessRuleAction,
   deleteAccessRuleAction,
   toggleAccessRuleAction,
 } from '@/application/actions/admin.actions';
-import type { AccessRule, PaginatedResult } from '@eduzone/types';
+import { container } from '@/container';
 
 /**
  * Access Rules service — management for the access_rules table.

@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Close } from '@mui/icons-material';
 import {
   Dialog,
   DialogTitle,
@@ -16,14 +17,15 @@ import {
   Avatar,
   CircularProgress,
 } from '@mui/material';
-import { Close } from '@mui/icons-material';
+import { useTranslations } from 'next-intl';
+import { useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { enrollStudentSchema, type EnrollStudentFormInput } from '@/domain/schemas/course.schema';
+
 import { useEnrollStudent } from '@/adapters/mutations/courses.mutations';
 import { useUsers } from '@/adapters/queries/users.queries';
+import { enrollStudentSchema, type EnrollStudentFormInput } from '@/domain/schemas/course.schema';
 import { getUserDisplayName } from '@/domain/types/user.types';
-import { useTranslations } from 'next-intl';
+
 
 interface EnrollStudentDialogProps {
   courseId: string;
@@ -51,7 +53,7 @@ export function EnrollStudentDialog({ courseId, open, onClose }: EnrollStudentDi
     reset,
     formState: { errors },
   } = useForm<EnrollStudentFormInput>({
-    resolver: zodResolver(enrollStudentSchema) as any,
+    resolver: zodResolver(enrollStudentSchema),
     defaultValues: {
       user_id: '',
       course_id: courseId,
@@ -120,7 +122,8 @@ export function EnrollStudentDialog({ courseId, open, onClose }: EnrollStudentDi
                   onChange={(_, value) => field.onChange(value?.id || '')}
                   renderInput={(params) => (
                     <TextField
-                      {...(params as any)}
+                      {...params}
+                      InputLabelProps={(params.InputLabelProps ?? {}) as NonNullable<React.ComponentProps<typeof TextField>['InputLabelProps']>}
                       label={t('select_student_label')}
                       autoFocus
                       error={!!errors.user_id}
@@ -140,7 +143,7 @@ export function EnrollStudentDialog({ courseId, open, onClose }: EnrollStudentDi
                     />
                   )}
                   renderOption={(props, option) => {
-                    const { key, ...optionProps } = props as any;
+                    const { key: _key, ...optionProps } = props;
                     return (
                       <Box component="li" key={option.id} {...optionProps} sx={{ display: 'flex', gap: 1.5, py: 1 }}>
                         <Avatar src={option.avatar_url || ''} sx={{ width: 32, height: 32, fontSize: '0.75rem' }}>

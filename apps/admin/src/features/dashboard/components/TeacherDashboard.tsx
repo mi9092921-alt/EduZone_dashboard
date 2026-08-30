@@ -1,6 +1,9 @@
 'use client';
 
 import { People, School, TrendingUp, Warning } from '@mui/icons-material';
+import { Typography, Box } from '@mui/material';
+import { useTranslations } from 'next-intl';
+
 import { useTeacherDashboardStats } from '@/adapters/queries/analytics.queries';
 import {
   Card,
@@ -11,8 +14,7 @@ import {
   StatsCardContent,
   StatsCardIcon
 } from '@/components/ui/Card';
-import { useTranslations } from 'next-intl';
-import { Typography, Box } from '@mui/material';
+
 
 export function TeacherDashboard() {
   const t = useTranslations('common');

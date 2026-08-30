@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { useParams } from 'next/navigation';
-import { useRouter } from '@/i18n/routing';
+
+import { Download, Search, People } from '@mui/icons-material';
 import {
   Box,
   Typography,
@@ -15,20 +14,21 @@ import {
   TableRow,
   Avatar,
   Chip,
-  CircularProgress,
-  IconButton,
   InputAdornment,
   TextField,
   useTheme,
   LinearProgress,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import { Download, Search, NavigateNext, ArrowBack, ChevronLeft, ChevronRight, CheckCircle, TrendingUp, People } from '@mui/icons-material';
-import { useStudentProgress } from '@/adapters/queries/teacher.queries';
-import { useCourseById } from '@/adapters/queries/courses.queries';
+import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+import { useState, useCallback } from 'react';
+
+import { useCourseById } from '@/adapters/queries/courses.queries';
+import { useStudentProgress } from '@/adapters/queries/teacher.queries';
 import { TablePagination } from '@/components/ui/TablePagination';
 import type { StudentProgress } from '@/domain/types/warning.types';
+import { EnrollStudentDialog } from '@/features/courses/components/EnrollStudentDialog';
 
 function getInitials(first: string | null, last: string | null) {
   return [(first ?? '')[0], (last ?? '')[0]].filter(Boolean).join('').toUpperCase() || '?';
@@ -46,10 +46,7 @@ function localizedTime(dateStr: string | null, locale: string) {
   return d.toLocaleTimeString(locale === 'ar' ? 'ar-EG' : 'en-US', { hour: '2-digit', minute: '2-digit' });
 }
 
-import { EnrollStudentDialog } from '@/features/courses/components/EnrollStudentDialog';
-
 export function StudentProgressPage() {
-  const router = useRouter();
   const theme = useTheme();
   const params = useParams();
   const locale = params.locale as string;
@@ -62,7 +59,7 @@ export function StudentProgressPage() {
   const [search, setSearch] = useState('');
   const [isEnrollOpen, setIsEnrollOpen] = useState(false);
 
-  const { data: course } = useCourseById(courseId);
+  useCourseById(courseId);
   const { data, isLoading, refetch } = useStudentProgress(courseId, page, pageSize);
   const students = (data?.data ?? []) as unknown as StudentProgress[];
   const totalCount = data?.count ?? 0;
@@ -87,8 +84,6 @@ export function StudentProgressPage() {
   }, [students, courseId]);
 
   // Aggregate stats for the cards
-  const avgProgress = students.length ? students.reduce((acc, s) => acc + s.progress_pct, 0) / students.length : 0;
-  const completedCount = students.filter(s => s.completed).length;
 
 
   return (
@@ -211,7 +206,6 @@ export function StudentProgressPage() {
                     const maskedEmail = row.email
                       ? row.email.substring(0, 1) + '***@' + row.email.split('@')[1]?.substring(0, 3) + '...'
                       : '';
-                    const progressColor = row.completed ? 'success.main' : 'primary.main';
 
                     return (
                       <TableRow key={row.user_id} hover sx={{ '&:last-child td': { border: 0 } }}>

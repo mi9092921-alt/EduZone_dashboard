@@ -1,8 +1,5 @@
 'use client';
 
-import Image from 'next/image';
-
-import React, { useState, useMemo, memo, useCallback } from 'react';
 import {
   Close,
   Email,
@@ -21,29 +18,30 @@ import {
   Laptop,
   Smartphone,
   Language,
-  Public,
   Security,
   Fingerprint,
   Work,
   History,
-  TaskAlt,
   School,
   ContentCopy,
 } from '@mui/icons-material';
-import type { User, Device, Session } from '@/domain/types/user.types';
-import { getUserDisplayName, getUserInitials } from '@/domain/types/user.types';
+import { Tooltip } from '@mui/material'; // Using MUI Tooltip as requested/implied for pro-tips
+import Image from 'next/image';
+import { useTranslations, useLocale } from 'next-intl';
+import React, { useState, useMemo, memo, useCallback } from 'react';
+
+import { formatDate, formatDistanceToNow } from './_utils';
+
 import {
   useUserDevices,
   useUserSessions,
-  useUserPermissions,
   useUserRoles,
 } from '@/adapters/queries/users.queries';
-import { useTranslations, useLocale } from 'next-intl';
-import { formatDate, formatDistanceToNow } from './_utils';
-import { Drawer } from '@/components/ui/Drawer';
 import { Button } from '@/components/ui/Button';
 import { StatsCard, StatsCardContent, StatsCardIcon } from '@/components/ui/Card';
-import { Tooltip } from '@mui/material'; // Using MUI Tooltip as requested/implied for pro-tips
+import { Drawer } from '@/components/ui/Drawer';
+import { getUserDisplayName, getUserInitials } from '@/domain/types/user.types';
+import type { User, Device, Session } from '@/domain/types/user.types';
 import { cn } from '@/lib/utils';
 
 export function UserProfileDrawer({
@@ -156,7 +154,7 @@ export function UserProfileDrawer({
 
             <div className="flex items-center gap-2.5 mt-2.5 flex-nowrap overflow-x-auto scrollbar-none">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-extrabold uppercase tracking-widest border transition-all duration-300 bg-primary/10 border-primary/20 text-primary">
-                {tUsers(`role_${user.primary_role}` as any)}
+                {tUsers(`role_${user.primary_role}` as Parameters<typeof tUsers>[0])}
               </span>
               <span className={cn("inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-extrabold uppercase tracking-widest border transition-all duration-300 border-transparent", theme.dot + "/10", theme.text)}>
                 <div className={cn("w-1.5 h-1.5 rounded-full", theme.dot)} />
@@ -278,7 +276,7 @@ function StatCard({ icon, label, value, subValue }: { icon: React.ReactNode, lab
   );
 }
 
-function OverviewTab({ user, t, locale }: { user: User, t: any, locale: string }) {
+function OverviewTab({ user, t, locale }: { user: User, t: ReturnType<typeof useTranslations>, locale: string }) {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -326,7 +324,7 @@ function OverviewTab({ user, t, locale }: { user: User, t: any, locale: string }
   );
 }
 
-function ActivityTab({ user, t }: { user: User, t: any }) {
+function ActivityTab({ user, t }: { user: User, t: ReturnType<typeof useTranslations> }) {
   return (
     <div className="h-[400px] flex flex-col items-center justify-center text-center space-y-6 animate-in zoom-in-95 duration-500">
       <History className="text-muted-foreground/30 text-5xl" />
@@ -339,7 +337,7 @@ function ActivityTab({ user, t }: { user: User, t: any }) {
   );
 }
 
-function EnrollmentsTab({ user, t }: { user: User, t: any }) {
+function EnrollmentsTab({ user, t }: { user: User, t: ReturnType<typeof useTranslations> }) {
   return (
     <div className="h-[400px] flex flex-col items-center justify-center text-center space-y-6 animate-in zoom-in-95 duration-500">
       <School className="text-muted-foreground/30 text-5xl" />
@@ -351,7 +349,7 @@ function EnrollmentsTab({ user, t }: { user: User, t: any }) {
   );
 }
 
-function SecurityTab({ user, onTerminateSessions, onResetDevices, t, locale }: { user: User, onTerminateSessions: (u: User) => void, onResetDevices: (u: User) => void, t: any, locale: string }) {
+function SecurityTab({ user, onTerminateSessions, onResetDevices, t, locale }: { user: User, onTerminateSessions: (u: User) => void, onResetDevices: (u: User) => void, t: ReturnType<typeof useTranslations>, locale: string }) {
   const { data: devices, isLoading: devLoading } = useUserDevices(user.id);
   const { data: sessions, isLoading: sesLoading } = useUserSessions(user.id);
 
@@ -379,7 +377,7 @@ function SecurityTab({ user, onTerminateSessions, onResetDevices, t, locale }: {
   );
 }
 
-function DeviceCard({ device, t, locale }: { device: Device, t: any, locale: string }) {
+function DeviceCard({ device, t, locale }: { device: Device, t: ReturnType<typeof useTranslations>, locale: string }) {
   const Icon = device.platform === 'android' || device.platform === 'ios' ? Smartphone : Laptop;
   return (
     <div className="p-5 rounded-3xl bg-card/40 border border-border/50 flex items-center gap-5">
@@ -396,7 +394,7 @@ function DeviceCard({ device, t, locale }: { device: Device, t: any, locale: str
   );
 }
 
-function SessionCard({ session, t, locale }: { session: Session, t: any, locale: string }) {
+function SessionCard({ session, t, locale }: { session: Session, t: ReturnType<typeof useTranslations>, locale: string }) {
   return (
     <div className="px-6 py-5 rounded-3xl bg-card/40 border border-border/50 flex items-center gap-5">
       <Language className="text-2xl text-muted-foreground" />
@@ -412,8 +410,7 @@ function SessionCard({ session, t, locale }: { session: Session, t: any, locale:
   );
 }
 
-function PermissionsTab({ user, t, locale }: { user: User, t: any, locale: string }) {
-  const { data: permissions } = useUserPermissions(user.id);
+function PermissionsTab({ user, t, locale }: { user: User, t: ReturnType<typeof useTranslations>, locale: string }) {
   const { data: roles, isLoading } = useUserRoles(user.id);
   const tUsers = useTranslations('users');
 
@@ -426,7 +423,7 @@ function PermissionsTab({ user, t, locale }: { user: User, t: any, locale: strin
       user_id: user.id,
       role_id: 'primary',
       role_name: user.primary_role,
-      role_label: tUsers(`role_${user.primary_role}` as any),
+      role_label: tUsers(`role_${user.primary_role}` as Parameters<typeof tUsers>[0]),
       granted_at: user.created_at,
     }];
   }, [roles, isLoading, user, tUsers]);

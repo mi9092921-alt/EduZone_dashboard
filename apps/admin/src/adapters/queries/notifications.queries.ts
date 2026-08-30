@@ -1,6 +1,8 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
+
 import { queryKeys } from './keys';
+
 import {
   getNotifications,
   getMyNotifications,

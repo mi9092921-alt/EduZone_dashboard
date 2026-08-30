@@ -1,24 +1,24 @@
 'use client';
 
-import { cn } from '@/lib/utils';
 
-import { useEffect, useRef } from 'react';
-import { usePathname, useRouter } from '@/i18n/routing';
-import { Sidebar } from './Sidebar';
-import { Topbar } from './Topbar';
-import { NetworkBanner } from './NetworkBanner';
-import { MaintenanceBanner } from './MaintenanceBanner';
-
-import { useAuthUser, useAuthLoading } from '@/adapters/stores/auth.store';
-import { useSetting } from '@/adapters/queries/settings.queries';
-import { Lock, WifiOff } from '@mui/icons-material';
+import { Lock } from '@mui/icons-material';
 import { useTranslations } from 'next-intl';
-import { isRouteAllowed } from '@/config/nav.config';
+import { useEffect, useRef } from 'react';
 
 import { useLayout } from '../hooks/useLayout';
 
+import { MaintenanceBanner } from './MaintenanceBanner';
+import { NetworkBanner } from './NetworkBanner';
+import { Sidebar } from './Sidebar';
+import { Topbar } from './Topbar';
+
+import { useSetting } from '@/adapters/queries/settings.queries';
+import { useAuthUser, useAuthLoading } from '@/adapters/stores/auth.store';
+import { isRouteAllowed } from '@/config/nav.config';
+import { usePathname, useRouter } from '@/i18n/routing';
+
 export function AdminShell({ children }: { children: React.ReactNode }) {
-  const { isDesktop, sidebarOpen } = useLayout();
+  useLayout();
   const pathname = usePathname();
   const router = useRouter();
   const user = useAuthUser();

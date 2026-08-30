@@ -1,9 +1,9 @@
 'use client';
 
-import * as React from 'react';
-import { ThemeProvider as NextThemesProvider, useTheme } from 'next-themes';
-import { ThemeProvider, CssBaseline } from '@mui/material';
 import { eduZoneTheme, eduZoneDarkTheme } from '@eduzone/ui';
+import { ThemeProvider, CssBaseline } from '@mui/material';
+import { ThemeProvider as NextThemesProvider, useTheme } from 'next-themes';
+import * as React from 'react';
 
 function MuiThemeBridge({ children }: { children: React.ReactNode }) {
   const { resolvedTheme } = useTheme();

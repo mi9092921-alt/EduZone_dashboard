@@ -1,16 +1,13 @@
 'use client';
 
-import { useState } from 'react';
-import { useDeleteCourse } from '@/adapters/mutations/courses.mutations';
-import type { Course } from '@/domain/types/course.types';
-import { Modal } from '@/components/ui/Modal';
-import { Button } from '@/components/ui/Button';
-
-import { useTranslations } from 'next-intl';
-
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { DeleteForever } from '@mui/icons-material';
+import { useTranslations } from 'next-intl';
+import { useState } from 'react';
+
+import { useDeleteCourse } from '@/adapters/mutations/courses.mutations';
 import { useToastStore } from '@/adapters/stores/toast.store';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import type { Course } from '@/domain/types/course.types';
 
 interface DeleteCourseDialogProps {
   course: Course | null;

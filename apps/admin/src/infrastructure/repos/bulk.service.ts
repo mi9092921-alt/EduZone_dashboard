@@ -1,11 +1,11 @@
 import { container } from '@/container';
-import type { UserFilters } from '@/domain/types/user.types';
 import type {
   BulkAction,
   BulkDryRunResponse,
   BulkSubmitResponse,
   BulkProgress,
 } from '@/domain/types/bulk.types';
+import type { UserFilters } from '@/domain/types/user.types';
 
 /**
  * Bulk operations service — calls local API route for bulk user actions.

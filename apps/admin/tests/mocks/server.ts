@@ -1,4 +1,5 @@
 import { setupServer } from 'msw/node';
+
 import { rpcHandlers } from './handlers/rpc.handlers';
 
 /**

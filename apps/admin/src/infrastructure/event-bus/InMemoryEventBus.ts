@@ -1,5 +1,5 @@
-import type { DomainEvent } from '@/domain/events/base';
 import type { IEventBus } from '@/application/ports/IEventBus';
+import type { DomainEvent } from '@/domain/events/base';
 
 type EventHandler = (event: DomainEvent<unknown>) => Promise<void>;
 

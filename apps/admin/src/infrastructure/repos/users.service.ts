@@ -9,7 +9,6 @@ import type {
   Session,
   Warning,
   PermissionCacheEntry,
-  UserRole,
   UserRoleAssignment,
   UserStats,
 } from '@/domain/types/user.types';
@@ -330,7 +329,17 @@ export async function getAllPermissions(): Promise<string[]> {
 }
 
 // ── Search users for targeting ───────────────────────────────────
-export async function searchUsers(query: string, limit = 20, tenantId?: string, role?: string): Promise<any[]> {
+export interface UserSearchResult {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  email: string;
+  primary_role: string;
+  avatar_url: string | null;
+  last_login: string | null;
+}
+
+export async function searchUsers(query: string, limit = 20, tenantId?: string, role?: string): Promise<UserSearchResult[]> {
   const { supabase } = container;
 
   let q = supabase

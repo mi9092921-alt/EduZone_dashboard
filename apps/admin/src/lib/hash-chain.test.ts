@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+
 import { verifyHashChain } from './hash-chain';
 
 async function sha256(input: string): Promise<string> {
@@ -26,7 +27,7 @@ describe('verifyHashChain', () => {
       prev_hash: genesis,
       entry_hash: ''
     };
-    log1.entry_hash = await sha256(`1log1userALOGIN{"ip":"127.0.0.1"}${genesis}`);
+    log1.entry_hash = await sha256(`1log1userALOGIN{"ip": "127.0.0.1"}${genesis}`);
 
     const log2 = {
       seq: 2,

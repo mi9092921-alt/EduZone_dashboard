@@ -1,29 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import {
-  Box,
-  Typography,
-  Button,
-  IconButton,
-  Switch,
-  Chip,
-  Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Tooltip,
-  CircularProgress,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  MenuItem,
-} from '@mui/material';
+import { AccessRule } from '@eduzone/types';
 import {
   Add,
   Delete,
@@ -34,10 +11,32 @@ import {
   Devices,
   InfoOutlined,
 } from '@mui/icons-material';
+import {
+  Box,
+  Typography,
+  Button,
+  IconButton,
+  Switch,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  MenuItem,
+} from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
-import { AccessRule } from '@eduzone/types';
-import { getAccessRules, upsertAccessRule, deleteAccessRule, toggleAccessRule } from '@/infrastructure/repos/access-rules.service';
+import { useState, useEffect } from 'react';
+
 import { useToastStore } from '@/adapters/stores/toast.store';
+import { getAccessRules, upsertAccessRule, deleteAccessRule, toggleAccessRule } from '@/infrastructure/repos/access-rules.service';
 
 export function AccessRulesManager({ tenantId }: { tenantId?: string }) {
   const theme = useTheme();
@@ -52,7 +51,7 @@ export function AccessRulesManager({ tenantId }: { tenantId?: string }) {
     try {
       const result = await getAccessRules(tenantId);
       setRules(result.data);
-    } catch (err) {
+    } catch {
       showToast('Failed to load access rules', 'error');
     } finally {
       setIsLoading(false);
@@ -68,7 +67,7 @@ export function AccessRulesManager({ tenantId }: { tenantId?: string }) {
       await toggleAccessRule(id, !current);
       setRules(rules.map(r => r.id === id ? { ...r, is_active: !current } : r));
       showToast('Rule status updated', 'success');
-    } catch (err) {
+    } catch {
       showToast('Failed to update rule status', 'error');
     }
   };
@@ -79,7 +78,7 @@ export function AccessRulesManager({ tenantId }: { tenantId?: string }) {
       await deleteAccessRule(id);
       setRules(rules.filter(r => r.id !== id));
       showToast('Rule deleted', 'success');
-    } catch (err) {
+    } catch {
       showToast('Failed to delete rule', 'error');
     }
   };
@@ -94,12 +93,12 @@ export function AccessRulesManager({ tenantId }: { tenantId?: string }) {
       fetchRules();
       setIsDialogOpen(false);
       showToast('Rule saved successfully', 'success');
-    } catch (err) {
+    } catch {
       showToast('Failed to save rule', 'error');
     }
   };
 
-  const RULE_ICONS: Record<string, any> = {
+  const RULE_ICONS: Record<AccessRule['rule_type'], React.ReactNode> = {
     ip_whitelist: <VpnLock />,
     geo_location: <Language />,
     time_window: <Schedule />,
@@ -201,7 +200,7 @@ export function AccessRulesManager({ tenantId }: { tenantId?: string }) {
               fullWidth
               autoFocus
               value={editingRule?.rule_type || ''}
-              onChange={(e) => setEditingRule({ ...editingRule, rule_type: e.target.value as any })}
+              onChange={(e) => setEditingRule({ ...editingRule, rule_type: e.target.value as AccessRule['rule_type'] })}
             >
               <MenuItem value="ip_whitelist">IP Whitelist (CIDR)</MenuItem>
               <MenuItem value="geo_location">Geo Location (ISO Country Codes)</MenuItem>

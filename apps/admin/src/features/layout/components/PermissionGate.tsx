@@ -1,7 +1,8 @@
 'use client';
 
-import { useAuthUser } from '@/adapters/stores/auth.store';
 import type { ReactNode } from 'react';
+
+import { useAuthUser } from '@/adapters/stores/auth.store';
 
 type PermissionName = string;
 

@@ -12,6 +12,7 @@ import type {
   UserPermissionCacheEntry as BaseUserPermissionCacheEntry,
   Warning as BaseWarning,
   PaginatedResult as BasePaginatedResult,
+  UserStats as BaseUserStats,
 } from '@eduzone/types';
 
 export type { AccountStatus, UserRole };
@@ -19,9 +20,8 @@ export type { AccountStatus, UserRole };
 export type PrimaryRole = UserRole;
 export type AccountAction = 'lock' | 'unlock' | 'suspend' | 'ban';
 
-export interface User extends BaseUser {
-  // Add any admin-specific UI fields here if needed
-}
+// Add any admin-specific UI fields here if needed
+export type User = BaseUser;
 
 /** Paginated result wrapper */
 export type PaginatedResult<T> = BasePaginatedResult<T>;
@@ -66,9 +66,8 @@ export interface Device extends BaseDevice {
 }
 
 // ── Session ──────────────────────────────────────────────────────
-export interface Session extends BaseSession {
-  // Joined extensions if any
-}
+// Joined extensions if any
+export type Session = BaseSession;
 
 // ── Warning ──────────────────────────────────────────────────────
 export interface Warning extends BaseWarning {
@@ -79,9 +78,8 @@ export interface Warning extends BaseWarning {
 }
 
 // ── Permission cache entry ───────────────────────────────────────
-export interface PermissionCacheEntry extends BaseUserPermissionCacheEntry {
-  // No extensions
-}
+// No extensions
+export type PermissionCacheEntry = BaseUserPermissionCacheEntry;
 
 // ── User role assignment ─────────────────────────────────────────
 export interface UserRoleAssignment extends BaseUserRoleAssignment {
@@ -91,5 +89,4 @@ export interface UserRoleAssignment extends BaseUserRoleAssignment {
 }
 
 // ── User stats (from get_user_stats_summary) ──────────────────────
-import { UserStats as BaseUserStats } from '@eduzone/types';
 export type UserStats = BaseUserStats;

@@ -1,8 +1,9 @@
 'use client';
 
 import { type ReactNode } from 'react';
-import { Modal } from '@/components/ui/Modal';
+
 import { Button } from '@/components/ui/Button';
+import { Modal } from '@/components/ui/Modal';
 import { cn } from '@/lib/utils';
 
 export interface ConfirmDialogProps {
@@ -85,7 +86,7 @@ export function ConfirmDialog({
             {cancelLabel}
           </Button>
           <Button
-            variant={getConfirmVariant() as any}
+            variant={getConfirmVariant()}
             onClick={onConfirm}
             isLoading={isLoading}
             className={cn(

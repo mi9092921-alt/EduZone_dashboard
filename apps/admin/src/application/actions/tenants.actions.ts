@@ -1,12 +1,13 @@
 'use server';
 
 import { createClient } from '@supabase/supabase-js';
-import { createServerClient } from '@/infrastructure/supabase/server';
+
 import type {
   Tenant,
   CreateTenantInput,
   UpdateTenantInput,
 } from '@/domain/types/tenant.types';
+import { createServerClient } from '@/infrastructure/supabase/server';
 
 function createAdminClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
 import { container } from '@/container';
 
 // ── Mock the container ────────────────────────────────────────────
@@ -10,6 +11,10 @@ vi.mock('@/container', () => ({
       auth: { getUser: vi.fn() },
     },
   },
+}));
+
+vi.mock('@/application/actions/user.actions', () => ({
+  issueWarningAction: vi.fn(),
 }));
 
 // ── Helper: build a chainable query-builder mock ──────────────────
@@ -25,7 +30,6 @@ function setupQuery(resolved: unknown) {
 
 describe('warnings.service', () => {
   const mockFrom = container.supabase.from as ReturnType<typeof vi.fn>;
-  const mockRpc  = container.supabase.rpc  as ReturnType<typeof vi.fn>;
 
   beforeEach(() => vi.clearAllMocks());
 
@@ -81,26 +85,23 @@ describe('warnings.service', () => {
   });
 
   // ── issueWarning ────────────────────────────────────────────────
-  it('issueWarning — calls RPC with correct parameters', async () => {
-    mockRpc.mockResolvedValue({ data: 'warning-uuid-001', error: null });
+  it('issueWarning — delegates to issueWarningAction', async () => {
+    const { issueWarningAction } = await import('@/application/actions/user.actions');
+    (issueWarningAction as any).mockResolvedValue({ success: true, warningId: 'warning-uuid-001' });
 
     const { issueWarning } = await importService();
     const id = await issueWarning('user-1', 'Violating community guidelines', 2, 'none');
 
-    expect(mockRpc).toHaveBeenCalledWith('issue_warning', {
-      p_user_id:  'user-1',
-      p_reason:   'Violating community guidelines',
-      p_severity: 2,
-      p_note:     'none',
-    });
+    expect(issueWarningAction).toHaveBeenCalledWith('user-1', 'Violating community guidelines', 2, 'none');
     expect(id).toBe('warning-uuid-001');
   });
 
-  it('issueWarning — throws on RPC error', async () => {
-    mockRpc.mockResolvedValue({ data: null, error: { code: 'RATE_LIMITED', message: 'Too many warnings' } });
+  it('issueWarning — throws when the action reports failure', async () => {
+    const { issueWarningAction } = await import('@/application/actions/user.actions');
+    (issueWarningAction as any).mockResolvedValue({ success: false, error: 'Too many warnings' });
 
     const { issueWarning } = await importService();
-    await expect(issueWarning('u1', 'reason', 1, 'none')).rejects.toMatchObject({ code: 'RATE_LIMITED' });
+    await expect(issueWarning('u1', 'reason', 1, 'none')).rejects.toThrow('Too many warnings');
   });
 
   // ── getTeacherStudents ──────────────────────────────────────────

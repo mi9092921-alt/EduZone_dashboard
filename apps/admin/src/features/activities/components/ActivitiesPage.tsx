@@ -1,18 +1,19 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
-import { UserActivitySelector } from './UserActivitySelector';
-import { ActivityViewsTab } from './ActivityViewsTab';
-import { ActivityLocationsTab } from './ActivityLocationsTab';
-import { useTranslations } from 'next-intl';
-import { motion, AnimatePresence } from 'framer-motion';
 import { Visibility, Place, History } from '@mui/icons-material';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslations } from 'next-intl';
+import React, { useState } from 'react';
+
+import { ActivityLocationsTab } from './ActivityLocationsTab';
+import { ActivityViewsTab } from './ActivityViewsTab';
+import { UserActivitySelector } from './UserActivitySelector';
+
+import { Card, CardContent } from '@/components/ui/Card';
 import { cn } from '@/lib/utils';
 
 export function ActivitiesPage() {
   const t = useTranslations('activities');
-  const tCommon = useTranslations('common');
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'views' | 'locations'>('views');
 
@@ -70,7 +71,7 @@ export function ActivitiesPage() {
               {tabs.map((tab) => (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
+                  onClick={() => setActiveTab(tab.id as 'views' | 'locations')}
                   className={cn(
                     "relative flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-300",
                     activeTab === tab.id

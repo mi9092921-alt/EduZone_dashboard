@@ -1,12 +1,14 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+
 import { queryKeys } from '../queries/keys';
+import type { TargetAudience, UserNotification } from '../queries/notifications.queries';
+
 import {
   sendNotification,
   deleteNotification,
   markNotificationAsRead,
   markAllNotificationsAsRead,
 } from '@/infrastructure/repos/notifications.service';
-import type { TargetAudience, UserNotification } from '../queries/notifications.queries';
 
 export interface SendNotificationInput {
   title: string;

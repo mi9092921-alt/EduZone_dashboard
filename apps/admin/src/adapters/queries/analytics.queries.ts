@@ -1,7 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
+
 import { queryKeys } from './keys';
-import { container } from '@/container';
+
 import { useAuthUser } from '@/adapters/stores/auth.store';
+import { container } from '@/container';
 import { getDashboardStats, type DashboardStats } from '@/infrastructure/stats-service';
 
 export type { DashboardStats };
@@ -121,8 +123,9 @@ export function useTeacherDashboardStats() {
             : Promise.resolve({ count: 0 })
         ]);
 
-        const avgProgress = (enrollmentsRes.data as any[])?.length 
-          ? (enrollmentsRes.data as any[]).reduce((acc, curr) => acc + (curr.progress_pct || 0), 0) / (enrollmentsRes.data as any[]).length
+        const enrollmentRows = enrollmentsRes.data as { progress_pct: number | null }[] | null;
+        const avgProgress = enrollmentRows?.length
+          ? enrollmentRows.reduce((acc, curr) => acc + (curr.progress_pct || 0), 0) / enrollmentRows.length
           : 0;
 
         return {
@@ -143,7 +146,7 @@ export function useTeacherDashboardStats() {
           totalDevices:     devicesRes.count ?? 0,
           refreshedAt:      new Date().toISOString(),
         };
-      } catch (err) {
+      } catch {
         return {
           totalUsers:       0,
           activeUsers:      0,

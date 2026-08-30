@@ -1,3 +1,5 @@
+import type { UserStats } from '@eduzone/types';
+
 import { container } from '@/container';
 import type {
   MvDailyRevenue,
@@ -5,7 +7,6 @@ import type {
   CourseWithStats,
   GeoPoint,
 } from '@/domain/types/analytics.types';
-import type { UserStats } from '@eduzone/types';
 
 /**
  * Analytics service — Supabase queries for materialized views
@@ -43,7 +44,7 @@ export async function getUserStats(tenantId?: string): Promise<UserStats> {
 export async function getCourseStats(tenantId?: string): Promise<CourseWithStats[]> {
   try {
     const { getAnalyticsCourseStatsAction } = await import('@/application/actions/admin.actions');
-    return getAnalyticsCourseStatsAction(tenantId);
+    return await getAnalyticsCourseStatsAction(tenantId);
   } catch {
     return [];
   }

@@ -3,10 +3,10 @@
  * `warnings` table + `issue_warning` RPC.
  */
 
+import type { Warning as BaseWarning, WarningSeverity } from '@eduzone/types';
+
 import type { PaginatedResult } from './user.types';
 export type { PaginatedResult };
-
-import type { Warning as BaseWarning, WarningSeverity } from '@eduzone/types';
 
 export type { WarningSeverity };
 

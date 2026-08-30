@@ -15,11 +15,13 @@ import {
   Devices
 } from '@mui/icons-material';
 import { useTranslations } from 'next-intl';
-import { useDashboardStats } from '@/adapters/queries/analytics.queries';
-import { cn } from '@/lib/utils';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
-import { SecurityAlertPanel } from './SecurityAlertPanel';
+
 import { QueueHealthPanel } from './QueueHealthPanel';
+import { SecurityAlertPanel } from './SecurityAlertPanel';
+
+import { useDashboardStats } from '@/adapters/queries/analytics.queries';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+import { cn } from '@/lib/utils';
 
 // ── Semantic Wrappers for KPI Grid ──────────────────────────────
 const StatsCard = ({ children, className }: { children: React.ReactNode; className?: string }) => (

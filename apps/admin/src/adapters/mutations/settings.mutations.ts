@@ -1,14 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+
 import { queryKeys } from '@/adapters/queries/keys';
-import {
-  setSetting,
-  createSetting,
-  deleteSetting,
-  enableMaintenanceMode,
-  disableMaintenanceMode,
-  lockApp,
-  unlockApp,
-} from '@/infrastructure/repos/settings.service';
+import type { CreateFeatureFlagInput, UpdateFeatureFlagInput } from '@/domain/types/feature-flag.types';
+import type { MaintenanceModeParams } from '@/domain/types/settings.types';
 import {
   createFeatureFlag,
   updateFeatureFlag,
@@ -19,8 +13,15 @@ import {
   addUserOverride,
   removeUserOverride,
 } from '@/infrastructure/repos/feature-flags.service';
-import type { MaintenanceModeParams } from '@/domain/types/settings.types';
-import type { CreateFeatureFlagInput, UpdateFeatureFlagInput } from '@/domain/types/feature-flag.types';
+import {
+  setSetting,
+  createSetting,
+  deleteSetting,
+  enableMaintenanceMode,
+  disableMaintenanceMode,
+  lockApp,
+  unlockApp,
+} from '@/infrastructure/repos/settings.service';
 
 /**
  * Mutation hooks for settings and feature flags.

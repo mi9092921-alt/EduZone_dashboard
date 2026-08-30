@@ -1,7 +1,5 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
-import { container } from '@/container';
 import {
   Warning,
   Security,
@@ -9,21 +7,24 @@ import {
   InfoOutlined,
   ReportProblem
 } from '@mui/icons-material';
+import { useQuery } from '@tanstack/react-query';
+import { formatDistanceToNow } from 'date-fns';
+import { useTranslations } from 'next-intl';
+
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from '@/components/ui/Card';
-import { useTranslations } from 'next-intl';
-import { formatDistanceToNow } from 'date-fns';
+import { container } from '@/container';
 import { cn } from '@/lib/utils';
 
 export interface SecurityEvent {
   id: string;
   activity_type: string;
   risk_level: 'low' | 'medium' | 'high' | 'critical';
-  details: any;
+  details: unknown;
   created_at: string;
 }
 
@@ -89,7 +90,7 @@ export function SecurityAlertPanel() {
                       {alert.activity_type.replace(/_/g, ' ').toUpperCase()}
                     </p>
                     <p className="text-[10px] opacity-80 mt-0.5">
-                      {alert.details?.reason || alert.details?.message || t('suspicious_activity_detected')}
+                      {(alert.details as { reason?: string; message?: string } | null)?.reason || (alert.details as { reason?: string; message?: string } | null)?.message || t('suspicious_activity_detected')}
                     </p>
                     <div className="flex items-center gap-1.5 mt-2 opacity-60">
                       <History className="w-3 h-3" />

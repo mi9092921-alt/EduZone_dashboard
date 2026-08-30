@@ -8,9 +8,8 @@ export type SettingValueType = 'string' | 'integer' | 'boolean' | 'json';
 
 export type SettingCategory = 'general' | 'security' | 'maintenance' | 'limits';
 
-export interface SettingKv extends BaseSetting {
-  // Sync with v13
-}
+// Sync with v13
+export type SettingKv = BaseSetting;
 
 /** Grouped settings for category tabs */
 export interface SettingsByCategory {

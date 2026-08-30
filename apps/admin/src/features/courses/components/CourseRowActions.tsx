@@ -8,11 +8,12 @@ import {
   Archive,
   Delete,
 } from '@mui/icons-material';
-import type { Course } from '@/domain/types/course.types';
-import { Dropdown, DropdownItem, DropdownSeparator } from '@/components/ui/Dropdown';
-import { Button } from '@/components/ui/Button';
-
 import { useTranslations } from 'next-intl';
+
+import { Button } from '@/components/ui/Button';
+import { Dropdown, DropdownItem, DropdownSeparator } from '@/components/ui/Dropdown';
+import type { Course } from '@/domain/types/course.types';
+
 
 interface CourseRowActionsProps {
   course: Course;

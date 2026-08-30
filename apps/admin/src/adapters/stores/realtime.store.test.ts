@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { useRealtimeStore, useUnreadAlertCount } from './realtime.store';
 import { renderHook } from '@testing-library/react';
+import { describe, it, expect, beforeEach } from 'vitest';
+
+import { useRealtimeStore, useUnreadAlertCount } from './realtime.store';
 
 describe('realtime.store', () => {
   const initialStore = useRealtimeStore.getState();

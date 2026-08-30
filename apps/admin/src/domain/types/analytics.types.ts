@@ -1,7 +1,6 @@
 /**
  * Analytics domain types — synced with materialized views in Eduzone Schema v13.9.0.
  */
-import { UserStats } from '@eduzone/types';
 
 // ── vw_course_stats (replaces mv_course_stats) ──────────────────
 export interface MvCourseStats {
@@ -57,7 +56,7 @@ export interface UserLocationLog {
   latitude: number | null;
   longitude: number | null;
   accuracy: number | null;
-  device_info: Record<string, any>;
+  device_info: Record<string, unknown>;
   source: string | null;
   timestamp: string;
 }

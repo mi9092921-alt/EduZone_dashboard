@@ -1,3 +1,4 @@
+import { getYoutubeMetadataAction } from '@/application/actions/video.actions';
 import { container } from '@/container';
 import type {
   Course,
@@ -17,8 +18,6 @@ import type {
   CourseLearningObjective,
   CoursePrerequisite,
 } from '@/domain/types/course.types';
-import { getYoutubeMetadataAction } from '@/application/actions/video.actions';
-import { extractYoutubeId } from '@/infrastructure/youtube.service';
 import { parseVideoUrl } from '@/domain/video.utils';
 
 /**
@@ -72,7 +71,7 @@ export async function getCourses(
       teacher_name: teacher
         ? [teacher.first_name, teacher.last_name].filter(Boolean).join(' ')
         : undefined,
-      lesson_count: (row.lesson_count as any)?.[0]?.count ?? (row.total_lessons as number) ?? 0,
+      lesson_count: (row.lesson_count as { count: number }[] | null)?.[0]?.count ?? (row.total_lessons as number) ?? 0,
     } as Course;
   });
 
@@ -148,7 +147,7 @@ export async function createCourse(data: CreateCourseInput): Promise<Course> {
 
   // v13: is_free is a generated column, do not insert it.
   // Instead, ensure price is 0 if is_free was passed as true.
-  const { is_free, ...cleanData } = data as any;
+  const { is_free, ...cleanData } = data;
   const finalPrice = is_free === true ? 0 : (cleanData.price ?? 0);
 
   const { data: course, error } = await supabase
@@ -173,8 +172,11 @@ export async function updateCourse(
   const { supabase } = container;
 
   // v13: is_free is a generated column, do not update it.
-  const { is_free, ...cleanData } = data as any;
-  const updatePayload: any = { ...cleanData, updated_at: new Date().toISOString() };
+  const { is_free, ...cleanData } = data;
+  const updatePayload: Partial<UpdateCourseInput> & { updated_at: string; price?: number } = {
+    ...cleanData,
+    updated_at: new Date().toISOString(),
+  };
   
   if (is_free === true) {
     updatePayload.price = 0;
@@ -501,7 +503,7 @@ export async function updateLesson(
   }
 
   // 1. Update Lesson Metadata
-  const metadata: Record<string, any> = {
+  const metadata: Record<string, unknown> = {
     updated_at: new Date().toISOString(),
   };
   if (data.title !== undefined) metadata.title = data.title;
@@ -711,7 +713,7 @@ export async function revokeEnrollment(
 export async function getCourseStats(courseId: string): Promise<CourseStats | null> {
   try {
     const { getCourseStatsAction } = await import('@/application/actions/admin.actions');
-    return getCourseStatsAction(courseId);
+    return await getCourseStatsAction(courseId);
   } catch (err: unknown) {
     if (process.env.NODE_ENV === 'development') {
       console.debug('[getCourseStats] Stats not available:', err);
@@ -785,13 +787,13 @@ export async function getVideoViewsByUser(
       : Promise.resolve({ data: [] }),
   ]);
 
-  const courseTitles = new Map((coursesRes.data ?? []).map((row: any) => [row.id, row.title]));
-  const lessonTitles = new Map((lessonsRes.data ?? []).map((row: any) => [row.id, row.title]));
+  const courseTitles = new Map((coursesRes.data ?? []).map((row: { id: string; title: string }) => [row.id, row.title]));
+  const lessonTitles = new Map((lessonsRes.data ?? []).map((row: { id: string; title: string }) => [row.id, row.title]));
 
-  const views = (data ?? []).map((row: any) => ({
+  const views = (data ?? []).map((row: Record<string, unknown>) => ({
     ...row,
-    course_title: courseTitles.get(row.course_id),
-    lesson_title: lessonTitles.get(row.lesson_id),
+    course_title: courseTitles.get(row.course_id as string),
+    lesson_title: lessonTitles.get(row.lesson_id as string),
   })) as VideoView[];
 
   return {
@@ -850,12 +852,17 @@ export async function getPrerequisites(courseId: string): Promise<CoursePrerequi
     .select('*, prerequisite:courses!course_prerequisites_prereq_tenant_fkey(title, level)')
     .eq('course_id', courseId);
   if (error) throw error;
-  return (data || []).map((row: any) => ({
+  return (data || []).map((row: {
+    course_id: string;
+    prerequisite_course_id: string;
+    tenant_id: string;
+    prerequisite?: { title: string; level: string } | null;
+  }) => ({
     course_id: row.course_id,
     prerequisite_course_id: row.prerequisite_course_id,
     tenant_id: row.tenant_id,
-    prerequisite_title: row.prerequisite?.title,
-    prerequisite_level: row.prerequisite?.level,
+    ...(row.prerequisite?.title !== undefined && { prerequisite_title: row.prerequisite.title }),
+    ...(row.prerequisite?.level !== undefined && { prerequisite_level: row.prerequisite.level }),
   }));
 }
 

@@ -1,13 +1,15 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Search, Person, Business, Close, Apartment } from '@mui/icons-material';
-import { useAuthUser } from '@/adapters/stores/auth.store';
-import { searchUsers } from '@/infrastructure/repos/users.service';
-import { useTenants } from '@/adapters/queries/tenants.queries';
-import { Select, SelectItem } from '@/components/ui/Select';
-import { cn } from '@/lib/utils';
+import { Search, Person, Close, Apartment } from '@mui/icons-material';
 import { useTranslations } from 'next-intl';
+import React, { useState, useEffect, useRef } from 'react';
+
+import { useTenants } from '@/adapters/queries/tenants.queries';
+import { useAuthUser } from '@/adapters/stores/auth.store';
+import { Select, SelectItem } from '@/components/ui/Select';
+import { searchUsers, type UserSearchResult } from '@/infrastructure/repos/users.service';
+import { cn } from '@/lib/utils';
+
 
 interface UserActivitySelectorProps {
   onSelect: (userId: string | null) => void;
@@ -22,7 +24,7 @@ export function UserActivitySelector({ onSelect, selectedUserId, userRole }: Use
   
   const [query, setQuery] = useState('');
   const [selectedTenantId, setSelectedTenantId] = useState<string>('all');
-  const [results, setResults] = useState<any[]>([]);
+  const [results, setResults] = useState<UserSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -80,7 +82,7 @@ export function UserActivitySelector({ onSelect, selectedUserId, userRole }: Use
     return () => clearTimeout(timer);
   }, [query, authUser, selectedTenantId]);
 
-  const handleSelect = (user: any) => {
+  const handleSelect = (user: UserSearchResult) => {
     if (!user || !user.id) return;
     
     const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email || 'User';

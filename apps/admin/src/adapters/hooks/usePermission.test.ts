@@ -1,6 +1,8 @@
-import { describe, it, expect, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+
 import { usePermission, useRole } from './usePermission';
+
 import { useAuthPermissions, useIsAdmin, useAuthStore } from '@/adapters/stores/auth.store';
 
 vi.mock('@/adapters/stores/auth.store', () => ({

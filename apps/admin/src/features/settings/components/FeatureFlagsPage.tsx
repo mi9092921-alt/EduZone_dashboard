@@ -1,7 +1,15 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
-import { useTranslations } from 'next-intl';
+import {
+  Flag,
+  Add,
+  ExpandMore,
+  ExpandLess,
+  Delete,
+  PersonAdd,
+  GroupAdd,
+  ContentCopy,
+} from '@mui/icons-material';
 import {
   Box,
   Typography,
@@ -34,19 +42,11 @@ import {
   useTheme,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import { Card, CardContent, StatsCard, StatsCardContent, StatsCardIcon } from '@/components/ui/Card';
-import {
-  Flag,
-  Add,
-  ExpandMore,
-  ExpandLess,
-  Delete,
-  PersonAdd,
-  GroupAdd,
-  ContentCopy,
-} from '@mui/icons-material';
+import { useTranslations } from 'next-intl';
+import React, { useState, useCallback } from 'react';
+
 import { PermissionGate } from '../../layout/components/PermissionGate';
-import { useFeatureFlags, useFeatureFlagDetail, useRoles } from '@/adapters/queries/settings.queries';
+
 import {
   useCreateFeatureFlag,
   useToggleFeatureFlag,
@@ -57,14 +57,14 @@ import {
   useAddUserOverride,
   useRemoveUserOverride,
 } from '@/adapters/mutations/settings.mutations';
-import type { FeatureFlag } from '@/domain/types/feature-flag.types';
+import { useFeatureFlags, useFeatureFlagDetail, useRoles } from '@/adapters/queries/settings.queries';
 import { useToastStore } from '@/adapters/stores/toast.store';
+import type { FeatureFlag, CreateFeatureFlagInput } from '@/domain/types/feature-flag.types';
 
 export function FeatureFlagsPage() {
   const theme = useTheme();
   const t = useTranslations('settings');
   const tCommon = useTranslations('common');
-  const tVal = useTranslations('validation');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<FeatureFlag | null>(null);
@@ -359,7 +359,6 @@ function FlagOverridesPanel({ flagId }: { flagId: string }) {
   const [addUserOpen, setAddUserOpen] = useState(false);
   const [selectedRoleId, setSelectedRoleId] = useState('');
   const [selectedIsExclude, setSelectedIsExclude] = useState(false);
-  const [userEmail, setUserEmail] = useState('');
   const [userId, setUserId] = useState('');
 
   if (isLoading) {
@@ -475,11 +474,11 @@ function FlagOverridesPanel({ flagId }: { flagId: string }) {
               )}
               onChange={(_, val) => setSelectedRoleId(val?.id ?? '')}
               renderInput={(params) => {
-                const { InputLabelProps, size, ...restParams } = params;
+                const { InputLabelProps, size: _size, ...restParams } = params;
                 return (
                   <TextField
                     {...restParams}
-                    InputLabelProps={InputLabelProps as any}
+                    InputLabelProps={(InputLabelProps ?? {}) as NonNullable<React.ComponentProps<typeof TextField>['InputLabelProps']>}
                     label={t('feature_flags.overrides.label_role')}
                   />
                 );
@@ -608,7 +607,7 @@ function CreateFlagDialog({ open, onClose, onSuccess }: CreateFlagDialogProps) {
       return;
     }
     try {
-      const input: any = {
+      const input: CreateFeatureFlagInput = {
         key,
         is_enabled: false,
         rollout_pct: 100,

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
 import {
   getAllSettings,
   getSettingsByCategory,
@@ -11,6 +12,7 @@ import {
   lockApp,
   unlockApp,
 } from './settings.service';
+
 import { container } from '@/container';
 
 vi.mock('@/container', () => ({
@@ -90,7 +92,7 @@ describe('settings.service', () => {
     q.eq.mockResolvedValue({ error: null });
 
     await setSetting('k', 'v', 'string');
-    expect(q.update).toHaveBeenCalledWith(expect.objectContaining({ value: 'v', value_type: 'string', updated_by: 'admin1' }));
+    expect(q.update).toHaveBeenCalledWith(expect.objectContaining({ value: 'v', updated_by: 'admin1' }));
   });
 
   it('createSetting and deleteSetting', async () => {
@@ -112,7 +114,7 @@ describe('settings.service', () => {
     expect(q.upsert).toHaveBeenCalledTimes(5);
 
     await disableMaintenanceMode();
-    expect(q.upsert).toHaveBeenCalledWith(expect.objectContaining({ key: 'maintenance_mode', value: 'false' }), { onConflict: 'key' });
+    expect(q.upsert).toHaveBeenCalledWith(expect.objectContaining({ key: 'maintenance_mode', value: false }), { onConflict: 'key' });
   });
 
   it('app locks', async () => {
@@ -122,6 +124,6 @@ describe('settings.service', () => {
     expect(q.upsert).toHaveBeenCalledTimes(2);
 
     await unlockApp();
-    expect(q.upsert).toHaveBeenCalledWith(expect.objectContaining({ key: 'app_locked', value: 'false' }), { onConflict: 'key' });
+    expect(q.upsert).toHaveBeenCalledWith(expect.objectContaining({ key: 'app_locked', value: false }), { onConflict: 'key' });
   });
 });

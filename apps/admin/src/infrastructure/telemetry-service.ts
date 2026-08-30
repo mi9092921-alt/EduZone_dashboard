@@ -13,7 +13,7 @@ export interface TelemetryParams {
   accuracy?: number;
   provider?: string;
   deviceId?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 /**

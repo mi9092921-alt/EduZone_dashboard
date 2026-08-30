@@ -7,13 +7,13 @@ import {
   PauseCircle,
   Block,
 } from '@mui/icons-material';
-import { useUserStats } from '@/adapters/queries/users.queries';
-import { Card, CardContent, StatsCard, StatsCardContent, StatsCardIcon } from '@/components/ui/Card';
-import { Select, SelectItem } from '@/components/ui/Select';
-import { useTranslations } from 'next-intl';
-import { cn } from '@/lib/utils';
 import { Typography, Box, useTheme } from '@mui/material';
 import { alpha } from '@mui/material/styles';
+import { useTranslations } from 'next-intl';
+
+import { useUserStats } from '@/adapters/queries/users.queries';
+import { StatsCard, StatsCardContent, StatsCardIcon } from '@/components/ui/Card';
+
 
 interface StatCardProps {
   label: string;

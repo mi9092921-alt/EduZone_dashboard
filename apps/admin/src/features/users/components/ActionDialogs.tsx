@@ -1,6 +1,5 @@
 'use client';
 
-import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Lock,
@@ -11,8 +10,22 @@ import {
   DevicesOther,
   DeleteForever,
 } from '@mui/icons-material';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { useTranslations } from 'next-intl';
+import { useForm, Controller } from 'react-hook-form';
+
+import {
+  useMutateUserAccount,
+  useTerminateSessions,
+  useResetDevices,
+  useMutateWarning,
+  useDeleteUser,
+} from '@/adapters/mutations/users.mutations';
 import { useToastStore } from '@/adapters/stores/toast.store';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { Input } from '@/components/ui/Input';
+import { Label } from '@/components/ui/Label';
+import { Select, SelectItem } from '@/components/ui/Select';
+import { parseRpcError } from '@/domain/errors';
 import {
   lockUserSchema,
   suspendUserSchema,
@@ -25,18 +38,7 @@ import {
 } from '@/domain/schemas/user.schema';
 import type { User } from '@/domain/types/user.types';
 import { getUserDisplayName } from '@/domain/types/user.types';
-import {
-  useMutateUserAccount,
-  useTerminateSessions,
-  useResetDevices,
-  useMutateWarning,
-  useDeleteUser,
-} from '@/adapters/mutations/users.mutations';
-import { parseRpcError } from '@/domain/errors';
-import { Input } from '@/components/ui/Input';
-import { Label } from '@/components/ui/Label';
-import { Select, SelectItem } from '@/components/ui/Select';
-import { useTranslations } from 'next-intl';
+
 
 // ── Lock Dialog ──────────────────────────────────────────────────
 export function LockUserDialog({
@@ -238,7 +240,7 @@ export function BanUserDialog({
     formState: { errors },
   } = useForm<BanUserInput>({
     resolver: zodResolver(banUserSchema),
-    defaultValues: { reason: '', confirm_text: '' as any },
+    defaultValues: { reason: '', confirm_text: '' as 'BAN' },
   });
 
   const onSubmit = (data: BanUserInput) => {

@@ -1,10 +1,10 @@
-import { createBrowserClient } from '@/infrastructure/supabase/client';
-import { InMemoryEventBus } from '@/infrastructure/event-bus/InMemoryEventBus';
-import { ConsoleLogger } from '@/infrastructure/observability/ConsoleLogger';
-import { NoopTracer } from '@/infrastructure/observability/NoopTracer';
 import type { IEventBus } from '@/application/ports/IEventBus';
 import type { ILogger } from '@/application/ports/ILogger';
 import type { ITracer } from '@/application/ports/ITracer';
+import { InMemoryEventBus } from '@/infrastructure/event-bus/InMemoryEventBus';
+import { ConsoleLogger } from '@/infrastructure/observability/ConsoleLogger';
+import { NoopTracer } from '@/infrastructure/observability/NoopTracer';
+import { createBrowserClient } from '@/infrastructure/supabase/client';
 
 /**
  * Dependency Injection Container

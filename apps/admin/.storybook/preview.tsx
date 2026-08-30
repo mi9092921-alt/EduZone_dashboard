@@ -1,13 +1,14 @@
+import createCache from '@emotion/cache';
+import { CacheProvider } from '@emotion/react';
+import { CssBaseline } from '@mui/material';
+import { ThemeProvider, createTheme } from '@mui/material/styles';
 import type { Preview } from '@storybook/react';
-import { NextIntlClientProvider } from 'next-intl';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { initialize, mswLoader } from 'msw-storybook-addon';
-import { CacheProvider } from '@emotion/react';
-import createCache from '@emotion/cache';
-import rtlPlugin from 'stylis-plugin-rtl';
+import { NextIntlClientProvider } from 'next-intl';
 import { prefixer } from 'stylis';
-import { ThemeProvider, createTheme } from '@mui/material/styles';
-import { CssBaseline } from '@mui/material';
+import rtlPlugin from 'stylis-plugin-rtl';
+
 import enMessages from '../messages/en.json';
 import '../src/app/globals.css';
 

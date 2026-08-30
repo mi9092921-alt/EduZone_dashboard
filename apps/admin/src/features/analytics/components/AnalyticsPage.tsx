@@ -1,18 +1,21 @@
 'use client';
 
-import { useState, useMemo } from 'react';
 import {
   People,
   TrendingUp,
-  School,
   Schedule,
-  Visibility,
   Shield,
   Public,
   Download,
   AccessTime,
 } from '@mui/icons-material';
+import { TrendingUp as TrendingUpIcon, TrendingDown as TrendingDownIcon } from '@mui/icons-material';
+import { Typography, Box, Tooltip } from '@mui/material';
 import { useTranslations, useLocale } from 'next-intl';
+import { useState, useMemo } from 'react';
+
+import { GeoDistributionMap } from './GeoDistributionMap';
+
 import {
   useUserStats,
   useCourseStats,
@@ -21,18 +24,15 @@ import {
   useGeographicDistribution,
   useGlobalCoordinates,
 } from '@/adapters/queries/analytics-mv.queries';
-import { GeoDistributionMap } from './GeoDistributionMap';
-import type { CourseWithStats, MvDailyRevenue, DailyCount } from '@/domain/types/analytics.types';
 import {
   Card,
-  CardContent,
   StatsCard,
   StatsCardContent,
   StatsCardIcon
 } from '@/components/ui/Card';
-import { TrendingUp as TrendingUpIcon, TrendingDown as TrendingDownIcon } from '@mui/icons-material';
+import type { CourseWithStats, MvDailyRevenue, DailyCount } from '@/domain/types/analytics.types';
 import { cn } from '@/lib/utils';
-import { Typography, Box, Tooltip } from '@mui/material';
+
 
 export function AnalyticsPage() {
   const { data: userStats, isLoading: userStatsLoading } = useUserStats();
@@ -76,7 +76,7 @@ export function AnalyticsPage() {
       <section className="space-y-4">
         <SectionHeader
           title={ta('section_users')}
-          refreshedAt={(userStats as any)?.refreshed_at ?? userStats?.last_updated}
+          refreshedAt={(userStats as unknown as Record<string, string> | null)?.refreshed_at ?? userStats?.last_updated}
           onExport={() => userStats && handleExportCsv('user-metrics', [userStats as unknown as Record<string, unknown>])}
           locale={locale}
           ta={ta}
@@ -309,7 +309,7 @@ export function AnalyticsPage() {
 }
 
 // ── Section Header ───────────────────────────────────────────────
-function SectionHeader({ title, refreshedAt, onExport, locale, ta }: { title: string; refreshedAt?: string | undefined; onExport?: (() => void) | undefined; locale: string; ta: any }) {
+function SectionHeader({ title, refreshedAt, onExport, locale, ta }: { title: string; refreshedAt?: string | undefined; onExport?: (() => void) | undefined; locale: string; ta: ReturnType<typeof useTranslations> }) {
   return (
     <div className="flex items-center justify-between">
       <h2 className="text-sm font-bold text-foreground">{title}</h2>
@@ -414,7 +414,7 @@ function KpiCard({
 
 // ── Status Distribution Bar ──────────────────────────────────────
 function StatusDistribution({ active, locked, suspended, banned, t }: {
-  active: number; locked: number; suspended: number; banned: number; t: any;
+  active: number; locked: number; suspended: number; banned: number; t: ReturnType<typeof useTranslations>;
 }) {
   const total = active + locked + suspended + banned || 1;
   const segments = [
@@ -506,7 +506,7 @@ function HorizontalBarChart({ data }: { data: CourseWithStats[] }) {
 }
 
 // ── Progress Row ─────────────────────────────────────────────────
-function ProgressRow({ course, ta }: { course: CourseWithStats; ta: any }) {
+function ProgressRow({ course, ta }: { course: CourseWithStats; ta: ReturnType<typeof useTranslations> }) {
   const completionRate = course.enrolled > 0 ? ((course.completed / course.enrolled) * 100).toFixed(0) : '0';
 
   return (
@@ -529,7 +529,7 @@ function ProgressRow({ course, ta }: { course: CourseWithStats; ta: any }) {
 }
 
 // ── Activity Heatmap ─────────────────────────────────────────────
-function ActivityHeatmap({ data, riskFilter, ta, locale }: { data: MvDailyRevenue[]; riskFilter: string | null; ta: any; locale: string }) {
+function ActivityHeatmap({ data, riskFilter: _riskFilter, ta, locale }: { data: MvDailyRevenue[]; riskFilter: string | null; ta: ReturnType<typeof useTranslations>; locale: string }) {
   const filtered = useMemo(() => {
     // Note: v13 vw_daily_revenue does not have risk_level, it tracks financial activity.
     // We display all daily revenue events here.

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
 import {
   bindDevice,
   getUsers,
@@ -10,12 +11,10 @@ import {
   getDevices,
   getSessions,
   getWarnings,
-  getEffectivePermissions,
-  getUserRoles,
   getUserStats,
-  getAllPermissions,
   searchUsers,
 } from './users.service';
+
 import { container } from '@/container';
 
 // Mock the container
@@ -29,6 +28,10 @@ vi.mock('@/container', () => ({
       },
     },
   },
+}));
+
+vi.mock('@/application/actions/user.actions', () => ({
+  issueWarningAction: vi.fn(),
 }));
 
 describe('users.service', () => {
@@ -121,17 +124,20 @@ describe('users.service', () => {
     });
   });
 
-  it('issueWarning uses RPC', async () => {
-    mockRpc.mockReturnValue(setupQuery({ data: 'w1', error: null }));
+  it('issueWarning delegates to issueWarningAction', async () => {
+    const { issueWarningAction } = await import('@/application/actions/user.actions');
+    (issueWarningAction as any).mockResolvedValue({ success: true, warningId: 'w1' });
 
     const id = await issueWarning('u1', 'r', 1);
     expect(id).toBe('w1');
-    expect(mockRpc).toHaveBeenCalledWith('issue_warning', {
-      p_user_id: 'u1',
-      p_reason: 'r',
-      p_severity: 1,
-      p_note: 'none',
-    });
+    expect(issueWarningAction).toHaveBeenCalledWith('u1', 'r', 1, 'none');
+  });
+
+  it('issueWarning throws when the action reports failure', async () => {
+    const { issueWarningAction } = await import('@/application/actions/user.actions');
+    (issueWarningAction as any).mockResolvedValue({ success: false, error: 'PERMISSION_DENIED' });
+
+    await expect(issueWarning('u1', 'r', 1)).rejects.toThrow('PERMISSION_DENIED');
   });
 
   it('bindDevice calls RPC correctly', async () => {

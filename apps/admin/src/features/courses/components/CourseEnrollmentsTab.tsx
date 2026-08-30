@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { Search, PersonAdd, Block, Download } from '@mui/icons-material';
 import {
   Box,
   Typography,
@@ -19,16 +19,20 @@ import {
   TableHead,
   TableRow,
 } from '@mui/material';
-import { Search, PersonAdd, Block, Download } from '@mui/icons-material';
-import type { Enrollment } from '@/domain/types/course.types';
-import { getEnrollmentStudentName } from '@/domain/types/course.types';
-import { useCourseEnrollments } from '@/adapters/queries/courses.queries';
-import { getAllCourseEnrollments } from '@/infrastructure/repos/courses.service';
+import { useTranslations } from 'next-intl';
+import { useState } from 'react';
+
 import { EnrollStudentDialog } from './EnrollStudentDialog';
 import { RevokeEnrollmentDialog } from './RevokeEnrollmentDialog';
 
-import { useTranslations } from 'next-intl';
+import { useCourseEnrollments } from '@/adapters/queries/courses.queries';
 import { TablePagination } from '@/components/ui/TablePagination';
+import type { Enrollment } from '@/domain/types/course.types';
+import { getEnrollmentStudentName } from '@/domain/types/course.types';
+import { getAllCourseEnrollments } from '@/infrastructure/repos/courses.service';
+
+
+
 
 const STATUS_CONFIG: Record<string, "success" | "primary" | "error" | "warning"> = {
   active: "success",
@@ -266,7 +270,7 @@ export function CourseEnrollmentsTab({ courseId }: CourseEnrollmentsTabProps) {
                       <Chip
                         label={(enrollment.status || 'active').toUpperCase()}
                         size="small"
-                        color={statusColor as any}
+                        color={statusColor as 'success' | 'primary' | 'error' | 'warning' | 'default'}
                         variant="outlined"
                         sx={{
                           height: 22,

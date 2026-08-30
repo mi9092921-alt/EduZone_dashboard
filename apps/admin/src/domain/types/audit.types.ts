@@ -28,9 +28,8 @@ export interface ActivityLogQueueEntry extends BaseActivityLogQueueEntry {
 }
 
 // ── Audit chain state ────────────────────────────────────────────
-export interface AuditChainState extends BaseAuditChainState {
-  // No extensions
-}
+// No extensions
+export type AuditChainState = BaseAuditChainState;
 
 // ── Filters ──────────────────────────────────────────────────────
 export interface AuditFilters {

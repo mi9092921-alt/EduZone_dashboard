@@ -1,4 +1,13 @@
+// @vitest-environment node
+//
+// The default unit-test environment is jsdom, which defines a global
+// `window`. feature-flags.service.ts is isomorphic: it delegates to a
+// server action when `typeof window !== 'undefined'` (browser/client
+// component call site) and uses container.supabase directly otherwise
+// (server component / already-trusted server context). These tests target
+// the container.supabase branch, so they must run without a global window.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
 import {
   getAllFeatureFlags,
   getFeatureFlagById,
@@ -12,21 +21,27 @@ import {
   removeUserOverride,
   getAllRoles,
 } from './feature-flags.service';
+
 import { container } from '@/container';
 
 vi.mock('@/container', () => ({
   container: {
     supabase: {
       from: vi.fn(),
+      auth: {
+        getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
+      },
     },
   },
 }));
 
 describe('feature-flags.service', () => {
   const mockFrom = container.supabase.from as any;
+  const mockGetUser = container.supabase.auth.getUser as any;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetUser.mockResolvedValue({ data: { user: null } });
   });
 
   const setupQuery = (resolvedValue: any) => {
@@ -35,6 +50,8 @@ describe('feature-flags.service', () => {
       eq: vi.fn().mockReturnThis(),
       order: vi.fn().mockReturnThis(),
       single: vi.fn().mockResolvedValue(resolvedValue),
+      maybeSingle: vi.fn().mockResolvedValue(resolvedValue),
+      limit: vi.fn().mockReturnThis(),
       insert: vi.fn().mockReturnThis(),
       update: vi.fn().mockReturnThis(),
       delete: vi.fn().mockReturnThis(),
@@ -202,26 +219,56 @@ describe('feature-flags.service', () => {
 
   // ── Role overrides ─────────────────────────────────────────
   describe('addRoleOverride', () => {
-    it('upserts a role override (include)', async () => {
-      const q = setupQuery({ error: null });
-      mockFrom.mockReturnValue(q);
+    const routeByTable = (upsertResult: any) => (table: string) => {
+      if (table === 'feature_flag_roles' || table === 'feature_flag_users') {
+        return setupQuery(upsertResult);
+      }
+      if (table === 'users') {
+        const q = setupQuery({});
+        q.maybeSingle = vi.fn().mockResolvedValue({ data: { tenant_id: 't1' } });
+        return q;
+      }
+      if (table === 'tenants') {
+        const q = setupQuery({});
+        q.limit = vi.fn().mockReturnValue({ maybeSingle: vi.fn().mockResolvedValue({ data: { id: 't1' } }) });
+        return q;
+      }
+      return setupQuery({});
+    };
+
+    it('upserts a role override scoped to the resolved tenant (include)', async () => {
+      mockGetUser.mockResolvedValue({ data: { user: { id: 'u1' } } });
+      // Capture the feature_flag_roles call specifically to assert on it.
+      let flagRolesQuery: any;
+      mockFrom.mockImplementation((table: string) => {
+        if (table === 'feature_flag_roles') {
+          flagRolesQuery = setupQuery({ error: null });
+          return flagRolesQuery;
+        }
+        return routeByTable({ error: null })(table);
+      });
 
       await addRoleOverride('f1', 'r1', false);
       expect(mockFrom).toHaveBeenCalledWith('feature_flag_roles');
-      expect(q.upsert).toHaveBeenCalledWith(
-        { flag_id: 'f1', role_id: 'r1', is_exclude: false },
-        { onConflict: 'flag_id,role_id' },
+      expect(flagRolesQuery.upsert).toHaveBeenCalledWith(
+        { tenant_id: 't1', flag_id: 'f1', role_id: 'r1' },
+        { onConflict: 'tenant_id,flag_id,role_id' },
       );
     });
 
-    it('upserts a role override (exclude)', async () => {
-      const q = setupQuery({ error: null });
-      mockFrom.mockReturnValue(q);
+    it('throws when no tenant can be resolved', async () => {
+      mockGetUser.mockResolvedValue({ data: { user: null } });
+      mockFrom.mockImplementation((table: string) => {
+        if (table === 'tenants') {
+          const q = setupQuery({});
+          q.limit = vi.fn().mockReturnValue({ maybeSingle: vi.fn().mockResolvedValue({ data: null }) });
+          return q;
+        }
+        return setupQuery({});
+      });
 
-      await addRoleOverride('f1', 'r1', true);
-      expect(q.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({ is_exclude: true }),
-        expect.any(Object),
+      await expect(addRoleOverride('f1', 'r1', false)).rejects.toThrow(
+        'No tenant found to associate override with',
       );
     });
   });
@@ -246,15 +293,26 @@ describe('feature-flags.service', () => {
 
   // ── User overrides ─────────────────────────────────────────
   describe('addUserOverride', () => {
-    it('upserts a user override', async () => {
-      const q = setupQuery({ error: null });
-      mockFrom.mockReturnValue(q);
+    it('upserts a user override scoped to the target user\'s tenant', async () => {
+      let flagUsersQuery: any;
+      mockFrom.mockImplementation((table: string) => {
+        if (table === 'feature_flag_users') {
+          flagUsersQuery = setupQuery({ error: null });
+          return flagUsersQuery;
+        }
+        if (table === 'users') {
+          const q = setupQuery({});
+          q.maybeSingle = vi.fn().mockResolvedValue({ data: { tenant_id: 't1' } });
+          return q;
+        }
+        return setupQuery({});
+      });
 
       await addUserOverride('f1', 'u1', false);
       expect(mockFrom).toHaveBeenCalledWith('feature_flag_users');
-      expect(q.upsert).toHaveBeenCalledWith(
-        { flag_id: 'f1', user_id: 'u1', is_exclude: false },
-        { onConflict: 'flag_id,user_id' },
+      expect(flagUsersQuery.upsert).toHaveBeenCalledWith(
+        { tenant_id: 't1', flag_id: 'f1', user_id: 'u1' },
+        { onConflict: 'tenant_id,flag_id,user_id' },
       );
     });
   });

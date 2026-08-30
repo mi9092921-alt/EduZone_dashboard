@@ -1,6 +1,7 @@
-import * as React from "react"
-import { Select as MuiSelect, MenuItem, MenuItemProps, SelectProps as MuiSelectProps, SelectChangeEvent } from "@mui/material"
 import { KeyboardArrowDown } from "@mui/icons-material"
+import { Select as MuiSelect, MenuItem, MenuItemProps, SelectProps as MuiSelectProps, SelectChangeEvent } from "@mui/material"
+import * as React from "react"
+
 import { cn } from "@/lib/utils"
 
 export interface SelectProps extends Omit<MuiSelectProps, 'onChange'> {
@@ -18,7 +19,7 @@ const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
 
     return (
       <MuiSelect
-        ref={ref as any}
+        ref={ref}
         value={value ?? ''}
         onChange={handleChange}
         onOpen={() => setIsOpen(true)}
@@ -59,7 +60,7 @@ const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
             fontWeight: 'inherit',
             minHeight: 'auto',
           },
-          ...((props.sx as any) || {})
+          ...((props.sx as object) || {})
         }}
         className={cn("transition-faang text-sm bg-background", className)}
         MenuProps={{

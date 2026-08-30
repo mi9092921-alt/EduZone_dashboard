@@ -1,15 +1,15 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { renderHook, waitFor, act } from '@testing-library/react';
 import { createElement, type ReactNode } from 'react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
 import { userFactory } from '../../../tests/factories/user.factory';
 
 // ── Mock the repository functions ─────────────────────────────────
 vi.mock('@/infrastructure/repos/users.service', () => ({
-  // controlUserAccount and terminateUserSessions are no longer called directly;
-  // the mutations now route through Server Actions (v13).
+  // controlUserAccount, terminateUserSessions, and issueWarning are no
+  // longer called directly; the mutations now route through Server Actions (v13).
   resetUserDevices:     vi.fn(),
-  issueWarning:         vi.fn(),
 }));
 
 // Mock Server Actions (application layer)
@@ -18,10 +18,10 @@ vi.mock('@/application/actions/user.actions', () => ({
   deleteUserAction: vi.fn(),
   controlUserAccountAction: vi.fn(),
   terminateUserSessionsAction: vi.fn(),
+  issueWarningAction: vi.fn(),
 }));
 
-import { issueWarning } from '@/infrastructure/repos/users.service';
-import { controlUserAccountAction } from '@/application/actions/user.actions';
+import { controlUserAccountAction, issueWarningAction } from '@/application/actions/user.actions';
 
 // ── Wrapper factory ───────────────────────────────────────────────
 function createWrapper() {
@@ -32,7 +32,7 @@ function createWrapper() {
 
 describe('users.mutations hooks', () => {
   const mockControl      = controlUserAccountAction as ReturnType<typeof vi.fn>;
-  const mockIssueWarning = issueWarning             as ReturnType<typeof vi.fn>;
+  const mockIssueWarning = issueWarningAction        as ReturnType<typeof vi.fn>;
 
   beforeEach(() => vi.clearAllMocks());
 
@@ -89,7 +89,7 @@ describe('users.mutations hooks', () => {
 
   // ── useMutateWarning ────────────────────────────────────────────
   it('useMutateWarning — issues warning with severity and action', async () => {
-    mockIssueWarning.mockResolvedValueOnce('warning-uuid-001');
+    mockIssueWarning.mockResolvedValueOnce({ success: true, warningId: 'warning-uuid-001' });
 
     const { useMutateWarning } = await import('./users.mutations');
     const wrapper = createWrapper();
@@ -129,7 +129,7 @@ describe('users.mutations hooks', () => {
     await waitFor(() => expect(result.current.isPending).toBe(true));
 
     // Resolve the promise
-    act(() => resolve!('done'));
+    act(() => resolve!({ success: true, warningId: 'done' }));
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
   });
 });

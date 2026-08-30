@@ -1,7 +1,7 @@
 'use client';
 
-import { AdminShell } from '@/features/layout';
 import { JobsPage } from '@/features/jobs';
+import { AdminShell } from '@/features/layout';
 
 export default function JobsRoute() {
   return (

@@ -1,12 +1,14 @@
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
+
 import { queryKeys } from './keys';
+
+import type { AuditFilters } from '@/domain/types/audit.types';
+import type { TenantFilters } from '@/domain/types/tenant.types';
 import {
   getTenants,
   getTenantById,
   getTenantAuditLogs,
 } from '@/infrastructure/repos/tenants.service';
-import type { TenantFilters } from '@/domain/types/tenant.types';
-import type { AuditFilters } from '@/domain/types/audit.types';
 
 export function useTenants(filters: TenantFilters, page: number, pageSize: number) {
   return useQuery({

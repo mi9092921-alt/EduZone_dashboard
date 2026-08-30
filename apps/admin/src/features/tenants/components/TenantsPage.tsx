@@ -1,29 +1,29 @@
 'use client';
 
-import { useState, useCallback } from 'react';
 import {
   Add,
   Business,
   Edit,
   Delete,
   Block,
-  Refresh,
   Search,
-  KeyboardArrowLeft,
-  KeyboardArrowRight,
 } from '@mui/icons-material';
-import { useTenants } from '@/adapters/queries/tenants.queries';
+import { useTranslations } from 'next-intl';
+import { useState, useCallback } from 'react';
+
 import {
   useCreateTenant,
   useSuspendTenant,
   useDeleteTenant,
 } from '@/adapters/mutations/tenants.mutations';
-import type { Tenant, TenantFilters, TenantPlan, TenantStatus, CreateTenantInput } from '@/domain/types/tenant.types';
-import { cn } from '@/lib/utils';
+import { useTenants } from '@/adapters/queries/tenants.queries';
 import { Button } from '@/components/ui/Button';
-import { useRouter } from '@/i18n/routing';
-import { useTranslations } from 'next-intl';
 import { TablePagination } from '@/components/ui/TablePagination';
+import type { Tenant, TenantFilters, TenantPlan, TenantStatus, CreateTenantInput } from '@/domain/types/tenant.types';
+import { useRouter } from '@/i18n/routing';
+import { cn } from '@/lib/utils';
+
+
 
 // ── Plan config ──────────────────────────────────────────────────
 const PLAN_CONFIG: Record<TenantPlan, { bg: string; text: string }> = {
@@ -71,7 +71,6 @@ export function TenantsPage() {
   const { data, isLoading, isFetching } = useTenants(filters, page, pageSize);
   const tenants = data?.data ?? [];
   const totalCount = data?.count ?? 0;
-  const totalPages = Math.ceil(totalCount / pageSize);
 
   const createMut = useCreateTenant();
   const suspendMut = useSuspendTenant();
@@ -228,13 +227,13 @@ export function TenantsPage() {
                       </td>
                       <td className="px-4 py-3">
                         <span className={cn('px-2 py-0.5 rounded-md border text-[10px] font-extrabold uppercase', plan.bg, plan.text)}>
-                          {t(`plan_${planKey}` as any)}
+                          {t(`plan_${planKey}` as Parameters<typeof t>[0])}
                         </span>
                       </td>
                       <td className="px-4 py-3">
                         <div className={cn('inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase border', status.bg, status.text)}>
                           <div className={cn('h-1.5 w-1.5 rounded-full', status.dot)} />
-                          {t(`status_${statusKey}` as any)}
+                          {t(`status_${statusKey}` as Parameters<typeof t>[0])}
                         </div>
                       </td>
                       <td className="px-4 py-3 text-xs text-muted-foreground font-mono">{t_item.region_id}</td>

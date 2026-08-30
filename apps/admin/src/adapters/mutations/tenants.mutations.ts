@@ -1,12 +1,13 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+
 import { queryKeys } from '@/adapters/queries/keys';
+import type { CreateTenantInput, UpdateTenantInput } from '@/domain/types/tenant.types';
 import {
   createTenant,
   updateTenant,
   suspendTenant,
   deleteTenant,
 } from '@/infrastructure/repos/tenants.service';
-import type { CreateTenantInput, UpdateTenantInput } from '@/domain/types/tenant.types';
 
 export function useCreateTenant() {
   const qc = useQueryClient();

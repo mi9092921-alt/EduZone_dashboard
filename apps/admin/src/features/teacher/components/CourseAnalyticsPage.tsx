@@ -1,12 +1,17 @@
 'use client';
 
-import { useParams, useRouter } from 'next/navigation';
+import {
+  Group,
+  Verified,
+  Schedule,
+  Bolt,
+  CalendarToday,
+  Download,
+  Star,
+} from '@mui/icons-material';
 import {
   Box,
   Typography,
-  Breadcrumbs,
-  Link,
-  IconButton,
   Chip,
   Button,
   CircularProgress,
@@ -20,28 +25,16 @@ import {
   useTheme,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-
-import {
-  NavigateNext,
-  ArrowBack,
-  Group,
-  Verified,
-  Schedule,
-  Bolt,
-  TrendingUp,
-  CalendarToday,
-  Download,
-  Star,
-} from '@mui/icons-material';
-import { useCourseById, useCourseStats } from '@/adapters/queries/courses.queries';
+import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+
+import { useCourseById, useCourseStats } from '@/adapters/queries/courses.queries';
 
 export function CourseAnalyticsPage() {
   const theme = useTheme();
   const t = useTranslations('analytics');
   const tCommon = useTranslations('common');
   const params = useParams();
-  const router = useRouter();
   const courseId = params.id as string;
 
   const { data: course } = useCourseById(courseId);
@@ -317,7 +310,7 @@ export function CourseAnalyticsPage() {
                           <LinearProgress
                             variant="determinate"
                             value={row.dropOff}
-                            color={row.dropColor as any}
+                            color={row.dropColor as 'success' | 'warning' | 'error'}
                             sx={{
                               width: 80,
                               height: 6,

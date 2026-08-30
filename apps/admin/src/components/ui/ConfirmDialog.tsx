@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode } from 'react';
+import { Close as CloseIcon } from '@mui/icons-material';
 import {
   Dialog,
   DialogTitle,
@@ -13,7 +13,7 @@ import {
   Box,
   IconButton
 } from '@mui/material';
-import { Close as CloseIcon } from '@mui/icons-material';
+import { ReactNode } from 'react';
 
 export interface ConfirmDialogProps {
   open: boolean;

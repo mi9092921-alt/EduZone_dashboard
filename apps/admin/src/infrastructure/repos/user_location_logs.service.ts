@@ -41,7 +41,7 @@ export async function getGlobalCoordinatePoints(limit = 1000): Promise<Coordinat
     return [];
   }
 
-  return data.map((d: any) => ({
+  return data.map((d: { latitude: number | null; longitude: number | null }) => ({
     lat: Number(d.latitude),
     lng: Number(d.longitude),
   }));

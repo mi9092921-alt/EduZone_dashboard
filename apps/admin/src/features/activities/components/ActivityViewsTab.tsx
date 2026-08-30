@@ -1,7 +1,9 @@
-import React from 'react';
-import { PlayCircle, Article, OndemandVideo, EventNote } from '@mui/icons-material';
-import { useVideoViews } from '@/adapters/queries/courses.queries';
+import { PlayCircle, EventNote } from '@mui/icons-material';
 import { useTranslations, useLocale } from 'next-intl';
+import React from 'react';
+
+import { useVideoViews } from '@/adapters/queries/courses.queries';
+
 
 interface ActivityViewsTabProps {
   userId: string;

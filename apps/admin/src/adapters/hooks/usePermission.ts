@@ -1,7 +1,8 @@
 'use client';
 
-import { useAuthPermissions, useIsAdmin, useAuthStore } from '@/adapters/stores/auth.store';
 import { PermissionName } from '@eduzone/types';
+
+import { useAuthPermissions, useIsAdmin, useAuthStore } from '@/adapters/stores/auth.store';
 
 /**
  * Hook to check if the current user has a specific permission.

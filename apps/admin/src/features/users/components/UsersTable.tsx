@@ -1,17 +1,19 @@
 'use client';
 
-import Image from 'next/image';
-import { useState, memo, useMemo, useCallback } from 'react';
 import { ContentCopy, MoreHoriz } from '@mui/icons-material';
 import { Tooltip } from '@mui/material';
+import Image from 'next/image';
+import { useTranslations, useLocale } from 'next-intl';
+import { useState, memo, useMemo, useCallback } from 'react';
+
+import { formatDistanceToNow } from './_utils';
+import { UserRowActions } from './UserRowActions';
+
+import { TablePagination } from '@/components/ui/TablePagination';
 import type { User, AccountAction } from '@/domain/types/user.types';
 import { getUserDisplayName, getUserInitials } from '@/domain/types/user.types';
-import { UserRowActions } from './UserRowActions';
-import { formatDistanceToNow } from './_utils';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/Button';
-import { TablePagination } from '@/components/ui/TablePagination';
-import { useTranslations, useLocale } from 'next-intl';
+
 
 // ── Status config ────────────────────────────────────────────────
 const STATUS_CONFIG = {
@@ -136,13 +138,13 @@ const UserRow = memo(({
       </td>
       <td className="px-4 py-4 border-b border-border/40">
         <span className={cn("px-2 py-0.5 rounded-md border text-[10px] font-extrabold uppercase tracking-tight", roleClass)}>
-          {t(`role_${user.primary_role}` as any)}
+          {t(`role_${user.primary_role}` as Parameters<typeof t>[0])}
         </span>
       </td>
       <td className="px-4 py-4 border-b border-border/40">
         <div className={cn("inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-tight border transition-faang", statusConfig.bg, statusConfig.color)}>
           <div className={cn("h-1.5 w-1.5 rounded-full", statusConfig.dot)} />
-          {t(`status_${user.account_status}` as any)}
+          {t(`status_${user.account_status}` as Parameters<typeof t>[0])}
         </div>
       </td>
       <td className="px-4 py-4 text-sm text-muted-foreground whitespace-nowrap border-b border-border/40">
@@ -202,17 +204,11 @@ export function UsersTable({
   onIssueWarning,
 }: UsersTableProps) {
   const t = useTranslations('users');
-  const tCommon = useTranslations('common');
   const locale = useLocale();
 
   const allSelected = useMemo(() =>
     users.length > 0 && users.every((u) => selectedIds.has(u.id)),
     [users, selectedIds]
-  );
-
-  const totalPages = useMemo(() =>
-    Math.ceil(totalCount / pageSize),
-    [totalCount, pageSize]
   );
 
   const skeletonRows = useMemo(() =>

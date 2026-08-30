@@ -1,12 +1,14 @@
 'use client';
 
-import { School, ChevronLeft, ChevronRight, MoreHoriz } from '@mui/icons-material';
-import type { Course } from '@/domain/types/course.types';
-import { CourseRowActions } from './CourseRowActions';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/Button';
-import { TablePagination } from '@/components/ui/TablePagination';
+import { School } from '@mui/icons-material';
 import { useTranslations } from 'next-intl';
+
+import { CourseRowActions } from './CourseRowActions';
+
+import { TablePagination } from '@/components/ui/TablePagination';
+import type { Course } from '@/domain/types/course.types';
+import { cn } from '@/lib/utils';
+
 
 // ── Status config ────────────────────────────────────────────────
 const STATUS_CONFIG = {
@@ -55,7 +57,6 @@ export function CoursesTable({
   onDeleteCourse,
 }: CoursesTableProps) {
   const t = useTranslations('common');
-  const totalPages = Math.ceil(totalCount / pageSize);
 
   const TABLE_HEADERS = [
     { label: '', className: 'w-12 px-4' },
@@ -83,7 +84,7 @@ export function CoursesTable({
     }
   };
 
-  const handleToggleRow = (e: React.MouseEvent, courseId: string) => {
+  const handleToggleRow = (e: React.SyntheticEvent, courseId: string) => {
     e.stopPropagation();
     if (selectedIds.includes(courseId)) {
       onSelectionChange(selectedIds.filter(id => id !== courseId));
@@ -166,7 +167,7 @@ export function CoursesTable({
                         <input
                           type="checkbox"
                           checked={selectedIds.includes(course.id)}
-                          onChange={(e) => handleToggleRow(e as any, course.id)}
+                          onChange={(e) => handleToggleRow(e, course.id)}
                           className="w-4 h-4 rounded border-border bg-background text-primary focus:ring-primary/30 transition-all cursor-pointer"
                         />
                       </div>
@@ -196,7 +197,7 @@ export function CoursesTable({
                     <td className="px-6 py-5 border-b border-border/40 text-start">
                       <div className={cn("inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-tight border transition-faang", status.bg, status.color)}>
                         <div className={cn("w-1.5 h-1.5 rounded-full shadow-sm", status.dot)} />
-                        {t(course.status as any)}
+                        {t(course.status as Parameters<typeof t>[0])}
                       </div>
                     </td>
 
@@ -204,7 +205,7 @@ export function CoursesTable({
                     <td className="px-6 py-5 border-b border-border/40 text-start">
                       <div className={cn("inline-flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-widest transition-faang", level.color)}>
                         <div className={cn("w-1.5 h-1.5 rounded-full shadow-sm", level.dot)} />
-                        {t(course.level || 'beginner' as any)}
+                        {t((course.level || 'beginner') as Parameters<typeof t>[0])}
                       </div>
                     </td>
 

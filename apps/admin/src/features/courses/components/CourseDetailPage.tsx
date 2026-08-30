@@ -1,7 +1,6 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from '@/i18n/routing';
+import { ArrowBack } from '@mui/icons-material';
 import {
   Box,
   Typography,
@@ -13,18 +12,23 @@ import {
   Breadcrumbs,
   Link as MuiLink,
 } from '@mui/material';
-import { Save, Visibility, ArrowBack } from '@mui/icons-material';
-import { useCourseById } from '@/adapters/queries/courses.queries';
-import { CourseInfoForm } from './CourseInfoForm';
-import { CurriculumBuilder } from './CurriculumBuilder';
+import { useTranslations } from 'next-intl';
+import { useState } from 'react';
+
+
+
 import { CourseEnrollmentsTab } from './CourseEnrollmentsTab';
+import { CourseInfoForm } from './CourseInfoForm';
 import { CourseSettingsTab } from './CourseSettingsTab';
+import { CurriculumBuilder } from './CurriculumBuilder';
+
+import { useCourseById } from '@/adapters/queries/courses.queries';
+import { useRouter } from '@/i18n/routing';
 
 interface CourseDetailPageProps {
   courseId: string;
 }
 
-import { useTranslations } from 'next-intl';
 
 export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
   const t = useTranslations('common');

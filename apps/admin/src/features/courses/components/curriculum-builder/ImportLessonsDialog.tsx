@@ -1,6 +1,19 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import {
+  Close,
+  UploadFile,
+  ContentPaste,
+  CheckCircle,
+  ContentCopy,
+  DeleteOutline,
+  Visibility,
+  VisibilityOff,
+  Code,
+  InfoOutlined,
+  ArrowDropDown,
+  ArrowDropUp,
+} from '@mui/icons-material';
 import {
   Dialog,
   DialogTitle,
@@ -13,7 +26,6 @@ import {
   IconButton,
   Alert,
   Stack,
-  Switch,
   Collapse,
   Card,
   Divider,
@@ -24,25 +36,12 @@ import {
   Tabs,
   Tab,
 } from '@mui/material';
-import {
-  Close,
-  UploadFile,
-  ContentPaste,
-  CheckCircle,
-  ErrorOutline,
-  HelpOutline,
-  ContentCopy,
-  DeleteOutline,
-  Visibility,
-  VisibilityOff,
-  Code,
-  InfoOutlined,
-  ArrowDropDown,
-  ArrowDropUp,
-} from '@mui/icons-material';
 import { useTranslations, useLocale } from 'next-intl';
-import { useToast } from '@/adapters/stores/toast.store';
+import { useState, useRef, useEffect } from 'react';
+
 import { useCreateLessons } from '@/adapters/mutations/courses.mutations';
+import { useToast } from '@/adapters/stores/toast.store';
+import { getErrorMessage } from '@/domain/errors';
 import { isValidVideoUrl } from '@/domain/video.utils';
 
 interface ImportLessonsDialogProps {
@@ -125,7 +124,18 @@ export function ImportLessonsDialog({
       const parsed = JSON.parse(cleaned);
       const items = Array.isArray(parsed) ? parsed : [parsed];
 
-      const mapped = items.map((item: any, idx: number) => {
+      interface RawImportedLesson {
+        title?: string;
+        video_url?: string;
+        url?: string;
+        order_index?: number;
+        order?: number;
+        duration_sec?: number;
+        duration?: number;
+        is_preview?: boolean;
+      }
+
+      const mapped = (items as RawImportedLesson[]).map((item, idx: number) => {
         const title = item.title || (isRtl ? `درس جديد #${idx + 1}` : `New Lesson #${idx + 1}`);
         const video_url = item.video_url || item.url || '';
         const order = typeof item.order_index === 'number'
@@ -145,9 +155,9 @@ export function ImportLessonsDialog({
       });
 
       setLessonsPreview(mapped);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setLessonsPreview([]);
-      setJsonError(err.message || t('invalid_json_format'));
+      setJsonError(getErrorMessage(err) || t('invalid_json_format'));
     }
   };
 
@@ -255,8 +265,8 @@ export function ImportLessonsDialog({
         'success'
       );
       onClose();
-    } catch (err: any) {
-      showToast(err.message || t('failed_to_import'), 'error');
+    } catch (err: unknown) {
+      showToast(getErrorMessage(err) || t('failed_to_import'), 'error');
     }
   };
 

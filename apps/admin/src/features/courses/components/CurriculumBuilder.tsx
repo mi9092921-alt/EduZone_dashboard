@@ -1,50 +1,5 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import {
-  Box,
-  Typography,
-  Button,
-  IconButton,
-  TextField,
-  Switch,
-  Collapse,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Alert,
-  Stack,
-  useTheme,
-  useMediaQuery,
-  alpha,
-} from '@mui/material';
-import {
-  Add,
-  ExpandMore,
-  ExpandLess,
-  Edit,
-  Delete,
-  DragIndicator,
-  OndemandVideo,
-  Description,
-  Quiz,
-  Download,
-  UploadFile,
-} from '@mui/icons-material';
-import { getCourseById } from '@/infrastructure/repos/courses.service';
-import type { Section, Lesson } from '@/domain/types/course.types';
-import {
-  useCreateSection,
-  useUpdateSection,
-  useDeleteSection,
-  useCreateLesson,
-  useCreateLessons,
-  useUpdateLesson,
-  useDeleteLesson,
-  useReorderSections,
-  useReorderLessons,
-} from '@/adapters/mutations/courses.mutations';
 import {
   DndContext,
   closestCenter,
@@ -60,14 +15,34 @@ import {
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
-  useSortable,
 } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+import {
+  Add,
+  Quiz,
+  Download,
+} from '@mui/icons-material';
+import {
+  Box,
+  Typography,
+  Button,
+  TextField,
+  Stack,
+  useTheme,
+  useMediaQuery,
+} from '@mui/material';
 import { useTranslations } from 'next-intl';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { useState, useEffect } from 'react';
+
+
 import { SectionCard } from './curriculum-builder/SectionCard';
+
+import {
+  useCreateSection,
+  useReorderSections,
+} from '@/adapters/mutations/courses.mutations';
+import type { Section } from '@/domain/types/course.types';
 import { formatVideoUrl } from '@/domain/video.utils';
-import { useToast } from '@/adapters/stores/toast.store';
+import { getCourseById } from '@/infrastructure/repos/courses.service';
 
 // ══════════════════════════════════════════════════
 // CURRICULUM BUILDER (main export)

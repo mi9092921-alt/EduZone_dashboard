@@ -1,12 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import type { PermissionName } from '@eduzone/types';
 import { Box, CircularProgress } from '@mui/material';
-import { useRouter, usePathname } from '@/i18n/routing';
-import { useAuthStore, useAuthUser } from '@/adapters/stores/auth.store';
+import { useEffect } from 'react';
+
 import { useSessionCheck } from '@/adapters/hooks/useSessionCheck';
-import { container } from '@/container';
+import { useAuthStore, useAuthUser, type PrimaryRole } from '@/adapters/stores/auth.store';
 import { recordCurrentSessionAction } from '@/application/actions/session.actions';
+import { container } from '@/container';
+import { useRouter, usePathname } from '@/i18n/routing';
 import { clearBrowserSessionId, getBrowserSessionId } from '@/infrastructure/auth/browserSession';
 
 /**
@@ -106,7 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.error('[AuthProvider] Permissions fetch failed:', permError);
         }
 
-        const permissions = (permissionRows ?? []).map(p => p.permission_name as any);
+        const permissions = ((permissionRows ?? []) as { permission_name: string }[]).map(p => p.permission_name) as PermissionName[];
 
         // Fallback: if RLS still blocks the direct query, build from RPC result
         const resolvedUser = userRecord ?? {
@@ -128,7 +130,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser({
             id: resolvedUser.id,
             email: session.user.email!,
-            primary_role: resolvedUser.primary_role as any,
+            primary_role: resolvedUser.primary_role as PrimaryRole,
             tenant_id: resolvedUser.tenant_id,
             token_version: resolvedUser.token_version ?? 1,
             permissions,
@@ -136,13 +138,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setInitialized();
           setLoading(false);
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const errObj = err as { message?: string; code?: string; details?: string; hint?: string; status?: number } | null;
         console.error('[AuthProvider] Initialization failed:', {
-          message: err?.message || String(err) || 'Unknown error',
-          code: err?.code,
-          details: err?.details,
-          hint: err?.hint,
-          status: err?.status,
+          message: errObj?.message || String(err) || 'Unknown error',
+          code: errObj?.code,
+          details: errObj?.details,
+          hint: errObj?.hint,
+          status: errObj?.status,
           raw: JSON.stringify(err),
         });
         if (isMounted) {
@@ -157,7 +160,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     hydrateAuth();
 
     // 2. Auth State Change Listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, _session) => {
       if (event === 'SIGNED_OUT') {
         container.actorId = '';
         container.tenantId = '';

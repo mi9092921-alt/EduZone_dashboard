@@ -1,4 +1,11 @@
+import {
+  createTenantAction,
+  updateTenantAction,
+  suspendTenantAction,
+  deleteTenantAction,
+} from '@/application/actions/tenants.actions';
 import { container } from '@/container';
+import type { ActivityLog, AuditFilters } from '@/domain/types/audit.types';
 import type {
   Tenant,
   TenantFilters,
@@ -6,13 +13,6 @@ import type {
   UpdateTenantInput,
   PaginatedResult,
 } from '@/domain/types/tenant.types';
-import type { ActivityLog, AuditFilters } from '@/domain/types/audit.types';
-import {
-  createTenantAction,
-  updateTenantAction,
-  suspendTenantAction,
-  deleteTenantAction,
-} from '@/application/actions/tenants.actions';
 
 type TenantWithUsage = Tenant & {
   current_users: number;

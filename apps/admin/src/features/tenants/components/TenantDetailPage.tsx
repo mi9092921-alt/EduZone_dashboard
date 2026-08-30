@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import {
   Business,
   People,
@@ -11,14 +10,17 @@ import {
   Block,
   CheckCircle,
 } from '@mui/icons-material';
-import { useTenantDetail, useTenantAuditLogs } from '@/adapters/queries/tenants.queries';
-import { useUpdateTenant, useSuspendTenant } from '@/adapters/mutations/tenants.mutations';
-import type { TenantPlan, UpdateTenantInput } from '@/domain/types/tenant.types';
-import type { AuditFilters } from '@/domain/types/audit.types';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/Button';
-import { useRouter } from '@/i18n/routing';
 import { useTranslations } from 'next-intl';
+import { useState } from 'react';
+
+import { useUpdateTenant, useSuspendTenant } from '@/adapters/mutations/tenants.mutations';
+import { useTenantDetail, useTenantAuditLogs } from '@/adapters/queries/tenants.queries';
+import { Button } from '@/components/ui/Button';
+import type { AuditFilters } from '@/domain/types/audit.types';
+import type { TenantPlan, UpdateTenantInput } from '@/domain/types/tenant.types';
+import { useRouter } from '@/i18n/routing';
+import { cn } from '@/lib/utils';
+
 
 type Tab = 'overview' | 'users' | 'courses' | 'audit';
 
@@ -65,7 +67,6 @@ export function TenantDetailPage({ tenantId }: { tenantId: string }) {
   const router = useRouter();
   const t = useTranslations('tenants');
   const tCommon = useTranslations('common');
-  const tAudit = useTranslations('audit');
 
   const [tab, setTab] = useState<Tab>('overview');
   const { data: tenant, isLoading } = useTenantDetail(tenantId);
@@ -142,8 +143,8 @@ export function TenantDetailPage({ tenantId }: { tenantId: string }) {
     current_storage_bytes: currentStorageBytes,
     // tenants table has no shard_id column (removed in v13 hardening).
     // Derive a stable display shard from region_id so the UI is never blank.
-    shard_id: Number((tenant as any).shard_id ?? (tenant as any).shard_key ?? shardFromRegion((tenant as any).data_residency ?? tenant.region_id)),
-    data_residency: (tenant as any).data_residency ?? tenant.region_id,
+    shard_id: Number((tenant as unknown as Record<string, unknown>).shard_id ?? (tenant as unknown as Record<string, unknown>).shard_key ?? shardFromRegion(((tenant as unknown as Record<string, unknown>).data_residency as string | undefined) ?? tenant.region_id)),
+    data_residency: ((tenant as unknown as Record<string, unknown>).data_residency as string | undefined) ?? tenant.region_id,
   };
   const userPct = tenant.max_users > 0 ? (currentUsers / tenant.max_users) * 100 : 0;
   const coursePct = tenant.max_courses > 0 ? (currentCourses / tenant.max_courses) * 100 : 0;
@@ -163,7 +164,7 @@ export function TenantDetailPage({ tenantId }: { tenantId: string }) {
           </div>
           <p className="text-xs text-muted-foreground">
             {t('plan_shard_region', {
-              plan: t(`plan_${tenant.plan}` as any),
+              plan: t(`plan_${tenant.plan}` as Parameters<typeof t>[0]),
               shard: tenantWithUsage.shard_id,
               region: tenant.region_id
             })}
@@ -286,7 +287,7 @@ function OverviewTab(props: OverviewTabProps) {
           <Field label={t('label_name')} value={editing ? undefined : tenant.name}>
             {editing && <input value={props.editName} onChange={(e) => props.onEditName(e.target.value)} className="h-8 px-2 rounded-lg border text-sm w-full" />}
           </Field>
-          <Field label={t('label_plan')} value={editing ? undefined : t(`plan_${tenant.plan}` as any)}>
+          <Field label={t('label_plan')} value={editing ? undefined : t(`plan_${tenant.plan}` as Parameters<typeof t>[0])}>
             {editing && (
               <select value={props.editPlan} onChange={(e) => props.onEditPlan(e.target.value as TenantPlan)} className="h-8 px-2 rounded-lg border text-sm w-full">
                 <option value="free">{t('plan_free')}</option>
@@ -305,7 +306,7 @@ function OverviewTab(props: OverviewTabProps) {
           <Field label={t('header_region')} value={editing ? undefined : tenant.region_id}>
             {editing && <input value={props.editRegion} onChange={(e) => props.onEditRegion(e.target.value)} className="h-8 px-2 rounded-lg border text-sm w-full" />}
           </Field>
-          <Field label={t('label_status')} value={t(`status_${tenant.status}` as any)} />
+          <Field label={t('label_status')} value={t(`status_${tenant.status}` as Parameters<typeof t>[0])} />
           <Field label={t('label_shard')} value={tenant.shard_id ? String(tenant.shard_id) : 'N/A'} />
           <Field label={t('label_data_residency')} value={tenant.data_residency} />
           <Field label={t('label_created')} value={new Date(tenant.created_at).toLocaleDateString()} />
@@ -356,7 +357,7 @@ function ResourceGauge({ label, current, max, pct, formatFn }: {
 }
 
 // ── Users Tab (placeholder — would reuse UsersTable w/ tenant filter) ─
-function UsersTab({ tenantId, tenantName, currentUsers }: { tenantId: string; tenantName: string; currentUsers: number }) {
+function UsersTab({ tenantId: _tenantId, tenantName, currentUsers }: { tenantId: string; tenantName: string; currentUsers: number }) {
   const t = useTranslations('tenants');
   return (
     <div className="rounded-2xl border border-border bg-card shadow-sm p-8 text-center">
@@ -373,7 +374,7 @@ function UsersTab({ tenantId, tenantName, currentUsers }: { tenantId: string; te
 }
 
 // ── Courses Tab (placeholder) ────────────────────────────────────
-function CoursesTab({ tenantId, tenantName, currentCourses }: { tenantId: string; tenantName: string; currentCourses: number }) {
+function CoursesTab({ tenantId: _tenantId, tenantName, currentCourses }: { tenantId: string; tenantName: string; currentCourses: number }) {
   const t = useTranslations('tenants');
   return (
     <div className="rounded-2xl border border-border bg-card shadow-sm p-8 text-center">
@@ -426,7 +427,7 @@ function AuditTab({ tenantId }: { tenantId: string }) {
                 <td className="px-4 py-2 text-xs text-muted-foreground whitespace-nowrap">
                   {new Date(log.created_at).toLocaleString()}
                 </td>
-                <td className="px-4 py-2 text-xs font-mono font-medium">{tAudit(`activity_types.${log.activity_type}` as any)}</td>
+                <td className="px-4 py-2 text-xs font-mono font-medium">{tAudit(`activity_types.${log.activity_type}` as Parameters<typeof tAudit>[0])}</td>
                 <td className="px-4 py-2">
                   <span className={cn(
                     'text-[10px] font-bold px-1.5 py-0.5 rounded-md uppercase',
@@ -435,7 +436,7 @@ function AuditTab({ tenantId }: { tenantId: string }) {
                         log.risk_level === 'medium' ? 'bg-amber-100 text-amber-700' :
                           'bg-slate-100 text-slate-600',
                   )}>
-                    {tAudit(`risk_levels.${log.risk_level}` as any)}
+                    {tAudit(`risk_levels.${log.risk_level}` as Parameters<typeof tAudit>[0])}
                   </span>
                 </td>
                 <td className="px-4 py-2 text-xs font-mono text-muted-foreground">{log.user_id?.slice(0, 8) ?? '—'}</td>

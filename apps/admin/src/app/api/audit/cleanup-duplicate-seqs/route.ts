@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { NextResponse } from 'next/server';
+
 import { createServerClient } from '@/infrastructure/supabase/server';
 
 /**

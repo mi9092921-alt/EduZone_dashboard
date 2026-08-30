@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
 import {
   getCourses,
   getCourseById,
   createCourse,
-  updateCourse,
   deleteCourse,
   getCourseSections,
   createSection,
@@ -20,8 +20,8 @@ import {
   enrollStudent,
   revokeEnrollment,
   getCourseStats,
-  getCoursesOverviewStats,
 } from './courses.service';
+
 import { container } from '@/container';
 
 vi.mock('@/container', () => ({
@@ -32,6 +32,11 @@ vi.mock('@/container', () => ({
       rpc: vi.fn(),
     },
   },
+}));
+
+vi.mock('@/application/actions/admin.actions', () => ({
+  deleteCourseAction: vi.fn(),
+  getCourseStatsAction: vi.fn(),
 }));
 
 describe('courses.service', () => {
@@ -58,6 +63,7 @@ describe('courses.service', () => {
       insert: vi.fn().mockReturnThis(),
       update: vi.fn().mockReturnThis(),
       in: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockReturnThis(),
       then: vi.fn().mockImplementation((cb) => cb(resolvedValue)),
     };
     return mockQuery;
@@ -99,12 +105,11 @@ describe('courses.service', () => {
     expect(c.id).toBe('cnew');
   });
 
-  it('deleteCourse', async () => {
-    const q = setupQuery({ error: null });
-    mockFrom.mockReturnValue(q);
-    q.eq.mockResolvedValue({ error: null });
+  it('deleteCourse delegates to deleteCourseAction', async () => {
+    const { deleteCourseAction } = await import('@/application/actions/admin.actions');
+    (deleteCourseAction as any).mockResolvedValue(undefined);
     await deleteCourse('c1');
-    expect(q.update).toHaveBeenCalledWith(expect.objectContaining({ deleted_at: expect.any(String) }));
+    expect(deleteCourseAction).toHaveBeenCalledWith('c1');
   });
 
   it('enrollStudent success and duplicate handling', async () => {
@@ -144,8 +149,11 @@ describe('courses.service', () => {
     await deleteSection('s1');
     expect(q.update).toHaveBeenCalledWith(expect.objectContaining({ deleted_at: expect.any(String) }));
 
+    mockRpc.mockResolvedValue({ error: null });
     await reorderSections([{ id: 's1', order_index: 2 }]);
-    expect(q.update).toHaveBeenCalled();
+    expect(mockRpc).toHaveBeenCalledWith('reorder_course_sections', {
+      p_section_updates: [{ id: 's1', order_index: 2 }],
+    });
   });
 
   it('createLesson, createLessons, updateLesson, deleteLesson, reorderLessons', async () => {
@@ -203,13 +211,13 @@ describe('courses.service', () => {
   });
 
   it('getCourseStats handles success and catch block', async () => {
-    const q = setupQuery({ data: { course_id: 'c1' }, error: null });
-    mockFrom.mockReturnValue(q);
-    
+    const { getCourseStatsAction } = await import('@/application/actions/admin.actions');
+
+    (getCourseStatsAction as any).mockResolvedValue({ course_id: 'c1' });
     const stats = await getCourseStats('c1');
     expect(stats!.course_id).toBe('c1');
 
-    q.maybeSingle.mockRejectedValue(new Error('fail'));
+    (getCourseStatsAction as any).mockRejectedValue(new Error('fail'));
     const stats2 = await getCourseStats('c1');
     expect(stats2).toBeNull();
   });

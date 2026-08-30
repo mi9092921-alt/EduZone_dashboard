@@ -1,14 +1,16 @@
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
+
 import { queryKeys } from './keys';
+
+import { useAuthUser } from '@/adapters/stores/auth.store';
+import type { CourseFilters } from '@/domain/types/course.types';
+import type { WarningFilters } from '@/domain/types/warning.types';
 import { getCourses } from '@/infrastructure/repos/courses.service';
 import {
   getWarnings,
   getTeacherStudents,
   getStudentProgress,
 } from '@/infrastructure/repos/warnings.service';
-import { useAuthUser } from '@/adapters/stores/auth.store';
-import type { CourseFilters } from '@/domain/types/course.types';
-import type { WarningFilters } from '@/domain/types/warning.types';
 
 /**
  * React Query hooks for teacher-scoped data.

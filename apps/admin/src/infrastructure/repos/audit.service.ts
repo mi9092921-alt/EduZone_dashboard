@@ -1,4 +1,5 @@
 import { container } from '@/container';
+import { AppError } from '@/domain/errors/AppError';
 import type {
   ActivityLog,
   ActivityLogQueueEntry,
@@ -6,7 +7,6 @@ import type {
   AuditFilters,
 } from '@/domain/types/audit.types';
 import type { PaginatedResult } from '@/domain/types/user.types';
-import { AppError } from '@/domain/errors/AppError';
 
 /**
  * Audit service — Supabase queries for audit chain domain.

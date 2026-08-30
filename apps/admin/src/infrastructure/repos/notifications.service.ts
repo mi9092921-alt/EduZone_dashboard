@@ -1,5 +1,5 @@
-import { container } from '@/container';
-import { parseRpcError } from '@/domain/errors/parseRpcError';
+import type { SendNotificationInput } from '@/adapters/mutations/notifications.mutations';
+import type { Notification, UserNotification, TargetAudience } from '@/adapters/queries/notifications.queries';
 import {
   getNotificationsAction,
   sendNotificationAction,
@@ -9,8 +9,8 @@ import {
   markAllNotificationsAsReadAction,
   getUnreadNotificationCountAction,
 } from '@/application/actions/admin.actions';
-import type { Notification, UserNotification, TargetAudience } from '@/adapters/queries/notifications.queries';
-import type { SendNotificationInput } from '@/adapters/mutations/notifications.mutations';
+import { container } from '@/container';
+import { parseRpcError } from '@/domain/errors/parseRpcError';
 
 /**
  * Notifications service — all Supabase queries for the notifications domain.
@@ -84,7 +84,7 @@ export async function sendNotification(
 
   const { supabase } = container;
 
-  const args: Record<string, any> = {
+  const args: Record<string, unknown> = {
     p_title: input.title,
     p_body: input.body,
   };
@@ -143,7 +143,7 @@ export async function getMyNotifications(
     query = query.eq('is_read', false);
   }
 
-  const { data, error, count } = await query;
+  const { data, error } = await query;
   if (error) throw parseRpcError(error);
 
   // Separate unread count query (always full, regardless of unreadOnly filter)

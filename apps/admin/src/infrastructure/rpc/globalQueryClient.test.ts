@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
 import { getQueryClient } from './globalQueryClient';
+
 import { parseRpcError } from '@/domain/errors';
 
 vi.mock('@/domain/errors', () => ({
@@ -11,7 +13,7 @@ describe('globalQueryClient', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Clear browserQueryClient singleton for testing
-    // @ts-ignore
+    // @ts-expect-error test-only: window/location globals are not fully typed here
     global.window = {}; // Ensure we are in "browser" mode for getQueryClient
   });
 
@@ -26,7 +28,7 @@ describe('globalQueryClient', () => {
   describe('retry logic', () => {
     it('does not retry for session-invalidating errors', () => {
       const client = getQueryClient();
-      const retry = client.getDefaultOptions().queries?.retry as Function;
+      const retry = client.getDefaultOptions().queries?.retry as (failureCount: number, error: unknown) => boolean;
       
       (parseRpcError as any).mockReturnValue({ code: 'AUTH_REQUIRED' });
       expect(retry(0, new Error())).toBe(false);
@@ -37,7 +39,7 @@ describe('globalQueryClient', () => {
 
     it('does not retry for permission or not found errors', () => {
       const client = getQueryClient();
-      const retry = client.getDefaultOptions().queries?.retry as Function;
+      const retry = client.getDefaultOptions().queries?.retry as (failureCount: number, error: unknown) => boolean;
       
       (parseRpcError as any).mockReturnValue({ code: 'PERMISSION_DENIED' });
       expect(retry(0, new Error())).toBe(false);
@@ -48,7 +50,7 @@ describe('globalQueryClient', () => {
 
     it('retries up to 2 times for other errors', () => {
       const client = getQueryClient();
-      const retry = client.getDefaultOptions().queries?.retry as Function;
+      const retry = client.getDefaultOptions().queries?.retry as (failureCount: number, error: unknown) => boolean;
       
       (parseRpcError as any).mockReturnValue({ code: 'UNKNOWN_ERROR' });
       
@@ -61,11 +63,11 @@ describe('globalQueryClient', () => {
   describe('mutation error handling', () => {
     it('redirects to login on session-invalidating errors', () => {
       const client = getQueryClient();
-      const onError = client.getDefaultOptions().mutations?.onError as Function;
+      const onError = client.getDefaultOptions().mutations?.onError as (error: unknown) => void;
       
       // Mock window.location
       const originalLocation = window.location;
-      // @ts-ignore
+      // @ts-expect-error test-only: window/location globals are not fully typed here
       delete window.location;
       window.location = { href: '' } as any;
       
@@ -75,16 +77,16 @@ describe('globalQueryClient', () => {
       
       expect(window.location.href).toContain('/login?reason=session_invalidated');
       
-      // @ts-ignore
+      // @ts-expect-error test-only: window/location globals are not fully typed here
       window.location = originalLocation;
     });
 
     it('does not redirect for non-auth errors', () => {
       const client = getQueryClient();
-      const onError = client.getDefaultOptions().mutations?.onError as Function;
+      const onError = client.getDefaultOptions().mutations?.onError as (error: unknown) => void;
       
       const originalLocation = window.location;
-      // @ts-ignore
+      // @ts-expect-error test-only: window/location globals are not fully typed here
       delete window.location;
       window.location = { href: '' } as any;
       
@@ -94,7 +96,7 @@ describe('globalQueryClient', () => {
       
       expect(window.location.href).toBe('');
       
-      // @ts-ignore
+      // @ts-expect-error test-only: window/location globals are not fully typed here
       window.location = originalLocation;
     });
   });

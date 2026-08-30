@@ -1,5 +1,5 @@
-import { create } from 'zustand';
 import { PermissionName } from '@eduzone/types';
+import { create } from 'zustand';
 
 /** Primary role types */
 export type PrimaryRole = 'super_admin' | 'admin' | 'teacher' | 'student';

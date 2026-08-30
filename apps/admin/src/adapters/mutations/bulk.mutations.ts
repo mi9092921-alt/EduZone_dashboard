@@ -1,11 +1,12 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+
 import { queryKeys } from '@/adapters/queries/keys';
+import type { BulkAction } from '@/domain/types/bulk.types';
+import type { UserFilters } from '@/domain/types/user.types';
 import {
   submitBulkAction,
   cancelBulkJob,
 } from '@/infrastructure/repos/bulk.service';
-import type { BulkAction } from '@/domain/types/bulk.types';
-import type { UserFilters } from '@/domain/types/user.types';
 
 /**
  * Mutation hooks for bulk operations.

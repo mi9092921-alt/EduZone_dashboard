@@ -1,9 +1,10 @@
+import { dehydrate, HydrationBoundary, QueryClient } from '@tanstack/react-query';
+
+import { queryKeys } from '@/adapters/queries/keys';
 import { AdminShell } from '@/features/layout';
 import { UsersPage } from '@/features/users';
-import { dehydrate, HydrationBoundary, QueryClient } from '@tanstack/react-query';
-import { createServerClient } from '@/infrastructure/supabase/server';
-import { queryKeys } from '@/adapters/queries/keys';
 import { getUserStats } from '@/infrastructure/repos/users.service';
+import { createServerClient } from '@/infrastructure/supabase/server';
 
 export default async function UsersRoute() {
   const queryClient = new QueryClient();

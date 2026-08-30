@@ -1,23 +1,21 @@
 'use client';
 
-import { useState } from 'react';
-import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { createCourseSchema, type CreateCourseFormInput } from '@/domain/schemas/course.schema';
+import { useTranslations } from 'next-intl';
+import { useForm, Controller, type Resolver } from 'react-hook-form';
+
 import { useCreateCourse } from '@/adapters/mutations/courses.mutations';
-import { useUsers } from '@/adapters/queries/users.queries';
-import { getUserDisplayName } from '@/domain/types/user.types';
 import { useAuthUser } from '@/adapters/stores/auth.store';
 import { useToast } from '@/adapters/stores/toast.store';
-
-import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
+import { Modal } from '@/components/ui/Modal';
 import { Select, SelectItem } from '@/components/ui/Select';
 import { Switch } from '@/components/ui/Switch';
+import { createCourseSchema, type CreateCourseFormInput } from '@/domain/schemas/course.schema';
+import type { CreateCourseInput } from '@/domain/types/course.types';
 
-import { useTranslations } from 'next-intl';
 
 interface CreateCourseDialogProps {
   open: boolean;
@@ -29,7 +27,6 @@ export function CreateCourseDialog({ open, onClose }: CreateCourseDialogProps) {
   const createMutation = useCreateCourse();
   const { showToast } = useToast();
   const user = useAuthUser();
-  const isTeacher = user?.primary_role === 'teacher';
 
   const levelOptions = [
     { value: 'beginner', label: t('beginner') },
@@ -45,7 +42,7 @@ export function CreateCourseDialog({ open, onClose }: CreateCourseDialogProps) {
     reset,
     formState: { errors },
   } = useForm<CreateCourseFormInput>({
-    resolver: zodResolver(createCourseSchema) as any,
+    resolver: zodResolver(createCourseSchema) as Resolver<CreateCourseFormInput>,
     defaultValues: {
       title: '',
       description: '',
@@ -63,7 +60,7 @@ export function CreateCourseDialog({ open, onClose }: CreateCourseDialogProps) {
 
   const onSubmit = async (data: CreateCourseFormInput) => {
     try {
-      const payload: any = {
+      const payload: CreateCourseInput = {
         title: data.title,
         level: data.level,
         price: data.is_free ? 0 : data.price,

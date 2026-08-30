@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
 import { Place, Language, Public, ContentCopy, Check, GpsFixed, TravelExplore } from '@mui/icons-material';
+import { useTranslations, useLocale } from 'next-intl';
+import React, { useState } from 'react';
+
 import { useActivityLogs } from '@/adapters/queries/audit.queries';
 import { useUserLocationLogs } from '@/adapters/queries/user_locations.queries';
-import { useTranslations, useLocale } from 'next-intl';
 import { cn } from '@/lib/utils';
 
 interface ActivityLocationsTabProps {

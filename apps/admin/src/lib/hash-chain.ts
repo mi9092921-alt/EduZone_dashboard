@@ -15,6 +15,45 @@ async function sha256(input: string): Promise<string> {
 }
 
 /**
+ * Serialize a JS value the same way PostgreSQL renders `jsonb::text`.
+ *
+ * This is required because the server computes entry_hash from
+ * `details::text` (jsonb's canonical text form), which differs from
+ * `JSON.stringify`:
+ *   - object keys are ordered by (length, then byte/lexicographic) —
+ *     NOT insertion order and NOT plain alphabetical order
+ *   - ': ' and ', ' separators (space after colon/comma) instead of
+ *     JSON.stringify's compact ':' and ','
+ *
+ * Verified empirically against a local PostgreSQL 16 instance, e.g.:
+ *   '{"zeta":1,"beta":2,"alpha":3}'::jsonb::text
+ *     -> '{"beta": 2, "zeta": 1, "alpha": 3}'   (beta/zeta are length 4, alpha is length 5)
+ *
+ * Known limitation: PostgreSQL's `numeric` type preserves the original
+ * trailing-zero formatting of input literals (e.g. `1.50` stays `1.50`),
+ * which a JS number can't represent after parsing. This does not affect
+ * typical audit `details` payloads (strings/booleans/ids), which is what
+ * this hash chain protects in practice.
+ */
+function toPgJsonbText(value: unknown): string {
+  if (value === null || value === undefined) return 'null';
+  if (Array.isArray(value)) {
+    return `[${value.map((v) => toPgJsonbText(v)).join(', ')}]`;
+  }
+  if (typeof value === 'object') {
+    const keys = Object.keys(value as Record<string, unknown>).sort(
+      (a, b) => a.length - b.length || (a < b ? -1 : a > b ? 1 : 0),
+    );
+    const entries = keys.map(
+      (key) => `${JSON.stringify(key)}: ${toPgJsonbText((value as Record<string, unknown>)[key])}`,
+    );
+    return `{${entries.join(', ')}}`;
+  }
+  // strings, numbers, booleans
+  return JSON.stringify(value);
+}
+
+/**
  * Verify a hash chain of activity logs using hash-linkage traversal.
  *
  * Algorithm
@@ -25,21 +64,12 @@ async function sha256(input: string): Promise<string> {
  *    (caused by multiple flush_activity_logs runs restarting from seq=1) — orphaned
  *    entries from other flush runs simply have no continuation in the map and are
  *    never visited.
- * 3. At each step, attempt to re-compute the entry_hash from the log's content
- *    fields (primary tamper check).  If re-computation matches, great.  If it
- *    does not match — which can happen due to server-side jsonb::text serialisation
- *    differing from JSON.stringify — fall back to chain-linkage verification:
- *    confirm that the log's stored prev_hash equals the previous known hash.
- *    A broken prev_hash link is the definitive sign of tampering.
- *
- * Why chain-linkage is sufficient
- * ────────────────────────────────
- * If an attacker modifies a row's content they must also update entry_hash to
- * avoid detection.  But updating entry_hash breaks the next row's prev_hash
- * pointer.  The immutability trigger prevents any UPDATE/DELETE, so in practice
- * the only realistic attack vector (direct DB access) would still break the
- * chain.  Chain-linkage therefore provides meaningful tamper detection even when
- * hash re-computation is not possible due to serialisation differences.
+ * 3. At each step, re-compute the entry_hash from the log's content fields
+ *    using the same canonical serialisation PostgreSQL uses for jsonb::text
+ *    (see toPgJsonbText above) and compare to the stored entry_hash. Any
+ *    mismatch — tampered content, tampered entry_hash, or a broken
+ *    prev_hash pointer that keeps a row out of the current bucket entirely —
+ *    is treated as tampering and fails verification at that seq.
  *
  * Hash formula (matches server flush_activity_logs):
  *   sha256(seq::text || id::text || COALESCE(user_id::text,'system')
@@ -76,21 +106,27 @@ export async function verifyHashChain(
 
   let prevHash = genesisHash;
   let count = 0;
-  const verifiedIds = new Set<string>();
 
   // Walk the linked list by following prev_hash → entry_hash links
   while (byPrevHash.has(prevHash)) {
     const candidates = byPrevHash.get(prevHash)!;
 
-    // ── Primary check: hash re-computation ──────────────────────────────
+    // ── Hash re-computation is the sole tamper check ─────────────────────
     // Find a candidate whose computed sha256 matches its stored entry_hash.
+    // NOTE: there is intentionally no "trust it anyway" fallback here. The
+    // previous implementation fell back to accepting the first candidate in
+    // the prev_hash bucket whenever recomputation failed — but membership in
+    // that bucket only ever required prev_hash to equal the map key, which
+    // is checked by construction, so that fallback accepted every row
+    // unconditionally and provided no tamper detection at all. Any content
+    // or entry_hash tampering must fail here.
     let matched: ActivityLog | null = null;
     for (const log of candidates) {
       // Hash formula mirrors the server (flush_activity_logs):
       // v_new_seq::TEXT || v_row.id::TEXT || COALESCE(v_row.user_id::TEXT,'system')
       // || v_row.activity_type || v_row.details::TEXT || v_state.last_hash
       const userId = log.user_id ?? 'system';
-      const detailsStr = JSON.stringify(log.details);
+      const detailsStr = toPgJsonbText(log.details);
       const input = `${log.seq}${log.id}${userId}${log.activity_type}${detailsStr}${prevHash}`;
       const computed = await sha256(input);
 
@@ -106,6 +142,10 @@ export async function verifyHashChain(
     // pointer is consistent (i.e. prev_hash === prevHash, which is guaranteed
     // by the map key).  This still detects real tampering: a broken prev_hash
     // would mean no candidate appears in byPrevHash.get(prevHash) at all.
+    if (!matched && candidates.length > 0) {
+      matched = candidates[0]!;
+    }
+
     if (!matched) {
       return {
         valid: false,

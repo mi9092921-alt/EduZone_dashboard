@@ -1,15 +1,17 @@
 import { useQuery } from '@tanstack/react-query';
+
 import { queryKeys } from './keys';
-import {
-  getAllSettings,
-  getSettingsByCategory,
-  getSetting,
-} from '@/infrastructure/repos/settings.service';
+
 import {
   getAllFeatureFlags,
   getFeatureFlagById,
   getAllRoles,
 } from '@/infrastructure/repos/feature-flags.service';
+import {
+  getAllSettings,
+  getSettingsByCategory,
+  getSetting,
+} from '@/infrastructure/repos/settings.service';
 
 /**
  * React Query hooks for settings and feature flags.

@@ -1,9 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { renderHook, waitFor } from '@testing-library/react';
 import { createElement, type ReactNode } from 'react';
-import { http, HttpResponse } from 'msw';
-import { server } from '../../../tests/mocks/server';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
 import { userFactory } from '../../../tests/factories/user.factory';
 
 // ── Mock the infrastructure service ──────────────────────────────

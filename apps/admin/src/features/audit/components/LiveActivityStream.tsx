@@ -1,6 +1,5 @@
 'use client';
 
-import { useState, useCallback } from 'react';
 import {
   Stream,
   Pause,
@@ -10,6 +9,8 @@ import {
 } from '@mui/icons-material';
 import { Tooltip } from '@mui/material';
 import { useTranslations } from 'next-intl';
+import { useState, useCallback } from 'react';
+
 import { useQueuedActivities } from '@/adapters/queries/audit.queries';
 import type { ActivityLogQueueEntry, RiskLevel } from '@/domain/types/audit.types';
 import { cn } from '@/lib/utils';

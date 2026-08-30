@@ -1,7 +1,8 @@
 'use client';
 
-import React from 'react';
 import { PermissionName } from '@eduzone/types';
+import React from 'react';
+
 import { usePermission } from '@/adapters/hooks/usePermission';
 import { useAuthUser } from '@/adapters/stores/auth.store';
 

@@ -13,7 +13,17 @@
  *  - Empty state with inbox icon
  */
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import {
+  Notifications as BellIcon,
+  NotificationsNone as BellOutlineIcon,
+  Inbox as InboxIcon,
+  DoneAll as DoneAllIcon,
+  AccountCircle as AccountActionIcon,
+  Warning as WarningIcon,
+  School as CourseUpdateIcon,
+  Campaign as SystemAlertIcon,
+  OpenInNew as OpenInNewIcon,
+} from '@mui/icons-material';
 import {
   Badge,
   Box,
@@ -27,29 +37,19 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
-import {
-  Notifications as BellIcon,
-  NotificationsNone as BellOutlineIcon,
-  Inbox as InboxIcon,
-  DoneAll as DoneAllIcon,
-  AccountCircle as AccountActionIcon,
-  Warning as WarningIcon,
-  School as CourseUpdateIcon,
-  Campaign as SystemAlertIcon,
-  OpenInNew as OpenInNewIcon,
-} from '@mui/icons-material';
-import { useRouter } from '@/i18n/routing';
 import { useTranslations, useLocale } from 'next-intl';
+import { useState, useRef, useEffect, useCallback } from 'react';
 
+import {
+  useMarkNotificationRead,
+  useMarkAllNotificationsRead,
+} from '@/adapters/mutations/notifications.mutations';
 import {
   useMyNotifications,
   useRealtimeNotifications,
   type UserNotification,
 } from '@/adapters/queries/notifications.queries';
-import {
-  useMarkNotificationRead,
-  useMarkAllNotificationsRead,
-} from '@/adapters/mutations/notifications.mutations';
+import { useRouter } from '@/i18n/routing';
 import { cn } from '@/lib/utils';
 
 // ─── Native relative time helper ─────────────────────────────────────────────
@@ -265,7 +265,7 @@ export function NotificationBell() {
 
   const handleNotifClick = useCallback((id: string, linkTo: string | null) => {
     markRead.mutate(id);
-    if (linkTo) router.push(linkTo as any);
+    if (linkTo) router.push(linkTo as Parameters<typeof router.push>[0]);
     setOpen(false);
   }, [markRead, router]);
 

@@ -1,5 +1,6 @@
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+
 import { createServerClient } from '@/infrastructure/supabase/server';
 
 /**
@@ -37,7 +38,6 @@ const ACTION_PERMISSIONS: Record<BulkAction, string> = {
 };
 
 const MAX_BULK_SIZE = 500;
-const MAX_PENDING_JOBS = 10_000;
 
 interface BulkRequestBody {
   action: BulkAction;
@@ -68,7 +68,14 @@ function roleAllowsPermission(role: string | undefined, permission: string) {
   return false;
 }
 
-function applyUserFilters(query: any, f: Record<string, unknown>) {
+interface UserFilterQuery {
+  in(column: string, values: unknown[]): UserFilterQuery;
+  eq(column: string, value: unknown): UserFilterQuery;
+  or(filters: string): UserFilterQuery;
+  limit(count: number): PromiseLike<{ data: Record<string, unknown>[] | null; error: { message: string } | null }>;
+}
+
+function applyUserFilters(query: UserFilterQuery, f: Record<string, unknown>): UserFilterQuery {
   if (f.user_ids && Array.isArray(f.user_ids) && f.user_ids.length > 0) {
     query = query.in('id', f.user_ids as string[]);
     if (f.tenant_id) query = query.eq('tenant_id', f.tenant_id as string);
@@ -87,7 +94,7 @@ function applyUserFilters(query: any, f: Record<string, unknown>) {
   return query;
 }
 
-async function updateBulkJob(admin: any, jobId: string, opts: {
+async function updateBulkJob(admin: SupabaseClient, jobId: string, opts: {
   status?: string;
   errorMessage?: string;
   finishedAt?: string;
@@ -104,8 +111,8 @@ async function updateBulkJob(admin: any, jobId: string, opts: {
 }
 
 async function processInlineBulkJob(
-  admin: any,
-  job: any,
+  admin: SupabaseClient,
+  job: { id: string },
   body: BulkRequestBody,
   initiatorId: string,
 ) {
@@ -113,7 +120,7 @@ async function processInlineBulkJob(
     admin
       .from('users')
       .select('id, tenant_id, email, first_name, last_name, phone, primary_role, account_status, warning_count, login_count, token_version, created_at, last_login, last_seen_at, region_id')
-      .is('deleted_at', null),
+      .is('deleted_at', null) as unknown as UserFilterQuery,
     body.filters,
   ).limit(MAX_BULK_SIZE);
 
@@ -132,7 +139,7 @@ async function processInlineBulkJob(
       await processInlineUserAction(admin, body.action, user, body.params ?? {}, initiatorId);
     } catch (err) {
       console.error(`[bulk-action] ${body.action} failed for ${user.id}:`, err);
-      failedIds.push(user.id);
+      failedIds.push(user.id as string);
     } finally {
       processed++;
     }
@@ -162,9 +169,9 @@ async function processInlineBulkJob(
 }
 
 async function processInlineUserAction(
-  admin: any,
+  admin: SupabaseClient,
   action: BulkAction,
-  user: Record<string, any>,
+  user: Record<string, unknown>,
   params: Record<string, unknown>,
   initiatorId: string,
 ) {
@@ -203,7 +210,7 @@ async function processInlineUserAction(
       // Best-effort: remove from Auth. Failures are silently ignored because:
       // 1. The user may not exist in Auth (e.g. created without auth record).
       // 2. Auth deletion is not the source of truth for our data model.
-      await admin.auth.admin.deleteUser(user.id).catch(() => { /* best-effort */ });
+      await admin.auth.admin.deleteUser(user.id as string).catch(() => { /* best-effort */ });
       break;
     }
     case 'lock':
@@ -256,9 +263,9 @@ async function processInlineUserAction(
 }
 
 async function exportUsers(
-  admin: any,
+  admin: SupabaseClient,
   jobId: string,
-  users: Record<string, any>[],
+  users: Record<string, unknown>[],
   body: BulkRequestBody,
   initiatorId: string,
 ) {
@@ -316,7 +323,7 @@ async function exportUsers(
   });
 }
 
-function generateCsv(users: Record<string, any>[]) {
+function generateCsv(users: Record<string, unknown>[]) {
   const fields = ['id', 'email', 'first_name', 'last_name', 'phone', 'primary_role', 'account_status', 'warning_count', 'login_count', 'created_at', 'last_login', 'tenant_id'];
   const escape = (value: unknown) => {
     if (value == null) return '';

@@ -1,11 +1,25 @@
 'use client';
 
-import { useState } from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import {
+  Add as AddIcon,
+  Campaign as CampaignIcon,
+  Close as CloseIcon,
+  Delete as DeleteIcon,
+  Notifications as NotificationsIcon,
+  People as PeopleIcon,
+  Person as PersonIcon,
+  School as SchoolIcon,
+  Send as SendIcon,
+  SupervisorAccount as SupervisorIcon,
+} from '@mui/icons-material';
+import {
+  EmojiEvents as PermissionIcon,
+} from '@mui/icons-material';
 import {
   Box,
   Button,
   Card as MuiCard,
-  CardContent as MuiCardContent,
   Chip,
   CircularProgress,
   Dialog,
@@ -19,7 +33,6 @@ import {
   IconButton,
   InputLabel,
   MenuItem,
-  Paper,
   Select,
   Stack,
   TextField,
@@ -38,40 +51,31 @@ import {
   LinearProgress,
 } from '@mui/material';
 import {
-  Add as AddIcon,
-  Campaign as CampaignIcon,
-  Close as CloseIcon,
-  Delete as DeleteIcon,
-  Notifications as NotificationsIcon,
-  People as PeopleIcon,
-  Person as PersonIcon,
-  School as SchoolIcon,
-  Send as SendIcon,
-  SupervisorAccount as SupervisorIcon,
-} from '@mui/icons-material';
-import { useForm, Controller } from 'react-hook-form';
-import { z } from 'zod';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useTranslations, useLocale } from 'next-intl';
-
-import { useAuthUser } from '@/adapters/stores/auth.store';
-import { PermissionGate } from '@/features/layout/components/PermissionGate';
-import { useNotifications, Notification, TargetAudience } from '@/adapters/queries/notifications.queries';
-import { useSendNotification, useDeleteNotification, SendNotificationInput } from '@/adapters/mutations/notifications.mutations';
-import { TablePagination } from '@/components/ui/TablePagination';
-import type { PrimaryRole } from '@/domain/types/user.types';
-import { getAllPermissions, searchUsers } from '@/infrastructure/repos/users.service';
-import {
   Autocomplete,
   ToggleButton,
   ToggleButtonGroup,
   Avatar,
 } from '@mui/material';
-import {
-  Star as StarIcon,
-  EmojiEvents as PermissionIcon,
-} from '@mui/icons-material';
+import { useTranslations, useLocale } from 'next-intl';
+import { useState } from 'react';
 import { useEffect } from 'react';
+import { useForm, Controller } from 'react-hook-form';
+import { z } from 'zod';
+
+import { useSendNotification, useDeleteNotification, SendNotificationInput } from '@/adapters/mutations/notifications.mutations';
+import { useNotifications, TargetAudience } from '@/adapters/queries/notifications.queries';
+import { useAuthUser } from '@/adapters/stores/auth.store';
+import { useToastStore } from '@/adapters/stores/toast.store';
+import {
+  StatsCard,
+  StatsCardContent,
+  StatsCardIcon
+} from '@/components/ui/Card';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { TablePagination } from '@/components/ui/TablePagination';
+import { PermissionGate } from '@/features/layout/components/PermissionGate';
+import { getAllPermissions, searchUsers, type UserSearchResult } from '@/infrastructure/repos/users.service';
+
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -92,9 +96,6 @@ function getAllowedAudiences(role: string): TargetAudience[] {
       return [];
   }
 }
-
-import { useToastStore } from '@/adapters/stores/toast.store';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 function AudienceChip({
   audience,
@@ -149,7 +150,7 @@ function AudienceChip({
   return (
     <Chip
       icon={icons[audience] as React.ReactElement}
-      label={t(`audience_${audience}` as any)}
+      label={t(`audience_${audience}` as Parameters<typeof t>[0])}
       color={colors[audience]}
       size="small"
       variant="outlined"
@@ -158,19 +159,11 @@ function AudienceChip({
   );
 }
 
-import {
-  Card,
-  CardContent,
-  StatsCard,
-  StatsCardContent,
-  StatsCardIcon
-} from '@/components/ui/Card';
-
 function StatCard({
   label,
   value,
   icon,
-  color,
+  color: _color,
 }: {
   label: string;
   value: number | string;
@@ -210,7 +203,7 @@ function SendNotificationDialog({ open, onClose, allowedAudiences, onSuccess }: 
   const sendMutation = useSendNotification();
   const [permissions, setPermissions] = useState<string[]>([]);
   const [userQuery, setUserQuery] = useState('');
-  const [userOptions, setUserOptions] = useState<any[]>([]);
+  const [userOptions, setUserOptions] = useState<UserSearchResult[]>([]);
 
   useEffect(() => {
     getAllPermissions().then(setPermissions);
@@ -237,7 +230,7 @@ function SendNotificationDialog({ open, onClose, allowedAudiences, onSuccess }: 
     reset,
     watch,
     formState: { errors, isSubmitting },
-  } = useForm<any>({
+  } = useForm<z.infer<typeof sendNotificationSchema>>({
     resolver: zodResolver(sendNotificationSchema),
     defaultValues: {
       title: '',
@@ -257,7 +250,7 @@ function SendNotificationDialog({ open, onClose, allowedAudiences, onSuccess }: 
     onClose();
   }
 
-  const onSubmit = async (data: any) => {
+  const onSubmit = async (data: z.infer<typeof sendNotificationSchema>) => {
     try {
       const payload: SendNotificationInput = {
         title: data.title,
@@ -268,7 +261,7 @@ function SendNotificationDialog({ open, onClose, allowedAudiences, onSuccess }: 
       const defaultAudience = allowedAudiences.includes('students') ? 'students' : (allowedAudiences[0] || 'all');
 
       if (data.targeting_type === 'role') {
-        payload.target_audience = data.target_audience;
+        payload.target_audience = data.target_audience || defaultAudience;
       } else if (data.targeting_type === 'permission') {
         payload.target_permission = data.target_permission || null;
         payload.target_audience = defaultAudience;
@@ -282,7 +275,7 @@ function SendNotificationDialog({ open, onClose, allowedAudiences, onSuccess }: 
       await sendMutation.mutateAsync(payload);
       onSuccess(t('status_success'));
       handleClose();
-    } catch (err) {
+    } catch {
       // error handled by mutation
     }
   };
@@ -316,7 +309,7 @@ function SendNotificationDialog({ open, onClose, allowedAudiences, onSuccess }: 
             </Typography>
             <Controller
               name="targeting_type"
-              control={control as any}
+              control={control}
               defaultValue="role"
               render={({ field }) => (
                 <ToggleButtonGroup
@@ -403,7 +396,7 @@ function SendNotificationDialog({ open, onClose, allowedAudiences, onSuccess }: 
                       error={!!errors.target_user_ids}
                       helperText={(errors.target_user_ids?.message as string)}
                       size="small"
-                      InputLabelProps={params.InputLabelProps as any}
+                      InputLabelProps={(params.InputLabelProps ?? {}) as NonNullable<React.ComponentProps<typeof TextField>['InputLabelProps']>}
                       InputProps={{ ...params.InputProps, sx: { borderRadius: 2 } }}
                     />
                   )}
@@ -499,7 +492,7 @@ function DeleteNotificationDialog({ open, notificationId, onClose, onSuccess }: 
       await deleteMutation.mutateAsync(notificationId);
       onSuccess(t('status_delete_success'));
       onClose();
-    } catch (err) {
+    } catch {
       // toast handled in mutation
     }
   };

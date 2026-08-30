@@ -1,8 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+
 import { queryKeys } from '@/adapters/queries/keys';
-import {
-  resetUserDevices,
-} from '@/infrastructure/repos/users.service';
 import {
   createUserAction,
   deleteUserAction,
@@ -10,7 +8,11 @@ import {
   terminateUserSessionsAction,
   issueWarningAction,
 } from '@/application/actions/user.actions';
+import type { CreateUserInput } from '@/domain/schemas/user.schema';
 import type { AccountAction } from '@/domain/types/user.types';
+import {
+  resetUserDevices,
+} from '@/infrastructure/repos/users.service';
 
 /**
  * Mutation hooks for user management actions.
@@ -35,7 +37,7 @@ export function useDeleteUser() {
 export function useCreateUser() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: CreateUserInput) => {
       const result = await createUserAction(data);
       return result;
     },

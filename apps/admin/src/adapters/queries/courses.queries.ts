@@ -1,5 +1,8 @@
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
+
 import { queryKeys } from './keys';
+
+import type { CourseFilters } from '@/domain/types/course.types';
 import {
   getCourses,
   getCourseById,
@@ -12,8 +15,6 @@ import {
   getPrerequisites,
   getPrerequisiteOptions,
 } from '@/infrastructure/repos/courses.service';
-import type { CourseFilters, VideoView } from '@/domain/types/course.types';
-import type { PaginatedResult } from '@/domain/types/user.types';
 
 /**
  * React Query hooks for courses domain data.
