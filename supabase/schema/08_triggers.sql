@@ -1,6 +1,8 @@
--- AUTO-GENERATED FROM CANONICAL SOURCE
--- Source of truth: ../../Eduzone_schema_v13.sql
--- Normalization pass #3 ownership rules applied.
+-- Canonical schema source. supabase/schema/ (this file and its siblings, per
+-- supabase/config.toml schema_paths) is the single source of truth -- no
+-- migrations, patches, or external SQL files. Historical note: originally
+-- generated from a monolithic Eduzone_schema_v13.sql during a normalization
+-- pass (#3, ownership rules); that file no longer exists in this repo.
 -- MEDIUM-04: Prevent physical delete on users
 DROP TRIGGER IF EXISTS trg_prevent_physical_delete_users ON public.users;
 

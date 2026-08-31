@@ -1,7 +1,9 @@
 -- ============================================================================
 -- Function & Object Permissions (Security Hardened)
 -- ============================================================================
--- Source of truth: ../../Eduzone_schema_v13.sql (schema) + hardening_patch.sql
+-- Canonical schema source: supabase/schema/ (this file and its siblings).
+-- Historical note: originally generated from a monolithic Eduzone_schema_v13.sql
+-- plus a hardening_patch.sql; neither file exists in this repo anymore.
 -- 
 -- Hardened per security audit (June 2026):
 -- - All SECURITY DEFINER functions audited and reference-checked

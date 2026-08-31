@@ -37,13 +37,15 @@ eduzone/                          # pnpm workspace + Turborepo
 │   ├── config/                   # Shared ESLint/TS/Tailwind configs (@eduzone/config)
 │   ├── core/                     # Core business logic (tests)
 │   ├── auth/                     # Auth package (empty — logic lives in features/auth)
-│   └── db/                       # Database package (empty — schema in root SQL files)
+│   └── db/                       # Database package (empty — schema lives in supabase/schema/)
 ├── supabase/
 │   ├── functions/                # Edge Functions (Deno): bulk-action, bulk-export, create-user…
-│   ├── migrations/               # SQL migration files
+│   ├── schema/                   # Canonical schema — 01_extensions.sql … 11_seed_reference.sql,
+│   │                             #   applied in supabase/config.toml schema_paths order. Single
+│   │                             #   source of truth: no migrations, patches, or external SQL.
+│   ├── _archived_patches/        # Retired/superseded SQL kept for history only — never applied
+│   ├── migrations/               # Not used for schema changes (see supabase/schema/ above)
 │   └── config.toml               # Local Supabase config
-├── Eduzone_schema_v13.sql        # Canonical production schema (~436KB)
-├── Eduzone_seed_qa.sql           # QA seed data
 ├── project_documents/            # Architecture docs, PRD, API design, implementation plan
 └── scripts/                      # Migration validators, security tools
 ```
@@ -226,14 +228,16 @@ Three roles: `super_admin` > `admin` > `teacher`
 | `lib/env.ts` | Zod-validated environment variables |
 | `app/globals.css` | Design tokens, RTL fixes, Tailwind theme |
 | `i18n/routing.ts` | Locale definitions and navigation helpers |
-| `Eduzone_schema_v13.sql` | Canonical production database schema |
+| `supabase/schema/` | Canonical production database schema (11 files, applied in order) |
 | `project_documents/implementation_plan.md` | Full implementation roadmap |
 
 ---
 
 ## 🗄️ Database Schema (v13)
 
-The canonical schema (`Eduzone_schema_v13.sql`, ~436KB) defines:
+The canonical schema (`supabase/schema/`, 11 files — 01_extensions.sql through
+11_seed_reference.sql, plus VALIDATION.sql — applied in the order listed in
+`supabase/config.toml`'s `schema_paths`) defines:
 
 - **Multi-tenant** with `tenant_id` on all tables
 - **RLS** enforced on every table — policies check JWT claims
