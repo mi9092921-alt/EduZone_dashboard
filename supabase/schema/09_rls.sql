@@ -189,6 +189,22 @@ ALTER TABLE public.active_sessions ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE public.session_snapshots ENABLE ROW LEVEL SECURITY;
 
+-- SEC-PART-01 FIX: statically pre-declared yearly partitions never received the
+-- ENABLE ROW LEVEL SECURITY that maintenance.create_next_partition_if_not_exists()
+-- already applies to every partition it creates dynamically (07_functions.sql).
+-- RLS enable/force is per-relation and does NOT cascade from a partitioned parent
+-- to its partitions in PostgreSQL; a partition queried directly bypasses the
+-- parent's policy entirely regardless of the parent's own RLS/FORCE/policy setup.
+-- Not currently reachable via anon/authenticated (10_permissions.sql grants only
+-- the parent by name, and GRANT does not cascade to partitions either), but this
+-- closes the gap so a future broadened grant can't silently bypass RLS, and
+-- brings these in line with the table's own partitions ending in _future.
+ALTER TABLE public.session_snapshots_2026 ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.session_snapshots_2027 ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.session_snapshots_2028 ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.session_snapshots_2029 ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.session_snapshots_future ENABLE ROW LEVEL SECURITY;
+
 -- CRIT-04 FIX: Use O(1) active_sessions PK lookup.
 -- Old IN (SELECT id FROM sessions WHERE user_id=...) forces a full cross-partition
 -- scan on the partitioned sessions table and cannot use partition pruning inside RLS.
@@ -209,6 +225,12 @@ CREATE POLICY session_snapshots_select ON public.session_snapshots
   );
 
 ALTER TABLE audit.alert_log ENABLE ROW LEVEL SECURITY;
+
+-- SEC-PART-01 FIX: see session_snapshots partitions above for rationale.
+ALTER TABLE audit.alert_log_2026 ENABLE ROW LEVEL SECURITY;
+ALTER TABLE audit.alert_log_2027 ENABLE ROW LEVEL SECURITY;
+ALTER TABLE audit.alert_log_2028 ENABLE ROW LEVEL SECURITY;
+ALTER TABLE audit.alert_log_future ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS alert_log_select ON audit.alert_log;
 
@@ -273,11 +295,31 @@ ALTER TABLE public.lesson_contents ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE private.user_access_cache ENABLE ROW LEVEL SECURITY;
 
+-- SEC-PART-01 FIX: sibling private-schema cache table never had RLS enabled at all
+-- (not partition-related, just missed during authoring; not currently reachable by
+-- anon/authenticated per 10_permissions.sql, this is defense-in-depth consistency
+-- with private.user_access_cache directly above).
+ALTER TABLE private.dashboard_stats_cache ENABLE ROW LEVEL SECURITY;
+
 ALTER TABLE public.devices ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE public.sessions ENABLE ROW LEVEL SECURITY;
 
+-- SEC-PART-01 FIX: see session_snapshots partitions above for rationale.
+-- (sessions_future already has ENABLE ROW LEVEL SECURITY further down this file.)
+ALTER TABLE public.sessions_2026 ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sessions_2027 ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sessions_2028 ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sessions_2029 ENABLE ROW LEVEL SECURITY;
+
 ALTER TABLE public.video_views ENABLE ROW LEVEL SECURITY;
+
+-- SEC-PART-01 FIX: see session_snapshots partitions above for rationale.
+-- (video_views_future already has ENABLE ROW LEVEL SECURITY further down this file.)
+ALTER TABLE public.video_views_2026 ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.video_views_2027 ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.video_views_2028 ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.video_views_2029 ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE public.todos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.todos FORCE ROW LEVEL SECURITY;
@@ -294,11 +336,27 @@ CREATE POLICY push_deliveries_deny_client ON public.push_deliveries
 
 ALTER TABLE public.user_location_logs ENABLE ROW LEVEL SECURITY;
 
+-- SEC-PART-01 FIX: see session_snapshots partitions above for rationale.
+-- (user_location_logs_future already has ENABLE ROW LEVEL SECURITY further down this file.)
+ALTER TABLE public.user_location_logs_2026 ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_location_logs_2027 ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_location_logs_2028 ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_location_logs_2029 ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_location_logs_2030 ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_location_logs_2031 ENABLE ROW LEVEL SECURITY;
+
 ALTER TABLE public.user_last_location ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE public.activity_log_queue ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE public.activity_logs ENABLE ROW LEVEL SECURITY;
+
+-- SEC-PART-01 FIX: see session_snapshots partitions above for rationale.
+-- (activity_logs_future already has ENABLE ROW LEVEL SECURITY further down this file.)
+ALTER TABLE public.activity_logs_2026 ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.activity_logs_2027 ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.activity_logs_2028 ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.activity_logs_2029 ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE public.audit_chain_state ENABLE ROW LEVEL SECURITY;
 
@@ -319,6 +377,12 @@ ALTER TABLE public.rate_limit_rules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.rate_limits ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE audit.lesson_access_log ENABLE ROW LEVEL SECURITY;
+
+-- SEC-PART-01 FIX: see session_snapshots partitions above for rationale.
+ALTER TABLE audit.lesson_access_log_2026 ENABLE ROW LEVEL SECURITY;
+ALTER TABLE audit.lesson_access_log_2027 ENABLE ROW LEVEL SECURITY;
+ALTER TABLE audit.lesson_access_log_2028 ENABLE ROW LEVEL SECURITY;
+ALTER TABLE audit.lesson_access_log_future ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE internal.job_queue ENABLE ROW LEVEL SECURITY;
 
