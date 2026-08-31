@@ -53,7 +53,7 @@ supabase db execute < schema/VALIDATION.sql
 ### Check Auth Works
 ```typescript
 // In browser console (after login)
-const { data: result } = await supabase.rpc('check_user_access');
+const { data: result } = await supabase.rpc('check_dashboard_access');
 console.log(result);
 // Should return: { allowed: true, tenant_id: '...', role: 'admin', token_version: 1 }
 ```
@@ -173,7 +173,7 @@ supabase logs
 
 ## ❓ Quick Troubleshooting
 
-**Q: Auth hydration fails with "check_user_access RPC failed"**
+**Q: Auth hydration fails with "check_dashboard_access RPC failed"**
 - A: System tenant missing. Run `supabase db execute < seed/00_system_seed_helper.sql`
 
 **Q: Can't see my seed data**

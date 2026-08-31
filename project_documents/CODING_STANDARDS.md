@@ -358,7 +358,7 @@ docs/security-design-doc
 
 ```
 feat(users): add bulk suspend endpoint
-fix(auth): handle token_version mismatch in check_user_access
+fix(auth): handle token_version mismatch in check_dashboard_access
 refactor(rpc): extract retry logic to shared withRetry utility
 test(users): add unit tests for suspendUser use case
 docs(security): document hash-chain audit trail

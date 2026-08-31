@@ -35,7 +35,7 @@ TOTP verification
 JWT issued (access_token + refresh_token in HttpOnly cookie)
     │
     ▼
-Frontend calls check_user_access()
+Frontend calls check_dashboard_access()
     ├── Validates account_status (not locked/banned/suspended)
     ├── Validates token_version (not stale from force-logout)
     ├── Checks maintenance_mode
@@ -65,7 +65,7 @@ Dashboard renders (or redirect to appropriate error screen)
 
 - JWT expiry: 1 hour (short-lived)
 - Refresh token expiry: 7 days
-- Sessions polled every 5 minutes via `check_user_access()` RPC
+- Sessions polled every 5 minutes via `check_dashboard_access()` RPC
 - Force-logout invalidates all sessions by incrementing `token_version`
 - Suspended/banned accounts get immediate session revocation via job queue
 
@@ -83,7 +83,7 @@ Dashboard renders (or redirect to appropriate error screen)
 
 ```typescript
 // Called every 5 minutes + on every navigation
-const { data } = await supabase.rpc('check_user_access');
+const { data } = await supabase.rpc('check_dashboard_access');
 
 if (!data.allowed) {
   switch (data.reason) {
@@ -103,7 +103,7 @@ if (!data.allowed) {
 }
 ```
 
-**RLS enforcement** — Every policy that touches user data implicitly calls `check_user_access()` internally, so a stale JWT will be rejected at the database level even if the client polling is delayed.
+**RLS enforcement** — Every policy that touches user data implicitly calls `check_dashboard_access()` internally, so a stale JWT will be rejected at the database level even if the client polling is delayed.
 
 ---
 

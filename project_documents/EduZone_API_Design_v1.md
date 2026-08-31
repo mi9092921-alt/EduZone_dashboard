@@ -749,7 +749,7 @@ export interface User {
 ## **5.2 RPC Request / Response Types**
 // packages/types/src/rpc.types.ts
 
-export type CheckUserAccessResult =
+export type CheckDashboardAccessResult =
 
 `  `| { allowed: true;  role: PrimaryRole; tenant\_id: string; maintenance\_bypass?: true }
 
@@ -923,7 +923,7 @@ const FN = process.env.NEXT\_PUBLIC\_APP\_ENV === 'production'
 |**Query key**|*camelCase nested factory*|queryKeys.users.detail(id)|
 |**Service function**|*camelCase verb + noun*|controlUserAccount, issueWarning|
 |**Error code**|*SCREAMING\_SNAKE\_CASE*|ADMIN\_ONLY, MAX\_DEVICES\_REACHED|
-|**TypeScript type**|*PascalCase + descriptive*|CheckUserAccessResult, RpcErrorCode|
+|**TypeScript type**|*PascalCase + descriptive*|CheckDashboardAccessResult, RpcErrorCode|
 
 ## **6.4 Changelog**
 

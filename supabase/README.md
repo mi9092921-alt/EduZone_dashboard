@@ -97,7 +97,7 @@ supabase logs                           # View logs
 ### ✅ Auth Hydration
 - System tenant auto-created
 - Roles auto-populated
-- check_user_access() RPC reliable
+- check_dashboard_access() RPC reliable
 - [AuthProvider] errors eliminated
 
 ### ✅ Documentation
@@ -221,7 +221,7 @@ supabase logs                           # View logs
 
 **...fix auth errors?**
 - Answer: [TROUBLESHOOTING.md](TROUBLESHOOTING.md) → Issue #1
-- Or: Search "check_user_access RPC failed"
+- Or: Search "check_dashboard_access RPC failed"
 
 **...understand RLS?**
 - Answer: [schema/README.md](schema/README.md) → Security Hardening

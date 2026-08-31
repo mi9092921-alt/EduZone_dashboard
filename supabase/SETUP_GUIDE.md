@@ -127,9 +127,9 @@ JOIN public.roles r ON r.name = u.primary_role AND r.tenant_id = public.system_t
 ON CONFLICT DO NOTHING;
 ```
 
-### Auth Hydration (Ensures check_user_access() RPC works)
+### Auth Hydration (Ensures check_dashboard_access() RPC works)
 
-The `check_user_access()` RPC verifies:
+The `check_dashboard_access()` RPC verifies:
 1. User exists and is not deleted
 2. Account status is 'active'
 3. JWT tenant_id matches user's tenant_id (or user is admin in that tenant)
@@ -173,10 +173,10 @@ WHERE table_schema = 'public' AND grantee = 'anon';
 ### Verify Permissions
 
 ```sql
--- Check that authenticated users can execute check_user_access()
+-- Check that authenticated users can execute check_dashboard_access()
 SELECT grantee, privilege_type 
 FROM information_schema.role_routine_grants
-WHERE routine_name = 'check_user_access';
+WHERE routine_name = 'check_dashboard_access';
 -- Expected: authenticated=EXECUTE, service_role=EXECUTE, anon=NONE
 ```
 
@@ -195,7 +195,7 @@ SELECT COUNT(*) FROM public.tenants;
 
 ```typescript
 // In browser console (authenticated session required)
-const { data: result, error } = await supabase.rpc('check_user_access');
+const { data: result, error } = await supabase.rpc('check_dashboard_access');
 if (error) {
   console.error('Auth check failed:', error);
 } else {
@@ -207,7 +207,7 @@ if (error) {
 
 ## Troubleshooting
 
-### Issue: `[AuthProvider] check_user_access RPC failed: {}`
+### Issue: `[AuthProvider] check_dashboard_access RPC failed: {}`
 
 **Diagnosis:**
 ```sql
@@ -232,14 +232,14 @@ SELECT * FROM public.users WHERE id = current_user_id();
 ```sql
 SELECT grantee, privilege_type 
 FROM information_schema.role_routine_grants
-WHERE routine_name = 'check_user_access'
+WHERE routine_name = 'check_dashboard_access'
 AND grantee IN ('authenticated', 'anon');
 ```
 
 **Fix (if missing):**
 ```sql
-REVOKE EXECUTE ON FUNCTION public.check_user_access() FROM anon;
-GRANT EXECUTE ON FUNCTION public.check_user_access() TO authenticated, service_role;
+REVOKE EXECUTE ON FUNCTION public.check_dashboard_access() FROM anon;
+GRANT EXECUTE ON FUNCTION public.check_dashboard_access() TO authenticated, service_role;
 ```
 
 ### Issue: Roles Not Found on User Insert

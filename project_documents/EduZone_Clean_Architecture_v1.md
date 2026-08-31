@@ -134,7 +134,7 @@ src/application/
 │   │   ├── enrollStudent.ts
 │   │   └── revokeEnrollment.ts
 │   ├── auth/
-│   │   ├── checkUserAccess.ts
+│   │   ├── checkDashboardAccess.ts
 │   │   └── handleTokenMismatch.ts
 │   └── settings/
 │       ├── getSetting.ts
@@ -236,10 +236,10 @@ src/infrastructure/
 src/contracts/
 ├── rpc/
 │   ├── v1/                     # Frozen — NEVER modify
-│   │   ├── checkUserAccess.ts  # Request/Response types for v1
+│   │   ├── checkDashboardAccess.ts  # Request/Response types for v1
 │   │   └── controlUser.ts
 │   └── v2/                     # Active development
-│       ├── checkUserAccess.ts
+│       ├── checkDashboardAccess.ts
 │       └── controlUser.ts
 └── common/
     ├── pagination.ts           # PaginationRequest, PaginationResponse
@@ -279,7 +279,7 @@ src/adapters/
 │   └── realtime.store.ts         # Alerts, unread count
 └── hooks/                        # Shared adapter hooks
     ├── usePermission.ts          # Permission check hook
-    ├── useCheckUserAccess.ts     # Polls check_user_access every 5min
+    ├── useCheckDashboardAccess.ts # Polls check_dashboard_access every 5min
     └── useUserRealtime.ts        # Realtime subscription hook
 ```
 

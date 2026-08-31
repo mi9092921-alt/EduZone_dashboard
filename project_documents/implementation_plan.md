@@ -193,7 +193,7 @@ Generate TypeScript types from DB schema and define domain types.
 - `packages/types/src/database.types.ts` — auto-generated via `supabase gen types`
 - `packages/types/src/rpc.types.ts` — typed wrappers for every RPC:
   ```typescript
-  export type CheckUserAccessResult = {
+  export type CheckDashboardAccessResult = {
     allowed: boolean;
     reason?: 'app_locked' | 'unauthenticated' | 'account_banned' | 
              'account_locked' | 'account_suspended' | 'user_not_found' | 'maintenance_mode';
@@ -426,7 +426,7 @@ Login UI with error handling and post-login routing.
 - Route: `app/(auth)/login/page.tsx`
 - Email + password form using React Hook Form + Zod schema
 - `supabase.auth.signInWithPassword()` on submit
-- On success: calls `check_user_access()` RPC immediately
+- On success: calls `check_dashboard_access()` RPC immediately
   - If `allowed: false` → show reason-specific error (see Section 5.1 of PRD) and call `supabase.auth.signOut()`
   - If `allowed: true` → redirect to `/(dashboard)`
 - Query param `?reason=session_invalidated` → shows banner: "Your session was ended by an administrator."
@@ -480,11 +480,11 @@ Global detection and response to stale JWT / forced logout.
     - Calls `isSessionInvalidated(error)`
     - If true: clears Zustand auth store, calls `supabase.auth.signOut()`, redirects to `/login?reason=session_invalidated`
     - Logs to Sentry with `{ user_id, tenant_id, error_code }` context
-- `apps/web/src/hooks/useCheckUserAccess.ts`:
-  - Polls `check_user_access()` every 5 minutes (React Query `refetchInterval`)
+- `apps/web/src/hooks/useCheckDashboardAccess.ts`:
+  - Polls `check_dashboard_access()` every 5 minutes (React Query `refetchInterval`)
   - On `allowed: false` → triggers mismatch handler
   - On `maintenance_mode` without bypass → shows `MaintenanceBanner` component (does NOT logout)
-- Tested: mock `check_user_access` returning each reason code; assert correct navigation
+- Tested: mock `check_dashboard_access` returning each reason code; assert correct navigation
 
 **Test Cases:**
 ```
@@ -1347,7 +1347,7 @@ Fix the known RLS gap on the `warnings` table. Currently teachers can potentiall
   - Prominent banner in Settings page when `app_locked = true`: "Application is currently locked for all users"
   - Lock button → ConfirmDialog with message textarea, calls `lock_app_for_all(message)`
   - Unlock button → simple ConfirmDialog, calls `unlock_app()`
-- `components/layout/AdminShell.tsx` shows persistent warning banner at top when app is locked (fetched via `useCheckUserAccess`)
+- `components/layout/AdminShell.tsx` shows persistent warning banner at top when app is locked (fetched via `useCheckDashboardAccess`)
 
 **Blockers:** P5-SETTINGS-001  
 **Unblocks:** None
@@ -1817,7 +1817,7 @@ Critical flows tested against Supabase staging environment:
 - `e2e/courses/revoke-enrollment.spec.ts` — revoke; verify status change
 - `e2e/warnings/issue-warning.spec.ts` — issue 3 warnings; verify auto-suspend
 - `e2e/settings/maintenance-mode.spec.ts` — enable; verify end-user blocked; disable
-- `e2e/settings/app-lock.spec.ts` — lock app; verify check_user_access returns app_locked; unlock
+- `e2e/settings/app-lock.spec.ts` — lock app; verify check_dashboard_access returns app_locked; unlock
 - `e2e/audit/verify-chain.spec.ts` — flush logs; verify chain; assert "Chain Intact"
 - `e2e/rtl/arabic-layout.spec.ts` — all pages render correctly in RTL (Arabic locale); verify sidebar, data grids, dialogs
 - Test factories using `@faker-js/faker` for seed data generation (per Testing Strategy §7.2)

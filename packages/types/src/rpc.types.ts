@@ -48,8 +48,8 @@ export interface RpcError {
   requestId?: string;
 }
 
-/** Check user access result from RPC */
-export interface CheckUserAccessResult {
+/** Check dashboard access result from RPC */
+export interface CheckDashboardAccessResult {
   allowed: boolean;
   reason?:
     | 'app_locked'

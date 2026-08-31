@@ -43,7 +43,7 @@ The following database-level improvements were implemented and are maintained as
 1. **Seed Data Integrity (`11_seed_reference.sql`)**: 
    - Added System Tenant creation (ID: `00000000-0000-0000-0000-000000000001`)
    - Ensures role lookups for QA users succeed without dependency issues
-   - Fixes `[AuthProvider] check_user_access RPC failed: {}` errors on auth hydration
+   - Fixes `[AuthProvider] check_dashboard_access RPC failed: {}` errors on auth hydration
 
 2. **Function Hardening (`07_functions.sql`)**: 
    - All `SECURITY DEFINER` functions audited and hardened
@@ -62,7 +62,7 @@ The following database-level improvements were implemented and are maintained as
 
 | Category | Status | Details |
 |----------|--------|---------|
-| **Auth Hydration** | ✅ Fixed | System Tenant now created in seed data; `check_user_access()` RPC succeeds |
+| **Auth Hydration** | ✅ Fixed | System Tenant now created in seed data; `check_dashboard_access()` RPC succeeds |
 | **Security Advisor** | ✅ Hardened | 0 errors, 1 info (pgcrypto in public schema—planned for next window) |
 | **Performance Advisor** | ✅ Optimized | 0 errors, 0 warnings, 304 info items |
 | **Modular Schema** | ✅ Complete | 11 canonical schema layers plus `VALIDATION.sql`, proper dependency ordering, single source of truth |
