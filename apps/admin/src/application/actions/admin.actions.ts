@@ -508,12 +508,16 @@ export async function getNotificationsAction(
   count: number;
   stats: { all: number; students: number; teachers: number; admins: number };
 }> {
-  await requirePermission(['notifications.send', 'settings.write']);
+  const { tenantId } = await requirePermission(['notifications.send', 'settings.write']);
   const admin = createAdminClient();
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
   let query = admin.from('notifications').select('*', { count: 'exact' }).is('deleted_at', null);
+
+  if (tenantId) {
+    query = query.eq('tenant_id', tenantId);
+  }
 
   if (audience && audience !== 'all') {
     query = query.eq('target_audience', audience);
@@ -524,18 +528,24 @@ export async function getNotificationsAction(
     .range(from, to);
   if (error) throw error;
 
-  // Fetch total stats for stats cards (unpaginated counts)
-  const { data: allAudienceData, error: statsError } = await admin
+  // Fetch total stats for stats cards (unpaginated counts) scoped to tenant
+  let statsQuery = admin
     .from('notifications')
     .select('target_audience')
     .is('deleted_at', null);
+
+  if (tenantId) {
+    statsQuery = statsQuery.eq('tenant_id', tenantId);
+  }
+
+  const { data: allAudienceData, error: statsError } = await statsQuery;
   if (statsError) throw statsError;
 
   const stats = {
-    all: allAudienceData.length,
-    students: allAudienceData.filter((n) => n.target_audience === 'students').length,
-    teachers: allAudienceData.filter((n) => n.target_audience === 'teachers').length,
-    admins: allAudienceData.filter((n) => n.target_audience === 'admins').length,
+    all: (allAudienceData ?? []).length,
+    students: (allAudienceData ?? []).filter((n) => n.target_audience === 'students').length,
+    teachers: (allAudienceData ?? []).filter((n) => n.target_audience === 'teachers').length,
+    admins: (allAudienceData ?? []).filter((n) => n.target_audience === 'admins').length,
   };
 
   return {
@@ -591,16 +601,35 @@ export async function sendNotificationAction(input: SendNotificationInput): Prom
     if (fanoutError) throw fanoutError;
   }
 
+  // BUG-PUSH-INSTANT: Immediately process notification fanout and trigger FCM push worker
+  // so student devices receive notifications in real-time without waiting for periodic cron.
+  try {
+    const workerId = crypto.randomUUID();
+    await admin.rpc('process_notification_fanout_jobs', {
+      p_limit: 500,
+      p_worker_id: workerId,
+    });
+    await admin.rpc('invoke_notification_push_worker');
+  } catch (pushErr) {
+    console.error('[SEND_NOTIFICATION_ACTION_PUSH_ERROR]', pushErr);
+  }
+
   return notificationId;
 }
 
 export async function deleteNotificationAction(id: string): Promise<void> {
-  await requirePermission(['notifications.delete', 'notifications.send', 'settings.write']);
+  const { tenantId } = await requirePermission(['notifications.delete', 'notifications.send', 'settings.write']);
   const admin = createAdminClient();
-  const { error } = await admin
+  let query = admin
     .from('notifications')
     .update({ deleted_at: new Date().toISOString() })
     .eq('id', id);
+
+  if (tenantId) {
+    query = query.eq('tenant_id', tenantId);
+  }
+
+  const { error } = await query;
   if (error) throw error;
 }
 
@@ -614,7 +643,7 @@ export async function getMyNotificationsAction(
 
     let query = admin
       .from('user_notifications')
-      .select('*, notifications(title, body)', { count: 'exact' })
+      .select('*, notifications!user_notifications_notification_id_fkey(title, body)', { count: 'exact' })
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(limit);

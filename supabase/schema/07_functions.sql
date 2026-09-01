@@ -1706,6 +1706,7 @@ BEGIN
     ) t;
   END IF;
 
+  -- 1. Insert notification master record
   INSERT INTO public.notifications (
     tenant_id, title, body, target_audience, created_by
   )
@@ -1715,6 +1716,7 @@ BEGIN
   )
   RETURNING id INTO v_id;
 
+  -- 2. Fanout immediately to in-app notifications
   IF v_final_user_ids IS NOT NULL AND array_length(v_final_user_ids, 1) IS NOT NULL THEN
     INSERT INTO public.notification_targets (notification_id, user_id)
     SELECT v_id, u.id
@@ -1724,15 +1726,6 @@ BEGIN
       AND u.deleted_at IS NULL
     ON CONFLICT DO NOTHING;
 
-    -- Explicitly-targeted notifications must also land in user_notifications:
-    -- that table (not notification_targets) is the sole source the client reads
-    -- from to discover a user's inbox (see notifications_remote_ds.dart step 1).
-    -- Without this insert, individually-targeted notifications were created and
-    -- recorded in notification_targets but never actually delivered to the
-    -- target user's notification list. The category-audience fanout worker
-    -- (internal.process_notification_fanout_jobs) only handles 'all'/'students'/
-    -- 'teachers'/'admins' and never processes notification_targets rows, so this
-    -- path must populate user_notifications itself.
     INSERT INTO public.user_notifications (user_id, notification_id, tenant_id, is_read)
     SELECT u.id, v_id, v_tenant_id, false
     FROM public.users u
@@ -1740,7 +1733,59 @@ BEGIN
       AND u.tenant_id = v_tenant_id
       AND u.deleted_at IS NULL
     ON CONFLICT (user_id, notification_id) DO NOTHING;
+  ELSE
+    INSERT INTO public.user_notifications (user_id, notification_id, tenant_id, is_read)
+    SELECT u.id, v_id, v_tenant_id, false
+    FROM public.users u
+    WHERE u.tenant_id = v_tenant_id
+      AND u.deleted_at IS NULL
+      AND u.account_status = 'active'
+      AND (
+            coalesce(p_target_audience, 'all') = 'all'
+        OR (p_target_audience = 'students' AND u.primary_role = 'student')
+        OR (p_target_audience = 'teachers' AND u.primary_role = 'teacher')
+        OR (p_target_audience = 'admins'   AND u.primary_role IN ('admin','super_admin'))
+      )
+    ON CONFLICT (user_id, notification_id) DO NOTHING;
   END IF;
+
+  -- 3. Create push deliveries immediately for all active devices
+  INSERT INTO public.push_deliveries (
+    notification_id, user_notification_id, user_id, tenant_id, push_token_id
+  )
+  SELECT un.notification_id, un.id, un.user_id, un.tenant_id, pt.id
+  FROM public.user_notifications un
+  JOIN public.push_tokens pt
+    ON pt.user_id = un.user_id
+   AND pt.tenant_id = un.tenant_id
+   AND pt.is_active
+  WHERE un.notification_id = v_id
+    AND un.tenant_id = v_tenant_id
+  ON CONFLICT (notification_id, push_token_id) DO NOTHING;
+
+  -- 4. Enqueue FCM push jobs
+  INSERT INTO internal.job_queue (tenant_id, job_type, payload, priority)
+  SELECT pd.tenant_id, 'notification_push',
+         jsonb_build_object(
+           'push_delivery_id', pd.id,
+           'notification_id', pd.notification_id,
+           'user_notification_id', pd.user_notification_id,
+           'push_token_id', pd.push_token_id
+         ), 10
+  FROM public.push_deliveries pd
+  WHERE pd.notification_id = v_id
+    AND pd.status = 'pending'
+    AND pd.attempt_count = 0
+  ON CONFLICT (job_type, payload_hash)
+    WHERE status IN ('pending', 'processing') DO NOTHING;
+
+  -- 5. Trigger instant push worker (non-blocking if vault/pg_net ready)
+  BEGIN
+    PERFORM internal.invoke_notification_push_worker();
+  EXCEPTION WHEN OTHERS THEN
+    -- Fallback: background cron will process queued jobs
+    NULL;
+  END;
 
   RETURN v_id;
 END;
@@ -4524,8 +4569,10 @@ AS $$
 BEGIN
   -- Propagate the exact same deleted_at timestamp to child lessons.
   -- WHERE clause ensures already-deleted lessons are not re-stamped.
+  -- is_published must be false when deleted_at is set to satisfy chk_lessons_publication_state.
   UPDATE public.lessons
-  SET deleted_at = NEW.deleted_at
+  SET deleted_at = NEW.deleted_at,
+      is_published = false
   WHERE course_id   = NEW.id
     AND deleted_at IS NULL;
 
@@ -5068,12 +5115,16 @@ BEGIN
      OR jsonb_typeof(COALESCE(p_device_info, '{}'::jsonb)) <> 'object' THEN
     RAISE EXCEPTION 'INVALID_PUSH_TOKEN' USING ERRCODE = '22023';
   END IF;
+  -- FIX-PUSH-01: Removed the overly strict `AND d.platform = p_platform` guard.
+  -- The (user_id, device_id) unique key already ensures device identity; requiring
+  -- an exact platform match caused DEVICE_NOT_BOUND when the device row was created
+  -- without a platform value or with a different one, silently preventing push token
+  -- registration and leaving push_deliveries permanently empty.
   IF NOT EXISTS (
     SELECT 1 FROM public.devices d
     WHERE d.user_id = v_user_id
       AND d.tenant_id = v_tenant_id
       AND d.device_id = p_device_id
-      AND d.platform = p_platform
       AND d.is_active
   ) THEN
     RAISE EXCEPTION 'DEVICE_NOT_BOUND' USING ERRCODE = '42501';
@@ -5879,6 +5930,10 @@ BEGIN
           OR (v_audience = 'students'  AND u.primary_role = 'student')
           OR (v_audience = 'teachers'  AND u.primary_role = 'teacher')
           OR (v_audience = 'admins'    AND u.primary_role IN ('admin','super_admin'))
+          OR EXISTS (
+               SELECT 1 FROM public.notification_targets nt
+               WHERE nt.notification_id = v_notif_id AND nt.user_id = u.id
+             )
         )
         AND NOT EXISTS (
           SELECT 1 FROM public.user_notifications un2
@@ -5944,6 +5999,15 @@ BEGIN
       WHERE id = v_job.id;
     END;
   END LOOP;
+
+  -- Trigger instant push delivery if jobs were processed
+  IF v_count > 0 THEN
+    BEGIN
+      PERFORM internal.invoke_notification_push_worker();
+    EXCEPTION WHEN OTHERS THEN
+      NULL;
+    END;
+  END IF;
 
   RETURN v_count;
 END;
