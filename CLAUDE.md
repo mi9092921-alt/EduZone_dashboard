@@ -1,7 +1,7 @@
 # CLAUDE.md — EduZone Admin Dashboard
 
 > **Quick Context:** Multi-tenant LMS admin dashboard.  
-> Stack: Next.js 15 (App Router) · Supabase (PostgreSQL 16) · TypeScript 5 (strict) · Turborepo monorepo  
+> Stack: Next.js 15 (App Router) · Supabase (PostgreSQL 17) · TypeScript 5 (strict) · Turborepo monorepo  
 > Locale: Arabic (RTL) + English (LTR) via `next-intl`
 
 ---

@@ -2,7 +2,7 @@
 
 > **Version:** 2.1  
 > **Date:** 2026-04-05  
-> **Schema:** EduZone v10.0 (PostgreSQL 16 / Supabase Pro)  
+> **Schema:** EduZone v10.0 (PostgreSQL 17 / Supabase Pro)  
 > **Stack:** Next.js 15 · React 18 · TypeScript 5 · Supabase · MUI v5 · Tailwind · React Query v5 · Zustand · Zod  
 > **Total Estimated Duration:** ~20 weeks (5 months)
 
@@ -2395,7 +2395,7 @@ P10-QA-001 (Unit Tests) ──requires── All Phase 0–9 tasks
 | Forms          | React Hook Form + Zod        | v7 + v3 | Validation, schema-driven forms             |
 | Charts         | Recharts                     | v2      | Line, Bar, Pie charts                       |
 | Drag & Drop    | @dnd-kit/core                | v6      | Section/lesson reordering                   |
-| Backend        | Supabase (PostgreSQL 16)     | Pro     | DB, Auth, Realtime, Storage, Edge Functions |
+| Backend        | Supabase (PostgreSQL 17)     | Pro     | DB, Auth, Realtime, Storage, Edge Functions |
 | Edge Functions | Deno (Supabase Edge Runtime) | latest  | Bulk operations, exports, sensitive RPCs    |
 | Testing (Unit) | Vitest                       | v1      | Service and hook unit tests                 |
 | Testing (E2E)  | Playwright                   | v1.40+  | Critical flow automation (per RFC-012)      |

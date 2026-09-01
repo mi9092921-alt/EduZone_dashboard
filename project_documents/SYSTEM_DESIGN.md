@@ -51,7 +51,7 @@ EduZone Admin Dashboard is a multi-tenant, enterprise-grade control plane built 
 │            └───────────────┬───────────────┘                   │
 │                            ▼                                   │
 │  ┌─────────────────────────────────────────────────────────┐   │
-│  │              PostgreSQL 16 (Row-Level Security)         │   │
+│  │              PostgreSQL 17 (Row-Level Security)         │   │
 │  │                                                         │   │
 │  │  users · tenants · courses · enrollments · sessions     │   │
 │  │  activity_logs · job_queue · feature_flags · settings   │   │
@@ -321,7 +321,7 @@ Three pillars of observability:
 | ------------ | ------------------------- | ---------------------------------------- |
 | Monorepo     | Turborepo                 | Shared packages, fast incremental builds |
 | Framework    | Next.js 15                | App Router, RSC, edge-ready              |
-| Database     | Supabase / PostgreSQL 16  | RLS, realtime, RPCs, managed             |
+| Database     | Supabase / PostgreSQL 17  | RLS, realtime, RPCs, managed             |
 | State        | React Query + Zustand     | Server state separate from UI state      |
 | Validation   | Zod                       | Runtime + compile-time type safety       |
 | Architecture | Clean Architecture        | Testable, swappable, dependency-inverted |

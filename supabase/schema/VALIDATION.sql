@@ -1902,7 +1902,7 @@ END $$;
 -- `authenticated` (user_progress) or deny everyone via `TO public
 -- USING (false)` (activity_log_queue). With FORCE in effect neither write
 -- has any matching policy, so both fail 100% of the time -- reproduced
--- with an isolated PostgreSQL 16 instance mirroring this exact
+-- with an isolated PostgreSQL 17 instance mirroring this exact
 -- owner/role/policy shape. This is the confirmed root cause of the
 -- "watched" checkbox in lesson_tile.dart always showing a generic error,
 -- and of lesson-progress activity logging silently never persisting
@@ -1931,7 +1931,7 @@ BEGIN
         || ' -- the SECURITY DEFINER function that writes to this table runs as '
         || 'the table owner, which has no matching policy on this table, so '
         || 'every write from that RPC will fail with a row-level security '
-        || 'violation (reproduced against a live PostgreSQL 16 instance)',
+        || 'violation (reproduced against a live PostgreSQL 17 instance)',
       'Neither user_progress nor activity_log_queue force RLS on the table owner (RLS remains enforced for anon/authenticated either way)'
     )
   );

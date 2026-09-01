@@ -25,7 +25,7 @@ async function sha256(input: string): Promise<string> {
  *   - ': ' and ', ' separators (space after colon/comma) instead of
  *     JSON.stringify's compact ':' and ','
  *
- * Verified empirically against a local PostgreSQL 16 instance, e.g.:
+ * Verified empirically against a local PostgreSQL 17 instance, e.g.:
  *   '{"zeta":1,"beta":2,"alpha":3}'::jsonb::text
  *     -> '{"beta": 2, "zeta": 1, "alpha": 3}'   (beta/zeta are length 4, alpha is length 5)
  *

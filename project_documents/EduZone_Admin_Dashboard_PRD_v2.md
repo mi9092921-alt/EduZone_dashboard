@@ -15,7 +15,7 @@ Based on EduZone Schema v5.0 | 2026-03-08
 | **Date**    | 2026-03-08                                         |
 | **Status**  | FINAL — Approved for Development                   |
 | **Author**  | PM Team — EduZone Platform                         |
-| **Schema**  | EduZone Schema v5.0 (PostgreSQL 16 / Supabase Pro) |
+| **Schema**  | EduZone Schema v5.0 (PostgreSQL 17 / Supabase Pro) |
 
 # **1. Executive Summary**
 

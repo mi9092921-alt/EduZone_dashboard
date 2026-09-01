@@ -13,7 +13,7 @@ _Version 1.0 | 2026-03-08 | Schema v5.0_
 | **Status**   | **FINAL — Approved**                  |
 | **Base URL** | _https://<project>.supabase.co_       |
 | **Auth**     | Supabase JWT (Bearer) — every request |
-| **Schema**   | EduZone v5.0 (PostgreSQL 16)          |
+| **Schema**   | EduZone v5.0 (PostgreSQL 17)          |
 
 # **1. Overview & Architecture**
 
