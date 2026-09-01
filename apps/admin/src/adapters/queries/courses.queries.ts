@@ -44,11 +44,7 @@ export function useCourseSections(courseId: string | null) {
   });
 }
 
-export function useCourseEnrollments(
-  courseId: string | null,
-  page: number,
-  pageSize: number,
-) {
+export function useCourseEnrollments(courseId: string | null, page: number, pageSize: number) {
   return useQuery({
     queryKey: queryKeys.enrollments.byCourse(courseId!),
     queryFn: () => getCourseEnrollments(courseId!, page, pageSize),
@@ -105,4 +101,3 @@ export function useCoursePrerequisiteOptions(courseId: string | null, tenantId: 
     enabled: !!courseId && !!tenantId,
   });
 }
-

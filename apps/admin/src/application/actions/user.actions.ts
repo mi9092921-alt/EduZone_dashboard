@@ -61,7 +61,10 @@ async function verifyCallerPermission(
   }
 
   if (!hasPerm) {
-    return { user: null, error: `Permission Denied: user lacks ${permissions.join(' or ')}` as const };
+    return {
+      user: null,
+      error: `Permission Denied: user lacks ${permissions.join(' or ')}` as const,
+    };
   }
 
   return { user: userData.user, error: null };
@@ -87,7 +90,9 @@ function roleAllowsPermissions(role: string | undefined, permissions: string[]) 
   }
 
   if (role === 'student') {
-    return permissions.some((permission) => permission === 'courses.read' || permission === 'reports.read');
+    return permissions.some(
+      (permission) => permission === 'courses.read' || permission === 'reports.read',
+    );
   }
 
   return false;
@@ -145,17 +150,15 @@ export async function createUserAction(data: CreateUserInput) {
     }
 
     // 5. Sync profile in the main DB via upsert (admin client bypasses RLS)
-    const { error: updateError } = await supabaseAdmin
-      .from('users')
-      .upsert({
-        id: authData.user.id,
-        email: parsed.email,
-        first_name: parsed.first_name,
-        last_name: parsed.last_name,
-        phone: parsed.phone,
-        primary_role: parsed.primary_role,
-        tenant_id: adminProfile.tenant_id,
-      });
+    const { error: updateError } = await supabaseAdmin.from('users').upsert({
+      id: authData.user.id,
+      email: parsed.email,
+      first_name: parsed.first_name,
+      last_name: parsed.last_name,
+      phone: parsed.phone,
+      primary_role: parsed.primary_role,
+      tenant_id: adminProfile.tenant_id,
+    });
 
     if (updateError) {
       await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
@@ -179,18 +182,16 @@ export async function createUserAction(data: CreateUserInput) {
       };
     }
 
-    const { error: roleSyncError } = await supabaseAdmin
-      .from('user_roles')
-      .upsert(
-        {
-          user_id: authData.user.id,
-          role_id: role.id,
-          tenant_id: adminProfile.tenant_id,
-          granted_by: user.id,
-          is_active: true,
-        },
-        { onConflict: 'user_id,role_id,tenant_id' },
-      );
+    const { error: roleSyncError } = await supabaseAdmin.from('user_roles').upsert(
+      {
+        user_id: authData.user.id,
+        role_id: role.id,
+        tenant_id: adminProfile.tenant_id,
+        granted_by: user.id,
+        is_active: true,
+      },
+      { onConflict: 'user_id,role_id,tenant_id' },
+    );
 
     if (roleSyncError) {
       await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
@@ -304,7 +305,10 @@ export async function terminateUserSessionsAction(
 ): Promise<{ success: boolean; count?: number; error?: string }> {
   try {
     const supabase = await createServerClient();
-    const { user, error: authError } = await verifyCallerPermission(supabase, ['sessions.manage', 'users.write']);
+    const { user, error: authError } = await verifyCallerPermission(supabase, [
+      'sessions.manage',
+      'users.write',
+    ]);
     if (authError || !user) {
       return { success: false, error: authError ?? 'Unauthorized' };
     }

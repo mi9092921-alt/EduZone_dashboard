@@ -34,7 +34,9 @@ describe('realtime.store', () => {
 
   it('clearAlerts removes all alerts', () => {
     useRealtimeStore.getState().addAlert({ type: 'A', risk: 'low', message: 'A', timestamp: '1' });
-    useRealtimeStore.getState().addAlert({ type: 'B', risk: 'medium', message: 'B', timestamp: '2' });
+    useRealtimeStore
+      .getState()
+      .addAlert({ type: 'B', risk: 'medium', message: 'B', timestamp: '2' });
 
     expect(useRealtimeStore.getState().alerts).toHaveLength(2);
 
@@ -44,7 +46,9 @@ describe('realtime.store', () => {
 
   it('markRead marks a specific alert as read', () => {
     useRealtimeStore.getState().addAlert({ type: 'A', risk: 'low', message: 'A', timestamp: '1' });
-    useRealtimeStore.getState().addAlert({ type: 'B', risk: 'medium', message: 'B', timestamp: '2' });
+    useRealtimeStore
+      .getState()
+      .addAlert({ type: 'B', risk: 'medium', message: 'B', timestamp: '2' });
 
     const state = useRealtimeStore.getState();
     expect(state.alerts).toHaveLength(2);
@@ -59,7 +63,9 @@ describe('realtime.store', () => {
 
   it('markAllRead marks all alerts as read', () => {
     useRealtimeStore.getState().addAlert({ type: 'A', risk: 'low', message: 'A', timestamp: '1' });
-    useRealtimeStore.getState().addAlert({ type: 'B', risk: 'medium', message: 'B', timestamp: '2' });
+    useRealtimeStore
+      .getState()
+      .addAlert({ type: 'B', risk: 'medium', message: 'B', timestamp: '2' });
 
     useRealtimeStore.getState().markAllRead();
 
@@ -74,7 +80,10 @@ describe('realtime.store', () => {
   it('caps alerts at 200 entries', () => {
     for (let i = 0; i < 205; i++) {
       useRealtimeStore.getState().addAlert({
-        type: 'A', risk: 'low', message: `alert-${i}`, timestamp: new Date().toISOString(),
+        type: 'A',
+        risk: 'low',
+        message: `alert-${i}`,
+        timestamp: new Date().toISOString(),
       });
     }
     expect(useRealtimeStore.getState().alerts).toHaveLength(200);

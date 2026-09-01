@@ -10,9 +10,7 @@ import {
 } from '@/application/actions/user.actions';
 import type { CreateUserInput } from '@/domain/schemas/user.schema';
 import type { AccountAction } from '@/domain/types/user.types';
-import {
-  resetUserDevices,
-} from '@/infrastructure/repos/users.service';
+import { resetUserDevices } from '@/infrastructure/repos/users.service';
 
 /**
  * Mutation hooks for user management actions.
@@ -118,12 +116,7 @@ export function useMutateWarning() {
       severity: 1 | 2 | 3;
       action?: string | undefined;
     }) => {
-      const result = await issueWarningAction(
-        vars.userId,
-        vars.reason,
-        vars.severity,
-        vars.action,
-      );
+      const result = await issueWarningAction(vars.userId, vars.reason, vars.severity, vars.action);
       if (!result.success) throw new Error(result.error);
       return result.warningId;
     },

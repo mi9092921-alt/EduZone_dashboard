@@ -17,6 +17,7 @@
 Goal: reduce clutter and group all downloads-related Supabase artifacts (Edge Functions, SQL, migrations, docs) under a single `downloads/` area while keeping changes non-destructive until reviewed.
 
 Current scattered items (examples from workspace):
+
 - `supabase/schema/12_downloads_functions.sql`
 - `supabase/schema/13_downloads_tables.sql`
 - `supabase/schema/14_video_cache_and_rate_limit.sql` (new)
@@ -51,14 +52,14 @@ supabase/
 
 Non-destructive migration steps (commands you can run locally):
 
-1) Create target directories:
+1. Create target directories:
 
 ```powershell
 mkdir supabase\schema\downloads
 mkdir supabase\functions\downloads
 ```
 
-2) Move files (use `git mv` to preserve history) — example:
+2. Move files (use `git mv` to preserve history) — example:
 
 ```powershell
 git mv supabase\functions\get-download-url supabase\functions\downloads\get-download-url
@@ -73,6 +74,7 @@ git mv supabase\schema\13_downloads_tables.sql supabase\schema\downloads\02_tabl
 If you prefer not to move yet, create the `downloads/` structure and copy files first, then test before removing originals.
 
 Deployment ordering (recommended):
+
 1. `supabase db push` — to ensure tables exist
 2. `supabase functions deploy <each function path>` — deploy functions under `functions/downloads/*`
 
@@ -89,6 +91,7 @@ supabase functions deploy downloads/video-info
 ```
 
 Notes & best practices
+
 - Keep secrets out of Flutter; set them via `supabase secrets set`.
 - Use `auth.uid()` as rate-limit key when possible (decode JWT inside function), not IP.
 - For heavy traffic, prefer counting/incrementing in a counter table or use Redis instead of scanning `rate_limit_logs` each request.
@@ -96,6 +99,7 @@ Notes & best practices
 - Add a small README in each function folder describing its inputs/outputs and required secrets.
 
 Next suggested actions (I can perform any of these):
+
 - Create the `supabase/schema/downloads/` folder and consolidate SQL files (copy or merge).
 - Create `supabase/functions/downloads/` folder and copy existing functions there (non-destructive), plus add README files per function.
 - Update Flutter docs and `IMPLEMENTATION_SUMMARY.md` to reference consolidated paths.

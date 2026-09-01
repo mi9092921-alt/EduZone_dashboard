@@ -70,9 +70,25 @@ describe('courses.service', () => {
   };
 
   it('getCourses filters and paginates', async () => {
-    const q = setupQuery({ data: [{ title: 'C1', teacher: { first_name: 'A', last_name: 'B' } }], count: 1, error: null });
+    const q = setupQuery({
+      data: [{ title: 'C1', teacher: { first_name: 'A', last_name: 'B' } }],
+      count: 1,
+      error: null,
+    });
     mockFrom.mockReturnValue(q);
-    const res = await getCourses({ search: 'react', status: 'published', category: 'IT', level: 'beginner', is_free: true, teacher_id: 't1', tenant_id: 'ten1' }, 1, 10);
+    const res = await getCourses(
+      {
+        search: 'react',
+        status: 'published',
+        category: 'IT',
+        level: 'beginner',
+        is_free: true,
+        teacher_id: 't1',
+        tenant_id: 'ten1',
+      },
+      1,
+      10,
+    );
     expect(res.data).toHaveLength(1);
     expect(res.data[0]!.teacher_name).toBe('A B');
     expect(q.ilike).toHaveBeenCalledWith('title', '%react%');
@@ -80,9 +96,15 @@ describe('courses.service', () => {
   });
 
   it('getCourseById joins sections and lessons', async () => {
-    const courseQuery = setupQuery({ data: { id: 'c1', teacher: { first_name: 'John' } }, error: null });
-    const sectionsQuery = setupQuery({ data: [{ id: 's1', lessons: [{ id: 'l1' }] }], error: null });
-    
+    const courseQuery = setupQuery({
+      data: { id: 'c1', teacher: { first_name: 'John' } },
+      error: null,
+    });
+    const sectionsQuery = setupQuery({
+      data: [{ id: 's1', lessons: [{ id: 'l1' }] }],
+      error: null,
+    });
+
     mockFrom.mockReturnValueOnce(courseQuery).mockReturnValueOnce(sectionsQuery);
 
     const res = await getCourseById('c1');
@@ -92,7 +114,7 @@ describe('courses.service', () => {
 
   it('createCourse handles tenant logic', async () => {
     mockAuth.mockResolvedValue({ data: { user: { id: 'u' } } });
-    
+
     // First query is `users` to get tenant_id, second is `courses` to insert
     mockFrom.mockImplementation((table: string) => {
       if (table === 'users') {
@@ -120,11 +142,14 @@ describe('courses.service', () => {
     expect(mockRpc).toHaveBeenLastCalledWith('enroll_student', {
       p_user_id: 'u1',
       p_course_id: 'c1',
-      p_expires_at: '2025-01-01'
+      p_expires_at: '2025-01-01',
     });
 
     // 2. Duplicate case
-    mockRpc.mockResolvedValueOnce({ data: null, error: { message: 'duplicate key value', code: '23505' } });
+    mockRpc.mockResolvedValueOnce({
+      data: null,
+      error: { message: 'duplicate key value', code: '23505' },
+    });
     await expect(enrollStudent('u1', 'c1', 'admin', '2025-01-01')).rejects.toThrow('DUPLICATE');
   });
 
@@ -136,7 +161,7 @@ describe('courses.service', () => {
       }
       return q;
     });
-    
+
     await getCourseSections('c1');
     expect(q.select).toHaveBeenCalled();
 
@@ -147,7 +172,9 @@ describe('courses.service', () => {
     expect(q.update).toHaveBeenCalled();
 
     await deleteSection('s1');
-    expect(q.update).toHaveBeenCalledWith(expect.objectContaining({ deleted_at: expect.any(String) }));
+    expect(q.update).toHaveBeenCalledWith(
+      expect.objectContaining({ deleted_at: expect.any(String) }),
+    );
 
     mockRpc.mockResolvedValue({ error: null });
     await reorderSections([{ id: 's1', order_index: 2 }]);
@@ -175,7 +202,9 @@ describe('courses.service', () => {
     expect(q.update).toHaveBeenCalled();
 
     await deleteLesson('l1');
-    expect(q.update).toHaveBeenCalledWith(expect.objectContaining({ deleted_at: expect.any(String) }));
+    expect(q.update).toHaveBeenCalledWith(
+      expect.objectContaining({ deleted_at: expect.any(String) }),
+    );
 
     await reorderLessons([{ id: 'l1', order_index: 2 }]);
     expect(q.update).toHaveBeenCalled();
@@ -203,11 +232,14 @@ describe('courses.service', () => {
     mockRpc.mockResolvedValue({ error: null });
 
     await revokeEnrollment('e1', 'admin', 'reason');
-    expect(mockRpc).toHaveBeenCalledWith('revoke_enrollment', expect.objectContaining({
-      p_user_id: 'u1',
-      p_course_id: 'c1',
-      p_reason: 'reason'
-    }));
+    expect(mockRpc).toHaveBeenCalledWith(
+      'revoke_enrollment',
+      expect.objectContaining({
+        p_user_id: 'u1',
+        p_course_id: 'c1',
+        p_reason: 'reason',
+      }),
+    );
   });
 
   it('getCourseStats handles success and catch block', async () => {

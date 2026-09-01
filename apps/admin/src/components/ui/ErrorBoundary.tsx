@@ -22,7 +22,7 @@ interface State {
  */
 export class ErrorBoundary extends Component<Props, State> {
   public state: State = {
-    hasError: false
+    hasError: false,
   };
 
   public static getDerivedStateFromError(error: Error): State {
@@ -36,12 +36,9 @@ export class ErrorBoundary extends Component<Props, State> {
   public render() {
     if (this.state.hasError) {
       if (this.props.fallback) return this.props.fallback;
-      
+
       return (
-        <ErrorPage 
-          error={this.state.error} 
-          reset={() => this.setState({ hasError: false })} 
-        />
+        <ErrorPage error={this.state.error} reset={() => this.setState({ hasError: false })} />
       );
     }
 
@@ -94,14 +91,14 @@ export function ErrorPage({ error, reset }: { error?: Error | undefined; reset?:
             variant="contained"
             color="primary"
             startIcon={<Refresh />}
-            onClick={() => reset ? reset() : window.location.reload()}
+            onClick={() => (reset ? reset() : window.location.reload())}
             sx={{ borderRadius: 2 }}
           >
             {t('retry')}
           </Button>
           <Button
             variant="outlined"
-            onClick={() => window.location.href = '/'}
+            onClick={() => (window.location.href = '/')}
             sx={{ borderRadius: 2 }}
           >
             {t('home')}
@@ -110,7 +107,16 @@ export function ErrorPage({ error, reset }: { error?: Error | undefined; reset?:
 
         {error && process.env.NODE_ENV === 'development' && (
           <Box sx={{ mt: 6, textAlign: 'left', width: '100%', overflow: 'auto' }}>
-            <Typography variant="caption" sx={{ fontFamily: 'monospace', p: 2, bgcolor: '#f1f1f1', display: 'block', borderRadius: 1 }}>
+            <Typography
+              variant="caption"
+              sx={{
+                fontFamily: 'monospace',
+                p: 2,
+                bgcolor: '#f1f1f1',
+                display: 'block',
+                borderRadius: 1,
+              }}
+            >
               {error.message}
               <br />
               {error.stack}

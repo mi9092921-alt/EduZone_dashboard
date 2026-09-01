@@ -37,44 +37,44 @@ The schema uses public/private/internal/audit/maintenance concerns, SQL function
 
 ## 3. Verified Current State
 
-| Area | Status | Evidence |
-|---|---|---|
-| pnpm/Turborepo workspace | VERIFIED | `package.json`, `pnpm-workspace.yaml`, `turbo.json` |
-| App Router/locales | VERIFIED | `apps/admin/src/app/[locale]/*` exists |
-| Supabase schema artifacts | VERIFIED | ordered `supabase/schema/*.sql`, validation SQL |
-| TypeScript check | VERIFIED (local run) | `pnpm.cmd typecheck`: 4 tasks successful |
-| Shared-package lint | BROKEN/MISSING | package scripts literally run `echo 'No lint configured yet'` |
-| Admin lint | BROKEN/NOT VERIFIED | `next lint` deprecated; run did not complete successfully |
-| Unit/storybook test command | BROKEN | failures, unhandled `Failed to fetch`, worker timeouts; run took about 9m38s |
-| Production compilation | PARTIALLY VERIFIED | Next reported `Compiled successfully`; overall `pnpm.cmd build` exited 1 during lint/type validation |
-| E2E execution in CI | MISSING | `.github/workflows/ci.yml` has no Playwright/Cypress step |
-| Integration/RLS tests in CI | MISSING | no database service, seeded test project, or isolation matrix in CI |
-| Migration history | MISSING/RISK | `supabase/migrations` contains only README |
-| Live RLS behavior | NOT VERIFIED | only source SQL/validation files were inspected; no two-tenant live test completed |
-| Secret hygiene | RISK | ignored local env contains populated privileged credentials; no rotation evidence |
-| Observability | PARTIALLY VERIFIED | Sentry configuration exists; request/correlation/alert/recovery verification is absent |
+| Area                        | Status               | Evidence                                                                                             |
+| --------------------------- | -------------------- | ---------------------------------------------------------------------------------------------------- |
+| pnpm/Turborepo workspace    | VERIFIED             | `package.json`, `pnpm-workspace.yaml`, `turbo.json`                                                  |
+| App Router/locales          | VERIFIED             | `apps/admin/src/app/[locale]/*` exists                                                               |
+| Supabase schema artifacts   | VERIFIED             | ordered `supabase/schema/*.sql`, validation SQL                                                      |
+| TypeScript check            | VERIFIED (local run) | `pnpm.cmd typecheck`: 4 tasks successful                                                             |
+| Shared-package lint         | BROKEN/MISSING       | package scripts literally run `echo 'No lint configured yet'`                                        |
+| Admin lint                  | BROKEN/NOT VERIFIED  | `next lint` deprecated; run did not complete successfully                                            |
+| Unit/storybook test command | BROKEN               | failures, unhandled `Failed to fetch`, worker timeouts; run took about 9m38s                         |
+| Production compilation      | PARTIALLY VERIFIED   | Next reported `Compiled successfully`; overall `pnpm.cmd build` exited 1 during lint/type validation |
+| E2E execution in CI         | MISSING              | `.github/workflows/ci.yml` has no Playwright/Cypress step                                            |
+| Integration/RLS tests in CI | MISSING              | no database service, seeded test project, or isolation matrix in CI                                  |
+| Migration history           | MISSING/RISK         | `supabase/migrations` contains only README                                                           |
+| Live RLS behavior           | NOT VERIFIED         | only source SQL/validation files were inspected; no two-tenant live test completed                   |
+| Secret hygiene              | RISK                 | ignored local env contains populated privileged credentials; no rotation evidence                    |
+| Observability               | PARTIALLY VERIFIED   | Sentry configuration exists; request/correlation/alert/recovery verification is absent               |
 
 ## 4. Production Readiness Score
 
 This score is a risk-oriented snapshot, not a release approval. It is weighted toward runtime evidence and release controls.
 
-| Dimension | Score | Reason |
-|---|---:|---|
-| Architecture | 6/10 | Layered folders exist; boundaries are not enforced and UI/API code contains broad casts and duplicated authorization logic |
-| Security | 4/10 | Security mechanisms exist, but privileged routes, CORS, secrets, and error exposure require hardening and tests |
-| Data Integrity | 5/10 | Constraints/functions/validation SQL exist; migration history and concurrency verification are incomplete |
-| Authentication | 6/10 | Supabase SSR refresh and auth guard exist; API route coverage and revocation/expiry evidence are incomplete |
-| Authorization | 4/10 | UI permission helpers exist, but route/RPC/worker consistency is not proven; bulk route has local role logic |
-| Multi-Tenancy | 4/10 | tenant fields and RLS are present in source; no executable cross-tenant attack matrix is passing |
-| Performance | 5/10 | indexes, MVs, pagination, and package optimization exist; bundle/query/load measurements are absent |
-| Testing | 2/10 | significant unit failures and unhandled network calls; no CI E2E/integration/security gate |
-| Observability | 4/10 | Sentry and logging exist; request IDs, dashboards, SLOs, alerts, and runbooks are not verified |
-| CI/CD | 3/10 | basic CI/deploy workflows exist; tool versions differ and release gates/rollback are incomplete |
-| UX | 6/10 | loading/error/RTL-oriented components exist; full responsive and critical-flow acceptance is unverified |
-| Accessibility | 5/10 | axe/Storybook tooling exists; automated suite is not a passing release gate |
-| Documentation | 5/10 | extensive design docs exist, but source-vs-doc drift and operational evidence remain |
-| Operations | 3/10 | backup/restore and rollback documents exist; executable restore drill and production proof are missing |
-| **Overall** | **4.3/10 (43/100)** | **NO-GO until P0/P1 work and release-gate evidence are complete** |
+| Dimension      |               Score | Reason                                                                                                                     |
+| -------------- | ------------------: | -------------------------------------------------------------------------------------------------------------------------- |
+| Architecture   |                6/10 | Layered folders exist; boundaries are not enforced and UI/API code contains broad casts and duplicated authorization logic |
+| Security       |                4/10 | Security mechanisms exist, but privileged routes, CORS, secrets, and error exposure require hardening and tests            |
+| Data Integrity |                5/10 | Constraints/functions/validation SQL exist; migration history and concurrency verification are incomplete                  |
+| Authentication |                6/10 | Supabase SSR refresh and auth guard exist; API route coverage and revocation/expiry evidence are incomplete                |
+| Authorization  |                4/10 | UI permission helpers exist, but route/RPC/worker consistency is not proven; bulk route has local role logic               |
+| Multi-Tenancy  |                4/10 | tenant fields and RLS are present in source; no executable cross-tenant attack matrix is passing                           |
+| Performance    |                5/10 | indexes, MVs, pagination, and package optimization exist; bundle/query/load measurements are absent                        |
+| Testing        |                2/10 | significant unit failures and unhandled network calls; no CI E2E/integration/security gate                                 |
+| Observability  |                4/10 | Sentry and logging exist; request IDs, dashboards, SLOs, alerts, and runbooks are not verified                             |
+| CI/CD          |                3/10 | basic CI/deploy workflows exist; tool versions differ and release gates/rollback are incomplete                            |
+| UX             |                6/10 | loading/error/RTL-oriented components exist; full responsive and critical-flow acceptance is unverified                    |
+| Accessibility  |                5/10 | axe/Storybook tooling exists; automated suite is not a passing release gate                                                |
+| Documentation  |                5/10 | extensive design docs exist, but source-vs-doc drift and operational evidence remain                                       |
+| Operations     |                3/10 | backup/restore and rollback documents exist; executable restore drill and production proof are missing                     |
+| **Overall**    | **4.3/10 (43/100)** | **NO-GO until P0/P1 work and release-gate evidence are complete**                                                          |
 
 ## 5. Critical Findings
 
@@ -114,17 +114,17 @@ This score is a risk-oriented snapshot, not a release approval. It is weighted t
 
 ## 6. Security Findings
 
-| ID | Priority | Status | Evidence / risk | Required action | Verification |
-|---|---|---|---|---|---|
-| P0-SEC-001 | P0 | RISK | populated ignored credentials and JWT emitted by tests | rotate, history/artifact scan, fake fixtures | old credentials revoked; gitleaks/secret scan clean |
-| P1-SEC-002 | P1 | BROKEN | `api/cron/routine/route.ts:13-16` skips secret enforcement when `NODE_ENV !== production` | require a non-empty constant-time secret in every environment; fail closed; use dedicated worker auth | unauthenticated/malformed requests always 401 |
-| P1-SEC-003 | P1 | RISK | cron uses service-role client at module scope and returns `err.message` at `:179-184` | lazy-load server-only client, generic external errors, structured internal logs | response contains no DB/function details |
-| P1-SEC-004 | P1 | RISK | `next.config.ts:18-22` and proxy routes allow `Access-Control-Allow-Origin: *` | restrict origins and methods/headers; require auth for media proxy | browser-origin matrix and preflight tests |
-| P1-SEC-005 | P1 | RISK | privileged bulk route uses direct service-role client and local role permission map | centralize authorization policy and tenant context; validate body with Zod | direct POST matrix for every role/action/tenant |
-| P1-SEC-006 | P1 | NOT VERIFIED | SECURITY DEFINER/RLS SQL is extensive, but live policy semantics are not tested | run catalog checks plus adversarial SQL/RPC tests; lock search_path and grants | two-tenant and anonymous access suite passes |
-| P2-SEC-007 | P2 | RISK | many `any` casts across API/UI/repositories | replace boundary types with generated DB types/Zod schemas | ESLint no-explicit-any policy with justified exceptions |
-| P2-SEC-008 | P2 | PARTIALLY VERIFIED | CSP is present in Vercel config but uses `unsafe-inline`, `unsafe-eval`, broad HTTPS images, and wildcard-like Supabase sources | generate nonce-based CSP and documented exceptions | header scan plus XSS regression suite |
-| P2-SEC-009 | P2 | NOT VERIFIED | CSRF, SSRF, upload/path traversal and rate-limit coverage not demonstrated | threat-model each route and add negative tests/rate limits | automated abuse tests and production limits observed |
+| ID         | Priority | Status             | Evidence / risk                                                                                                                 | Required action                                                                                       | Verification                                            |
+| ---------- | -------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| P0-SEC-001 | P0       | RISK               | populated ignored credentials and JWT emitted by tests                                                                          | rotate, history/artifact scan, fake fixtures                                                          | old credentials revoked; gitleaks/secret scan clean     |
+| P1-SEC-002 | P1       | BROKEN             | `api/cron/routine/route.ts:13-16` skips secret enforcement when `NODE_ENV !== production`                                       | require a non-empty constant-time secret in every environment; fail closed; use dedicated worker auth | unauthenticated/malformed requests always 401           |
+| P1-SEC-003 | P1       | RISK               | cron uses service-role client at module scope and returns `err.message` at `:179-184`                                           | lazy-load server-only client, generic external errors, structured internal logs                       | response contains no DB/function details                |
+| P1-SEC-004 | P1       | RISK               | `next.config.ts:18-22` and proxy routes allow `Access-Control-Allow-Origin: *`                                                  | restrict origins and methods/headers; require auth for media proxy                                    | browser-origin matrix and preflight tests               |
+| P1-SEC-005 | P1       | RISK               | privileged bulk route uses direct service-role client and local role permission map                                             | centralize authorization policy and tenant context; validate body with Zod                            | direct POST matrix for every role/action/tenant         |
+| P1-SEC-006 | P1       | NOT VERIFIED       | SECURITY DEFINER/RLS SQL is extensive, but live policy semantics are not tested                                                 | run catalog checks plus adversarial SQL/RPC tests; lock search_path and grants                        | two-tenant and anonymous access suite passes            |
+| P2-SEC-007 | P2       | RISK               | many `any` casts across API/UI/repositories                                                                                     | replace boundary types with generated DB types/Zod schemas                                            | ESLint no-explicit-any policy with justified exceptions |
+| P2-SEC-008 | P2       | PARTIALLY VERIFIED | CSP is present in Vercel config but uses `unsafe-inline`, `unsafe-eval`, broad HTTPS images, and wildcard-like Supabase sources | generate nonce-based CSP and documented exceptions                                                    | header scan plus XSS regression suite                   |
+| P2-SEC-009 | P2       | NOT VERIFIED       | CSRF, SSRF, upload/path traversal and rate-limit coverage not demonstrated                                                      | threat-model each route and add negative tests/rate limits                                            | automated abuse tests and production limits observed    |
 
 ## 7. Database Findings
 
@@ -208,18 +208,18 @@ Existing documents are useful design intent but must be reconciled with source a
 
 ## 14. Risk Register
 
-| Risk | Severity | Likelihood | Owner | Mitigation / exit evidence |
-|---|---|---:|---|---|
-| credential compromise | P0 | High | Security | rotate/revoke, history/artifact scan, clean secret scan |
-| cross-tenant disclosure | P0 | Medium/High | Backend/DB | A/B adversarial matrix passes on all boundaries |
-| red test/build gate | P0 | Certain | QA/Platform | deterministic green CI from clean install |
-| non-repeatable schema deploy | P0 | High | DB/DevOps | canonical migrations + reset/diff/rollback drill |
-| unauthorized cron/bulk action | P1 | Medium | Backend | fail-closed auth, centralized policy, route tests |
-| sensitive error/CORS exposure | P1 | Medium | Security | generic errors, origin allowlist, header tests |
-| worker duplicate/partial processing | P1 | Medium | Backend | idempotency keys, leases, retries, reconciliation |
-| missing incident diagnosis | P1 | Medium | Operations | request IDs, Sentry alerts, dashboards, runbook drill |
-| performance collapse at scale | P2 | Medium | Platform | load baseline and bounded operations |
-| RTL/a11y regression | P2 | Medium | Frontend | automated locale/a11y/responsive suite |
+| Risk                                | Severity |  Likelihood | Owner       | Mitigation / exit evidence                              |
+| ----------------------------------- | -------- | ----------: | ----------- | ------------------------------------------------------- |
+| credential compromise               | P0       |        High | Security    | rotate/revoke, history/artifact scan, clean secret scan |
+| cross-tenant disclosure             | P0       | Medium/High | Backend/DB  | A/B adversarial matrix passes on all boundaries         |
+| red test/build gate                 | P0       |     Certain | QA/Platform | deterministic green CI from clean install               |
+| non-repeatable schema deploy        | P0       |        High | DB/DevOps   | canonical migrations + reset/diff/rollback drill        |
+| unauthorized cron/bulk action       | P1       |      Medium | Backend     | fail-closed auth, centralized policy, route tests       |
+| sensitive error/CORS exposure       | P1       |      Medium | Security    | generic errors, origin allowlist, header tests          |
+| worker duplicate/partial processing | P1       |      Medium | Backend     | idempotency keys, leases, retries, reconciliation       |
+| missing incident diagnosis          | P1       |      Medium | Operations  | request IDs, Sentry alerts, dashboards, runbook drill   |
+| performance collapse at scale       | P2       |      Medium | Platform    | load baseline and bounded operations                    |
+| RTL/a11y regression                 | P2       |      Medium | Frontend    | automated locale/a11y/responsive suite                  |
 
 ## 15. Root Cause Clusters
 

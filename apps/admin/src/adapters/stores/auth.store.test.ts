@@ -13,12 +13,12 @@ import {
 import type { AuthUser } from './auth.store';
 
 const makeUser = (overrides: Partial<AuthUser> = {}): AuthUser => ({
-  id:            '1',
-  email:         'test@test.com',
-  primary_role:  'admin',
-  tenant_id:     'tenant-1',
+  id: '1',
+  email: 'test@test.com',
+  primary_role: 'admin',
+  tenant_id: 'tenant-1',
   token_version: 1,
-  permissions:   [],
+  permissions: [],
   ...overrides,
 });
 

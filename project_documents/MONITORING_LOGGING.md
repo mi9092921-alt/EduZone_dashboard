@@ -9,11 +9,11 @@
 
 EduZone follows the **Three Pillars of Observability**:
 
-| Pillar | Tool (Dev) | Tool (Production) | Purpose |
-|--------|-----------|------------------|---------|
-| **Logs** | ConsoleLogger | Datadog Log Management | Structured event records |
-| **Metrics** | ConsoleMetrics | Datadog Metrics / Prometheus | Counters, timers, gauges |
-| **Traces** | NoopTracer | OpenTelemetry → Datadog APM | Distributed request tracing |
+| Pillar      | Tool (Dev)     | Tool (Production)            | Purpose                     |
+| ----------- | -------------- | ---------------------------- | --------------------------- |
+| **Logs**    | ConsoleLogger  | Datadog Log Management       | Structured event records    |
+| **Metrics** | ConsoleMetrics | Datadog Metrics / Prometheus | Counters, timers, gauges    |
+| **Traces**  | NoopTracer     | OpenTelemetry → Datadog APM  | Distributed request tracing |
 
 All three are wired through **port interfaces** (ILogger, IMetrics, ITracer) — production implementations are injected via the DI container with zero changes to business logic.
 
@@ -55,17 +55,18 @@ Every log line is a JSON object. No free-form strings in production.
 
 ### 2.3 Required Fields in Every Log
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `level` | string | `info` / `warn` / `error` / `debug` |
-| `message` | string | Human-readable description |
-| `timestamp` | ISO 8601 | Auto-injected by logger |
-| `traceId` | UUID | Correlation ID from X-Request-ID header |
-| `service` | string | Always `"admin-dashboard"` |
+| Field       | Type     | Description                             |
+| ----------- | -------- | --------------------------------------- |
+| `level`     | string   | `info` / `warn` / `error` / `debug`     |
+| `message`   | string   | Human-readable description              |
+| `timestamp` | ISO 8601 | Auto-injected by logger                 |
+| `traceId`   | UUID     | Correlation ID from X-Request-ID header |
+| `service`   | string   | Always `"admin-dashboard"`              |
 
 ### 2.4 What NOT to Log
 
 **Never log PII or secrets:**
+
 - Passwords (any form)
 - Access tokens / refresh tokens
 - Credit card numbers
@@ -74,27 +75,31 @@ Every log line is a JSON object. No free-form strings in production.
 
 ### 2.5 Log Levels Usage Guide
 
-| Level | When to Use | Example |
-|-------|------------|---------|
-| `debug` | Development tracing only; disabled in production | `"Entering suspendUser use case"` |
-| `info` | Successful business events | `"User suspended"`, `"Course published"` |
-| `warn` | Recoverable issues / unusual but non-critical | `"Retry attempt 2/3 for RPC call"` |
-| `error` | Failures that need attention | `"RPC admin_list_users failed"` |
+| Level   | When to Use                                      | Example                                  |
+| ------- | ------------------------------------------------ | ---------------------------------------- |
+| `debug` | Development tracing only; disabled in production | `"Entering suspendUser use case"`        |
+| `info`  | Successful business events                       | `"User suspended"`, `"Course published"` |
+| `warn`  | Recoverable issues / unusual but non-critical    | `"Retry attempt 2/3 for RPC call"`       |
+| `error` | Failures that need attention                     | `"RPC admin_list_users failed"`          |
 
 ### 2.6 Logger Implementations
 
 **Development (ConsoleLogger):**
+
 ```typescript
 // infrastructure/logger/ConsoleLogger.ts
 export class ConsoleLogger implements ILogger {
   info(message: string, context?: Record<string, unknown>) {
-    console.log(JSON.stringify({ level: 'info', message, ...context, timestamp: new Date().toISOString() }));
+    console.log(
+      JSON.stringify({ level: 'info', message, ...context, timestamp: new Date().toISOString() }),
+    );
   }
   // ...
 }
 ```
 
 **Production (DatadogLogger):**
+
 ```typescript
 // infrastructure/logger/DatadogLogger.ts
 export class DatadogLogger implements ILogger {
@@ -124,18 +129,18 @@ export interface IMetrics {
 
 All use cases automatically emit the following via the RPC client wrapper:
 
-| Metric Name | Type | Tags | Description |
-|-------------|------|------|-------------|
-| `rpc.{fnName}.duration` | timing | `tenant_id`, `env` | RPC call duration in ms |
-| `rpc.{fnName}.success` | counter | `tenant_id` | Successful RPC calls |
-| `rpc.{fnName}.error` | counter | `tenant_id`, `error_code` | Failed RPC calls |
-| `user.suspended` | counter | `tenant_id` | Users suspended |
-| `user.banned` | counter | `tenant_id` | Users banned |
-| `course.published` | counter | `tenant_id` | Courses published |
-| `bulk_action.started` | counter | `action_type`, `tenant_id` | Bulk operations started |
+| Metric Name             | Type    | Tags                       | Description               |
+| ----------------------- | ------- | -------------------------- | ------------------------- |
+| `rpc.{fnName}.duration` | timing  | `tenant_id`, `env`         | RPC call duration in ms   |
+| `rpc.{fnName}.success`  | counter | `tenant_id`                | Successful RPC calls      |
+| `rpc.{fnName}.error`    | counter | `tenant_id`, `error_code`  | Failed RPC calls          |
+| `user.suspended`        | counter | `tenant_id`                | Users suspended           |
+| `user.banned`           | counter | `tenant_id`                | Users banned              |
+| `course.published`      | counter | `tenant_id`                | Courses published         |
+| `bulk_action.started`   | counter | `action_type`, `tenant_id` | Bulk operations started   |
 | `bulk_action.completed` | counter | `action_type`, `tenant_id` | Bulk operations completed |
-| `job_queue.depth` | gauge | `job_name` | Current job queue depth |
-| `rate_limit.exceeded` | counter | `user_id`, `endpoint` | Rate limit hits |
+| `job_queue.depth`       | gauge   | `job_name`                 | Current job queue depth   |
+| `rate_limit.exceeded`   | counter | `user_id`, `endpoint`      | Rate limit hits           |
 
 ### 3.3 Custom Business Metrics (Feature Teams)
 
@@ -213,8 +218,8 @@ export class OtelTracer implements ITracer {
 Sentry.init({
   dsn: process.env.SENTRY_DSN,
   environment: process.env.NEXT_PUBLIC_APP_ENV,
-  tracesSampleRate: 0.1,     // 10% of requests traced
-  profilesSampleRate: 0.05,  // 5% profiled
+  tracesSampleRate: 0.1, // 10% of requests traced
+  profilesSampleRate: 0.05, // 5% profiled
   beforeSend(event) {
     // Strip PII before sending to Sentry
     return scrubPii(event);
@@ -232,12 +237,12 @@ span.end('error', err);
 
 ### 5.3 Alert Rules in Sentry
 
-| Alert | Threshold | Action |
-|-------|-----------|--------|
-| New error type detected | Any | Notify #alerts-engineering Slack |
-| Error rate > 1% | 5 min sustained | PagerDuty P2 |
-| Error rate > 5% | 2 min sustained | PagerDuty P1 |
-| Auth error spike | > 50 errors/min | PagerDuty P1 (potential attack) |
+| Alert                   | Threshold       | Action                           |
+| ----------------------- | --------------- | -------------------------------- |
+| New error type detected | Any             | Notify #alerts-engineering Slack |
+| Error rate > 1%         | 5 min sustained | PagerDuty P2                     |
+| Error rate > 5%         | 2 min sustained | PagerDuty P1                     |
+| Auth error spike        | > 50 errors/min | PagerDuty P1 (potential attack)  |
 
 ---
 
@@ -246,6 +251,7 @@ span.end('error', err);
 ### 6.1 Datadog Dashboards
 
 **Dashboard: EduZone Admin — Overview**
+
 - Request rate (total RPC calls/min)
 - Error rate (%)
 - P50/P95/P99 response times
@@ -253,6 +259,7 @@ span.end('error', err);
 - Job queue depth
 
 **Dashboard: EduZone Admin — Business Metrics**
+
 - Users suspended/banned per hour
 - Courses published per day
 - Bulk operations in-flight
@@ -260,6 +267,7 @@ span.end('error', err);
 - Analytics view freshness
 
 **Dashboard: EduZone Admin — Infrastructure**
+
 - Supabase connection pool utilisation
 - DB query time (P99)
 - Edge Function cold start rate
@@ -268,15 +276,15 @@ span.end('error', err);
 
 ### 6.2 Alert Thresholds
 
-| Metric | Warning | Critical | Action |
-|--------|---------|---------|--------|
-| RPC P99 response time | > 1s | > 2s | Investigate + add indexes |
-| Error rate | > 0.5% | > 2% | PagerDuty alert |
-| Job queue depth | > 500 | > 2000 | Scale Edge concurrency |
-| DB connection pool | > 70% | > 90% | Upgrade Supabase plan |
-| Rate limit hit rate | > 100/min | > 500/min | Investigate abuse |
-| Audit hash mismatch | Any | Any | P0 incident — potential tampering |
-| View refresh failure | 1 failure | 3 consecutive | Alert on-call |
+| Metric                | Warning   | Critical      | Action                            |
+| --------------------- | --------- | ------------- | --------------------------------- |
+| RPC P99 response time | > 1s      | > 2s          | Investigate + add indexes         |
+| Error rate            | > 0.5%    | > 2%          | PagerDuty alert                   |
+| Job queue depth       | > 500     | > 2000        | Scale Edge concurrency            |
+| DB connection pool    | > 70%     | > 90%         | Upgrade Supabase plan             |
+| Rate limit hit rate   | > 100/min | > 500/min     | Investigate abuse                 |
+| Audit hash mismatch   | Any       | Any           | P0 incident — potential tampering |
+| View refresh failure  | 1 failure | 3 consecutive | Alert on-call                     |
 
 ---
 
@@ -284,13 +292,13 @@ span.end('error', err);
 
 ### 7.1 Key Supabase Metrics to Watch
 
-| Metric | Location | Threshold |
-|--------|----------|-----------|
-| DB CPU | Supabase Dashboard → Database | < 80% |
-| Connection pool usage | Supabase Dashboard | < 80% |
-| Storage usage | Supabase Dashboard | < 80% |
-| Edge Function errors | Supabase Dashboard → Functions | < 1% |
-| Realtime connection count | Supabase Dashboard | < 8,000 |
+| Metric                    | Location                       | Threshold |
+| ------------------------- | ------------------------------ | --------- |
+| DB CPU                    | Supabase Dashboard → Database  | < 80%     |
+| Connection pool usage     | Supabase Dashboard             | < 80%     |
+| Storage usage             | Supabase Dashboard             | < 80%     |
+| Edge Function errors      | Supabase Dashboard → Functions | < 1%      |
+| Realtime connection count | Supabase Dashboard             | < 8,000   |
 
 ### 7.2 Supabase Log Queries
 
@@ -328,22 +336,23 @@ Automated verification runs every 6 hours via a Supabase cron job:
 
 ```sql
 -- Verify audit chain integrity
-SELECT verify_audit_hash_chain(); 
+SELECT verify_audit_hash_chain();
 -- Returns: { valid: true, last_verified_id: uuid, checked_count: integer }
 -- On failure: raises exception → triggers PagerDuty P0 alert
 ```
 
 ### 8.2 Audit Log Retention
 
-| Environment | Retention |
-|-------------|-----------|
-| Development | 30 days |
-| Staging | 90 days |
-| Production | 7 years (GDPR + compliance) |
+| Environment | Retention                   |
+| ----------- | --------------------------- |
+| Development | 30 days                     |
+| Staging     | 90 days                     |
+| Production  | 7 years (GDPR + compliance) |
 
 ### 8.3 Activity Log Dashboard
 
 Available in the admin UI under **System → Audit Trail**:
+
 - Filter by actor, action type, tenant, date range
 - Export to CSV (triggers async bulk-export job)
 - Hash chain status indicator (green = verified, red = alert)

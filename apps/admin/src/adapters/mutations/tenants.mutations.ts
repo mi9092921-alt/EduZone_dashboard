@@ -34,8 +34,7 @@ export function useUpdateTenant() {
 export function useSuspendTenant() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (vars: { id: string; reason: string }) =>
-      suspendTenant(vars.id, vars.reason),
+    mutationFn: (vars: { id: string; reason: string }) => suspendTenant(vars.id, vars.reason),
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: queryKeys.tenants.all });
       qc.invalidateQueries({ queryKey: queryKeys.tenants.detail(vars.id) });

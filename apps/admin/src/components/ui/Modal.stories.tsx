@@ -28,7 +28,7 @@ const ModalDemo = (args: React.ComponentProps<typeof Modal>) => {
       <Button onClick={() => setOpen(true)}>Open Modal</Button>
       <Modal {...args} open={open} onClose={() => setOpen(false)}>
         <p className="text-muted-foreground text-sm">
-          Modal body content goes here. The overarching width is controlled by `maxWidth` prop, 
+          Modal body content goes here. The overarching width is controlled by `maxWidth` prop,
           which snaps to Tailwind container breaks. And there is a fancy glassmorphism backdrop.
         </p>
       </Modal>

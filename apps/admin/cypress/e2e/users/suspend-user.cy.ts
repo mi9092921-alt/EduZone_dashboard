@@ -22,18 +22,24 @@ describe('User Management: Suspend User Flow (Cloud Safe)', () => {
     cy.contains('button', /Security/i).click();
     cy.contains('button', /Suspend User/i).click();
 
-    cy.get('h2').contains(/Suspend/).should('be.visible');
+    cy.get('h2')
+      .contains(/Suspend/)
+      .should('be.visible');
     cy.get('textarea[aria-label="Action Reason"]').type('Policy violation E2E');
-    
+
     // Select 48 hours from the dropdown/radio if applicable (using generic fallback)
     // If it's a fixed duration string/input:
     // cy.get('select[name="duration"]').select('48');
 
     // Intercept mutation
-    cy.intercept('POST', '**/rest/v1/rpc/*suspend*', { statusCode: 200, body: {} }).as('rpcSuspend');
+    cy.intercept('POST', '**/rest/v1/rpc/*suspend*', { statusCode: 200, body: {} }).as(
+      'rpcSuspend',
+    );
     cy.intercept('PATCH', '**/rest/v1/users*', { statusCode: 200, body: [{}] }).as('patchSuspend');
 
-    cy.get('button').contains(/^Suspend$/i).click();
+    cy.get('button')
+      .contains(/^Suspend$/i)
+      .click();
 
     // Wait for the mutation to ensure no crash
     // cy.wait('@patchSuspend').its('request.body.suspension_until').should('exist');

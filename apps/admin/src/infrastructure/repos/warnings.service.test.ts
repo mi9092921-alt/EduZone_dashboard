@@ -6,7 +6,7 @@ import { container } from '@/container';
 vi.mock('@/container', () => ({
   container: {
     supabase: {
-      rpc:  vi.fn(),
+      rpc: vi.fn(),
       from: vi.fn(),
       auth: { getUser: vi.fn() },
     },
@@ -20,11 +20,27 @@ vi.mock('@/application/actions/user.actions', () => ({
 // ── Helper: build a chainable query-builder mock ──────────────────
 function setupQuery(resolved: unknown) {
   const q: Record<string, unknown> = {};
-  ['select','eq','is','in','or','order','range','limit','gte','lte','not','update','insert','delete']
-    .forEach((fn) => { q[fn] = vi.fn().mockReturnValue(q); });
-  q['single']      = vi.fn().mockResolvedValue(resolved);
+  [
+    'select',
+    'eq',
+    'is',
+    'in',
+    'or',
+    'order',
+    'range',
+    'limit',
+    'gte',
+    'lte',
+    'not',
+    'update',
+    'insert',
+    'delete',
+  ].forEach((fn) => {
+    q[fn] = vi.fn().mockReturnValue(q);
+  });
+  q['single'] = vi.fn().mockResolvedValue(resolved);
   q['maybeSingle'] = vi.fn().mockResolvedValue(resolved);
-  q['then']        = vi.fn().mockImplementation((cb: (v: unknown) => unknown) => cb(resolved));
+  q['then'] = vi.fn().mockImplementation((cb: (v: unknown) => unknown) => cb(resolved));
   return q;
 }
 
@@ -42,11 +58,15 @@ describe('warnings.service', () => {
     const q = setupQuery({
       data: [
         {
-          id: 'w1', user_id: 'u1', severity: 2, reason: 'Late submissions',
-          action_taken: 'none', created_at: '2026-01-01',
+          id: 'w1',
+          user_id: 'u1',
+          severity: 2,
+          reason: 'Late submissions',
+          action_taken: 'none',
+          created_at: '2026-01-01',
           // v13: student is joined from users_with_pii_access; email is in email_decrypted
           student: { first_name: 'Ali', last_name: 'Hassan', email: 'ali@t.com', avatar_url: null },
-          issuer:  { first_name: 'Admin', last_name: 'User' },
+          issuer: { first_name: 'Admin', last_name: 'User' },
         },
       ],
       count: 1,
@@ -72,8 +92,8 @@ describe('warnings.service', () => {
     const { getWarnings } = await importService();
     await getWarnings({ issued_by: 'admin1', severity: 3 }, 1, 20);
 
-    expect((q.eq as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith('issued_by', 'admin1');
-    expect((q.eq as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith('severity', 3);
+    expect(q.eq as ReturnType<typeof vi.fn>).toHaveBeenCalledWith('issued_by', 'admin1');
+    expect(q.eq as ReturnType<typeof vi.fn>).toHaveBeenCalledWith('severity', 3);
   });
 
   it('getWarnings — throws on Supabase error', async () => {
@@ -92,7 +112,12 @@ describe('warnings.service', () => {
     const { issueWarning } = await importService();
     const id = await issueWarning('user-1', 'Violating community guidelines', 2, 'none');
 
-    expect(issueWarningAction).toHaveBeenCalledWith('user-1', 'Violating community guidelines', 2, 'none');
+    expect(issueWarningAction).toHaveBeenCalledWith(
+      'user-1',
+      'Violating community guidelines',
+      2,
+      'none',
+    );
     expect(id).toBe('warning-uuid-001');
   });
 
@@ -120,7 +145,10 @@ describe('warnings.service', () => {
       if (callCount === 1) {
         // courses_active query
         return setupQuery({
-          data: [{ id: 'c1', title: 'Course A' }, { id: 'c2', title: 'Course B' }],
+          data: [
+            { id: 'c1', title: 'Course A' },
+            { id: 'c2', title: 'Course B' },
+          ],
           error: null,
         });
       }
@@ -128,9 +156,21 @@ describe('warnings.service', () => {
       // v13: user data is in users_with_pii_access with email_decrypted
       return setupQuery({
         data: [
-          { user_id: 'u1', course_id: 'c1', users: { first_name: 'Sara', last_name: 'Ali', email: 's@t.com', avatar_url: null } },
-          { user_id: 'u1', course_id: 'c2', users: { first_name: 'Sara', last_name: 'Ali', email: 's@t.com', avatar_url: null } },
-          { user_id: 'u2', course_id: 'c1', users: { first_name: 'Omar', last_name: 'K',   email: 'o@t.com', avatar_url: null } },
+          {
+            user_id: 'u1',
+            course_id: 'c1',
+            users: { first_name: 'Sara', last_name: 'Ali', email: 's@t.com', avatar_url: null },
+          },
+          {
+            user_id: 'u1',
+            course_id: 'c2',
+            users: { first_name: 'Sara', last_name: 'Ali', email: 's@t.com', avatar_url: null },
+          },
+          {
+            user_id: 'u2',
+            course_id: 'c1',
+            users: { first_name: 'Omar', last_name: 'K', email: 'o@t.com', avatar_url: null },
+          },
         ],
         error: null,
       });
@@ -156,9 +196,15 @@ describe('warnings.service', () => {
         // v13: user data is in users_with_pii_access with email_decrypted
         return setupQuery({
           data: [
-            { user_id: 'u1', status: 'active', enrolled_at: '2026-01-01', completed_at: null,
-              progress_pct: 75, last_watched_at: '2026-03-01',
-              users: { first_name: 'Ali', last_name: 'H', email: 'ali@t.com', avatar_url: null } },
+            {
+              user_id: 'u1',
+              status: 'active',
+              enrolled_at: '2026-01-01',
+              completed_at: null,
+              progress_pct: 75,
+              last_watched_at: '2026-03-01',
+              users: { first_name: 'Ali', last_name: 'H', email: 'ali@t.com', avatar_url: null },
+            },
           ],
           count: 1,
           error: null,

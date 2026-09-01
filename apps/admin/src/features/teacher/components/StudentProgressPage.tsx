@@ -1,6 +1,5 @@
 'use client';
 
-
 import { Download, Search, People } from '@mui/icons-material';
 import {
   Box,
@@ -37,13 +36,20 @@ function getInitials(first: string | null, last: string | null) {
 function localizedDate(dateStr: string | null, locale: string) {
   if (!dateStr) return '—';
   const d = new Date(dateStr);
-  return d.toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return d.toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
 }
 
 function localizedTime(dateStr: string | null, locale: string) {
   if (!dateStr) return '';
   const d = new Date(dateStr);
-  return d.toLocaleTimeString(locale === 'ar' ? 'ar-EG' : 'en-US', { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleTimeString(locale === 'ar' ? 'ar-EG' : 'en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 export function StudentProgressPage() {
@@ -51,7 +57,7 @@ export function StudentProgressPage() {
   const params = useParams();
   const locale = params.locale as string;
   const t = useTranslations('common');
-  
+
   const courseId = params.id as string;
 
   const [page, setPage] = useState(1);
@@ -85,11 +91,12 @@ export function StudentProgressPage() {
 
   // Aggregate stats for the cards
 
-
   return (
     <Box>
       {/* Actions Bar */}
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 4, gap: 2, alignItems: 'center' }}>
+      <Box
+        sx={{ display: 'flex', justifyContent: 'flex-end', mb: 4, gap: 2, alignItems: 'center' }}
+      >
         <Button
           variant="contained"
           onClick={() => setIsEnrollOpen(true)}
@@ -101,8 +108,8 @@ export function StudentProgressPage() {
             boxShadow: 'none',
             '&:hover': {
               boxShadow: (theme) => `0 4px 12px ${alpha(theme.palette.primary.main, 0.2)}`,
-              backgroundColor: 'primary.dark'
-            }
+              backgroundColor: 'primary.dark',
+            },
           }}
         >
           {t('btn_enroll_student')}
@@ -118,7 +125,7 @@ export function StudentProgressPage() {
             borderColor: 'divider',
             color: alpha(theme.palette.text.primary, 0.6),
             px: 3,
-            '&:hover': { borderColor: 'primary.main', color: 'primary.main' }
+            '&:hover': { borderColor: 'primary.main', color: 'primary.main' },
           }}
         >
           {t('btn_export_csv')}
@@ -135,9 +142,26 @@ export function StudentProgressPage() {
       />
 
       {/* Table Card */}
-      <Box sx={{ bgcolor: 'background.paper', borderRadius: 4, border: '1px solid', borderColor: 'divider', boxShadow: (t) => t.shadows[1], overflow: 'hidden' }}>
+      <Box
+        sx={{
+          bgcolor: 'background.paper',
+          borderRadius: 4,
+          border: '1px solid',
+          borderColor: 'divider',
+          boxShadow: (t) => t.shadows[1],
+          overflow: 'hidden',
+        }}
+      >
         {/* Search */}
-        <Box sx={{ p: 3, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center' }}>
+        <Box
+          sx={{
+            p: 3,
+            borderBottom: '1px solid',
+            borderColor: 'divider',
+            display: 'flex',
+            alignItems: 'center',
+          }}
+        >
           <TextField
             placeholder={t('search_students_placeholder')}
             size="small"
@@ -168,10 +192,55 @@ export function StudentProgressPage() {
           <Table sx={{ minWidth: 650 }}>
             <TableHead>
               <TableRow sx={{ backgroundColor: 'action.hover' }}>
-                <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.7rem', color: alpha(theme.palette.text.primary, 0.6), letterSpacing: '0.05em', py: 2 }}>{t('table_header_student')}</TableCell>
-                <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.7rem', color: alpha(theme.palette.text.primary, 0.6), letterSpacing: '0.05em', py: 2 }}>{t('table_header_progress')}</TableCell>
-                <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.7rem', color: alpha(theme.palette.text.primary, 0.6), letterSpacing: '0.05em', py: 2 }}>{t('table_header_last_watched')}</TableCell>
-                <TableCell align="center" sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.7rem', color: alpha(theme.palette.text.primary, 0.6), letterSpacing: '0.05em', py: 2 }}>{t('table_header_status')}</TableCell>
+                <TableCell
+                  sx={{
+                    fontWeight: 800,
+                    textTransform: 'uppercase',
+                    fontSize: '0.7rem',
+                    color: alpha(theme.palette.text.primary, 0.6),
+                    letterSpacing: '0.05em',
+                    py: 2,
+                  }}
+                >
+                  {t('table_header_student')}
+                </TableCell>
+                <TableCell
+                  sx={{
+                    fontWeight: 800,
+                    textTransform: 'uppercase',
+                    fontSize: '0.7rem',
+                    color: alpha(theme.palette.text.primary, 0.6),
+                    letterSpacing: '0.05em',
+                    py: 2,
+                  }}
+                >
+                  {t('table_header_progress')}
+                </TableCell>
+                <TableCell
+                  sx={{
+                    fontWeight: 800,
+                    textTransform: 'uppercase',
+                    fontSize: '0.7rem',
+                    color: alpha(theme.palette.text.primary, 0.6),
+                    letterSpacing: '0.05em',
+                    py: 2,
+                  }}
+                >
+                  {t('table_header_last_watched')}
+                </TableCell>
+                <TableCell
+                  align="center"
+                  sx={{
+                    fontWeight: 800,
+                    textTransform: 'uppercase',
+                    fontSize: '0.7rem',
+                    color: alpha(theme.palette.text.primary, 0.6),
+                    letterSpacing: '0.05em',
+                    py: 2,
+                  }}
+                >
+                  {t('table_header_status')}
+                </TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -186,9 +255,20 @@ export function StudentProgressPage() {
               ) : students.length === 0 ? (
                 <TableRow sx={{ backgroundColor: 'transparent' }}>
                   <TableCell colSpan={4} align="center" sx={{ py: 12, border: 0 }}>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, opacity: 0.6 }}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: 2,
+                        opacity: 0.6,
+                      }}
+                    >
                       <People sx={{ fontSize: 48, color: 'text.disabled' }} />
-                      <Typography variant="body1" sx={{ color: alpha(theme.palette.text.primary, 0.6), fontWeight: 600 }}>
+                      <Typography
+                        variant="body1"
+                        sx={{ color: alpha(theme.palette.text.primary, 0.6), fontWeight: 600 }}
+                      >
                         {t('no_student_data')}
                       </Typography>
                     </Box>
@@ -202,9 +282,13 @@ export function StudentProgressPage() {
                     return name.includes(search.toLowerCase());
                   })
                   .map((row) => {
-                    const name = [row.first_name, row.last_name].filter(Boolean).join(' ') || t('unknown');
+                    const name =
+                      [row.first_name, row.last_name].filter(Boolean).join(' ') || t('unknown');
                     const maskedEmail = row.email
-                      ? row.email.substring(0, 1) + '***@' + row.email.split('@')[1]?.substring(0, 3) + '...'
+                      ? row.email.substring(0, 1) +
+                        '***@' +
+                        row.email.split('@')[1]?.substring(0, 3) +
+                        '...'
                       : '';
 
                     return (
@@ -218,7 +302,10 @@ export function StudentProgressPage() {
                                 height: 40,
                                 fontSize: '0.8rem',
                                 fontWeight: 700,
-                                backgroundColor: (theme) => row.completed ? alpha(theme.palette.success.main, 0.1) : alpha(theme.palette.primary.main, 0.1),
+                                backgroundColor: (theme) =>
+                                  row.completed
+                                    ? alpha(theme.palette.success.main, 0.1)
+                                    : alpha(theme.palette.primary.main, 0.1),
                                 color: row.completed ? 'success.main' : 'primary.main',
                                 opacity: 0.9,
                               }}
@@ -226,10 +313,19 @@ export function StudentProgressPage() {
                               {getInitials(row.first_name, row.last_name)}
                             </Avatar>
                             <Box>
-                              <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary', lineHeight: 1.2 }}>
+                              <Typography
+                                variant="body2"
+                                sx={{ fontWeight: 700, color: 'text.primary', lineHeight: 1.2 }}
+                              >
                                 {name}
                               </Typography>
-                              <Typography variant="caption" sx={{ color: alpha(theme.palette.text.primary, 0.6), fontWeight: 500 }}>
+                              <Typography
+                                variant="caption"
+                                sx={{
+                                  color: alpha(theme.palette.text.primary, 0.6),
+                                  fontWeight: 500,
+                                }}
+                              >
                                 {maskedEmail}
                               </Typography>
                             </Box>
@@ -237,7 +333,16 @@ export function StudentProgressPage() {
                         </TableCell>
                         <TableCell>
                           <Box sx={{ minWidth: 140 }}>
-                            <Typography variant="overline" sx={{ fontWeight: 800, color: alpha(theme.palette.text.primary, 0.6), display: 'block', mb: 0.5, lineHeight: 1 }}>
+                            <Typography
+                              variant="overline"
+                              sx={{
+                                fontWeight: 800,
+                                color: alpha(theme.palette.text.primary, 0.6),
+                                display: 'block',
+                                mb: 0.5,
+                                lineHeight: 1,
+                              }}
+                            >
                               {t('completed_pct', { pct: Math.round(row.progress_pct) })}
                             </Typography>
                             <LinearProgress
@@ -257,10 +362,16 @@ export function StudentProgressPage() {
                         </TableCell>
                         <TableCell>
                           <Box>
-                            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
+                            <Typography
+                              variant="body2"
+                              sx={{ fontWeight: 600, color: 'text.primary' }}
+                            >
                               {localizedDate(row.last_watched, locale)}
                             </Typography>
-                            <Typography variant="caption" sx={{ color: alpha(theme.palette.text.primary, 0.6) }}>
+                            <Typography
+                              variant="caption"
+                              sx={{ color: alpha(theme.palette.text.primary, 0.6) }}
+                            >
                               {localizedTime(row.last_watched, locale)}
                             </Typography>
                           </Box>
@@ -274,10 +385,16 @@ export function StudentProgressPage() {
                               fontSize: '0.65rem',
                               textTransform: 'uppercase',
                               height: 24,
-                              backgroundColor: (theme) => row.completed ? alpha(theme.palette.success.main, 0.1) : alpha(theme.palette.warning.main, 0.1),
+                              backgroundColor: (theme) =>
+                                row.completed
+                                  ? alpha(theme.palette.success.main, 0.1)
+                                  : alpha(theme.palette.warning.main, 0.1),
                               color: row.completed ? 'success.main' : 'warning.main',
                               border: '1px solid',
-                              borderColor: (theme) => row.completed ? alpha(theme.palette.success.main, 0.2) : alpha(theme.palette.warning.main, 0.2),
+                              borderColor: (theme) =>
+                                row.completed
+                                  ? alpha(theme.palette.success.main, 0.2)
+                                  : alpha(theme.palette.warning.main, 0.2),
                             }}
                           />
                         </TableCell>

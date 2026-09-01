@@ -16,30 +16,14 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import {
-  Add,
-  Quiz,
-  Download,
-} from '@mui/icons-material';
-import {
-  Box,
-  Typography,
-  Button,
-  TextField,
-  Stack,
-  useTheme,
-  useMediaQuery,
-} from '@mui/material';
+import { Add, Quiz, Download } from '@mui/icons-material';
+import { Box, Typography, Button, TextField, Stack, useTheme, useMediaQuery } from '@mui/material';
 import { useTranslations } from 'next-intl';
 import { useState, useEffect } from 'react';
 
-
 import { SectionCard } from './curriculum-builder/SectionCard';
 
-import {
-  useCreateSection,
-  useReorderSections,
-} from '@/adapters/mutations/courses.mutations';
+import { useCreateSection, useReorderSections } from '@/adapters/mutations/courses.mutations';
 import type { Section } from '@/domain/types/course.types';
 import { formatVideoUrl } from '@/domain/video.utils';
 import { getCourseById } from '@/infrastructure/repos/courses.service';
@@ -64,12 +48,14 @@ export function CurriculumBuilder({ courseId, sections }: CurriculumBuilderProps
   const reorderSections = useReorderSections();
 
   const [localSections, setLocalSections] = useState(sections);
-  useEffect(() => { setLocalSections(sections); }, [sections]);
+  useEffect(() => {
+    setLocalSections(sections);
+  }, [sections]);
 
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 15 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 300, tolerance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -133,7 +119,7 @@ export function CurriculumBuilder({ courseId, sections }: CurriculumBuilderProps
               duration_sec: les.duration_sec,
             };
           }),
-        }))
+        })),
       };
 
       const jsonString = JSON.stringify(exportData, null, 2);
@@ -221,7 +207,10 @@ export function CurriculumBuilder({ courseId, sections }: CurriculumBuilderProps
 
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={localSections.map((s: Section) => s.id)} strategy={verticalListSortingStrategy}>
+          <SortableContext
+            items={localSections.map((s: Section) => s.id)}
+            strategy={verticalListSortingStrategy}
+          >
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
               {localSections.map((section: Section, i: number) => (
                 <SectionCard key={section.id} section={section} courseId={courseId} index={i} />
@@ -250,17 +239,22 @@ export function CurriculumBuilder({ courseId, sections }: CurriculumBuilderProps
               onChange={(e) => setNewSecTitle(e.target.value)}
               fullWidth
               autoFocus
-              sx={{ 
-                '& .MuiOutlinedInput-root': { 
+              sx={{
+                '& .MuiOutlinedInput-root': {
                   borderRadius: 2,
-                  backgroundColor: 'background.paper'
-                } 
+                  backgroundColor: 'background.paper',
+                },
               }}
             />
             <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
               <Button
                 onClick={() => setAddingSec(false)}
-                sx={{ textTransform: 'none', fontWeight: 600, color: 'text.secondary', borderRadius: 2 }}
+                sx={{
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  color: 'text.secondary',
+                  borderRadius: 2,
+                }}
               >
                 {t('cancel')}
               </Button>

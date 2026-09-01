@@ -76,9 +76,8 @@ export function AppLockControl({ settings }: AppLockControlProps) {
             borderRadius: 3,
             border: '2px solid',
             borderColor: 'error.main',
-            backgroundColor: (theme) => theme.palette.mode === 'dark'
-              ? 'rgba(220,38,38,0.1)'
-              : 'rgba(254,242,242,1)',
+            backgroundColor: (theme) =>
+              theme.palette.mode === 'dark' ? 'rgba(220,38,38,0.1)' : 'rgba(254,242,242,1)',
             p: 2.5,
             mb: 3,
             display: 'flex',
@@ -89,9 +88,13 @@ export function AppLockControl({ settings }: AppLockControlProps) {
         >
           <Box
             sx={{
-              width: 44, height: 44, borderRadius: 2,
+              width: 44,
+              height: 44,
+              borderRadius: 2,
               background: 'linear-gradient(135deg, #DC2626, #EF4444)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               flexShrink: 0,
             }}
           >
@@ -145,17 +148,19 @@ export function AppLockControl({ settings }: AppLockControlProps) {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
             <Box
               sx={{
-                width: 40, height: 40, borderRadius: 2,
+                width: 40,
+                height: 40,
+                borderRadius: 2,
                 background: 'linear-gradient(135deg, #16A34A, #22C55E)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
             >
               <LockOpen sx={{ color: '#fff', fontSize: 20 }} />
             </Box>
             <Box>
-              <Typography sx={{ fontWeight: 700, color: 'text.primary' }}>
-                {t('title')}
-              </Typography>
+              <Typography sx={{ fontWeight: 700, color: 'text.primary' }}>{t('title')}</Typography>
               <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                 {t('desc')}
               </Typography>
@@ -197,7 +202,11 @@ export function AppLockControl({ settings }: AppLockControlProps) {
           <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }}>
             {t('warning_msg')}
           </Alert>
-          {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
+          {error && (
+            <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
+              {error}
+            </Alert>
+          )}
           <TextField
             label={t('label_message')}
             value={message}
@@ -220,9 +229,9 @@ export function AppLockControl({ settings }: AppLockControlProps) {
             onClick={handleLock}
             disabled={isPending}
             startIcon={isPending ? <CircularProgress size={16} color="inherit" /> : <Lock />}
-            sx={{ 
-              textTransform: 'none', 
-              fontWeight: 600, 
+            sx={{
+              textTransform: 'none',
+              fontWeight: 600,
               borderRadius: 2,
               gap: 1,
               '& .MuiButton-startIcon': {
@@ -243,13 +252,9 @@ export function AppLockControl({ settings }: AppLockControlProps) {
         fullWidth
         PaperProps={{ sx: { borderRadius: 3 } }}
       >
-        <DialogTitle sx={{ fontWeight: 700 }}>
-          {t('unlock_confirm_title')}
-        </DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700 }}>{t('unlock_confirm_title')}</DialogTitle>
         <DialogContent>
-          <Typography>
-            {t('unlock_confirm_msg')}
-          </Typography>
+          <Typography>{t('unlock_confirm_msg')}</Typography>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => setUnlockDialogOpen(false)} sx={{ textTransform: 'none' }}>
@@ -262,7 +267,9 @@ export function AppLockControl({ settings }: AppLockControlProps) {
             disabled={isPending}
             startIcon={isPending ? <CircularProgress size={16} color="inherit" /> : <LockOpen />}
             sx={{
-              textTransform: 'none', fontWeight: 600, borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 600,
+              borderRadius: 2,
               gap: 1,
               '& .MuiButton-startIcon': {
                 margin: 0,

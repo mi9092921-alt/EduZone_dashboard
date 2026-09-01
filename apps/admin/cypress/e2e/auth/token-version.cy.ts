@@ -16,10 +16,10 @@ describe('Token Version Validation Flow (Staging)', () => {
     // Setup an intercept to mock a token_version mismatch error from the database check
     cy.intercept('POST', '**/rest/v1/rpc/check_dashboard_access', {
       statusCode: 200,
-      body: { 
+      body: {
         status: 'version_mismatch',
-        error: 'Token version expired'
-      }
+        error: 'Token version expired',
+      },
     }).as('checkAccessMismatch');
 
     // Trigger a refresh or navigation that calls check_dashboard_access
@@ -28,10 +28,10 @@ describe('Token Version Validation Flow (Staging)', () => {
 
     cy.wait('@checkAccessMismatch');
 
-    // The middleware or client guard should forcibly sign out via supabase.auth.signOut() 
+    // The middleware or client guard should forcibly sign out via supabase.auth.signOut()
     // and route to login with reason
     cy.url({ timeout: 10000 }).should('include', 'reason=session_invalidated');
-    
+
     // Assert the invalidation toast appears
     cy.contains(/Session Invalidated|Logged out/i).should('be.visible');
   });

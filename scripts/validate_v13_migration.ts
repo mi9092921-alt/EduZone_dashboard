@@ -10,12 +10,10 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 // ── Config ────────────────────────────────────────────────────────
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
-  || 'https://vlezaxucklrwiouoamkk.supabase.co';
-const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
-  || '';
-const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  || '';
+const SUPABASE_URL =
+  process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://vlezaxucklrwiouoamkk.supabase.co';
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
 if (!SERVICE_ROLE_KEY || !ANON_KEY) {
   console.error('❌ Missing SUPABASE_SERVICE_ROLE_KEY or NEXT_PUBLIC_SUPABASE_ANON_KEY');
@@ -184,7 +182,11 @@ async function validateNotificationRPCs(client: SupabaseClient) {
     p_target_audience: 'all',
   });
 
-  if (sendErr && !sendErr.message.includes('PERMISSION_DENIED') && !sendErr.message.includes('does not exist')) {
+  if (
+    sendErr &&
+    !sendErr.message.includes('PERMISSION_DENIED') &&
+    !sendErr.message.includes('does not exist')
+  ) {
     // RPC exists but auth issue — that's expected
     pass('send_notification RPC exists');
   } else if (sendErr?.message?.includes('does not exist')) {
@@ -209,11 +211,23 @@ async function validateSeedData(client: SupabaseClient) {
   console.log('\n🔍 8. QA Seed Data Integrity');
 
   const checks = [
-    { table: 'tenants', filter: { id: '11111111-0000-0000-0000-000000000001' }, label: 'QA Tenant' },
-    { table: 'users', filter: { email: 'super_admin@eduzone-test.com' }, label: 'Super Admin user' },
+    {
+      table: 'tenants',
+      filter: { id: '11111111-0000-0000-0000-000000000001' },
+      label: 'QA Tenant',
+    },
+    {
+      table: 'users',
+      filter: { email: 'super_admin@eduzone-test.com' },
+      label: 'Super Admin user',
+    },
     { table: 'courses', filter: { slug: 'intro-react' }, label: 'Sample course' },
     { table: 'lessons', filter: { title: 'What is React?' }, label: 'Sample lesson' },
-    { table: 'enrollments', filter: { id: 'eeeeeeee-0000-0000-0000-000000000001' }, label: 'Sample enrollment' },
+    {
+      table: 'enrollments',
+      filter: { id: 'eeeeeeee-0000-0000-0000-000000000001' },
+      label: 'Sample enrollment',
+    },
   ];
 
   for (const check of checks) {

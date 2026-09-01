@@ -40,10 +40,7 @@ export async function getAllFeatureFlags(): Promise<FeatureFlag[]> {
   }
 
   const { supabase } = container;
-  const { data, error } = await supabase
-    .from('feature_flags')
-    .select('*')
-    .order('key');
+  const { data, error } = await supabase.from('feature_flags').select('*').order('key');
 
   if (error) throw error;
   return (data ?? []).map(mapDbRowToFeatureFlag);
@@ -122,11 +119,7 @@ export async function createFeatureFlag(input: CreateFeatureFlagInput): Promise<
 
   const { supabase } = container;
   const payload = prepareFeatureFlagPayload(input);
-  const { data, error } = await supabase
-    .from('feature_flags')
-    .insert(payload)
-    .select()
-    .single();
+  const { data, error } = await supabase.from('feature_flags').insert(payload).select().single();
 
   if (error) {
     if (error.code === '23505') throw new Error('FLAG_KEY_EXISTS');
@@ -170,10 +163,7 @@ export async function deleteFeatureFlag(id: string): Promise<void> {
   }
 
   const { supabase } = container;
-  const { error } = await supabase
-    .from('feature_flags')
-    .delete()
-    .eq('id', id);
+  const { error } = await supabase.from('feature_flags').delete().eq('id', id);
 
   if (error) throw error;
 }
@@ -207,7 +197,9 @@ export async function addRoleOverride(
 
   const { supabase } = container;
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   let tenantId: string | null = null;
   if (user) {
     const { data: profile } = await supabase
@@ -231,7 +223,7 @@ export async function addRoleOverride(
     .from('feature_flag_roles')
     .upsert(
       { tenant_id: tenantId, flag_id: flagId, role_id: roleId },
-      { onConflict: 'tenant_id,flag_id,role_id' }
+      { onConflict: 'tenant_id,flag_id,role_id' },
     );
   if (error) throw error;
 }
@@ -262,11 +254,17 @@ export async function addUserOverride(
   const { supabase } = container;
 
   let tenantId: string | null = null;
-  const { data: userData } = await supabase.from('users').select('tenant_id').eq('id', userId).maybeSingle();
+  const { data: userData } = await supabase
+    .from('users')
+    .select('tenant_id')
+    .eq('id', userId)
+    .maybeSingle();
   tenantId = userData?.tenant_id ?? null;
 
   if (!tenantId) {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (user) {
       const { data: profile } = await supabase
         .from('users')
@@ -290,7 +288,7 @@ export async function addUserOverride(
     .from('feature_flag_users')
     .upsert(
       { tenant_id: tenantId, flag_id: flagId, user_id: userId },
-      { onConflict: 'tenant_id,flag_id,user_id' }
+      { onConflict: 'tenant_id,flag_id,user_id' },
     );
   if (error) throw error;
 }
@@ -319,13 +317,10 @@ export async function getAllRoles(): Promise<{ id: string; name: string; key: st
   }
 
   const { supabase } = container;
-  const { data, error } = await supabase
-    .from('roles')
-    .select('id, name, label')
-    .order('name');
+  const { data, error } = await supabase.from('roles').select('id, name, label').order('name');
 
   if (error) throw error;
-  
+
   return (data ?? []).map((r: { id: string; name: string; label: string | null }) => ({
     id: r.id,
     name: r.label || r.name,

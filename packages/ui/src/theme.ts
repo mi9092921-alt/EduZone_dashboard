@@ -42,7 +42,8 @@ export const eduZoneTheme = createTheme({
     divider: colors.neutral[200],
   },
   typography: {
-    fontFamily: "'Inter', 'Cairo', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    fontFamily:
+      "'Inter', 'Cairo', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
     h1: { fontSize: '32px', fontWeight: 700, letterSpacing: '-0.5px' },
     h2: { fontSize: '24px', fontWeight: 700, letterSpacing: '-0.25px' },
     h3: { fontSize: '20px', fontWeight: 600 },
@@ -54,7 +55,13 @@ export const eduZoneTheme = createTheme({
     body1: { fontSize: '16px', fontWeight: 400 },
     body2: { fontSize: '14px', fontWeight: 400, color: 'text.secondary' },
     caption: { fontSize: '12px', fontWeight: 400, color: 'text.secondary' },
-    overline: { fontSize: '11px', fontWeight: 600, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '1.0px' },
+    overline: {
+      fontSize: '11px',
+      fontWeight: 600,
+      color: 'text.secondary',
+      textTransform: 'uppercase',
+      letterSpacing: '1.0px',
+    },
     button: { textTransform: 'none', fontWeight: 600, fontSize: '14px' },
   },
   spacing: spacing.unit,
@@ -132,7 +139,8 @@ export const eduZoneTheme = createTheme({
           boxShadow: '0 4px 20px -2px rgba(15, 23, 42, 0.05)',
         },
         elevation8: {
-          boxShadow: '0 10px 32px -4px rgba(15, 23, 42, 0.1), 0 4px 12px -2px rgba(15, 23, 42, 0.05)',
+          boxShadow:
+            '0 10px 32px -4px rgba(15, 23, 42, 0.1), 0 4px 12px -2px rgba(15, 23, 42, 0.05)',
         },
       },
     },
@@ -155,8 +163,8 @@ export const eduZoneTheme = createTheme({
     MuiTableCell: {
       styleOverrides: {
         root: {
-          padding: `${spacing.md}px ${spacing.lg}px`, 
-          borderBottom: 'none', 
+          padding: `${spacing.md}px ${spacing.lg}px`,
+          borderBottom: 'none',
           backgroundColor: 'var(--mui-paper)',
           fontSize: '0.875rem',
         },
@@ -418,4 +426,3 @@ export const eduZoneDarkTheme = createTheme({
     },
   },
 });
-

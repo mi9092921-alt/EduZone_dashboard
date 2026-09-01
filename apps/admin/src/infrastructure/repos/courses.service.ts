@@ -40,7 +40,10 @@ export async function getCourses(
 
   let query = supabase
     .from('courses')
-    .select('*, lesson_count:lessons(count), teacher:users!courses_teacher_id_fkey(first_name, last_name)', { count: 'exact' })
+    .select(
+      '*, lesson_count:lessons(count), teacher:users!courses_teacher_id_fkey(first_name, last_name)',
+      { count: 'exact' },
+    )
     .is('deleted_at', null)
     .order('created_at', { ascending: false })
     .range(from, to);
@@ -71,7 +74,10 @@ export async function getCourses(
       teacher_name: teacher
         ? [teacher.first_name, teacher.last_name].filter(Boolean).join(' ')
         : undefined,
-      lesson_count: (row.lesson_count as { count: number }[] | null)?.[0]?.count ?? (row.total_lessons as number) ?? 0,
+      lesson_count:
+        (row.lesson_count as { count: number }[] | null)?.[0]?.count ??
+        (row.total_lessons as number) ??
+        0,
     } as Course;
   });
 
@@ -130,9 +136,11 @@ export async function getCourseById(id: string): Promise<CourseDetail | null> {
 export async function createCourse(data: CreateCourseInput): Promise<Course> {
   const { supabase } = container;
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
-  
+
   // Get tenant_id from the current user
   const { data: userData, error: userError } = await supabase
     .from('users')
@@ -165,10 +173,7 @@ export async function createCourse(data: CreateCourseInput): Promise<Course> {
   return course as Course;
 }
 
-export async function updateCourse(
-  id: string,
-  data: UpdateCourseInput,
-): Promise<Course> {
+export async function updateCourse(id: string, data: UpdateCourseInput): Promise<Course> {
   const { supabase } = container;
 
   // v13: is_free is a generated column, do not update it.
@@ -177,7 +182,7 @@ export async function updateCourse(
     ...cleanData,
     updated_at: new Date().toISOString(),
   };
-  
+
   if (is_free === true) {
     updatePayload.price = 0;
   } else if (is_free === false && updatePayload.price === 0) {
@@ -224,10 +229,7 @@ export async function getCourseSections(courseId: string): Promise<Section[]> {
   })) as Section[];
 }
 
-export async function createSection(
-  courseId: string,
-  data: CreateSectionInput,
-): Promise<Section> {
+export async function createSection(courseId: string, data: CreateSectionInput): Promise<Section> {
   const { supabase } = container;
 
   // v13: sections require tenant_id — derive from course
@@ -293,21 +295,23 @@ export async function deleteSection(id: string): Promise<void> {
   if (error) throw error;
 }
 
-export async function reorderSections(updates: { id: string; order_index: number }[]): Promise<void> {
+export async function reorderSections(
+  updates: { id: string; order_index: number }[],
+): Promise<void> {
   const { supabase } = container;
-  
+
   // v13: Use RPC for atomic reordering
   const { error } = await supabase.rpc('reorder_course_sections', {
-    p_section_updates: updates
+    p_section_updates: updates,
   });
 
   if (error) {
     console.error('[reorderSections] RPC failed, falling back to batch updates:', error);
     // Fallback if RPC fails or is not yet available in the environment
     await Promise.all(
-      updates.map((u) => 
-        supabase.from('sections').update({ order_index: u.order_index }).eq('id', u.id)
-      )
+      updates.map((u) =>
+        supabase.from('sections').update({ order_index: u.order_index }).eq('id', u.id),
+      ),
     );
   }
 }
@@ -316,10 +320,7 @@ export async function reorderSections(updates: { id: string; order_index: number
 // LESSONS
 // ══════════════════════════════════════════════════
 
-export async function createLesson(
-  sectionId: string,
-  data: CreateLessonInput,
-): Promise<Lesson> {
+export async function createLesson(sectionId: string, data: CreateLessonInput): Promise<Lesson> {
   const { supabase } = container;
 
   // v13: lessons + lesson_contents require tenant_id — derive from section → course
@@ -331,7 +332,9 @@ export async function createLesson(
 
   if (sectionErr || !sectionData?.tenant_id) {
     console.error('[createLesson] Tenant context missing:', sectionErr);
-    throw new Error('TENANT_CONTEXT_REQUIRED: تأكد من تسجيل الدخول بشكل صحيح وأن حسابك مرتبط بمؤسسة.');
+    throw new Error(
+      'TENANT_CONTEXT_REQUIRED: تأكد من تسجيل الدخول بشكل صحيح وأن حسابك مرتبط بمؤسسة.',
+    );
   }
 
   const courseId = sectionData.course_id;
@@ -374,7 +377,7 @@ export async function createLesson(
   // 2. Create Lesson Content (v13 security model)
   if (data.video_url) {
     const parsed = parseVideoUrl(data.video_url);
-    
+
     const { error: contentErr } = await supabase.from('lesson_contents').insert({
       lesson_id: lesson.id,
       course_id: courseId,
@@ -407,68 +410,80 @@ export async function createLessons(
   data: CreateLessonInput[],
 ): Promise<Lesson[]> {
   const { supabase } = container;
-  
+
   // v13: Derive course_id + tenant_id from section
-  const { data: section, error: sectionErr } = await supabase.from('sections').select('course_id, tenant_id').eq('id', sectionId).single();
+  const { data: section, error: sectionErr } = await supabase
+    .from('sections')
+    .select('course_id, tenant_id')
+    .eq('id', sectionId)
+    .single();
   const courseId = section?.course_id;
   const tenantId = section?.tenant_id;
 
   if (sectionErr || !courseId || !tenantId) {
     console.error('[createLessons] Tenant context missing:', sectionErr);
-    throw new Error('TENANT_CONTEXT_REQUIRED: تأكد من تسجيل الدخول بشكل صحيح وأن حسابك مرتبط بمؤسسة.');
+    throw new Error(
+      'TENANT_CONTEXT_REQUIRED: تأكد من تسجيل الدخول بشكل صحيح وأن حسابك مرتبط بمؤسسة.',
+    );
   }
 
   // v13: Batch fetch YouTube durations
-  const enrichedData = await Promise.all(data.map(async (item) => {
-    let duration = item.duration_sec ?? 0;
-    if (item.video_url && !item.duration_sec) {
-      const parsed = parseVideoUrl(item.video_url);
-      if (parsed.provider === 'youtube') {
-        console.log('[createLessons] Fetching YouTube metadata for:', item.video_url);
-        const res = await getYoutubeMetadataAction(item.video_url);
-        console.log('[createLessons] Metadata result:', res);
-        if (res.success && res.data) {
-          duration = res.data.duration_sec;
+  const enrichedData = await Promise.all(
+    data.map(async (item) => {
+      let duration = item.duration_sec ?? 0;
+      if (item.video_url && !item.duration_sec) {
+        const parsed = parseVideoUrl(item.video_url);
+        if (parsed.provider === 'youtube') {
+          console.log('[createLessons] Fetching YouTube metadata for:', item.video_url);
+          const res = await getYoutubeMetadataAction(item.video_url);
+          console.log('[createLessons] Metadata result:', res);
+          if (res.success && res.data) {
+            duration = res.data.duration_sec;
+          }
         }
       }
-    }
-    return { ...item, duration_sec: duration };
-  }));
+      return { ...item, duration_sec: duration };
+    }),
+  );
 
   // 2. Insert Lessons
   const { data: lessons, error } = await supabase
     .from('lessons')
-    .insert(enrichedData.map((item) => ({ 
-      title: item.title,
-      section_id: sectionId,
-      course_id: courseId,
-      tenant_id: tenantId,
-      order_index: item.order_index ?? 0,
-      is_published: item.is_published ?? true,
-      is_preview: item.is_preview ?? false,
-      duration_sec: item.duration_sec,
-    })))
+    .insert(
+      enrichedData.map((item) => ({
+        title: item.title,
+        section_id: sectionId,
+        course_id: courseId,
+        tenant_id: tenantId,
+        order_index: item.order_index ?? 0,
+        is_published: item.is_published ?? true,
+        is_preview: item.is_preview ?? false,
+        duration_sec: item.duration_sec,
+      })),
+    )
     .select();
 
   if (error) throw error;
 
   // 3. Insert Lesson Contents (v13)
-  const contents = lessons.map((lesson, idx) => {
-    const input = enrichedData[idx];
-    if (!input || !input.video_url) return null;
-    const parsed = parseVideoUrl(input.video_url);
-    
-    return {
-      lesson_id: lesson.id,
-      course_id: courseId,
-      section_id: sectionId,
-      tenant_id: tenantId,
-      video_path: parsed.video_path,
-      provider: parsed.provider,
-      duration_sec: lesson.duration_sec,
-      updated_at: new Date().toISOString(),
-    };
-  }).filter((c): c is NonNullable<typeof c> => c !== null);
+  const contents = lessons
+    .map((lesson, idx) => {
+      const input = enrichedData[idx];
+      if (!input || !input.video_url) return null;
+      const parsed = parseVideoUrl(input.video_url);
+
+      return {
+        lesson_id: lesson.id,
+        course_id: courseId,
+        section_id: sectionId,
+        tenant_id: tenantId,
+        video_path: parsed.video_path,
+        provider: parsed.provider,
+        duration_sec: lesson.duration_sec,
+        updated_at: new Date().toISOString(),
+      };
+    })
+    .filter((c): c is NonNullable<typeof c> => c !== null);
 
   if (contents.length > 0) {
     const { error: batchErr } = await supabase.from('lesson_contents').insert(contents);
@@ -477,17 +492,16 @@ export async function createLessons(
       // Clean up the created lessons metadata to preserve database integrity
       const lessonIds = lessons.map((l) => l.id);
       await supabase.from('lessons').delete().in('id', lessonIds);
-      throw new Error(`تعذر حفظ محتويات الفيديو للدروس المستوردة: ${batchErr.message || 'خطأ في قواعد البيانات'}`);
+      throw new Error(
+        `تعذر حفظ محتويات الفيديو للدروس المستوردة: ${batchErr.message || 'خطأ في قواعد البيانات'}`,
+      );
     }
   }
 
   return lessons as Lesson[];
 }
 
-export async function updateLesson(
-  id: string,
-  data: Partial<CreateLessonInput>,
-): Promise<Lesson> {
+export async function updateLesson(id: string, data: Partial<CreateLessonInput>): Promise<Lesson> {
   const { supabase } = container;
 
   // v13: duration fetch from YouTube on update
@@ -524,19 +538,17 @@ export async function updateLesson(
   // 2. Sync Lesson Content
   if (data.video_url !== undefined) {
     const parsed = parseVideoUrl(data.video_url);
-    
-    const { error: contentErr } = await supabase
-      .from('lesson_contents')
-      .upsert({
-        lesson_id: lesson.id,
-        course_id: lesson.course_id,
-        section_id: lesson.section_id,
-        tenant_id: lesson.tenant_id,
-        video_path: parsed.video_path,
-        provider: parsed.provider,
-        duration_sec: lesson.duration_sec,
-        updated_at: new Date().toISOString(),
-      });
+
+    const { error: contentErr } = await supabase.from('lesson_contents').upsert({
+      lesson_id: lesson.id,
+      course_id: lesson.course_id,
+      section_id: lesson.section_id,
+      tenant_id: lesson.tenant_id,
+      video_path: parsed.video_path,
+      provider: parsed.provider,
+      duration_sec: lesson.duration_sec,
+      updated_at: new Date().toISOString(),
+    });
 
     if (contentErr) {
       console.error('[updateLesson] Failed to sync lesson_contents:', contentErr);
@@ -546,12 +558,12 @@ export async function updateLesson(
     // If only duration changed (rare but possible), update lesson_contents too
     const { error: durationErr } = await supabase
       .from('lesson_contents')
-      .update({ 
+      .update({
         duration_sec: duration,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       })
       .eq('lesson_id', id);
-    
+
     if (durationErr) {
       console.error('[updateLesson] Failed to update lesson_contents duration:', durationErr);
       throw new Error(`تعذر تحديث مدة الفيديو: ${durationErr.message || 'خطأ في قواعد البيانات'}`);
@@ -565,21 +577,23 @@ export async function deleteLesson(id: string): Promise<void> {
   const { supabase } = container;
   const { error } = await supabase
     .from('lessons')
-    .update({ 
+    .update({
       deleted_at: new Date().toISOString(),
-      is_published: false
+      is_published: false,
     })
     .eq('id', id);
 
   if (error) throw error;
 }
 
-export async function reorderLessons(updates: { id: string; order_index: number }[]): Promise<void> {
+export async function reorderLessons(
+  updates: { id: string; order_index: number }[],
+): Promise<void> {
   const { supabase } = container;
   await Promise.all(
-    updates.map((u) => 
-      supabase.from('lessons').update({ order_index: u.order_index }).eq('id', u.id)
-    )
+    updates.map((u) =>
+      supabase.from('lessons').update({ order_index: u.order_index }).eq('id', u.id),
+    ),
   );
 }
 
@@ -630,9 +644,7 @@ export async function getCourseEnrollments(
   };
 }
 
-export async function getAllCourseEnrollments(
-  courseId: string,
-): Promise<Enrollment[]> {
+export async function getAllCourseEnrollments(courseId: string): Promise<Enrollment[]> {
   const { supabase } = container;
 
   const { data, error } = await supabase
@@ -722,9 +734,7 @@ export async function getCourseStats(courseId: string): Promise<CourseStats | nu
   }
 }
 
-export async function getCoursesOverviewStats(
-  tenantId?: string,
-): Promise<CoursesOverviewStats> {
+export async function getCoursesOverviewStats(tenantId?: string): Promise<CoursesOverviewStats> {
   const { supabase } = container;
 
   const buildQuery = (status?: string) => {
@@ -775,8 +785,16 @@ export async function getVideoViewsByUser(
   if (error) throw error;
 
   const rows = (data ?? []) as Record<string, unknown>[];
-  const courseIds = [...new Set(rows.map((row) => row.course_id).filter((id): id is string => typeof id === 'string'))];
-  const lessonIds = [...new Set(rows.map((row) => row.lesson_id).filter((id): id is string => typeof id === 'string'))];
+  const courseIds = [
+    ...new Set(
+      rows.map((row) => row.course_id).filter((id): id is string => typeof id === 'string'),
+    ),
+  ];
+  const lessonIds = [
+    ...new Set(
+      rows.map((row) => row.lesson_id).filter((id): id is string => typeof id === 'string'),
+    ),
+  ];
 
   const [coursesRes, lessonsRes] = await Promise.all([
     courseIds.length
@@ -787,8 +805,12 @@ export async function getVideoViewsByUser(
       : Promise.resolve({ data: [] }),
   ]);
 
-  const courseTitles = new Map((coursesRes.data ?? []).map((row: { id: string; title: string }) => [row.id, row.title]));
-  const lessonTitles = new Map((lessonsRes.data ?? []).map((row: { id: string; title: string }) => [row.id, row.title]));
+  const courseTitles = new Map(
+    (coursesRes.data ?? []).map((row: { id: string; title: string }) => [row.id, row.title]),
+  );
+  const lessonTitles = new Map(
+    (lessonsRes.data ?? []).map((row: { id: string; title: string }) => [row.id, row.title]),
+  );
 
   const views = (data ?? []).map((row: Record<string, unknown>) => ({
     ...row,
@@ -820,9 +842,12 @@ export async function getLearningObjectives(courseId: string): Promise<CourseLea
   return data || [];
 }
 
-export async function saveLearningObjectives(courseId: string, objectives: string[]): Promise<void> {
+export async function saveLearningObjectives(
+  courseId: string,
+  objectives: string[],
+): Promise<void> {
   const { supabase } = container;
-  
+
   // Delete old
   const { error: delErr } = await supabase
     .from('course_learning_objectives')
@@ -839,9 +864,7 @@ export async function saveLearningObjectives(courseId: string, objectives: strin
     order_index: index,
   }));
 
-  const { error: insErr } = await supabase
-    .from('course_learning_objectives')
-    .insert(rows);
+  const { error: insErr } = await supabase.from('course_learning_objectives').insert(rows);
   if (insErr) throw insErr;
 }
 
@@ -852,27 +875,29 @@ export async function getPrerequisites(courseId: string): Promise<CoursePrerequi
     .select('*, prerequisite:courses!course_prerequisites_prereq_tenant_fkey(title, level)')
     .eq('course_id', courseId);
   if (error) throw error;
-  return (data || []).map((row: {
-    course_id: string;
-    prerequisite_course_id: string;
-    tenant_id: string;
-    prerequisite?: { title: string; level: string } | null;
-  }) => ({
-    course_id: row.course_id,
-    prerequisite_course_id: row.prerequisite_course_id,
-    tenant_id: row.tenant_id,
-    ...(row.prerequisite?.title !== undefined && { prerequisite_title: row.prerequisite.title }),
-    ...(row.prerequisite?.level !== undefined && { prerequisite_level: row.prerequisite.level }),
-  }));
+  return (data || []).map(
+    (row: {
+      course_id: string;
+      prerequisite_course_id: string;
+      tenant_id: string;
+      prerequisite?: { title: string; level: string } | null;
+    }) => ({
+      course_id: row.course_id,
+      prerequisite_course_id: row.prerequisite_course_id,
+      tenant_id: row.tenant_id,
+      ...(row.prerequisite?.title !== undefined && { prerequisite_title: row.prerequisite.title }),
+      ...(row.prerequisite?.level !== undefined && { prerequisite_level: row.prerequisite.level }),
+    }),
+  );
 }
 
 export async function savePrerequisites(
   courseId: string,
   prerequisiteCourseIds: string[],
-  tenantId: string
+  tenantId: string,
 ): Promise<void> {
   const { supabase } = container;
-  
+
   // Delete old
   const { error: delErr } = await supabase
     .from('course_prerequisites')
@@ -883,19 +908,20 @@ export async function savePrerequisites(
   if (prerequisiteCourseIds.length === 0) return;
 
   // Insert new
-  const rows = prerequisiteCourseIds.map(prereqId => ({
+  const rows = prerequisiteCourseIds.map((prereqId) => ({
     course_id: courseId,
     prerequisite_course_id: prereqId,
     tenant_id: tenantId,
   }));
 
-  const { error: insErr } = await supabase
-    .from('course_prerequisites')
-    .insert(rows);
+  const { error: insErr } = await supabase.from('course_prerequisites').insert(rows);
   if (insErr) throw insErr;
 }
 
-export async function getPrerequisiteOptions(courseId: string, tenantId: string): Promise<Course[]> {
+export async function getPrerequisiteOptions(
+  courseId: string,
+  tenantId: string,
+): Promise<Course[]> {
   const { supabase } = container;
   const { data, error } = await supabase
     .from('courses')

@@ -2,11 +2,11 @@
 const config = {
   semi: true,
   singleQuote: true,
-  trailingComma: "all",
+  trailingComma: 'all',
   printWidth: 100,
   tabWidth: 2,
-  arrowParens: "always",
-  endOfLine: "lf",
+  arrowParens: 'always',
+  endOfLine: 'lf',
 };
 
 module.exports = config;

@@ -22,31 +22,31 @@ export default defineConfig({
     //   CYPRESS_BASE_URL=https://admin-staging.eduzone.app pnpm cypress:run
     baseUrl: process.env.CYPRESS_BASE_URL ?? 'http://localhost:3000',
 
-    viewportWidth:  1280,
+    viewportWidth: 1280,
     viewportHeight: 900,
 
     // ── Video / Screenshots ───────────────────────────────────────
-    video:                    true,
-    videoCompression:         32,
-    screenshotOnRunFailure:   true,
-    trashAssetsBeforeRuns:    true,
+    video: true,
+    videoCompression: 32,
+    screenshotOnRunFailure: true,
+    trashAssetsBeforeRuns: true,
 
     // ── Timeouts (staging may be slower than local) ───────────────
-    defaultCommandTimeout:    10_000,
-    requestTimeout:           15_000,
-    responseTimeout:          15_000,
-    pageLoadTimeout:          30_000,
-    taskTimeout:              30_000,
+    defaultCommandTimeout: 10_000,
+    requestTimeout: 15_000,
+    responseTimeout: 15_000,
+    pageLoadTimeout: 30_000,
+    taskTimeout: 30_000,
 
     // ── Retry on CI ───────────────────────────────────────────────
     retries: {
-      runMode:  2,   // CI: retry up to 2× before marking as failed
-      openMode: 0,   // Dev: no retries for fast feedback
+      runMode: 2, // CI: retry up to 2× before marking as failed
+      openMode: 0, // Dev: no retries for fast feedback
     },
 
     // ── Spec patterns ────────────────────────────────────────────
-    specPattern:  'cypress/e2e/**/*.cy.{ts,tsx}',
-    supportFile:  'cypress/support/e2e.ts',
+    specPattern: 'cypress/e2e/**/*.cy.{ts,tsx}',
+    supportFile: 'cypress/support/e2e.ts',
     fixturesFolder: 'cypress/fixtures',
 
     setupNodeEvents(on, config) {

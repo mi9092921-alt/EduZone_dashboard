@@ -7,20 +7,17 @@
  * Overlays شفافة بتمنع التفاعل مع عناصر YouTube UI.
  */
 
-import { type NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from 'next/server';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Route Handler
 // ─────────────────────────────────────────────────────────────────────────────
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ videoId: string }> }
-) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ videoId: string }> }) {
   const { videoId } = await params;
 
   // Validate videoId (alphanumeric + - _)
   if (!/^[\w-]{5,20}$/.test(videoId)) {
-    return new NextResponse("Invalid video ID", { status: 400 });
+    return new NextResponse('Invalid video ID', { status: 400 });
   }
 
   const embedUrl =
@@ -109,9 +106,9 @@ export async function GET(
   return new NextResponse(html, {
     status: 200,
     headers: {
-      "Content-Type": "text/html; charset=utf-8",
-      "Cache-Control": "public, max-age=30, stale-while-revalidate=60",
-      "X-Content-Type-Options": "nosniff",
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': 'public, max-age=30, stale-while-revalidate=60',
+      'X-Content-Type-Options': 'nosniff',
     },
   });
 }

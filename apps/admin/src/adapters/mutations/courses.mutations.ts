@@ -46,8 +46,7 @@ export function useCreateCourse() {
 export function useUpdateCourse() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (vars: { id: string; data: UpdateCourseInput }) =>
-      updateCourse(vars.id, vars.data),
+    mutationFn: (vars: { id: string; data: UpdateCourseInput }) => updateCourse(vars.id, vars.data),
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: queryKeys.courses.all });
       qc.invalidateQueries({ queryKey: queryKeys.courses.detail(vars.id) });
@@ -143,11 +142,8 @@ export function useCreateLessons() {
 export function useUpdateLesson() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (vars: {
-      id: string;
-      courseId: string;
-      data: Partial<CreateLessonInput>;
-    }) => updateLesson(vars.id, vars.data),
+    mutationFn: (vars: { id: string; courseId: string; data: Partial<CreateLessonInput> }) =>
+      updateLesson(vars.id, vars.data),
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: queryKeys.courses.sections(vars.courseId) });
       qc.invalidateQueries({ queryKey: queryKeys.courses.detail(vars.courseId) });
@@ -183,12 +179,10 @@ export function useReorderLessons() {
 export function useEnrollStudent() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (vars: {
-      userId: string;
-      courseId: string;
-      expiresAt?: string;
-    }) => {
-      const { data: { user } } = await container.supabase.auth.getUser();
+    mutationFn: async (vars: { userId: string; courseId: string; expiresAt?: string }) => {
+      const {
+        data: { user },
+      } = await container.supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
       return enrollStudent(vars.userId, vars.courseId, user.id, vars.expiresAt);
     },
@@ -203,12 +197,10 @@ export function useEnrollStudent() {
 export function useRevokeEnrollment() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (vars: {
-      enrollmentId: string;
-      courseId: string;
-      reason: string;
-    }) => {
-      const { data: { user } } = await container.supabase.auth.getUser();
+    mutationFn: async (vars: { enrollmentId: string; courseId: string; reason: string }) => {
+      const {
+        data: { user },
+      } = await container.supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
       return revokeEnrollment(vars.enrollmentId, user.id, vars.reason);
     },
@@ -240,4 +232,3 @@ export function useSavePrerequisites() {
     },
   });
 }
-

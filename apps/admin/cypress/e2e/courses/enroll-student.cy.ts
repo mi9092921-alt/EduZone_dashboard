@@ -28,26 +28,30 @@ describe('Course Management: Enroll Student Flow (Cloud Safe)', () => {
     cy.contains(/Enroll Student|Add/i).click();
 
     // Wait for the modal/drawer to open
-    cy.get('h2').contains(/Enroll/).should('be.visible');
+    cy.get('h2')
+      .contains(/Enroll/)
+      .should('be.visible');
 
     // Assuming we type the user's email or ID in an autocomplete
     cy.get('input[placeholder*="Search by email"]').type('student@eduzone.app');
-    
+
     // MUI Autocomplete interaction logic
     cy.get('li[role="option"]').contains('student@eduzone.app').click();
 
     // Intercept the POST to `enrollments` table or `enroll_student` RPC
     cy.intercept('POST', '**/rest/v1/enrollments*', {
       statusCode: 201,
-      body: [{ id: 'mock-enrollment-1', course_id: 'course-1', user_id: 'mock-student' }]
+      body: [{ id: 'mock-enrollment-1', course_id: 'course-1', user_id: 'mock-student' }],
     }).as('postEnrollment');
 
     cy.intercept('POST', '**/rest/v1/rpc/*enroll*', {
       statusCode: 200,
-      body: {}
+      body: {},
     }).as('rpcEnrollment');
 
-    cy.get('button').contains(/Confirm|Enroll/i).click();
+    cy.get('button')
+      .contains(/Confirm|Enroll/i)
+      .click();
 
     // Assert success
     cy.contains(/succesfully enrolled|added to course/i, { timeout: 10000 }).should('be.visible');

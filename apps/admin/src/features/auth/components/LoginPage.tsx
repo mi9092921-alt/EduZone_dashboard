@@ -46,13 +46,16 @@ export function LoginPage() {
       });
 
       if (authError) {
-        setError(authError.message === 'Invalid login credentials' 
-          ? 'Invalid email or password. Please try again.' 
-          : authError.message);
+        setError(
+          authError.message === 'Invalid login credentials'
+            ? 'Invalid email or password. Please try again.'
+            : authError.message,
+        );
         return;
       }
 
-      const { data: accessResult, error: accessError } = await supabase.rpc('check_dashboard_access');
+      const { data: accessResult, error: accessError } =
+        await supabase.rpc('check_dashboard_access');
       if (accessError) {
         setError('Failed to verify account access. Please try again.');
         return;
@@ -61,11 +64,15 @@ export function LoginPage() {
       if (!accessResult?.allowed) {
         const reason = accessResult?.reason;
         if (reason === 'account_banned') setError('Your account has been permanently banned.');
-        else if (reason === 'account_locked') setError('Your account is locked. Contact your administrator.');
+        else if (reason === 'account_locked')
+          setError('Your account is locked. Contact your administrator.');
         else if (reason === 'account_suspended') {
           const until = accessResult?.until;
-          setError(`Your account is suspended${until ? ` until ${new Date(until).toLocaleString()}` : ''}.`);
-        } else if (reason === 'maintenance_mode') setError(accessResult?.message || 'System is under maintenance.');
+          setError(
+            `Your account is suspended${until ? ` until ${new Date(until).toLocaleString()}` : ''}.`,
+          );
+        } else if (reason === 'maintenance_mode')
+          setError(accessResult?.message || 'System is under maintenance.');
         else setError('Access denied.');
         await supabase.auth.signOut();
         return;
@@ -111,7 +118,7 @@ export function LoginPage() {
             Sign in to your administration panel
           </CardDescription>
         </CardHeader>
-        
+
         <CardContent className="space-y-4">
           {reason && reasonMessages[reason] && (
             <div className="flex items-center gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-sm animate-in slide-in-from-top-2 duration-300">
@@ -140,12 +147,12 @@ export function LoginPage() {
                 autoComplete="email"
               />
             </div>
-            
+
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">Password</Label>
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="text-xs font-medium text-primary hover:underline transition-faang"
                 >
@@ -163,9 +170,9 @@ export function LoginPage() {
               />
             </div>
 
-            <Button 
-              type="submit" 
-              className="w-full mt-2" 
+            <Button
+              type="submit"
+              className="w-full mt-2"
               disabled={isLoading || !email || !password}
               size="lg"
             >
@@ -177,7 +184,7 @@ export function LoginPage() {
             </Button>
           </form>
         </CardContent>
-        
+
         <div className="p-6 pt-0 text-center">
           <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">
             EduZone Admin Control v0.1.0

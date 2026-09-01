@@ -22,10 +22,7 @@ export async function getRateLimitRules(): Promise<RateLimitRule[]> {
 }
 
 // ── Toggle rule active state ─────────────────────────────────────
-export async function toggleRateLimitRule(
-  action: string,
-  isActive: boolean,
-): Promise<void> {
+export async function toggleRateLimitRule(action: string, isActive: boolean): Promise<void> {
   const { toggleRateLimitRuleAction } = await import('@/application/actions/admin.actions');
   return toggleRateLimitRuleAction(action, isActive);
 }

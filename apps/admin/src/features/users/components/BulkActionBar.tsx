@@ -24,8 +24,6 @@ import type { BulkAction } from '@/domain/types/bulk.types';
 import type { UserFilters } from '@/domain/types/user.types';
 import { cn } from '@/lib/utils';
 
-
-
 interface BulkActionBarProps {
   selectedCount: number;
   selectedIds: string[];
@@ -41,17 +39,70 @@ const ACTIONS: {
   color: string;
   bgColor: string;
 }[] = [
-    { id: 'lock' as const, labelKey: 'bulk_action_lock', icon: Lock, color: 'text-orange-600 dark:text-orange-400', bgColor: 'hover:bg-orange-50 dark:hover:bg-orange-500/10' },
-    { id: 'unlock' as const, labelKey: 'bulk_action_unlock', icon: LockOpen, color: 'text-emerald-600 dark:text-emerald-400', bgColor: 'hover:bg-emerald-50 dark:hover:bg-emerald-500/10' },
-    { id: 'suspend' as const, labelKey: 'bulk_action_suspend', icon: Block, color: 'text-amber-600 dark:text-amber-400', bgColor: 'hover:bg-amber-50 dark:hover:bg-amber-500/10' },
-    { id: 'ban' as const, labelKey: 'bulk_action_ban', icon: Block, color: 'text-red-600 dark:text-red-400', bgColor: 'hover:bg-red-50 dark:hover:bg-red-500/10' },
-    { id: 'warn' as const, labelKey: 'bulk_action_warn', icon: Warning, color: 'text-yellow-600 dark:text-yellow-400', bgColor: 'hover:bg-yellow-50 dark:hover:bg-yellow-500/10' },
-    { id: 'terminate_sessions' as const, labelKey: 'bulk_action_terminate_sessions', icon: ExitToApp, color: 'text-purple-600 dark:text-purple-400', bgColor: 'hover:bg-purple-50 dark:hover:bg-purple-500/10' },
-    { id: 'reset_devices' as const, labelKey: 'bulk_action_reset_devices', icon: DevicesOther, color: 'text-indigo-600 dark:text-indigo-400', bgColor: 'hover:bg-indigo-50 dark:hover:bg-indigo-500/10' },
-    { id: 'export' as const, labelKey: 'bulk_action_export', icon: FileDownload, color: 'text-emerald-600 dark:text-emerald-400', bgColor: 'hover:bg-emerald-50 dark:hover:bg-emerald-500/10' },
-    { id: 'delete' as const, labelKey: 'bulk_action_delete', icon: DeleteForever, color: 'text-red-600 dark:text-red-400', bgColor: 'hover:bg-red-50 dark:hover:bg-red-500/10' },
-
-  ];
+  {
+    id: 'lock' as const,
+    labelKey: 'bulk_action_lock',
+    icon: Lock,
+    color: 'text-orange-600 dark:text-orange-400',
+    bgColor: 'hover:bg-orange-50 dark:hover:bg-orange-500/10',
+  },
+  {
+    id: 'unlock' as const,
+    labelKey: 'bulk_action_unlock',
+    icon: LockOpen,
+    color: 'text-emerald-600 dark:text-emerald-400',
+    bgColor: 'hover:bg-emerald-50 dark:hover:bg-emerald-500/10',
+  },
+  {
+    id: 'suspend' as const,
+    labelKey: 'bulk_action_suspend',
+    icon: Block,
+    color: 'text-amber-600 dark:text-amber-400',
+    bgColor: 'hover:bg-amber-50 dark:hover:bg-amber-500/10',
+  },
+  {
+    id: 'ban' as const,
+    labelKey: 'bulk_action_ban',
+    icon: Block,
+    color: 'text-red-600 dark:text-red-400',
+    bgColor: 'hover:bg-red-50 dark:hover:bg-red-500/10',
+  },
+  {
+    id: 'warn' as const,
+    labelKey: 'bulk_action_warn',
+    icon: Warning,
+    color: 'text-yellow-600 dark:text-yellow-400',
+    bgColor: 'hover:bg-yellow-50 dark:hover:bg-yellow-500/10',
+  },
+  {
+    id: 'terminate_sessions' as const,
+    labelKey: 'bulk_action_terminate_sessions',
+    icon: ExitToApp,
+    color: 'text-purple-600 dark:text-purple-400',
+    bgColor: 'hover:bg-purple-50 dark:hover:bg-purple-500/10',
+  },
+  {
+    id: 'reset_devices' as const,
+    labelKey: 'bulk_action_reset_devices',
+    icon: DevicesOther,
+    color: 'text-indigo-600 dark:text-indigo-400',
+    bgColor: 'hover:bg-indigo-50 dark:hover:bg-indigo-500/10',
+  },
+  {
+    id: 'export' as const,
+    labelKey: 'bulk_action_export',
+    icon: FileDownload,
+    color: 'text-emerald-600 dark:text-emerald-400',
+    bgColor: 'hover:bg-emerald-50 dark:hover:bg-emerald-500/10',
+  },
+  {
+    id: 'delete' as const,
+    labelKey: 'bulk_action_delete',
+    icon: DeleteForever,
+    color: 'text-red-600 dark:text-red-400',
+    bgColor: 'hover:bg-red-50 dark:hover:bg-red-500/10',
+  },
+];
 
 export function BulkActionBar({
   selectedCount,
@@ -174,12 +225,21 @@ export function BulkActionBar({
           confirmColor={pendingAction === 'ban' || pendingAction === 'delete' ? 'error' : 'warning'}
           isLoading={submitBulk.isPending}
           error={error}
-          icon={pendingAction ? ACTIONS.find(a => a.id === pendingAction)?.icon && 
-            React.createElement(ACTIONS.find(a => a.id === pendingAction)!.icon, { sx: { fontSize: 22 } }) : null}
+          icon={
+            pendingAction
+              ? ACTIONS.find((a) => a.id === pendingAction)?.icon &&
+                React.createElement(ACTIONS.find((a) => a.id === pendingAction)!.icon, {
+                  sx: { fontSize: 22 },
+                })
+              : null
+          }
         >
           {pendingAction !== 'export' && pendingAction !== 'unlock' && (
             <div className="space-y-2 pt-2">
-              <Label htmlFor="bulk-reason" className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest ps-1">
+              <Label
+                htmlFor="bulk-reason"
+                className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest ps-1"
+              >
                 {t('bulk_reason_label')}
               </Label>
               <Input

@@ -67,7 +67,7 @@ interface FeatureFlagDbRow {
 export function mapDbRowToFeatureFlag(row: FeatureFlagDbRow | null): FeatureFlag {
   if (!row) return row as unknown as FeatureFlag;
   const metadata = row.metadata || {};
-  
+
   // Friendly default label from key
   const defaultLabel = row.key
     .split('_')
@@ -95,12 +95,12 @@ export function prepareFeatureFlagPayload(
   existingMetadata: Record<string, unknown> = {},
 ) {
   const { label, starts_at, ends_at, ...rest } = input;
-  
+
   const mergedMetadata: Record<string, unknown> = {
     ...existingMetadata,
     ...(rest.metadata || {}),
   };
-  
+
   if (label !== undefined) mergedMetadata.label = label;
   if (starts_at !== undefined) mergedMetadata.starts_at = starts_at;
   if (ends_at !== undefined) mergedMetadata.ends_at = ends_at;
@@ -110,4 +110,3 @@ export function prepareFeatureFlagPayload(
     metadata: mergedMetadata,
   };
 }
-

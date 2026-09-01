@@ -1,4 +1,5 @@
 # 🗺️ EduZone Admin Dashboard — Implementation Plan
+
 > **Version:** 2.1  
 > **Date:** 2026-04-05  
 > **Schema:** EduZone v10.0 (PostgreSQL 16 / Supabase Pro)  
@@ -44,17 +45,17 @@ PHASE-DOMAIN-NNN
 
 ### 1.2 Priority Levels
 
-| Symbol | Priority    | Description                                              |
-|--------|-------------|----------------------------------------------------------|
-| 🔴     | Critical    | Blocks other tasks or phases; must complete first        |
-| 🟠     | High        | Core feature; scheduled in current phase                 |
-| 🟡     | Medium      | Important but has workarounds; can slip one sprint       |
-| 🟢     | Low         | Enhancement; can defer to next phase                     |
+| Symbol | Priority | Description                                        |
+| ------ | -------- | -------------------------------------------------- |
+| 🔴     | Critical | Blocks other tasks or phases; must complete first  |
+| 🟠     | High     | Core feature; scheduled in current phase           |
+| 🟡     | Medium   | Important but has workarounds; can slip one sprint |
+| 🟢     | Low      | Enhancement; can defer to next phase               |
 
 ### 1.3 Effort Estimation
 
 | Size | Points | Typical Duration |
-|------|--------|------------------|
+| ---- | ------ | ---------------- |
 | XS   | 1      | < 2 hours        |
 | S    | 2      | 2–4 hours        |
 | M    | 3      | 0.5–1 day        |
@@ -65,6 +66,7 @@ PHASE-DOMAIN-NNN
 ### 1.4 Definition of Done (DoD)
 
 A task is **Done** when:
+
 - [ ] Code written and self-reviewed
 - [ ] TypeScript strict mode passes (`tsc --noEmit`)
 - [ ] ESLint + Prettier pass with zero warnings
@@ -89,7 +91,7 @@ A task is **Done** when:
 
 > **Goal:** Project skeleton, toolchain, CI/CD, and local Supabase ready.  
 > **Duration:** Week 1 (5 days)  
-> **Owner:** Lead Engineer + DevOps  
+> **Owner:** Lead Engineer + DevOps
 
 ---
 
@@ -99,6 +101,7 @@ A task is **Done** when:
 Bootstrap the Turborepo monorepo with all workspace packages defined.
 
 **Acceptance Criteria:**
+
 - `apps/web` (Next.js 15 App Router) initialised with `--typescript --tailwind --app`
 - `packages/types`, `packages/design-system`, `packages/utils` created as empty workspaces
 - `edge-functions/` directory with Deno config
@@ -109,6 +112,7 @@ Bootstrap the Turborepo monorepo with all workspace packages defined.
 - `tsconfig.base.json` with `strict: true`, `exactOptionalPropertyTypes: true`
 
 **Files Created:**
+
 ```
 /
 ├── apps/web/
@@ -134,6 +138,7 @@ Bootstrap the Turborepo monorepo with all workspace packages defined.
 Configure Supabase CLI for local development with the full Schema v5.0.
 
 **Acceptance Criteria:**
+
 - `supabase/` directory with `config.toml` targeting local instance
 - Schema v5.0 SQL (`migrations/2026-03-01-init.sql`) applied cleanly via `supabase db reset`
 - Seed file (`migrations/2026-03-08-seed.sql`) inserts default settings_kv + feature_flags
@@ -143,6 +148,7 @@ Configure Supabase CLI for local development with the full Schema v5.0.
 - Local Studio accessible at `http://localhost:54323`
 
 **Commands Verified:**
+
 ```bash
 supabase start
 supabase db reset
@@ -160,6 +166,7 @@ supabase gen types typescript --local > packages/types/src/database.types.ts
 GitHub Actions pipeline with quality gates, type checking, and deployment.
 
 **Acceptance Criteria:**
+
 - `.github/workflows/ci.yml`: runs on PR to `main`
   - `pnpm install --frozen-lockfile`
   - `turbo typecheck` (must pass)
@@ -174,6 +181,7 @@ GitHub Actions pipeline with quality gates, type checking, and deployment.
 - Branch protection: require 1 review + CI pass before merge
 
 **Secrets Required (GitHub):**
+
 ```
 SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY (edge-functions only)
 VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID
@@ -190,13 +198,20 @@ VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID
 Generate TypeScript types from DB schema and define domain types.
 
 **Acceptance Criteria:**
+
 - `packages/types/src/database.types.ts` — auto-generated via `supabase gen types`
 - `packages/types/src/rpc.types.ts` — typed wrappers for every RPC:
   ```typescript
   export type CheckDashboardAccessResult = {
     allowed: boolean;
-    reason?: 'app_locked' | 'unauthenticated' | 'account_banned' | 
-             'account_locked' | 'account_suspended' | 'user_not_found' | 'maintenance_mode';
+    reason?:
+      | 'app_locked'
+      | 'unauthenticated'
+      | 'account_banned'
+      | 'account_locked'
+      | 'account_suspended'
+      | 'user_not_found'
+      | 'maintenance_mode';
     message?: string;
     role?: string;
     tenant_id?: string;
@@ -220,6 +235,7 @@ Generate TypeScript types from DB schema and define domain types.
 MUI theme + Tailwind tokens + Storybook setup.
 
 **Acceptance Criteria:**
+
 - `packages/design-system/src/theme.ts`:
   - Primary `#1B4F8A`, Secondary `#2E86C1`, Error `#E74C3C`, Warning `#D4AC0D`, Success `#1E8449`
   - Typography: `Inter` for body, `JetBrains Mono` for code/hash values
@@ -241,6 +257,7 @@ MUI theme + Tailwind tokens + Storybook setup.
 `.env` structure, validation, and documentation.
 
 **Acceptance Criteria:**
+
 - `.env.local.example` with all required variables and descriptions:
   ```
   NEXT_PUBLIC_SUPABASE_URL=
@@ -265,7 +282,9 @@ MUI theme + Tailwind tokens + Storybook setup.
 Create migration files and verification scripts for all 9 pg_cron scheduled jobs defined in Schema v10.0. These jobs are currently commented out in the schema and must be explicitly deployed.
 
 **Acceptance Criteria:**
+
 - `supabase/migrations/YYYYMMDD_configure_pg_cron.sql`:
+
   ```sql
   -- Enable pg_cron extension
   CREATE EXTENSION IF NOT EXISTS pg_cron;
@@ -280,6 +299,7 @@ Create migration files and verification scripts for all 9 pg_cron scheduled jobs
   SELECT cron.schedule('cleanup_alq',       '0 4 * * *',      $$DELETE FROM activity_log_queue WHERE flushed AND flushed_at < NOW() - INTERVAL '30 days'$$);
   SELECT cron.schedule('expire_enrollments','0 0 * * *',      $$UPDATE enrollments SET status='expired' WHERE status='active' AND expires_at < NOW()$$);
   ```
+
 - Verification script `scripts/verify-cron-jobs.sh`: connects to staging and confirms `SELECT count(*) FROM cron.job` returns 9
 - Rollback SQL: `SELECT cron.unschedule(jobname)` for all 9 jobs
 - **⚠️ Local dev workaround:** pg_cron is **not available** in `supabase start` (local Docker). Provide:
@@ -298,6 +318,7 @@ Create migration files and verification scripts for all 9 pg_cron scheduled jobs
 Implement idempotency key support for all mutation operations, as mandated by RFC-007 (ACCEPTED). Prevents double-submission from button double-clicks, network retries, and Edge Function timeout re-runs.
 
 **Acceptance Criteria:**
+
 - `supabase/migrations/YYYYMMDD_idempotency_store.sql`:
   ```sql
   CREATE TABLE IF NOT EXISTS idempotency_store (
@@ -318,14 +339,31 @@ Implement idempotency key support for all mutation operations, as mandated by RF
   ```
 - `packages/utils/src/idempotency.ts`:
   ```typescript
-  export function generateIdempotencyKey(): string // UUID v4
-  export function buildIdempotencyHeader(endpoint: string): { 'X-Idempotency-Key': string; 'X-Idempotency-Endpoint': string }
-  export function withIdempotencyKey<T>(endpoint: string, fn: (key: string) => Promise<T>): Promise<T>
+  export function generateIdempotencyKey(): string; // UUID v4
+  export function buildIdempotencyHeader(endpoint: string): {
+    'X-Idempotency-Key': string;
+    'X-Idempotency-Endpoint': string;
+  };
+  export function withIdempotencyKey<T>(
+    endpoint: string,
+    fn: (key: string) => Promise<T>,
+  ): Promise<T>;
   ```
 - `edge-functions/_shared/idempotency.ts`:
   ```typescript
-  export async function checkIdempotency(userId: string, endpoint: string, key: string, sb: SupabaseClient): Promise<CachedResponse | null>
-  export async function storeIdempotency(userId: string, endpoint: string, key: string, response: unknown, sb: SupabaseClient): Promise<void>
+  export async function checkIdempotency(
+    userId: string,
+    endpoint: string,
+    key: string,
+    sb: SupabaseClient,
+  ): Promise<CachedResponse | null>;
+  export async function storeIdempotency(
+    userId: string,
+    endpoint: string,
+    key: string,
+    response: unknown,
+    sb: SupabaseClient,
+  ): Promise<void>;
   // Returns cached response if key already processed; throws ConflictError if status='processing'
   ```
 - pg_cron job: `SELECT cron.schedule('cleanup_idempotency', '0 3 * * *', $$DELETE FROM idempotency_store WHERE expires_at < NOW()$$)` — added to P0-INFRA-007 migration
@@ -343,9 +381,13 @@ Implement idempotency key support for all mutation operations, as mandated by RF
 Configure CSP, HSTS, X-Frame-Options, and CORS headers as mandated by SECURITY_DESIGN §9.1 and §10 checklist.
 
 **Acceptance Criteria:**
+
 - `apps/web/src/middleware.ts` — Next.js middleware sets security headers on all responses:
   ```typescript
-  headers.set('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io");
+  headers.set(
+    'Content-Security-Policy',
+    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io",
+  );
   headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   headers.set('X-Frame-Options', 'DENY');
   headers.set('X-Content-Type-Options', 'nosniff');
@@ -354,8 +396,8 @@ Configure CSP, HSTS, X-Frame-Options, and CORS headers as mandated by SECURITY_D
   ```
 - `edge-functions/_shared/headers.ts` — shared CORS + security header utility for all Edge Functions:
   ```typescript
-  export function corsHeaders(origin: string): HeadersInit
-  export function securityHeaders(): HeadersInit
+  export function corsHeaders(origin: string): HeadersInit;
+  export function securityHeaders(): HeadersInit;
   ```
 - Helmet-style scan passes: verify all headers present via `curl -I` against staging
 
@@ -366,17 +408,17 @@ Configure CSP, HSTS, X-Frame-Options, and CORS headers as mandated by SECURITY_D
 
 **Phase 0 Summary**
 
-| Task ID       | Title                              | Priority | Size | Days |
-|---------------|------------------------------------|----------|------|------|
-| P0-INFRA-001  | Monorepo Initialisation            | 🔴       | XL   | 3    |
-| P0-INFRA-002  | Supabase Local Dev Setup           | 🔴       | L    | 1.5  |
-| P0-INFRA-003  | CI/CD Pipeline                     | 🔴       | XL   | 3    |
-| P0-INFRA-004  | Type Generation & Shared Types     | 🔴       | M    | 1    |
-| P0-INFRA-005  | Design System & Theme              | 🔴       | L    | 1.5  |
-| P0-INFRA-006  | Environment Configuration          | 🟠       | S    | 0.5  |
-| P0-INFRA-007  | pg_cron Job Configuration          | 🔴       | M    | 1    |
-| P0-INFRA-008  | Idempotency Key Infrastructure     | 🔴       | M    | 1    |
-| P0-INFRA-009  | Security Headers Configuration     | 🔴       | S    | 0.5  |
+| Task ID      | Title                          | Priority | Size | Days |
+| ------------ | ------------------------------ | -------- | ---- | ---- |
+| P0-INFRA-001 | Monorepo Initialisation        | 🔴       | XL   | 3    |
+| P0-INFRA-002 | Supabase Local Dev Setup       | 🔴       | L    | 1.5  |
+| P0-INFRA-003 | CI/CD Pipeline                 | 🔴       | XL   | 3    |
+| P0-INFRA-004 | Type Generation & Shared Types | 🔴       | M    | 1    |
+| P0-INFRA-005 | Design System & Theme          | 🔴       | L    | 1.5  |
+| P0-INFRA-006 | Environment Configuration      | 🟠       | S    | 0.5  |
+| P0-INFRA-007 | pg_cron Job Configuration      | 🔴       | M    | 1    |
+| P0-INFRA-008 | Idempotency Key Infrastructure | 🔴       | M    | 1    |
+| P0-INFRA-009 | Security Headers Configuration | 🔴       | S    | 0.5  |
 
 **Phase 0 Total:** ~13 days
 
@@ -386,7 +428,7 @@ Configure CSP, HSTS, X-Frame-Options, and CORS headers as mandated by SECURITY_D
 
 > **Goal:** Working login, AdminShell layout, token-version handling, and global RPC client.  
 > **Duration:** Weeks 2–3 (10 days)  
-> **Owner:** Lead Engineer + Frontend Engineer  
+> **Owner:** Lead Engineer + Frontend Engineer
 
 ---
 
@@ -396,6 +438,7 @@ Configure CSP, HSTS, X-Frame-Options, and CORS headers as mandated by SECURITY_D
 Singleton Supabase client with proper SSR/client split.
 
 **Acceptance Criteria:**
+
 - `apps/web/src/lib/supabase/client.ts` — `createBrowserClient` (singleton pattern)
 - `apps/web/src/lib/supabase/server.ts` — `createServerClient` for Server Components and Route Handlers
 - `apps/web/src/lib/supabase/middleware.ts` — session refresh in Next.js middleware
@@ -404,6 +447,7 @@ Singleton Supabase client with proper SSR/client split.
 - No `localStorage` usage anywhere (verified by ESLint rule `no-restricted-globals`)
 
 **Files:**
+
 ```
 apps/web/src/lib/supabase/
 ├── client.ts
@@ -423,6 +467,7 @@ apps/web/src/middleware.ts
 Login UI with error handling and post-login routing.
 
 **Acceptance Criteria:**
+
 - Route: `app/(auth)/login/page.tsx`
 - Email + password form using React Hook Form + Zod schema
 - `supabase.auth.signInWithPassword()` on submit
@@ -446,10 +491,11 @@ Login UI with error handling and post-login routing.
 Global auth state with token_version tracking.
 
 **Acceptance Criteria:**
+
 - `apps/web/src/store/auth.store.ts`:
   ```typescript
   interface AuthState {
-    user: AuthUser | null;        // { id, email, primary_role, tenant_id, token_version }
+    user: AuthUser | null; // { id, email, primary_role, tenant_id, token_version }
     isLoading: boolean;
     setUser: (user: AuthUser | null) => void;
     clearUser: () => void;
@@ -472,6 +518,7 @@ Global auth state with token_version tracking.
 Global detection and response to stale JWT / forced logout.
 
 **Acceptance Criteria:**
+
 - `apps/web/src/lib/rpc/errorHandler.ts`:
   - `parseRpcError(error: unknown): RpcErrorCode` — maps PostgreSQL exception messages to typed error codes
   - `isSessionInvalidated(error: unknown): boolean` — returns true for auth-invalidating errors
@@ -487,10 +534,11 @@ Global detection and response to stale JWT / forced logout.
 - Tested: mock `check_dashboard_access` returning each reason code; assert correct navigation
 
 **Test Cases:**
+
 ```
 ✓ account_locked → hard logout + /login?reason=session_invalidated
 ✓ account_banned → hard logout + /login?reason=session_invalidated
-✓ account_suspended → hard logout + /login?reason=session_invalidated  
+✓ account_suspended → hard logout + /login?reason=session_invalidated
 ✓ maintenance_mode (no bypass) → show MaintenanceBanner, stay authenticated
 ✓ maintenance_bypass: true → render dashboard normally
 ✓ JWT expired → attempt silent refresh; if fails → hard logout
@@ -508,6 +556,7 @@ Global detection and response to stale JWT / forced logout.
 Main dashboard layout: collapsible sidebar + topbar + content area.
 
 **Acceptance Criteria:**
+
 - `app/(dashboard)/layout.tsx` — wraps all dashboard routes
   - Server Component: reads auth session; redirects to `/login` if unauthenticated
   - Renders `AdminShell` client component
@@ -544,6 +593,7 @@ Main dashboard layout: collapsible sidebar + topbar + content area.
 Declarative permission-based UI gating.
 
 **Acceptance Criteria:**
+
 - `components/ui/PermissionGate.tsx`:
   ```typescript
   <PermissionGate permission="users.lock" fallback={<DisabledButton />}>
@@ -568,6 +618,7 @@ Declarative permission-based UI gating.
 UI state store for modals, drawers, and filter persistence.
 
 **Acceptance Criteria:**
+
 - `apps/web/src/store/ui.store.ts`:
   ```typescript
   interface UiState {
@@ -602,6 +653,7 @@ UI state store for modals, drawers, and filter persistence.
 Production error tracking and graceful error UI.
 
 **Acceptance Criteria:**
+
 - Sentry initialised in `apps/web/src/instrumentation.ts` (Next.js instrumentation hook)
 - `components/ui/ErrorBoundary.tsx` — React error boundary wrapping each page route
 - Every Sentry capture includes: `{ user_id, tenant_id, primary_role, url, request_id }`
@@ -620,6 +672,7 @@ Production error tracking and graceful error UI.
 QueryClient configuration with global defaults.
 
 **Acceptance Criteria:**
+
 - `apps/web/src/lib/rpc/globalQueryClient.ts`:
   - `staleTime: 30_000` (30s default)
   - `retry: (count, error) => count < 2 && !isSessionInvalidated(error)`
@@ -634,7 +687,7 @@ QueryClient configuration with global defaults.
       detail: (id: string) => ['users', 'detail', id] as const,
     },
     // ... courses, settings, audit, jobs, etc.
-  }
+  };
   ```
 
 **Blockers:** P0-INFRA-004  
@@ -648,10 +701,17 @@ QueryClient configuration with global defaults.
 Bootstrap the Clean Architecture dependency injection container with all port interfaces and their implementations. This is the glue layer mandated by RFC-001, SYSTEM_DESIGN §5.2, and CODING_STANDARDS §5.1.
 
 **Acceptance Criteria:**
+
 - `apps/web/src/application/ports/` — port interfaces:
   ```typescript
-  IUserRepo, ICourseRepo, IEnrollmentRepo, ISettingsRepo,
-  ITenantRepo, IAuditRepo, IJobQueueRepo, INotificationRepo
+  (IUserRepo,
+    ICourseRepo,
+    IEnrollmentRepo,
+    ISettingsRepo,
+    ITenantRepo,
+    IAuditRepo,
+    IJobQueueRepo,
+    INotificationRepo);
   ```
 - `apps/web/src/application/ports/IEventBus.ts` — see P1-CORE-002
 - `apps/web/src/application/ports/ILogger.ts`, `IMetrics.ts`, `ITracer.ts` — see P1-CORE-003
@@ -660,9 +720,9 @@ Bootstrap the Clean Architecture dependency injection container with all port in
   export const container = {
     userRepo: new SupabaseUserRepo(supabase),
     eventBus: new InMemoryEventBus(),
-    logger:   isProduction ? new DatadogLogger() : new ConsoleLogger(),
-    metrics:  isProduction ? new DatadogMetrics() : new ConsoleMetrics(),
-    tracer:   isProduction ? new OtelTracer() : new NoopTracer(),
+    logger: isProduction ? new DatadogLogger() : new ConsoleLogger(),
+    metrics: isProduction ? new DatadogMetrics() : new ConsoleMetrics(),
+    tracer: isProduction ? new OtelTracer() : new NoopTracer(),
     // ... all repos
   };
   ```
@@ -681,6 +741,7 @@ Bootstrap the Clean Architecture dependency injection container with all port in
 Typed domain event system as mandated by RFC-004 (ACCEPTED). Use cases emit events; handlers process side-effects (audit logging, session revocation, email queueing).
 
 **Acceptance Criteria:**
+
 - `apps/web/src/application/ports/IEventBus.ts`:
   ```typescript
   export interface IDomainEvent {
@@ -698,10 +759,18 @@ Typed domain event system as mandated by RFC-004 (ACCEPTED). Use cases emit even
   ```
 - `apps/web/src/application/events/registry.ts` — typed event definitions:
   ```typescript
-  UserSuspendedEvent, UserBannedEvent, UserLockedEvent, UserUnlockedEvent,
-  CoursePublishedEvent, CourseArchivedEvent, EnrollmentCreatedEvent,
-  EnrollmentRevokedEvent, WarningIssuedEvent, BulkActionCompletedEvent,
-  SettingChangedEvent, MaintenanceModeToggledEvent
+  (UserSuspendedEvent,
+    UserBannedEvent,
+    UserLockedEvent,
+    UserUnlockedEvent,
+    CoursePublishedEvent,
+    CourseArchivedEvent,
+    EnrollmentCreatedEvent,
+    EnrollmentRevokedEvent,
+    WarningIssuedEvent,
+    BulkActionCompletedEvent,
+    SettingChangedEvent,
+    MaintenanceModeToggledEvent);
   ```
 - `apps/web/src/infrastructure/events/InMemoryEventBus.ts` — synchronous in-process handler dispatch
 - `apps/web/src/application/events/handlers/`:
@@ -721,6 +790,7 @@ Typed domain event system as mandated by RFC-004 (ACCEPTED). Use cases emit even
 Implement the three pillars of observability (ILogger, IMetrics, ITracer) as defined in MONITORING_LOGGING §2.1, §3.1, §4.1.
 
 **Acceptance Criteria:**
+
 - `apps/web/src/application/ports/ILogger.ts` — `info`, `warn`, `error`, `debug` with structured context
 - `apps/web/src/application/ports/IMetrics.ts` — `increment`, `gauge`, `histogram`, `timing`
 - `apps/web/src/application/ports/ITracer.ts` — `startSpan` returning `ISpan` with `traceId`, `spanId`, `end()`
@@ -742,20 +812,20 @@ Implement the three pillars of observability (ILogger, IMetrics, ITracer) as def
 
 **Phase 1 Summary**
 
-| Task ID        | Title                            | Priority | Size | Days |
-|----------------|----------------------------------|----------|------|------|
-| P1-AUTH-001    | Supabase Client Setup            | 🔴       | M    | 1    |
-| P1-AUTH-002    | Login Page                       | 🔴       | L    | 1.5  |
-| P1-AUTH-003    | Auth Store (Zustand)             | 🔴       | M    | 1    |
-| P1-AUTH-004    | Token-Version Mismatch Handler   | 🔴       | L    | 2    |
-| P1-SHELL-001   | AdminShell Layout                | 🔴       | XL   | 3    |
-| P1-SHELL-002   | Permission Gate Component        | 🔴       | M    | 1    |
-| P1-SHELL-003   | Global UI State (Zustand)        | 🟠       | M    | 0.5  |
-| P1-SHELL-004   | Global Error Boundary & Sentry   | 🟠       | M    | 1    |
-| P1-SHELL-005   | React Query Setup                | 🔴       | M    | 0.5  |
-| P1-CORE-001    | DI Container & Port Registration | 🔴       | L    | 1.5  |
-| P1-CORE-002    | Domain Events & Event Bus        | 🔴       | M    | 1    |
-| P1-CORE-003    | Observability Ports & Impls      | 🟠       | M    | 1    |
+| Task ID      | Title                            | Priority | Size | Days |
+| ------------ | -------------------------------- | -------- | ---- | ---- |
+| P1-AUTH-001  | Supabase Client Setup            | 🔴       | M    | 1    |
+| P1-AUTH-002  | Login Page                       | 🔴       | L    | 1.5  |
+| P1-AUTH-003  | Auth Store (Zustand)             | 🔴       | M    | 1    |
+| P1-AUTH-004  | Token-Version Mismatch Handler   | 🔴       | L    | 2    |
+| P1-SHELL-001 | AdminShell Layout                | 🔴       | XL   | 3    |
+| P1-SHELL-002 | Permission Gate Component        | 🔴       | M    | 1    |
+| P1-SHELL-003 | Global UI State (Zustand)        | 🟠       | M    | 0.5  |
+| P1-SHELL-004 | Global Error Boundary & Sentry   | 🟠       | M    | 1    |
+| P1-SHELL-005 | React Query Setup                | 🔴       | M    | 0.5  |
+| P1-CORE-001  | DI Container & Port Registration | 🔴       | L    | 1.5  |
+| P1-CORE-002  | Domain Events & Event Bus        | 🔴       | M    | 1    |
+| P1-CORE-003  | Observability Ports & Impls      | 🟠       | M    | 1    |
 
 **Phase 1 Total:** ~15.5 days
 
@@ -766,7 +836,7 @@ Implement the three pillars of observability (ILogger, IMetrics, ITracer) as def
 > **Goal:** Full user list, profile drawer, and all single-user admin actions.  
 > **Duration:** Weeks 4–5 (10 days)  
 > **Owner:** Frontend Engineer  
-> **DB Calls:** `users`, `user_roles`, `devices`, `sessions`, `warnings`, `user_permission_cache`  
+> **DB Calls:** `users`, `user_roles`, `devices`, `sessions`, `warnings`, `user_permission_cache`
 
 ---
 
@@ -776,6 +846,7 @@ Implement the three pillars of observability (ILogger, IMetrics, ITracer) as def
 All Supabase queries for the users domain. No UI — service functions only.
 
 **Acceptance Criteria:**
+
 - `apps/web/src/services/users.service.ts`:
   ```typescript
   getUsers(filters: UserFilters, page: number, pageSize: number): Promise<PaginatedResult<User>>
@@ -806,6 +877,7 @@ All Supabase queries for the users domain. No UI — service functions only.
 React Query hooks for all user data.
 
 **Acceptance Criteria:**
+
 - `apps/web/src/queries/users.queries.ts`:
   ```typescript
   useUsers(filters, page, pageSize)   → { data, isLoading, isFetching }
@@ -833,6 +905,7 @@ React Query hooks for all user data.
 Main user management page with DataGrid and filter bar.
 
 **Acceptance Criteria:**
+
 - Route: `app/(dashboard)/users/page.tsx`
 - `components/domain/users/UsersPage.tsx`:
   - Toolbar: search input (debounced 300ms), filter panel (tenant, role, status, region, last-seen range, warning count range)
@@ -864,6 +937,7 @@ Main user management page with DataGrid and filter bar.
 Right-side slide-in drawer with 5 tabs for a selected user.
 
 **Acceptance Criteria:**
+
 - `components/domain/users/UserProfileDrawer.tsx`:
   - Opens when user row is clicked or "View Profile" action selected
   - Width: 520px; slides in from right; focus-trapped for accessibility
@@ -901,6 +975,7 @@ Right-side slide-in drawer with 5 tabs for a selected user.
 ConfirmDialog variants for each user action with proper error display.
 
 **Acceptance Criteria:**
+
 - `components/ui/ConfirmDialog.tsx` — base dialog with:
   - `title`, `description`, `confirmLabel`, `cancelLabel`
   - Optional `confirmText` field (user must type text to confirm — used for "BAN")
@@ -934,6 +1009,7 @@ ConfirmDialog variants for each user action with proper error display.
 Live account_status updates without page refresh.
 
 **Acceptance Criteria:**
+
 - `hooks/useUserRealtime.ts`:
   - Subscribes to `users` table UPDATE events via Supabase Realtime
   - Filters: `tenant_id = current_tenant_id` (or all for super_admin)
@@ -954,6 +1030,7 @@ Live account_status updates without page refresh.
 Validation schemas that mirror DB CHECK constraints.
 
 **Acceptance Criteria:**
+
 - `apps/web/src/forms/schemas/user.schema.ts`:
   ```typescript
   export const accountActionSchema = z.enum(['lock', 'unlock', 'suspend', 'ban']);
@@ -982,15 +1059,15 @@ Validation schemas that mirror DB CHECK constraints.
 
 **Phase 2 Summary**
 
-| Task ID      | Title                          | Priority | Size | Days |
-|--------------|--------------------------------|----------|------|------|
-| P2-USER-001  | Users Service Layer            | 🔴       | L    | 1.5  |
-| P2-USER-002  | User Queries (React Query)     | 🔴       | M    | 1    |
-| P2-USER-003  | Users List Page                | 🔴       | XL   | 2.5  |
-| P2-USER-004  | User Profile Drawer            | 🔴       | XL   | 2.5  |
-| P2-USER-005  | Action Dialogs & Error Handling| 🔴       | L    | 1.5  |
-| P2-USER-006  | User Realtime Updates          | 🟠       | M    | 0.5  |
-| P2-USER-007  | User Zod Schemas & Forms       | 🟠       | M    | 0.5  |
+| Task ID     | Title                           | Priority | Size | Days |
+| ----------- | ------------------------------- | -------- | ---- | ---- |
+| P2-USER-001 | Users Service Layer             | 🔴       | L    | 1.5  |
+| P2-USER-002 | User Queries (React Query)      | 🔴       | M    | 1    |
+| P2-USER-003 | Users List Page                 | 🔴       | XL   | 2.5  |
+| P2-USER-004 | User Profile Drawer             | 🔴       | XL   | 2.5  |
+| P2-USER-005 | Action Dialogs & Error Handling | 🔴       | L    | 1.5  |
+| P2-USER-006 | User Realtime Updates           | 🟠       | M    | 0.5  |
+| P2-USER-007 | User Zod Schemas & Forms        | 🟠       | M    | 0.5  |
 
 **Phase 2 Total:** ~10 days
 
@@ -1001,13 +1078,14 @@ Validation schemas that mirror DB CHECK constraints.
 > **Goal:** Course CRUD, section/lesson editor, enrollment management, course analytics.  
 > **Duration:** Weeks 5–6 (8 days)  
 > **Owner:** Frontend Engineer  
-> **DB Calls:** `courses`, `sections`, `lessons`, `enrollments`, `user_progress`, `video_views`, `mv_course_stats`  
+> **DB Calls:** `courses`, `sections`, `lessons`, `enrollments`, `user_progress`, `video_views`, `mv_course_stats`
 
 ---
 
 ### P3-COURSE-001 · Courses Service Layer 🔴 `L`
 
 **Acceptance Criteria:**
+
 - `apps/web/src/services/courses.service.ts`:
   ```typescript
   getCourses(filters: CourseFilters, page: number): Promise<PaginatedResult<Course>>
@@ -1039,6 +1117,7 @@ Validation schemas that mirror DB CHECK constraints.
 ### P3-COURSE-002 · Courses List Page 🔴 `L`
 
 **Acceptance Criteria:**
+
 - Route: `app/(dashboard)/courses/page.tsx`
 - DataGrid: Title, Status badge, Teacher name, Tenant (super_admin only), Category, Level, Price/Free badge, Enrollment count, Created At
 - Filters: tenant, status, category, level, is_free, teacher search
@@ -1054,6 +1133,7 @@ Validation schemas that mirror DB CHECK constraints.
 ### P3-COURSE-003 · Course Detail & Editor 🔴 `XL`
 
 **Acceptance Criteria:**
+
 - Route: `app/(dashboard)/courses/[id]/page.tsx`
 - Two-panel layout: left (course info + settings), right (sections/lessons accordion)
 - Course info form (React Hook Form + Zod):
@@ -1078,6 +1158,7 @@ Validation schemas that mirror DB CHECK constraints.
 ### P3-COURSE-004 · Enrollment Management 🔴 `L`
 
 **Acceptance Criteria:**
+
 - Route: `app/(dashboard)/enrollments/page.tsx`
 - DataGrid: Student email, Course title, Status badge, Enrolled At, Expires At (with "EXPIRED" chip if past), Progress %, Enrolled By, Actions
 - Filters: tenant, course, status, expiry range
@@ -1093,6 +1174,7 @@ Validation schemas that mirror DB CHECK constraints.
 ### P3-COURSE-005 · Course Analytics Tab 🟠 `L`
 
 **Acceptance Criteria:**
+
 - Tab within `app/(dashboard)/courses/[id]/page.tsx`
 - KPI row: Total Enrolled, Completed, Average Progress %, Total Video Views — from `mv_course_stats`
 - Progress distribution histogram (Recharts BarChart): buckets 0–25%, 25–50%, 50–75%, 75–100%, Completed
@@ -1107,13 +1189,13 @@ Validation schemas that mirror DB CHECK constraints.
 
 **Phase 3 Summary**
 
-| Task ID        | Title                      | Priority | Size | Days |
-|----------------|----------------------------|----------|------|------|
-| P3-COURSE-001  | Courses Service Layer      | 🔴       | L    | 1.5  |
-| P3-COURSE-002  | Courses List Page          | 🔴       | L    | 1.5  |
-| P3-COURSE-003  | Course Detail & Editor     | 🔴       | XL   | 4    |
-| P3-COURSE-004  | Enrollment Management      | 🔴       | L    | 1.5  |
-| P3-COURSE-005  | Course Analytics Tab       | 🟠       | L    | 1.5  |
+| Task ID       | Title                  | Priority | Size | Days |
+| ------------- | ---------------------- | -------- | ---- | ---- |
+| P3-COURSE-001 | Courses Service Layer  | 🔴       | L    | 1.5  |
+| P3-COURSE-002 | Courses List Page      | 🔴       | L    | 1.5  |
+| P3-COURSE-003 | Course Detail & Editor | 🔴       | XL   | 4    |
+| P3-COURSE-004 | Enrollment Management  | 🔴       | L    | 1.5  |
+| P3-COURSE-005 | Course Analytics Tab   | 🟠       | L    | 1.5  |
 
 **Phase 3 Total:** ~10 days
 
@@ -1124,13 +1206,14 @@ Validation schemas that mirror DB CHECK constraints.
 > **Goal:** Dedicated restricted view for teacher role with own courses, student progress, and warnings.  
 > **Duration:** Week 7 (5 days)  
 > **Owner:** Frontend Engineer  
-> **Note:** Teachers reuse services from Phase 3 with scoped filters (`teacher_id = auth.uid()`).  
+> **Note:** Teachers reuse services from Phase 3 with scoped filters (`teacher_id = auth.uid()`).
 
 ---
 
 ### P4-TEACHER-001 · Teacher Route Guard 🟠 `M`
 
 **Acceptance Criteria:**
+
 - `app/(dashboard)/layout.tsx` checks `primary_role`
 - Teachers redirected away from: `/users`, `/tenants`, `/audit`, `/jobs`, `/feature-flags`, `/settings`
 - Attempting direct URL navigation to forbidden routes → redirects to `/my-courses` with toast: "Access denied."
@@ -1144,6 +1227,7 @@ Validation schemas that mirror DB CHECK constraints.
 ### P4-TEACHER-002 · My Courses Page (Teacher) 🔴 `L`
 
 **Acceptance Criteria:**
+
 - Route: `app/(dashboard)/my-courses/page.tsx`
 - Fetches courses WHERE `teacher_id = auth.uid()` using `courses.service.getCourses({ teacher_id: user.id })`
 - Course card grid (3 columns): thumbnail, title, status badge, lesson count, enrolled student count
@@ -1159,6 +1243,7 @@ Validation schemas that mirror DB CHECK constraints.
 ### P4-TEACHER-003 · Student Progress Page (Teacher) 🔴 `L`
 
 **Acceptance Criteria:**
+
 - Route: `app/(dashboard)/my-courses/[id]/students/page.tsx`
 - Lists enrolled students for teacher's course: first_name + last_name, progress_pct bar, last_watched, completed badge
 - Email shown only if tenant setting `data_sharing_teachers = true`; otherwise masked as `u***@***.com`
@@ -1174,6 +1259,7 @@ Validation schemas that mirror DB CHECK constraints.
 ### P4-TEACHER-004 · Teacher Analytics Page 🟠 `L`
 
 **Acceptance Criteria:**
+
 - Route: `app/(dashboard)/my-courses/[id]/analytics/page.tsx`
 - KPI row from `mv_course_stats` WHERE `course_id` in teacher's courses
 - Progress distribution chart (Recharts BarChart)
@@ -1189,6 +1275,7 @@ Validation schemas that mirror DB CHECK constraints.
 ### P4-TEACHER-005 · Teacher Warnings Page 🔴 `M`
 
 **Acceptance Criteria:**
+
 - Route: `app/(dashboard)/warnings/page.tsx` (shared route, scoped by role)
 - Teacher view:
   - Issue warning form: student selector (enrolled in teacher's courses only), reason (min 20 chars), severity, action
@@ -1208,7 +1295,9 @@ Validation schemas that mirror DB CHECK constraints.
 Fix the known RLS gap on the `warnings` table. Currently teachers can potentially access all warnings in their tenant. The correct policy should scope teacher access to only warnings they issued.
 
 **Acceptance Criteria:**
+
 - Migration file `supabase/migrations/YYYYMMDD_fix_warnings_rls.sql`:
+
   ```sql
   -- Drop existing overly-permissive policy if any
   DROP POLICY IF EXISTS warnings_tenant_isolation ON warnings;
@@ -1247,6 +1336,7 @@ Fix the known RLS gap on the `warnings` table. Currently teachers can potentiall
       AND is_current_user_super_admin()
     );
   ```
+
 - Vitest unit test: mock Supabase client as teacher → confirm cannot query other teachers' warnings
 - Vitest unit test: mock Supabase client as teacher → confirm cannot UPDATE or DELETE any warning
 - Integration test against local Supabase: teacher A cannot see teacher B's warnings in same tenant
@@ -1258,14 +1348,14 @@ Fix the known RLS gap on the `warnings` table. Currently teachers can potentiall
 
 **Phase 4 Summary**
 
-| Task ID          | Title                          | Priority | Size | Days |
-|------------------|--------------------------------|----------|------|------|
-| P4-TEACHER-001   | Teacher Route Guard            | 🟠       | M    | 0.5  |
-| P4-TEACHER-002   | My Courses Page (Teacher)      | 🔴       | L    | 1.5  |
-| P4-TEACHER-003   | Student Progress Page          | 🔴       | L    | 1.5  |
-| P4-TEACHER-004   | Teacher Analytics Page         | 🟠       | L    | 0.5  |
-| P4-TEACHER-005   | Teacher Warnings Page          | 🔴       | M    | 0.5  |
-| P4-TEACHER-006   | Warnings RLS Policy Fix        | 🔴       | S    | 0.5  |
+| Task ID        | Title                     | Priority | Size | Days |
+| -------------- | ------------------------- | -------- | ---- | ---- |
+| P4-TEACHER-001 | Teacher Route Guard       | 🟠       | M    | 0.5  |
+| P4-TEACHER-002 | My Courses Page (Teacher) | 🔴       | L    | 1.5  |
+| P4-TEACHER-003 | Student Progress Page     | 🔴       | L    | 1.5  |
+| P4-TEACHER-004 | Teacher Analytics Page    | 🟠       | L    | 0.5  |
+| P4-TEACHER-005 | Teacher Warnings Page     | 🔴       | M    | 0.5  |
+| P4-TEACHER-006 | Warnings RLS Policy Fix   | 🔴       | S    | 0.5  |
 
 **Phase 4 Total:** ~5 days
 
@@ -1275,13 +1365,14 @@ Fix the known RLS gap on the `warnings` table. Currently teachers can potentiall
 
 > **Goal:** KV settings editor, maintenance wizard, app lock, feature flag management.  
 > **Duration:** Week 8 (5 days)  
-> **Owner:** Frontend Engineer  
+> **Owner:** Frontend Engineer
 
 ---
 
 ### P5-SETTINGS-001 · Settings Service & Cache Invalidation 🔴 `M`
 
 **Acceptance Criteria:**
+
 - `apps/web/src/services/settings.service.ts`:
   ```typescript
   getAllSettings(): Promise<SettingKv[]>
@@ -1304,6 +1395,7 @@ Fix the known RLS gap on the `warnings` table. Currently teachers can potentiall
 ### P5-SETTINGS-002 · Settings Page 🔴 `L`
 
 **Acceptance Criteria:**
+
 - Route: `app/(dashboard)/settings/page.tsx`
 - Tabs by category: Security, Maintenance, Limits, General
 - Each setting row: label (Arabic), key (monospace), current value, value_type badge, is_public badge, version, "Edit" button
@@ -1324,6 +1416,7 @@ Fix the known RLS gap on the `warnings` table. Currently teachers can potentiall
 ### P5-SETTINGS-003 · Maintenance Mode Wizard 🟠 `L`
 
 **Acceptance Criteria:**
+
 - `components/domain/settings/MaintenanceWizard.tsx` — 5-step wizard:
   1. Enable/Disable toggle
   2. Message textarea (Arabic + English)
@@ -1343,6 +1436,7 @@ Fix the known RLS gap on the `warnings` table. Currently teachers can potentiall
 ### P5-SETTINGS-004 · App Lock Controls 🟠 `M`
 
 **Acceptance Criteria:**
+
 - `components/domain/settings/AppLockControl.tsx`:
   - Prominent banner in Settings page when `app_locked = true`: "Application is currently locked for all users"
   - Lock button → ConfirmDialog with message textarea, calls `lock_app_for_all(message)`
@@ -1357,6 +1451,7 @@ Fix the known RLS gap on the `warnings` table. Currently teachers can potentiall
 ### P5-SETTINGS-005 · Feature Flags Page 🟠 `L`
 
 **Acceptance Criteria:**
+
 - Route: `app/(dashboard)/feature-flags/page.tsx`
 - List all flags: key, label (Arabic), is_enabled toggle, rollout_pct slider (0–100), starts_at, ends_at, metadata
 - Expandable row: per-flag role overrides table (feature_flag_roles: role, include/exclude)
@@ -1372,13 +1467,13 @@ Fix the known RLS gap on the `warnings` table. Currently teachers can potentiall
 
 **Phase 5 Summary**
 
-| Task ID           | Title                       | Priority | Size | Days |
-|-------------------|-----------------------------|----------|------|------|
-| P5-SETTINGS-001   | Settings Service & Cache    | 🔴       | M    | 1    |
-| P5-SETTINGS-002   | Settings Page               | 🔴       | L    | 1.5  |
-| P5-SETTINGS-003   | Maintenance Mode Wizard     | 🟠       | L    | 1    |
-| P5-SETTINGS-004   | App Lock Controls           | 🟠       | M    | 0.5  |
-| P5-SETTINGS-005   | Feature Flags Page          | 🟠       | L    | 1.5  |
+| Task ID         | Title                    | Priority | Size | Days |
+| --------------- | ------------------------ | -------- | ---- | ---- |
+| P5-SETTINGS-001 | Settings Service & Cache | 🔴       | M    | 1    |
+| P5-SETTINGS-002 | Settings Page            | 🔴       | L    | 1.5  |
+| P5-SETTINGS-003 | Maintenance Mode Wizard  | 🟠       | L    | 1    |
+| P5-SETTINGS-004 | App Lock Controls        | 🟠       | M    | 0.5  |
+| P5-SETTINGS-005 | Feature Flags Page       | 🟠       | L    | 1.5  |
 
 **Phase 5 Total:** ~5.5 days
 
@@ -1388,13 +1483,14 @@ Fix the known RLS gap on the `warnings` table. Currently teachers can potentiall
 
 > **Goal:** Audit log viewer with hash-chain verification, rate limits dashboard, live activity stream, job queue management.  
 > **Duration:** Weeks 9–10 (8 days)  
-> **Owner:** Senior Frontend Engineer  
+> **Owner:** Senior Frontend Engineer
 
 ---
 
 ### P6-MONITOR-001 · Audit Service Layer 🔴 `M`
 
 **Acceptance Criteria:**
+
 - `apps/web/src/services/audit.service.ts`:
   ```typescript
   getActivityLogs(filters: AuditFilters, page: number): Promise<PaginatedResult<ActivityLog>>
@@ -1417,6 +1513,7 @@ Fix the known RLS gap on the `warnings` table. Currently teachers can potentiall
 ### P6-MONITOR-002 · Audit Log Viewer 🔴 `XL`
 
 **Acceptance Criteria:**
+
 - Route: `app/(dashboard)/audit/page.tsx` (super_admin only)
 - DataGrid: seq, created_at, user email, activity_type, risk_level chip, entry_hash (truncated 12 chars), details (JSON tooltip)
 - Row expand → full details JSON (prettified), prev_hash (with "Chain Link" arrow to previous entry)
@@ -1440,6 +1537,7 @@ Fix the known RLS gap on the `warnings` table. Currently teachers can potentiall
 ### P6-MONITOR-003 · Rate Limits Dashboard 🟠 `L`
 
 **Acceptance Criteria:**
+
 - Route: `app/(dashboard)/audit/page.tsx` — "Rate Limits" tab
 - Active blocks table: user_id/email, ip_address, action, hit_count, blocked_until countdown timer
 - Top offenders: GROUP BY user_id/ip ORDER BY hit_count DESC LIMIT 20 (last 24h)
@@ -1455,6 +1553,7 @@ Fix the known RLS gap on the `warnings` table. Currently teachers can potentiall
 ### P6-MONITOR-004 · Job Queue Management 🔴 `L`
 
 **Acceptance Criteria:**
+
 - Route: `app/(dashboard)/jobs/page.tsx`
 - `apps/web/src/services/jobs.service.ts`:
   ```typescript
@@ -1476,12 +1575,12 @@ Fix the known RLS gap on the `warnings` table. Currently teachers can potentiall
 
 **Phase 6 Summary**
 
-| Task ID          | Title                     | Priority | Size | Days |
-|------------------|---------------------------|----------|------|------|
-| P6-MONITOR-001   | Audit Service Layer       | 🔴       | M    | 1    |
-| P6-MONITOR-002   | Audit Log Viewer          | 🔴       | XL   | 3    |
-| P6-MONITOR-003   | Rate Limits Dashboard     | 🟠       | L    | 1.5  |
-| P6-MONITOR-004   | Job Queue Management      | 🔴       | L    | 1.5  |
+| Task ID        | Title                 | Priority | Size | Days |
+| -------------- | --------------------- | -------- | ---- | ---- |
+| P6-MONITOR-001 | Audit Service Layer   | 🔴       | M    | 1    |
+| P6-MONITOR-002 | Audit Log Viewer      | 🔴       | XL   | 3    |
+| P6-MONITOR-003 | Rate Limits Dashboard | 🟠       | L    | 1.5  |
+| P6-MONITOR-004 | Job Queue Management  | 🔴       | L    | 1.5  |
 
 **Phase 6 Total:** ~7 days
 
@@ -1491,7 +1590,7 @@ Fix the known RLS gap on the `warnings` table. Currently teachers can potentiall
 
 > **Goal:** Edge Function for bulk actions + full UI for progress tracking, cancellation, and partial failure handling.  
 > **Duration:** Weeks 10–11 (8 days)  
-> **Owner:** Senior Engineer + Backend Engineer  
+> **Owner:** Senior Engineer + Backend Engineer
 
 ---
 
@@ -1501,22 +1600,25 @@ Fix the known RLS gap on the `warnings` table. Currently teachers can potentiall
 Supabase Edge Function that validates, queues, and manages bulk jobs.
 
 **Acceptance Criteria:**
+
 - `edge-functions/bulk-action/index.ts`:
   - Validates JWT (`_shared/auth.ts`): extracts user_id + role, verifies permission for requested action
   - Validates request body against Zod schema (see PRD Section 7.2)
-  - `dry_run: true` → runs COUNT(*) from filters, returns `{ estimated_count }` without inserting
+  - `dry_run: true` → runs COUNT(\*) from filters, returns `{ estimated_count }` without inserting
   - `dry_run: false` → validates estimated_count ≤ 500, checks job_queue pending < 10,000
   - Inserts job record into `job_queue` with `job_type = action`, `payload = { filters, params, initiator_id }`
   - Returns `202 Accepted` with `{ job_id, estimated_count, status: 'pending', created_at }`
   - Logs via `log_activity_async(userId, 'bulk_action_queued', { action, estimated_count }, ...)`
 
 - `edge-functions/_shared/auth.ts`:
+
   ```typescript
-  async function requirePermission(jwt: string, permission: PermissionName): Promise<User>
+  async function requirePermission(jwt: string, permission: PermissionName): Promise<User>;
   // throws 403 if permission missing; extracts user from JWT + validates token_version
   ```
 
 - `edge-functions/_shared/supabaseAdmin.ts`:
+
   ```typescript
   // createClient with SUPABASE_SERVICE_ROLE_KEY — Deno env only
   // Never exposed to browser
@@ -1541,6 +1643,7 @@ Supabase Edge Function that validates, queues, and manages bulk jobs.
 Worker that dequeues and processes bulk jobs in batches.
 
 **Acceptance Criteria:**
+
 - `edge-functions/bulk-worker/index.ts`:
   - Triggered by Supabase cron (every 60 seconds) or HTTP trigger
   - Calls `dequeue_job('bulk-worker', BULK_JOB_TYPES, 1800)` to claim a job
@@ -1559,6 +1662,7 @@ Worker that dequeues and processes bulk jobs in batches.
 ### P7-BULK-003 · Bulk Action UI (BulkActionBar) 🔴 `L`
 
 **Acceptance Criteria:**
+
 - `components/domain/users/BulkActionBar.tsx` (extends P2-USER-003):
   - Shows when ≥1 users selected in DataGrid
   - Action buttons: Lock, Suspend, Warn, Terminate Sessions, Reset Devices, Export
@@ -1584,6 +1688,7 @@ Worker that dequeues and processes bulk jobs in batches.
 Export user data as JSON or CSV with signed download URL.
 
 **Acceptance Criteria:**
+
 - `edge-functions/bulk-export/index.ts`:
   - Triggered by bulk worker when `job_type = 'bulk_export'`
   - Collects all data for filtered users across: users, user_roles, enrollments, warnings, devices, activity_logs (last 30 days)
@@ -1601,12 +1706,12 @@ Export user data as JSON or CSV with signed download URL.
 
 **Phase 7 Summary**
 
-| Task ID       | Title                       | Priority | Size | Days |
-|---------------|-----------------------------|----------|------|------|
-| P7-BULK-001   | Bulk Action Edge Function   | 🔴       | XXL  | 3    |
-| P7-BULK-002   | Bulk Worker Edge Function   | 🔴       | XL   | 2.5  |
-| P7-BULK-003   | Bulk Action UI              | 🔴       | L    | 1.5  |
-| P7-BULK-004   | Bulk Export Edge Function   | 🟠       | L    | 1    |
+| Task ID     | Title                     | Priority | Size | Days |
+| ----------- | ------------------------- | -------- | ---- | ---- |
+| P7-BULK-001 | Bulk Action Edge Function | 🔴       | XXL  | 3    |
+| P7-BULK-002 | Bulk Worker Edge Function | 🔴       | XL   | 2.5  |
+| P7-BULK-003 | Bulk Action UI            | 🔴       | L    | 1.5  |
+| P7-BULK-004 | Bulk Export Edge Function | 🟠       | L    | 1    |
 
 **Phase 7 Total:** ~8 days
 
@@ -1616,13 +1721,14 @@ Export user data as JSON or CSV with signed download URL.
 
 > **Goal:** Global analytics dashboard, materialised view charts, CSV/PDF export.  
 > **Duration:** Week 12 (5 days)  
-> **Owner:** Frontend Engineer  
+> **Owner:** Frontend Engineer
 
 ---
 
 ### P8-ANALYTICS-001 · Analytics Service & MV Queries 🔴 `M`
 
 **Acceptance Criteria:**
+
 - `apps/web/src/services/analytics.service.ts`:
   ```typescript
   getUserStats(tenantId?: string): Promise<MvUserStats>
@@ -1642,6 +1748,7 @@ Export user data as JSON or CSV with signed download URL.
 ### P8-ANALYTICS-002 · Analytics Dashboard Page 🔴 `XL`
 
 **Acceptance Criteria:**
+
 - Route: `app/(dashboard)/analytics/page.tsx`
 - Super-admin: global view (no tenant filter); Admin: tenant-scoped
 - **Section 1 — User Metrics:**
@@ -1668,6 +1775,7 @@ Export user data as JSON or CSV with signed download URL.
 ### P8-ANALYTICS-003 · Report Export Edge Function 🟠 `L`
 
 **Acceptance Criteria:**
+
 - `edge-functions/export-report/index.ts`:
   - Accepts: `{ report_type: 'user_stats' | 'course_stats' | 'activity', tenant_id, date_range, format: 'csv' | 'pdf' }`
   - CSV: streams data from MV queries, generates CSV via Deno CSV library
@@ -1681,11 +1789,11 @@ Export user data as JSON or CSV with signed download URL.
 
 **Phase 8 Summary**
 
-| Task ID            | Title                         | Priority | Size | Days |
-|--------------------|-------------------------------|----------|------|------|
-| P8-ANALYTICS-001   | Analytics Service & MV Queries| 🔴       | M    | 1    |
-| P8-ANALYTICS-002   | Analytics Dashboard Page      | 🔴       | XL   | 3    |
-| P8-ANALYTICS-003   | Report Export Edge Function   | 🟠       | L    | 1.5  |
+| Task ID          | Title                          | Priority | Size | Days |
+| ---------------- | ------------------------------ | -------- | ---- | ---- |
+| P8-ANALYTICS-001 | Analytics Service & MV Queries | 🔴       | M    | 1    |
+| P8-ANALYTICS-002 | Analytics Dashboard Page       | 🔴       | XL   | 3    |
+| P8-ANALYTICS-003 | Report Export Edge Function    | 🟠       | L    | 1.5  |
 
 **Phase 8 Total:** ~5.5 days
 
@@ -1695,13 +1803,14 @@ Export user data as JSON or CSV with signed download URL.
 
 > **Goal:** Full tenant CRUD, resource monitoring, and tenant-scoped audit for super_admin.  
 > **Duration:** Week 13 (5 days)  
-> **Owner:** Frontend Engineer  
+> **Owner:** Frontend Engineer
 
 ---
 
 ### P9-TENANT-001 · Tenant Service Layer 🔴 `M`
 
 **Acceptance Criteria:**
+
 - `apps/web/src/services/tenants.service.ts`:
   ```typescript
   getTenants(filters: TenantFilters): Promise<PaginatedResult<Tenant>>
@@ -1723,6 +1832,7 @@ Export user data as JSON or CSV with signed download URL.
 ### P9-TENANT-002 · Tenants List Page 🔴 `L`
 
 **Acceptance Criteria:**
+
 - Route: `app/(dashboard)/tenants/page.tsx` (super_admin only — route guard)
 - DataGrid: name, slug, plan badge, region badge, shard_id, status, current_users/max_users bar, current_courses/max_courses bar, created_at
 - Filters: region, plan, status
@@ -1737,6 +1847,7 @@ Export user data as JSON or CSV with signed download URL.
 ### P9-TENANT-003 · Tenant Detail Page 🟠 `L`
 
 **Acceptance Criteria:**
+
 - Route: `app/(dashboard)/tenants/[id]/page.tsx`
 - Overview tab: all tenant fields, resource usage bars (users, courses, storage)
 - Users tab: users list scoped to this tenant (reuses P2-USER-003 component with `tenant_id` filter)
@@ -1752,11 +1863,11 @@ Export user data as JSON or CSV with signed download URL.
 
 **Phase 9 Summary**
 
-| Task ID          | Title                  | Priority | Size | Days |
-|------------------|------------------------|----------|------|------|
-| P9-TENANT-001    | Tenant Service Layer   | 🔴       | M    | 1    |
-| P9-TENANT-002    | Tenants List Page      | 🔴       | L    | 1.5  |
-| P9-TENANT-003    | Tenant Detail Page     | 🟠       | L    | 2    |
+| Task ID       | Title                | Priority | Size | Days |
+| ------------- | -------------------- | -------- | ---- | ---- |
+| P9-TENANT-001 | Tenant Service Layer | 🔴       | M    | 1    |
+| P9-TENANT-002 | Tenants List Page    | 🔴       | L    | 1.5  |
+| P9-TENANT-003 | Tenant Detail Page   | 🟠       | L    | 2    |
 
 **Phase 9 Total:** ~4.5 days
 
@@ -1766,13 +1877,14 @@ Export user data as JSON or CSV with signed download URL.
 
 > **Goal:** Full E2E test suite, security audit, performance tuning, i18n completion, production deploy.  
 > **Duration:** Weeks 14–18 (18 days)  
-> **Owner:** Full Team  
+> **Owner:** Full Team
 
 ---
 
 ### P10-QA-001 · Unit Test Suite 🔴 `XL`
 
 **Acceptance Criteria:**
+
 - Vitest tests for all service functions (mock Supabase client)
 - Coverage ≥ 80% for: `services/`, `hooks/`, `store/`, `forms/schemas/`
 - `parseRpcError` — tests for every error code in the catalogue
@@ -1787,6 +1899,7 @@ Export user data as JSON or CSV with signed download URL.
 ### P10-QA-002 · Storybook Component Library 🟡 `XL`
 
 **Acceptance Criteria:**
+
 - Stories for every component in `components/ui/` and `components/domain/`
 - Interaction tests (Storybook play functions) for:
   - ConfirmDialog — all variants (lock, ban, suspend)
@@ -1807,6 +1920,7 @@ End-to-end tests using Playwright (per RFC-012 binding decision) against Supabas
 
 **Acceptance Criteria:**
 Critical flows tested against Supabase staging environment:
+
 - `e2e/auth/login.spec.ts` — login, MFA, wrong credentials, session_invalidated banner
 - `e2e/auth/token-version.spec.ts` — force logout from second tab; assert first tab redirects
 - `e2e/users/lock-user.spec.ts` — lock a user; assert account_status changes; unlock
@@ -1831,6 +1945,7 @@ Critical flows tested against Supabase staging environment:
 ### P10-SECURITY-001 · Security Audit 🔴 `L`
 
 **Acceptance Criteria:**
+
 - Manual OWASP Top 10 review against all Edge Functions
 - Verify `service_role` key only present in edge functions (gitleaks scan passes)
 - RLS smoke test: login as teacher; attempt direct Supabase query to `users` → assert 0 rows returned
@@ -1849,6 +1964,7 @@ Critical flows tested against Supabase staging environment:
 Implement GDPR Article 17 (Right to Erasure) compliance. Soft-deleted user records must be hard-deleted after 30 days. Data export on request must complete within 72 hours (SECURITY_DESIGN §10).
 
 **Acceptance Criteria:**
+
 - `supabase/migrations/YYYYMMDD_gdpr_hard_delete.sql`:
   ```sql
   CREATE OR REPLACE FUNCTION gdpr_hard_delete_expired_users()
@@ -1862,7 +1978,7 @@ Implement GDPR Article 17 (Right to Erasure) compliance. Soft-deleted user recor
   BEGIN
     -- PRE-CHECK: Verify all FK relationships have ON DELETE CASCADE/SET NULL
     -- If any FK lacks cascade, this function will fail safely (FK violation)
-    
+
     -- Step 1: Delete users (cascade handles: devices, sessions, enrollments, warnings)
     -- activity_log uses ON DELETE SET NULL (preserves audit trail with NULL actor)
     WITH deleted AS (
@@ -1872,16 +1988,16 @@ Implement GDPR Article 17 (Right to Erasure) compliance. Soft-deleted user recor
       RETURNING id
     )
     SELECT count(*) INTO deleted_count FROM deleted;
-    
+
     -- Step 2: Verify no orphan records remain (safety net)
     SELECT count(*) INTO orphan_count
     FROM devices d
     WHERE NOT EXISTS (SELECT 1 FROM users u WHERE u.id = d.user_id);
-    
+
     IF orphan_count > 0 THEN
       RAISE WARNING 'GDPR erasure left % orphan device records', orphan_count;
     END IF;
-    
+
     -- Step 3: Log the erasure action
     PERFORM log_activity_async(
       NULL, system_tenant_id(), 'gdpr_hard_delete',
@@ -1917,6 +2033,7 @@ Implement GDPR Article 17 (Right to Erasure) compliance. Soft-deleted user recor
 ### P10-PERF-001 · Performance Tuning 🟠 `L`
 
 **Acceptance Criteria:**
+
 - Lighthouse score ≥ 90 for Performance on dashboard home (with Recharts lazy loaded)
 - React Query prefetching: prefetch `mv_user_stats` in layout Server Component
 - DataGrid virtualisation verified with 10,000 row mock dataset (no jank)
@@ -1932,6 +2049,7 @@ Implement GDPR Article 17 (Right to Erasure) compliance. Soft-deleted user recor
 ### P10-I18N-001 · i18n Completion 🟠 `L`
 
 **Acceptance Criteria:**
+
 - `next-intl` configured for `en` and `ar` locales
 - All hardcoded English strings extracted to `i18n/en.json`
 - Arabic translations complete in `i18n/ar.json` (all keys present — no fallback to English)
@@ -1947,6 +2065,7 @@ Implement GDPR Article 17 (Right to Erasure) compliance. Soft-deleted user recor
 ### P10-LAUNCH-001 · Staging Deployment & Smoke Test 🔴 `M`
 
 **Acceptance Criteria:**
+
 - `apps/web` deployed to Vercel staging (branch: `staging`)
 - All Edge Functions deployed to Supabase staging project
 - Schema v10.0 migrations applied to staging DB
@@ -1965,6 +2084,7 @@ Implement GDPR Article 17 (Right to Erasure) compliance. Soft-deleted user recor
 ### P10-LAUNCH-002 · Production Launch 🔴 `M`
 
 **Acceptance Criteria:**
+
 - Production Supabase project provisioned in `me-south-1` (primary region) + `eu-west-1` read replica
 - `pg_cron` jobs configured (from PRD Section R):
   - `flush_logs` (every minute)
@@ -1987,17 +2107,17 @@ Implement GDPR Article 17 (Right to Erasure) compliance. Soft-deleted user recor
 
 **Phase 10 Summary**
 
-| Task ID            | Title                         | Priority | Size  | Days |
-|--------------------|-------------------------------|----------|-------|------|
-| P10-QA-001         | Unit Test Suite               | 🔴       | XL    | 4    |
-| P10-QA-002         | Storybook Component Library   | 🟡       | XL    | 3    |
-| P10-QA-003         | Playwright E2E Tests          | 🔴       | XXL   | 7    |
-| P10-SECURITY-001   | Security Audit                | 🔴       | L     | 2    |
-| P10-SECURITY-002   | GDPR Data Erasure Job         | 🔴       | M     | 1    |
-| P10-PERF-001       | Performance Tuning            | 🟠       | L     | 1.5  |
-| P10-I18N-001       | i18n Completion               | 🟠       | XL    | 3    |
-| P10-LAUNCH-001     | Staging Deploy & Smoke Test   | 🔴       | M     | 1    |
-| P10-LAUNCH-002     | Production Launch             | 🔴       | M     | 1    |
+| Task ID          | Title                       | Priority | Size | Days |
+| ---------------- | --------------------------- | -------- | ---- | ---- |
+| P10-QA-001       | Unit Test Suite             | 🔴       | XL   | 4    |
+| P10-QA-002       | Storybook Component Library | 🟡       | XL   | 3    |
+| P10-QA-003       | Playwright E2E Tests        | 🔴       | XXL  | 7    |
+| P10-SECURITY-001 | Security Audit              | 🔴       | L    | 2    |
+| P10-SECURITY-002 | GDPR Data Erasure Job       | 🔴       | M    | 1    |
+| P10-PERF-001     | Performance Tuning          | 🟠       | L    | 1.5  |
+| P10-I18N-001     | i18n Completion             | 🟠       | XL   | 3    |
+| P10-LAUNCH-001   | Staging Deploy & Smoke Test | 🔴       | M    | 1    |
+| P10-LAUNCH-002   | Production Launch           | 🔴       | M    | 1    |
 
 **Phase 10 Total:** ~23.5 days
 
@@ -2009,79 +2129,79 @@ Implement GDPR Article 17 (Right to Erasure) compliance. Soft-deleted user recor
 > **Legend — Size:** S ≤ 0.5d · M ≤ 1d · L ≤ 2d · XL ≤ 4d · XXL > 4d  
 > **Total Estimated Duration:** ~100 days across 20 weeks
 
-| Task ID            | Title                                  | Phase | Priority | Size  | Est. Days |
-|--------------------|----------------------------------------|-------|----------|-------|-----------|
-| P0-INFRA-001       | Monorepo Initialisation                | 0     | 🔴       | XL    | 3         |
-| P0-INFRA-002       | Supabase Local Dev Setup               | 0     | 🔴       | L     | 1.5       |
-| P0-INFRA-003       | CI/CD Pipeline                         | 0     | 🔴       | XL    | 3         |
-| P0-INFRA-004       | Type Generation & Shared Types         | 0     | 🔴       | M     | 1         |
-| P0-INFRA-005       | Design System & Theme                  | 0     | 🔴       | L     | 1.5       |
-| P0-INFRA-006       | Environment Configuration              | 0     | 🟠       | S     | 0.5       |
-| P0-INFRA-007       | pg_cron Job Configuration              | 0     | 🔴       | M     | 1         |
-| P0-INFRA-008       | Idempotency Key Infrastructure         | 0     | 🔴       | M     | 1         |
-| P0-INFRA-009       | Security Headers Configuration         | 0     | 🔴       | S     | 0.5       |
-| P1-AUTH-001        | Supabase Client Setup                  | 1     | 🔴       | M     | 1         |
-| P1-AUTH-002        | Login Page                             | 1     | 🔴       | L     | 1.5       |
-| P1-AUTH-003        | Auth Store (Zustand)                   | 1     | 🔴       | M     | 1         |
-| P1-AUTH-004        | Token-Version Mismatch Handler         | 1     | 🔴       | L     | 2         |
-| P1-SHELL-001       | AdminShell Layout                      | 1     | 🔴       | XL    | 3         |
-| P1-SHELL-002       | Permission Gate Component              | 1     | 🔴       | M     | 1         |
-| P1-SHELL-003       | Global UI State (Zustand)              | 1     | 🟠       | M     | 0.5       |
-| P1-SHELL-004       | Global Error Boundary & Sentry         | 1     | 🟠       | M     | 1         |
-| P1-SHELL-005       | React Query Setup                      | 1     | 🔴       | M     | 0.5       |
-| P1-CORE-001        | DI Container & Port Registration       | 1     | 🔴       | L     | 1.5       |
-| P1-CORE-002        | Domain Events & Event Bus              | 1     | 🔴       | M     | 1         |
-| P1-CORE-003        | Observability Ports & Implementations  | 1     | 🟠       | M     | 1         |
-| P2-USER-001        | Users Service Layer                    | 2     | 🔴       | L     | 1.5       |
-| P2-USER-002        | User Queries (React Query)             | 2     | 🔴       | M     | 1         |
-| P2-USER-003        | Users List Page                        | 2     | 🔴       | XL    | 3         |
-| P2-USER-004        | User Profile Drawer                    | 2     | 🔴       | XL    | 3         |
-| P2-USER-005        | Action Dialogs & Error Handling        | 2     | 🔴       | L     | 1.5       |
-| P2-USER-006        | User Realtime Updates                  | 2     | 🟠       | M     | 1         |
-| P2-USER-007        | User Zod Schemas & Forms               | 2     | 🟠       | M     | 1         |
-| P3-COURSE-001      | Courses Service Layer                  | 3     | 🔴       | L     | 1.5       |
-| P3-COURSE-002      | Courses List Page                      | 3     | 🔴       | L     | 1.5       |
-| P3-COURSE-003      | Course Detail & Editor                 | 3     | 🔴       | XL    | 4         |
-| P3-COURSE-004      | Enrollment Management                  | 3     | 🔴       | L     | 1.5       |
-| P3-COURSE-005      | Course Analytics Tab                   | 3     | 🟠       | L     | 1.5       |
-| P4-TEACHER-001     | Teacher Route Guard                    | 4     | 🟠       | M     | 0.5       |
-| P4-TEACHER-002     | My Courses Page (Teacher)              | 4     | 🔴       | L     | 1.5       |
-| P4-TEACHER-003     | Student Progress Page                  | 4     | 🔴       | L     | 1.5       |
-| P4-TEACHER-004     | Teacher Analytics Page                 | 4     | 🟠       | L     | 0.5       |
-| P4-TEACHER-005     | Teacher Warnings Page                  | 4     | 🔴       | M     | 0.5       |
-| P4-TEACHER-006     | Warnings RLS Policy Fix                | 4     | 🔴       | S     | 0.5       |
-| P5-SETTINGS-001    | Settings Service & Cache               | 5     | 🔴       | M     | 1         |
-| P5-SETTINGS-002    | Settings Page                          | 5     | 🔴       | L     | 1.5       |
-| P5-SETTINGS-003    | Maintenance Mode Wizard                | 5     | 🟠       | L     | 1         |
-| P5-SETTINGS-004    | App Lock Controls                      | 5     | 🟠       | M     | 0.5       |
-| P5-SETTINGS-005    | Feature Flags Page                     | 5     | 🟠       | L     | 1.5       |
-| P6-MONITOR-001     | Audit Service Layer                    | 6     | 🔴       | M     | 1         |
-| P6-MONITOR-002     | Audit Log Viewer                       | 6     | 🔴       | XL    | 3         |
-| P6-MONITOR-003     | Rate Limits Dashboard                  | 6     | 🟠       | L     | 1.5       |
-| P6-MONITOR-004     | Job Queue Management                   | 6     | 🔴       | L     | 1.5       |
-| P7-BULK-001        | Bulk Action Edge Function              | 7     | 🔴       | XXL   | 4         |
-| P7-BULK-002        | Bulk Worker Edge Function              | 7     | 🔴       | XL    | 2.5       |
-| P7-BULK-003        | Bulk Action UI                         | 7     | 🔴       | L     | 1.5       |
-| P7-BULK-004        | Bulk Export Edge Function              | 7     | 🟠       | L     | 1         |
-| P8-ANALYTICS-001   | Analytics Service & MV Queries         | 8     | 🔴       | M     | 1         |
-| P8-ANALYTICS-002   | Analytics Dashboard Page               | 8     | 🔴       | XL    | 3         |
-| P8-ANALYTICS-003   | Report Export Edge Function            | 8     | 🟠       | L     | 1.5       |
-| P9-TENANT-001      | Tenant Service Layer                   | 9     | 🔴       | M     | 1         |
-| P9-TENANT-002      | Tenants List Page                      | 9     | 🔴       | L     | 1.5       |
-| P9-TENANT-003      | Tenant Detail Page                     | 9     | 🔴       | L     | 2         |
-| P10-QA-001         | Unit Test Suite                        | 10    | 🔴       | XL    | 4         |
-| P10-QA-002         | Storybook Component Library            | 10    | 🟡       | XL    | 3         |
-| P10-QA-003         | Playwright E2E Tests                   | 10    | 🔴       | XXL   | 7         |
-| P10-SECURITY-001   | Security Audit                         | 10    | 🔴       | L     | 2         |
-| P10-SECURITY-002   | GDPR Data Erasure Job                  | 10    | 🔴       | M     | 1         |
-| P10-PERF-001       | Performance Tuning                     | 10    | 🟠       | L     | 1.5       |
-| P10-I18N-001       | i18n Completion                        | 10    | 🟠       | XL    | 3         |
-| P10-LAUNCH-001     | Staging Deploy & Smoke Test            | 10    | 🔴       | M     | 1         |
-| P10-LAUNCH-002     | Production Launch                      | 10    | 🔴       | M     | 1         |
+| Task ID          | Title                                 | Phase | Priority | Size | Est. Days |
+| ---------------- | ------------------------------------- | ----- | -------- | ---- | --------- |
+| P0-INFRA-001     | Monorepo Initialisation               | 0     | 🔴       | XL   | 3         |
+| P0-INFRA-002     | Supabase Local Dev Setup              | 0     | 🔴       | L    | 1.5       |
+| P0-INFRA-003     | CI/CD Pipeline                        | 0     | 🔴       | XL   | 3         |
+| P0-INFRA-004     | Type Generation & Shared Types        | 0     | 🔴       | M    | 1         |
+| P0-INFRA-005     | Design System & Theme                 | 0     | 🔴       | L    | 1.5       |
+| P0-INFRA-006     | Environment Configuration             | 0     | 🟠       | S    | 0.5       |
+| P0-INFRA-007     | pg_cron Job Configuration             | 0     | 🔴       | M    | 1         |
+| P0-INFRA-008     | Idempotency Key Infrastructure        | 0     | 🔴       | M    | 1         |
+| P0-INFRA-009     | Security Headers Configuration        | 0     | 🔴       | S    | 0.5       |
+| P1-AUTH-001      | Supabase Client Setup                 | 1     | 🔴       | M    | 1         |
+| P1-AUTH-002      | Login Page                            | 1     | 🔴       | L    | 1.5       |
+| P1-AUTH-003      | Auth Store (Zustand)                  | 1     | 🔴       | M    | 1         |
+| P1-AUTH-004      | Token-Version Mismatch Handler        | 1     | 🔴       | L    | 2         |
+| P1-SHELL-001     | AdminShell Layout                     | 1     | 🔴       | XL   | 3         |
+| P1-SHELL-002     | Permission Gate Component             | 1     | 🔴       | M    | 1         |
+| P1-SHELL-003     | Global UI State (Zustand)             | 1     | 🟠       | M    | 0.5       |
+| P1-SHELL-004     | Global Error Boundary & Sentry        | 1     | 🟠       | M    | 1         |
+| P1-SHELL-005     | React Query Setup                     | 1     | 🔴       | M    | 0.5       |
+| P1-CORE-001      | DI Container & Port Registration      | 1     | 🔴       | L    | 1.5       |
+| P1-CORE-002      | Domain Events & Event Bus             | 1     | 🔴       | M    | 1         |
+| P1-CORE-003      | Observability Ports & Implementations | 1     | 🟠       | M    | 1         |
+| P2-USER-001      | Users Service Layer                   | 2     | 🔴       | L    | 1.5       |
+| P2-USER-002      | User Queries (React Query)            | 2     | 🔴       | M    | 1         |
+| P2-USER-003      | Users List Page                       | 2     | 🔴       | XL   | 3         |
+| P2-USER-004      | User Profile Drawer                   | 2     | 🔴       | XL   | 3         |
+| P2-USER-005      | Action Dialogs & Error Handling       | 2     | 🔴       | L    | 1.5       |
+| P2-USER-006      | User Realtime Updates                 | 2     | 🟠       | M    | 1         |
+| P2-USER-007      | User Zod Schemas & Forms              | 2     | 🟠       | M    | 1         |
+| P3-COURSE-001    | Courses Service Layer                 | 3     | 🔴       | L    | 1.5       |
+| P3-COURSE-002    | Courses List Page                     | 3     | 🔴       | L    | 1.5       |
+| P3-COURSE-003    | Course Detail & Editor                | 3     | 🔴       | XL   | 4         |
+| P3-COURSE-004    | Enrollment Management                 | 3     | 🔴       | L    | 1.5       |
+| P3-COURSE-005    | Course Analytics Tab                  | 3     | 🟠       | L    | 1.5       |
+| P4-TEACHER-001   | Teacher Route Guard                   | 4     | 🟠       | M    | 0.5       |
+| P4-TEACHER-002   | My Courses Page (Teacher)             | 4     | 🔴       | L    | 1.5       |
+| P4-TEACHER-003   | Student Progress Page                 | 4     | 🔴       | L    | 1.5       |
+| P4-TEACHER-004   | Teacher Analytics Page                | 4     | 🟠       | L    | 0.5       |
+| P4-TEACHER-005   | Teacher Warnings Page                 | 4     | 🔴       | M    | 0.5       |
+| P4-TEACHER-006   | Warnings RLS Policy Fix               | 4     | 🔴       | S    | 0.5       |
+| P5-SETTINGS-001  | Settings Service & Cache              | 5     | 🔴       | M    | 1         |
+| P5-SETTINGS-002  | Settings Page                         | 5     | 🔴       | L    | 1.5       |
+| P5-SETTINGS-003  | Maintenance Mode Wizard               | 5     | 🟠       | L    | 1         |
+| P5-SETTINGS-004  | App Lock Controls                     | 5     | 🟠       | M    | 0.5       |
+| P5-SETTINGS-005  | Feature Flags Page                    | 5     | 🟠       | L    | 1.5       |
+| P6-MONITOR-001   | Audit Service Layer                   | 6     | 🔴       | M    | 1         |
+| P6-MONITOR-002   | Audit Log Viewer                      | 6     | 🔴       | XL   | 3         |
+| P6-MONITOR-003   | Rate Limits Dashboard                 | 6     | 🟠       | L    | 1.5       |
+| P6-MONITOR-004   | Job Queue Management                  | 6     | 🔴       | L    | 1.5       |
+| P7-BULK-001      | Bulk Action Edge Function             | 7     | 🔴       | XXL  | 4         |
+| P7-BULK-002      | Bulk Worker Edge Function             | 7     | 🔴       | XL   | 2.5       |
+| P7-BULK-003      | Bulk Action UI                        | 7     | 🔴       | L    | 1.5       |
+| P7-BULK-004      | Bulk Export Edge Function             | 7     | 🟠       | L    | 1         |
+| P8-ANALYTICS-001 | Analytics Service & MV Queries        | 8     | 🔴       | M    | 1         |
+| P8-ANALYTICS-002 | Analytics Dashboard Page              | 8     | 🔴       | XL   | 3         |
+| P8-ANALYTICS-003 | Report Export Edge Function           | 8     | 🟠       | L    | 1.5       |
+| P9-TENANT-001    | Tenant Service Layer                  | 9     | 🔴       | M    | 1         |
+| P9-TENANT-002    | Tenants List Page                     | 9     | 🔴       | L    | 1.5       |
+| P9-TENANT-003    | Tenant Detail Page                    | 9     | 🔴       | L    | 2         |
+| P10-QA-001       | Unit Test Suite                       | 10    | 🔴       | XL   | 4         |
+| P10-QA-002       | Storybook Component Library           | 10    | 🟡       | XL   | 3         |
+| P10-QA-003       | Playwright E2E Tests                  | 10    | 🔴       | XXL  | 7         |
+| P10-SECURITY-001 | Security Audit                        | 10    | 🔴       | L    | 2         |
+| P10-SECURITY-002 | GDPR Data Erasure Job                 | 10    | 🔴       | M    | 1         |
+| P10-PERF-001     | Performance Tuning                    | 10    | 🟠       | L    | 1.5       |
+| P10-I18N-001     | i18n Completion                       | 10    | 🟠       | XL   | 3         |
+| P10-LAUNCH-001   | Staging Deploy & Smoke Test           | 10    | 🔴       | M    | 1         |
+| P10-LAUNCH-002   | Production Launch                     | 10    | 🔴       | M    | 1         |
 
-**Total Tasks:** 66 *(+2 Notification tasks in Section 16)*  
+**Total Tasks:** 66 _(+2 Notification tasks in Section 16)_  
 **Total Critical (🔴):** 41 · **Total High (🟠):** 21 · **Total Medium (🟡):** 3 · **Total Low (🟢):** 1  
-**Priority Ratio — Critical:** 62% *(target ≤ 65%)* ✅
+**Priority Ratio — Critical:** 62% _(target ≤ 65%)_ ✅
 
 > **Priority changes from v1.0 → v2.1:**  
 > • `P0-INFRA-005` promoted 🟠 → 🔴 (Design System blocks all UI phases)  
@@ -2094,27 +2214,27 @@ Implement GDPR Article 17 (Right to Erasure) compliance. Soft-deleted user recor
 
 ## 14. Risk Register
 
-| ID     | Risk                                                      | Probability | Impact   | Mitigation                                                                                                          |
-|--------|-----------------------------------------------------------|-------------|----------|---------------------------------------------------------------------------------------------------------------------|
-| R-001  | Supabase Realtime instability under load                  | Medium      | High     | Implement polling fallback (30s interval) when WS disconnected; exponential reconnect                               |
-| R-002  | MV refresh blocking during peak hours                     | Low         | Medium   | Use `CONCURRENTLY` flag; schedule during off-peak (2–4 AM); alert if refresh > 10 min                               |
-| R-003  | token_version check adding latency to every call          | Medium      | Medium   | Cache token_version in Zustand; only re-fetch on session refresh, not per-request                                   |
-| R-004  | Bulk worker overwhelms DB with 500 RPCs in series         | Medium      | High     | Batch in chunks of 50; use `pg_advisory_xact_lock` to prevent duplicate workers                                     |
-| R-005  | Arabic RTL layout breaking in MUI DataGrid                | High        | **High** | Test RTL in dedicated Storybook story per component; use `dir="rtl"` on MUI ThemeProvider; RTL smoke test in CI     |
-| R-006  | service_role key accidentally committed                   | Low         | Critical | gitleaks in CI blocks merge; rotate key immediately if detected; weekly secret scan                                 |
-| R-007  | hash-chain gap if flush_activity_logs fails               | Low         | High     | Advisory lock in function; idempotent retry; cron monitors gap between last_seq and queue                           |
-| R-008  | Scope creep from super_admin feature requests             | High        | Medium   | Strict PRD change control; new features require PM sign-off + phase slot assignment                                 |
-| R-009  | Next.js 15 App Router breaking changes                    | Low         | Medium   | Pin Next.js minor version; review changelog before upgrades; regression test on upgrade                             |
-| R-010  | Supabase Edge Function cold start latency                 | Medium      | Low      | Keep functions lightweight; use `supabase functions serve` for local testing                                        |
-| R-011  | RLS misconfiguration leaks data across tenants            | Low         | Critical | Automated RLS smoke tests in CI (login as Tenant A user, assert zero rows from Tenant B); reviewed per migration    |
-| R-012  | Production migration without rollback plan causes outage  | Medium      | Critical | Every migration ships a `down.sql`; apply to staging first; snapshot DB before prod deploy; 15-min rollback window  |
-| R-013  | Missing CORS/CSP headers on Edge Functions expose XSS     | Low         | High     | Shared `_shared/headers.ts` enforces `Content-Security-Policy`, `X-Frame-Options`, `CORS` on every Edge Function   |
-| R-014  | Notification delivery failure silently drops user alerts  | Medium      | Medium   | Implement dead-letter queue for failed notifications; retry ×3 with exp. backoff; alert admin on 3 consecutive fails|
-| R-015  | `warnings` RLS gap leaks cross-teacher data               | High        | High     | Fix RLS policy (P4-TEACHER-006); scope teacher SELECT to `issued_by = auth.uid() OR is_current_user_admin()`        |
-| R-016  | i18n bolt-on in Phase 10 requires rework of all UI        | High        | Medium   | Require `t()` wrappers from Phase 1; add i18n extraction check to ESLint; track English-only tech debt              |
-| R-017  | pg_cron not testable locally (Supabase Docker limitation) | Medium      | High     | Test cron SQL manually against staging; document workaround; verify via `SELECT * FROM cron.job` after deploy        |
-| R-018  | Idempotency infrastructure missing despite RFC-007        | High        | Critical | Added P0-INFRA-008; idempotency store + client key gen + Edge Function guard; blocks all mutation service tasks      |
-| R-019  | Schema v10 RPCs reimplemented in TypeScript service layer | Medium      | Medium   | Audit service tasks against schema function list; prefer calling existing RPCs over rewriting logic in application   |
+| ID    | Risk                                                      | Probability | Impact   | Mitigation                                                                                                           |
+| ----- | --------------------------------------------------------- | ----------- | -------- | -------------------------------------------------------------------------------------------------------------------- |
+| R-001 | Supabase Realtime instability under load                  | Medium      | High     | Implement polling fallback (30s interval) when WS disconnected; exponential reconnect                                |
+| R-002 | MV refresh blocking during peak hours                     | Low         | Medium   | Use `CONCURRENTLY` flag; schedule during off-peak (2–4 AM); alert if refresh > 10 min                                |
+| R-003 | token_version check adding latency to every call          | Medium      | Medium   | Cache token_version in Zustand; only re-fetch on session refresh, not per-request                                    |
+| R-004 | Bulk worker overwhelms DB with 500 RPCs in series         | Medium      | High     | Batch in chunks of 50; use `pg_advisory_xact_lock` to prevent duplicate workers                                      |
+| R-005 | Arabic RTL layout breaking in MUI DataGrid                | High        | **High** | Test RTL in dedicated Storybook story per component; use `dir="rtl"` on MUI ThemeProvider; RTL smoke test in CI      |
+| R-006 | service_role key accidentally committed                   | Low         | Critical | gitleaks in CI blocks merge; rotate key immediately if detected; weekly secret scan                                  |
+| R-007 | hash-chain gap if flush_activity_logs fails               | Low         | High     | Advisory lock in function; idempotent retry; cron monitors gap between last_seq and queue                            |
+| R-008 | Scope creep from super_admin feature requests             | High        | Medium   | Strict PRD change control; new features require PM sign-off + phase slot assignment                                  |
+| R-009 | Next.js 15 App Router breaking changes                    | Low         | Medium   | Pin Next.js minor version; review changelog before upgrades; regression test on upgrade                              |
+| R-010 | Supabase Edge Function cold start latency                 | Medium      | Low      | Keep functions lightweight; use `supabase functions serve` for local testing                                         |
+| R-011 | RLS misconfiguration leaks data across tenants            | Low         | Critical | Automated RLS smoke tests in CI (login as Tenant A user, assert zero rows from Tenant B); reviewed per migration     |
+| R-012 | Production migration without rollback plan causes outage  | Medium      | Critical | Every migration ships a `down.sql`; apply to staging first; snapshot DB before prod deploy; 15-min rollback window   |
+| R-013 | Missing CORS/CSP headers on Edge Functions expose XSS     | Low         | High     | Shared `_shared/headers.ts` enforces `Content-Security-Policy`, `X-Frame-Options`, `CORS` on every Edge Function     |
+| R-014 | Notification delivery failure silently drops user alerts  | Medium      | Medium   | Implement dead-letter queue for failed notifications; retry ×3 with exp. backoff; alert admin on 3 consecutive fails |
+| R-015 | `warnings` RLS gap leaks cross-teacher data               | High        | High     | Fix RLS policy (P4-TEACHER-006); scope teacher SELECT to `issued_by = auth.uid() OR is_current_user_admin()`         |
+| R-016 | i18n bolt-on in Phase 10 requires rework of all UI        | High        | Medium   | Require `t()` wrappers from Phase 1; add i18n extraction check to ESLint; track English-only tech debt               |
+| R-017 | pg_cron not testable locally (Supabase Docker limitation) | Medium      | High     | Test cron SQL manually against staging; document workaround; verify via `SELECT * FROM cron.job` after deploy        |
+| R-018 | Idempotency infrastructure missing despite RFC-007        | High        | Critical | Added P0-INFRA-008; idempotency store + client key gen + Edge Function guard; blocks all mutation service tasks      |
+| R-019 | Schema v10 RPCs reimplemented in TypeScript service layer | Medium      | Medium   | Audit service tasks against schema function list; prefer calling existing RPCs over rewriting logic in application   |
 
 **Risk Summary:** 19 risks · 4 Critical · 7 High · 6 Medium · 2 Low
 
@@ -2198,6 +2318,7 @@ P10-QA-001 (Unit Tests) ──requires── All Phase 0–9 tasks
 ### P11-NOTIFY-001 · Notification Service Layer 🟠 `M`
 
 **Acceptance Criteria:**
+
 - `apps/web/src/services/notifications.service.ts`:
   ```typescript
   getNotifications(userId: string, unreadOnly?: boolean): Promise<PaginatedResult<Notification>>
@@ -2217,6 +2338,7 @@ P10-QA-001 (Unit Tests) ──requires── All Phase 0–9 tasks
 ### P11-NOTIFY-002 · Notification Bell UI 🟠 `M`
 
 **Acceptance Criteria:**
+
 - `components/layout/NotificationBell.tsx` in AdminShell topbar:
   - Badge with unread count (max display: 99+)
   - Dropdown panel: list of latest 20 notifications, grouped by date
@@ -2234,10 +2356,10 @@ P10-QA-001 (Unit Tests) ──requires── All Phase 0–9 tasks
 
 **Phase 11 Summary**
 
-| Task ID           | Title                        | Priority | Size | Est. Days |
-|-------------------|------------------------------|----------|------|-----------|
-| P11-NOTIFY-001    | Notification Service Layer   | 🟢       | M    | 1         |
-| P11-NOTIFY-002    | Notification Bell UI         | 🟢       | M    | 1         |
+| Task ID        | Title                      | Priority | Size | Est. Days |
+| -------------- | -------------------------- | -------- | ---- | --------- |
+| P11-NOTIFY-001 | Notification Service Layer | 🟢       | M    | 1         |
+| P11-NOTIFY-002 | Notification Bell UI       | 🟢       | M    | 1         |
 
 **Phase 11 Total:** ~2 days (can be parallelised with Phase 6)
 
@@ -2245,46 +2367,46 @@ P10-QA-001 (Unit Tests) ──requires── All Phase 0–9 tasks
 
 ## Appendix A — Sprint Schedule
 
-| Sprint | Weeks  | Phases         | Key Deliverables                                          |
-|--------|--------|----------------|-----------------------------------------------------------|
-| S1     | 1–2    | P0             | Monorepo, CI/CD, pg_cron, Idempotency, Security Headers  |
-| S2     | 3–4    | P1             | Login, Auth, Shell, DI Container, Events, Observability   |
-| S3     | 5–6    | P2             | Users list, Profile drawer, Action dialogs, Zod schemas   |
-| S4     | 7–8    | P3             | Courses, Enrollments, Course analytics                    |
-| S5     | 9–10   | P4, P5 start   | Teacher dashboard, Warnings RLS fix, Settings             |
-| S6     | 11–12  | P5 end, P6     | Feature flags, Audit viewer, Job queue                    |
-| S7     | 13–14  | P7, P8 start   | Bulk actions, Analytics dashboard                         |
-| S8     | 15–16  | P8 end, P9     | Report export, Tenant management                          |
-| S9     | 17–18  | P10 start      | Unit tests, Storybook, Playwright E2E, GDPR erasure       |
-| S10    | 19–20  | P10 end        | Security audit, i18n, Perf tuning, Staging, Production    |
+| Sprint | Weeks | Phases       | Key Deliverables                                        |
+| ------ | ----- | ------------ | ------------------------------------------------------- |
+| S1     | 1–2   | P0           | Monorepo, CI/CD, pg_cron, Idempotency, Security Headers |
+| S2     | 3–4   | P1           | Login, Auth, Shell, DI Container, Events, Observability |
+| S3     | 5–6   | P2           | Users list, Profile drawer, Action dialogs, Zod schemas |
+| S4     | 7–8   | P3           | Courses, Enrollments, Course analytics                  |
+| S5     | 9–10  | P4, P5 start | Teacher dashboard, Warnings RLS fix, Settings           |
+| S6     | 11–12 | P5 end, P6   | Feature flags, Audit viewer, Job queue                  |
+| S7     | 13–14 | P7, P8 start | Bulk actions, Analytics dashboard                       |
+| S8     | 15–16 | P8 end, P9   | Report export, Tenant management                        |
+| S9     | 17–18 | P10 start    | Unit tests, Storybook, Playwright E2E, GDPR erasure     |
+| S10    | 19–20 | P10 end      | Security audit, i18n, Perf tuning, Staging, Production  |
 
 ---
 
 ## Appendix B — Tech Stack Reference
 
-| Layer           | Technology                        | Version  | Purpose                                      |
-|-----------------|-----------------------------------|----------|----------------------------------------------|
-| Framework       | Next.js (App Router)              | 15.x     | SSR, routing, Server Components              |
-| Language        | TypeScript                        | 5.x      | Type safety (strict mode)                    |
-| UI Library      | Material-UI                       | v5       | Component library, DataGrid                  |
-| Styling         | Tailwind CSS                      | v3       | Utility overrides, layout                    |
-| Server State    | TanStack Query (React Query)      | v5       | Caching, background refetch, optimistic UI   |
-| Client State    | Zustand                           | v4       | Auth store, UI store, realtime store         |
-| Forms           | React Hook Form + Zod             | v7 + v3  | Validation, schema-driven forms              |
-| Charts          | Recharts                          | v2       | Line, Bar, Pie charts                        |
-| Drag & Drop     | @dnd-kit/core                     | v6       | Section/lesson reordering                    |
-| Backend         | Supabase (PostgreSQL 16)          | Pro      | DB, Auth, Realtime, Storage, Edge Functions  |
-| Edge Functions  | Deno (Supabase Edge Runtime)      | latest   | Bulk operations, exports, sensitive RPCs     |
-| Testing (Unit)  | Vitest                            | v1       | Service and hook unit tests                  |
-| Testing (E2E)   | Playwright                        | v1.40+   | Critical flow automation (per RFC-012)       |
-| Component Docs  | Storybook                         | v8       | Component library, visual regression         |
-| Error Tracking  | Sentry                            | latest   | Frontend errors, performance monitoring      |
-| Build Tool      | Turborepo + pnpm                  | latest   | Monorepo pipeline management                 |
-| CI/CD           | GitHub Actions + Vercel           | —        | Automated testing and deployment             |
-| i18n            | next-intl                         | v3       | Arabic/English localisation, RTL support     |
+| Layer          | Technology                   | Version | Purpose                                     |
+| -------------- | ---------------------------- | ------- | ------------------------------------------- |
+| Framework      | Next.js (App Router)         | 15.x    | SSR, routing, Server Components             |
+| Language       | TypeScript                   | 5.x     | Type safety (strict mode)                   |
+| UI Library     | Material-UI                  | v5      | Component library, DataGrid                 |
+| Styling        | Tailwind CSS                 | v3      | Utility overrides, layout                   |
+| Server State   | TanStack Query (React Query) | v5      | Caching, background refetch, optimistic UI  |
+| Client State   | Zustand                      | v4      | Auth store, UI store, realtime store        |
+| Forms          | React Hook Form + Zod        | v7 + v3 | Validation, schema-driven forms             |
+| Charts         | Recharts                     | v2      | Line, Bar, Pie charts                       |
+| Drag & Drop    | @dnd-kit/core                | v6      | Section/lesson reordering                   |
+| Backend        | Supabase (PostgreSQL 16)     | Pro     | DB, Auth, Realtime, Storage, Edge Functions |
+| Edge Functions | Deno (Supabase Edge Runtime) | latest  | Bulk operations, exports, sensitive RPCs    |
+| Testing (Unit) | Vitest                       | v1      | Service and hook unit tests                 |
+| Testing (E2E)  | Playwright                   | v1.40+  | Critical flow automation (per RFC-012)      |
+| Component Docs | Storybook                    | v8      | Component library, visual regression        |
+| Error Tracking | Sentry                       | latest  | Frontend errors, performance monitoring     |
+| Build Tool     | Turborepo + pnpm             | latest  | Monorepo pipeline management                |
+| CI/CD          | GitHub Actions + Vercel      | —       | Automated testing and deployment            |
+| i18n           | next-intl                    | v3      | Arabic/English localisation, RTL support    |
 
 ---
 
-*EduZone Admin Dashboard — Implementation Plan v2.1*  
-*Generated: 2026-03-08 | Revised: 2026-04-05 | Schema: v10.0 | Total Tasks: 66 | Duration: 20 weeks*  
-*Changelog v2.1: Added P0-INFRA-007/008/009 (pg_cron, Idempotency, Security Headers) · Added P1-CORE-001/002/003 (DI Container, Domain Events, Observability) · Added P4-TEACHER-006 (Warnings RLS Fix) · Added P10-SECURITY-002 (GDPR Erasure) · Replaced Cypress with Playwright (RFC-012) · Fixed schema version drift v5→v10 · Updated estimates for P3-COURSE-003 (2.5d→4d), P10-QA-003 (5d→7d), P10-I18N-001 (1.5d→3d) · Added 5 risks (R-015–R-019) · Updated sprint schedule to 10 sprints / 20 weeks*
+_EduZone Admin Dashboard — Implementation Plan v2.1_  
+_Generated: 2026-03-08 | Revised: 2026-04-05 | Schema: v10.0 | Total Tasks: 66 | Duration: 20 weeks_  
+_Changelog v2.1: Added P0-INFRA-007/008/009 (pg_cron, Idempotency, Security Headers) · Added P1-CORE-001/002/003 (DI Container, Domain Events, Observability) · Added P4-TEACHER-006 (Warnings RLS Fix) · Added P10-SECURITY-002 (GDPR Erasure) · Replaced Cypress with Playwright (RFC-012) · Fixed schema version drift v5→v10 · Updated estimates for P3-COURSE-003 (2.5d→4d), P10-QA-003 (5d→7d), P10-I18N-001 (1.5d→3d) · Added 5 risks (R-015–R-019) · Updated sprint schedule to 10 sprints / 20 weeks_

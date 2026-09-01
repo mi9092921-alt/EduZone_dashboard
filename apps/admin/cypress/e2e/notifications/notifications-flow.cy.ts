@@ -9,7 +9,7 @@ describe('Notifications Flow', () => {
       user: {
         id: 'admin-123',
         email: 'admin@eduzone.com',
-        user_metadata: { role: 'super_admin' }
+        user_metadata: { role: 'super_admin' },
       },
     };
     window.localStorage.setItem('sb-auth-token', JSON.stringify(session));
@@ -24,15 +24,15 @@ describe('Notifications Flow', () => {
           body: 'Hello World',
           target_audience: 'all',
           created_at: new Date().toISOString(),
-        }
+        },
       ],
-      headers: { 'Content-Range': '0-0/1' }
+      headers: { 'Content-Range': '0-0/1' },
     }).as('getNotifications');
 
     // Mock permissions list
     cy.intercept('GET', '**/rest/v1/permissions*', {
       statusCode: 200,
-      body: [{ name: 'users.manage' }, { name: 'courses.manage' }]
+      body: [{ name: 'users.manage' }, { name: 'courses.manage' }],
     }).as('getPermissions');
 
     cy.visit('/en/notifications');
@@ -46,19 +46,26 @@ describe('Notifications Flow', () => {
     cy.get('textarea[name="body"]').type('This is a test notification for all students.');
 
     // Audience selection (MUI Select)
-    cy.get('[role="combobox"]').contains(/students/i).parent().click();
-    cy.get('[role="listbox"]').contains(/Students/i).click();
+    cy.get('[role="combobox"]')
+      .contains(/students/i)
+      .parent()
+      .click();
+    cy.get('[role="listbox"]')
+      .contains(/Students/i)
+      .click();
 
     cy.intercept('POST', '**/rest/v1/rpc/send_notification', {
       statusCode: 200,
-      body: 'new-id'
+      body: 'new-id',
     }).as('sendNotification');
 
-    cy.get('button').contains(/Send Notification/i).click();
+    cy.get('button')
+      .contains(/Send Notification/i)
+      .click();
 
     cy.wait('@sendNotification').its('request.body').should('deep.include', {
       p_title: 'Hello Students',
-      p_target_audience: 'students'
+      p_target_audience: 'students',
     });
 
     cy.contains(/Success/i).should('be.visible');
@@ -68,24 +75,33 @@ describe('Notifications Flow', () => {
     cy.contains('button', /Send New Notification/i).click();
 
     // Change targeting type to Permission
-    cy.get('[role="group"]').contains(/Permission/i).click();
+    cy.get('[role="group"]')
+      .contains(/Permission/i)
+      .click();
 
     cy.get('input[name="title"]').type('For Managers');
     cy.get('textarea[name="body"]').type('You have special access.');
 
     // Permission select
-    cy.contains('label', /Target Permission/i).parent().find('[role="combobox"]').click();
-    cy.get('[role="listbox"]').contains(/users.manage/i).click();
+    cy.contains('label', /Target Permission/i)
+      .parent()
+      .find('[role="combobox"]')
+      .click();
+    cy.get('[role="listbox"]')
+      .contains(/users.manage/i)
+      .click();
 
     cy.intercept('POST', '**/rest/v1/rpc/send_notification', {
       statusCode: 200,
-      body: 'new-id'
+      body: 'new-id',
     }).as('sendNotification');
 
-    cy.get('button').contains(/Send Notification/i).click();
+    cy.get('button')
+      .contains(/Send Notification/i)
+      .click();
 
     cy.wait('@sendNotification').its('request.body').should('deep.include', {
-      p_target_permission: 'users.manage'
+      p_target_permission: 'users.manage',
     });
   });
 
@@ -97,10 +113,12 @@ describe('Notifications Flow', () => {
 
     cy.intercept('POST', '**/rest/v1/rpc/delete_notification', {
       statusCode: 200,
-      body: null
+      body: null,
     }).as('deleteNotification');
 
-    cy.get('button').contains(/Delete Notification/i).click();
+    cy.get('button')
+      .contains(/Delete Notification/i)
+      .click();
 
     cy.wait('@deleteNotification');
     cy.contains(/deleted successfully/i).should('be.visible');

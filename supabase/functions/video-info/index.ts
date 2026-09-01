@@ -1,22 +1,22 @@
-import { serve } from "https://deno.land/std@0.203.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { serve } from 'https://deno.land/std@0.203.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
-const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || "";
-const SUPABASE_SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-const EXTERNAL_API_URL = Deno.env.get("VIDEO_API_URL") || "";
-const EXTERNAL_API_KEY = Deno.env.get("VIDEO_API_KEY") || "";
-const REPLIT_TIMEOUT_MS = Number(Deno.env.get("VIDEO_REPLIT_TIMEOUT_MS") || 8000);
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
+const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || '';
+const SUPABASE_SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const EXTERNAL_API_URL = Deno.env.get('VIDEO_API_URL') || '';
+const EXTERNAL_API_KEY = Deno.env.get('VIDEO_API_KEY') || '';
+const REPLIT_TIMEOUT_MS = Number(Deno.env.get('VIDEO_REPLIT_TIMEOUT_MS') || 8000);
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
 // ─── Supabase REST helpers ────────────────────────────────────────────────────
 
 function sbUrl(path: string) {
-  return `${SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/${path}`;
+  return `${SUPABASE_URL.replace(/\/+$/, '')}/rest/v1/${path}`;
 }
 
 async function sbGet(path: string) {
@@ -24,19 +24,19 @@ async function sbGet(path: string) {
     headers: {
       apikey: SUPABASE_SERVICE_ROLE,
       Authorization: `Bearer ${SUPABASE_SERVICE_ROLE}`,
-      Accept: "application/json",
+      Accept: 'application/json',
     },
   });
 }
 
 function sbPost(path: string, body: unknown) {
   return fetch(sbUrl(path), {
-    method: "POST",
+    method: 'POST',
     headers: {
       apikey: SUPABASE_SERVICE_ROLE,
       Authorization: `Bearer ${SUPABASE_SERVICE_ROLE}`,
-      "Content-Type": "application/json",
-      Prefer: "resolution=merge-duplicates,return=minimal",
+      'Content-Type': 'application/json',
+      Prefer: 'resolution=merge-duplicates,return=minimal',
     },
     body: JSON.stringify(body),
   });
@@ -45,10 +45,10 @@ function sbPost(path: string, body: unknown) {
 // ─── URL hash ─────────────────────────────────────────────────────────────────
 
 async function hashUrl(url: string): Promise<string> {
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(url));
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(url));
   return Array.from(new Uint8Array(buf))
-    .map(b => b.toString(16).padStart(2, "0"))
-    .join("");
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 // ─── Normalize ────────────────────────────────────────────────────────────────
@@ -57,7 +57,7 @@ async function hashUrl(url: string): Promise<string> {
 
 function firstString(...values: unknown[]): string | null {
   for (const value of values) {
-    if (typeof value === "string" && value.trim().length > 0) {
+    if (typeof value === 'string' && value.trim().length > 0) {
       return value.trim();
     }
   }
@@ -65,7 +65,7 @@ function firstString(...values: unknown[]): string | null {
 }
 
 function normalizeAudio(rawAudio: any) {
-  if (!rawAudio || typeof rawAudio !== "object") return null;
+  if (!rawAudio || typeof rawAudio !== 'object') return null;
 
   const url = firstString(
     rawAudio.audio_url,
@@ -84,20 +84,22 @@ function normalizeAudio(rawAudio: any) {
       rawAudio.audio_size ??
       rawAudio.size ??
       null,
-    ext: rawAudio.ext ?? "m4a",
+    ext: rawAudio.ext ?? 'm4a',
   };
 }
 
 function isRawAudioOnly(format: any): boolean {
-  const mime = firstString(format.mime_type, format.mimeType, format.mime) ?? "";
-  const type = firstString(format.type, format.kind) ?? "";
-  const vcodec = firstString(format.vcodec, format.video_codec, format.videoCodec) ?? "";
+  const mime = firstString(format.mime_type, format.mimeType, format.mime) ?? '';
+  const type = firstString(format.type, format.kind) ?? '';
+  const vcodec = firstString(format.vcodec, format.video_codec, format.videoCodec) ?? '';
 
-  return format.audio_only === true ||
+  return (
+    format.audio_only === true ||
     format.is_audio === true ||
-    type.toLowerCase() === "audio" ||
-    mime.toLowerCase().startsWith("audio/") ||
-    vcodec.toLowerCase() === "none";
+    type.toLowerCase() === 'audio' ||
+    mime.toLowerCase().startsWith('audio/') ||
+    vcodec.toLowerCase() === 'none'
+  );
 }
 
 function hasFormatAudioUrl(format: any): boolean {
@@ -107,9 +109,7 @@ function hasFormatAudioUrl(format: any): boolean {
 function responseNeedsSeparateAudio(data: any): boolean {
   if (!data || data.audio) return false;
   const formats = Array.isArray(data.formats) ? data.formats : [];
-  return formats.some(
-    (f: any) => f.requires_merge === true || f.has_audio === false,
-  );
+  return formats.some((f: any) => f.requires_merge === true || f.has_audio === false);
 }
 
 function normalize(raw: any) {
@@ -121,18 +121,14 @@ function normalize(raw: any) {
       quality: f.quality_label ?? f.quality,
       height: f.height ?? null,
       fps: f.fps ?? null,
-      ext: f.ext ?? "mp4",
+      ext: f.ext ?? 'mp4',
       size_bytes: f.size_bytes ?? null,
       has_audio: f.has_audio ?? false,
       requires_merge: f.requires_merge ?? !f.has_audio,
       video_url: f.video_url ?? f.url,
       audio_url: firstString(f.audio_url, f.audio?.url),
       audio_size:
-        f.audio_size ??
-        f.audio_size_bytes ??
-        f.audio?.size_bytes ??
-        f.audio?.audio_size ??
-        null,
+        f.audio_size ?? f.audio_size_bytes ?? f.audio?.size_bytes ?? f.audio?.audio_size ?? null,
       audio_ext: f.audio_ext ?? f.audio?.ext ?? null,
     }));
 
@@ -158,19 +154,19 @@ function normalize(raw: any) {
     view_count: raw.view_count ?? null,
     audio,
     formats,
-    default_download_quality: "360p",
+    default_download_quality: '360p',
     cache_expires_at: new Date(Date.now() + 86400000).toISOString(),
-    source: "fresh",
-    platform: "YouTube",
-    time_ms: 0,       // overwritten before returning
+    source: 'fresh',
+    platform: 'YouTube',
+    time_ms: 0, // overwritten before returning
   };
 }
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
   }
 
   const startMs = Date.now();
@@ -208,90 +204,86 @@ serve(async (req) => {
     // genuinely has no lesson context yet, without a hard failure. Do not
     // reinterpret "optional field" as "unauthorized path in current use" —
     // re-check both call sites above before loosening this comment further.
-    const authHeader = req.headers.get("Authorization");
+    const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: "Missing Authorization header" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ error: 'Missing Authorization header' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
-    const bearerToken = authHeader.replace(/^Bearer\s+/i, "").trim();
+    const bearerToken = authHeader.replace(/^Bearer\s+/i, '').trim();
     if (!bearerToken) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: { headers: { Authorization: `Bearer ${bearerToken}` } },
       auth: { autoRefreshToken: false, persistSession: false },
     });
-    const { data: authData, error: authError } = await authClient.auth.getUser(
-      bearerToken,
-    );
+    const { data: authData, error: authError } = await authClient.auth.getUser(bearerToken);
     if (authError || !authData.user) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
-    const { data: sessionValid, error: sessionError } = await authClient.rpc(
-      "validate_user_session",
-    );
+    const { data: sessionValid, error: sessionError } =
+      await authClient.rpc('validate_user_session');
     if (sessionError || sessionValid !== true) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
-    const { data: rateLimit, error: rateLimitError } = await authClient.rpc(
-      "check_rate_limit",
-      { p_action: "api_call", p_user_id: authData.user.id },
-    );
+    const { data: rateLimit, error: rateLimitError } = await authClient.rpc('check_rate_limit', {
+      p_action: 'api_call',
+      p_user_id: authData.user.id,
+    });
     if (rateLimitError) {
-      console.error("video-info rate-limit check failed", rateLimitError);
-      return new Response(
-        JSON.stringify({ error: "Service unavailable" }),
-        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      console.error('video-info rate-limit check failed', rateLimitError);
+      return new Response(JSON.stringify({ error: 'Service unavailable' }), {
+        status: 503,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
     if (rateLimit?.allowed === false) {
-      return new Response(
-        JSON.stringify({ error: "Too many requests" }),
-        {
-          status: 429,
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-            "Retry-After": rateLimit.retryAfter
-              ? Math.max(1, Math.ceil((new Date(rateLimit.retryAfter).getTime() - Date.now()) / 1000)).toString()
-              : "60",
-          },
+      return new Response(JSON.stringify({ error: 'Too many requests' }), {
+        status: 429,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+          'Retry-After': rateLimit.retryAfter
+            ? Math.max(
+                1,
+                Math.ceil((new Date(rateLimit.retryAfter).getTime() - Date.now()) / 1000),
+              ).toString()
+            : '60',
         },
-      );
+      });
     }
 
     // Parse body
-    const contentType = req.headers.get("content-type") || "";
+    const contentType = req.headers.get('content-type') || '';
     let body: any = {};
-    if (contentType.includes("application/json")) {
+    if (contentType.includes('application/json')) {
       body = await req.json();
     } else {
       const text = await req.text();
       if (text) {
         const params = new URLSearchParams(text);
-        body.url = params.get("url") ?? undefined;
-        body.lesson_id = params.get("lesson_id") ?? undefined;
+        body.url = params.get('url') ?? undefined;
+        body.lesson_id = params.get('lesson_id') ?? undefined;
       }
     }
 
-    let videoUrl: string | undefined =
-      typeof body?.url === "string" ? body.url : undefined;
+    let videoUrl: string | undefined = typeof body?.url === 'string' ? body.url : undefined;
     const lessonId: string | undefined =
-      typeof body?.lesson_id === "string" && body.lesson_id.trim().length > 0
+      typeof body?.lesson_id === 'string' && body.lesson_id.trim().length > 0
         ? body.lesson_id.trim()
         : undefined;
 
@@ -307,52 +299,52 @@ serve(async (req) => {
     // (403/404, no internal detail leaked).
     if (lessonId) {
       const { data: lessonContent, error: accessError } = await authClient.rpc(
-        "get_lesson_content",
+        'get_lesson_content',
         { p_lesson_id: lessonId },
       );
       if (accessError || !lessonContent) {
-        const reason = accessError?.message ?? "";
-        if (reason.includes("LESSON_NOT_FOUND")) {
-          return new Response(
-            JSON.stringify({ error: "Lesson not found" }),
-            { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-          );
+        const reason = accessError?.message ?? '';
+        if (reason.includes('LESSON_NOT_FOUND')) {
+          return new Response(JSON.stringify({ error: 'Lesson not found' }), {
+            status: 404,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
         }
         // ACCESS_DENIED and any other unexpected failure are both a 403
         // from the caller's point of view — do not leak the raw Postgres
         // error (schema/constraint/internal detail), mirroring
         // get-lesson-content/index.ts.
-        return new Response(
-          JSON.stringify({ error: "Access denied" }),
-          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
+        return new Response(JSON.stringify({ error: 'Access denied' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
 
       const provider: string | null = lessonContent.provider ?? null;
       const videoPath: string | null = lessonContent.videoPath ?? null;
-      if (provider !== "youtube" || !videoPath) {
+      if (provider !== 'youtube' || !videoPath) {
         // video-info is a YouTube-formats extractor only; a lesson whose
         // content isn't a YouTube reference has nothing for this function
         // to resolve, authorized or not.
-        return new Response(
-          JSON.stringify({ error: "Access denied" }),
-          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
+        return new Response(JSON.stringify({ error: 'Access denied' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
 
       // Server-authoritative from here on: use the lesson's own stored
       // reference, never the client-supplied url, once lesson_id has been
       // verified against it.
-      videoUrl = videoPath.startsWith("http")
+      videoUrl = videoPath.startsWith('http')
         ? videoPath
         : `https://www.youtube.com/watch?v=${videoPath}`;
     }
 
     if (!videoUrl) {
-      return new Response(
-        JSON.stringify({ error: "Video URL is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ error: 'Video URL is required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const urlHash = await hashUrl(videoUrl);
@@ -368,9 +360,9 @@ serve(async (req) => {
     if (cacheRes.ok) {
       const rows = await cacheRes.json();
       if (Array.isArray(rows) && rows.length > 0) {
-        staleData = rows[0].data;                                          // always keep
+        staleData = rows[0].data; // always keep
         if (rows[0].expires_at && new Date(rows[0].expires_at) > new Date()) {
-          freshData = rows[0].data;                                        // valid cache
+          freshData = rows[0].data; // valid cache
         }
       }
     }
@@ -378,20 +370,20 @@ serve(async (req) => {
     // Fresh cache hit → return immediately
     if (freshData && !responseNeedsSeparateAudio(freshData)) {
       return new Response(
-        JSON.stringify({ ...freshData, source: "cache", time_ms: Date.now() - startMs }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        JSON.stringify({ ...freshData, source: 'cache', time_ms: Date.now() - startMs }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
     // ── Fetch from Replit (8s timeout) ────────────────────────────────────────
-    const apiUrl = `${EXTERNAL_API_URL.replace(/\/+$/, "")}/info?url=${encodeURIComponent(videoUrl)}`;
+    const apiUrl = `${EXTERNAL_API_URL.replace(/\/+$/, '')}/info?url=${encodeURIComponent(videoUrl)}`;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), REPLIT_TIMEOUT_MS);
 
     let normalized: any;
     try {
       const res = await fetch(apiUrl, {
-        headers: { "x-api-key": EXTERNAL_API_KEY },
+        headers: { 'x-api-key': EXTERNAL_API_KEY },
         signal: controller.signal,
       });
       clearTimeout(timer);
@@ -403,45 +395,43 @@ serve(async (req) => {
       normalized.time_ms = Date.now() - startMs;
 
       // Write to cache — best-effort, never blocks the response
-      sbPost("video_cache?on_conflict=url_hash", {
+      sbPost('video_cache?on_conflict=url_hash', {
         url: videoUrl,
         url_hash: urlHash,
         data: normalized,
         expires_at: normalized.cache_expires_at,
-      }).catch(e => console.warn("Cache write failed:", e));
-
+      }).catch((e) => console.warn('Cache write failed:', e));
     } catch (fetchErr: any) {
       clearTimeout(timer);
 
       // Replit down or timed out → serve stale cache if available
       if (staleData && !responseNeedsSeparateAudio(staleData)) {
-        console.warn("Replit unavailable, serving stale cache:", fetchErr.message);
+        console.warn('Replit unavailable, serving stale cache:', fetchErr.message);
         return new Response(
-          JSON.stringify({ ...staleData, source: "stale", time_ms: Date.now() - startMs }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          JSON.stringify({ ...staleData, source: 'stale', time_ms: Date.now() - startMs }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
         );
       }
 
       // No cache at all
-      const msg = fetchErr.name === "AbortError"
-        ? "Video server timed out, please try again"
-        : "Video server unavailable";
-      return new Response(
-        JSON.stringify({ error: msg }),
-        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      const msg =
+        fetchErr.name === 'AbortError'
+          ? 'Video server timed out, please try again'
+          : 'Video server unavailable';
+      return new Response(JSON.stringify({ error: msg }), {
+        status: 503,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
-    return new Response(
-      JSON.stringify(normalized),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
-
+    return new Response(JSON.stringify(normalized), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   } catch (err: any) {
-    console.error("Unhandled error in video-info:", err);
-    return new Response(
-      JSON.stringify({ error: "Internal server error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
+    console.error('Unhandled error in video-info:', err);
+    return new Response(JSON.stringify({ error: 'Internal server error' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 });

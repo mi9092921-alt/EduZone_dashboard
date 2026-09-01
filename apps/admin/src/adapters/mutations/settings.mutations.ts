@@ -1,7 +1,10 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { queryKeys } from '@/adapters/queries/keys';
-import type { CreateFeatureFlagInput, UpdateFeatureFlagInput } from '@/domain/types/feature-flag.types';
+import type {
+  CreateFeatureFlagInput,
+  UpdateFeatureFlagInput,
+} from '@/domain/types/feature-flag.types';
 import type { MaintenanceModeParams } from '@/domain/types/settings.types';
 import {
   createFeatureFlag,

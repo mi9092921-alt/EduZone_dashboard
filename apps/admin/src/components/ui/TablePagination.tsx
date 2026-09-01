@@ -36,13 +36,16 @@ export function TablePagination({
             onValueChange={(val: string) => onPageSizeChange(Number(val))}
             className="bg-transparent border-none focus-visible:ring-0 shadow-none h-8 py-1 px-2 text-xs font-bold text-foreground cursor-pointer w-[70px] hover:bg-muted/50 rounded-lg"
           >
-            {pageSizeOptions.map(size => (
-              <SelectItem key={size} value={size.toString()}>{size}</SelectItem>
+            {pageSizeOptions.map((size) => (
+              <SelectItem key={size} value={size.toString()}>
+                {size}
+              </SelectItem>
             ))}
           </Select>
         </div>
         <span>
-          {t('showing')} {(page - 1) * pageSize + 1} - {Math.min(page * pageSize, totalCount)} {t('of')} {totalCount}
+          {t('showing')} {(page - 1) * pageSize + 1} - {Math.min(page * pageSize, totalCount)}{' '}
+          {t('of')} {totalCount}
         </span>
       </div>
 

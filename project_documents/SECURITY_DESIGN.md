@@ -10,6 +10,7 @@
 EduZone Admin Dashboard follows a **Zero-Trust** security model: every request is authenticated, authorised, and validated — regardless of origin. No implicit trust is granted to any component, user, or network.
 
 **Core Principles:**
+
 1. **Never trust, always verify** — JWT + token_version checked on every RPC
 2. **Least privilege** — Users get minimum permissions required for their role
 3. **Defense in depth** — Multiple security layers (JWT → RLS → SECURITY DEFINER → audit)
@@ -47,19 +48,19 @@ Dashboard renders (or redirect to appropriate error screen)
 
 ### 2.2 Token Storage
 
-| Token | Storage | Rationale |
-|-------|---------|-----------|
-| `access_token` (JWT) | **Memory only** | Prevents XSS theft from localStorage |
-| `refresh_token` | **HttpOnly cookie** | Inaccessible to JavaScript |
-| `service_role` key | **Edge Function env vars only** | Never sent to browser |
+| Token                | Storage                         | Rationale                            |
+| -------------------- | ------------------------------- | ------------------------------------ |
+| `access_token` (JWT) | **Memory only**                 | Prevents XSS theft from localStorage |
+| `refresh_token`      | **HttpOnly cookie**             | Inaccessible to JavaScript           |
+| `service_role` key   | **Edge Function env vars only** | Never sent to browser                |
 
 ### 2.3 MFA Requirements
 
-| Role | MFA Status |
-|------|-----------|
+| Role          | MFA Status                                |
+| ------------- | ----------------------------------------- |
 | `super_admin` | **Enforced** — cannot access without TOTP |
-| `admin` | **Enforced** — cannot access without TOTP |
-| `teacher` | Optional — can enrol via profile settings |
+| `admin`       | **Enforced** — cannot access without TOTP |
+| `teacher`     | Optional — can enrol via profile settings |
 
 ### 2.4 Session Management
 
@@ -74,6 +75,7 @@ Dashboard renders (or redirect to appropriate error screen)
 ## 3. token_version Mismatch Handling
 
 `token_version` in the `users` table is incremented whenever:
+
 - Admin forces logout
 - Account is locked, banned, or suspended
 - Password is reset
@@ -126,17 +128,17 @@ student  (NO dashboard access)
 
 ### 4.2 Permission Matrix
 
-| Action | super_admin | admin | teacher |
-|--------|------------|-------|---------|
-| Manage all tenants | ✅ | ❌ | ❌ |
-| View/manage all users | ✅ | ✅ (own tenant) | ❌ |
-| Suspend/ban users | ✅ | ✅ (not super_admin) | ❌ |
-| Manage system settings | ✅ | ❌ | ❌ |
-| Manage feature flags | ✅ | ❌ | ❌ |
-| Manage own-tenant courses | ✅ | ✅ | ✅ (own courses) |
-| View analytics | ✅ | ✅ (own tenant) | ✅ (own courses) |
-| Bulk operations | ✅ | ✅ | ❌ |
-| View audit logs | ✅ | ✅ (own tenant) | ❌ |
+| Action                    | super_admin | admin                | teacher          |
+| ------------------------- | ----------- | -------------------- | ---------------- |
+| Manage all tenants        | ✅          | ❌                   | ❌               |
+| View/manage all users     | ✅          | ✅ (own tenant)      | ❌               |
+| Suspend/ban users         | ✅          | ✅ (not super_admin) | ❌               |
+| Manage system settings    | ✅          | ❌                   | ❌               |
+| Manage feature flags      | ✅          | ❌                   | ❌               |
+| Manage own-tenant courses | ✅          | ✅                   | ✅ (own courses) |
+| View analytics            | ✅          | ✅ (own tenant)      | ✅ (own courses) |
+| Bulk operations           | ✅          | ✅                   | ❌               |
+| View audit logs           | ✅          | ✅ (own tenant)      | ❌               |
 
 ### 4.3 PermissionService (Domain Layer)
 
@@ -189,19 +191,19 @@ This creates a tamper-evident chain. If any historical record is modified, all s
 
 **Audit log fields:**
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | UUID | Unique entry ID |
-| `tenant_id` | UUID | Tenant scope |
-| `actor_id` | UUID | Admin who performed the action |
-| `action` | TEXT | e.g. `user.suspended`, `course.published` |
-| `target_type` | TEXT | e.g. `user`, `course`, `setting` |
-| `target_id` | UUID | Affected entity |
-| `details` | JSONB | Action-specific metadata |
-| `ip_address` | INET | Actor's IP |
-| `user_agent` | TEXT | Actor's browser/client |
-| `hash` | TEXT | SHA256 chain hash |
-| `created_at` | TIMESTAMPTZ | Immutable timestamp |
+| Field         | Type        | Description                               |
+| ------------- | ----------- | ----------------------------------------- |
+| `id`          | UUID        | Unique entry ID                           |
+| `tenant_id`   | UUID        | Tenant scope                              |
+| `actor_id`    | UUID        | Admin who performed the action            |
+| `action`      | TEXT        | e.g. `user.suspended`, `course.published` |
+| `target_type` | TEXT        | e.g. `user`, `course`, `setting`          |
+| `target_id`   | UUID        | Affected entity                           |
+| `details`     | JSONB       | Action-specific metadata                  |
+| `ip_address`  | INET        | Actor's IP                                |
+| `user_agent`  | TEXT        | Actor's browser/client                    |
+| `hash`        | TEXT        | SHA256 chain hash                         |
+| `created_at`  | TIMESTAMPTZ | Immutable timestamp                       |
 
 **Verification cron:** Runs every 6 hours to verify hash chain integrity. Alerts on any mismatch.
 
@@ -213,13 +215,13 @@ Rate limits prevent abuse and protect database resources.
 
 ### 6.1 Default Limits
 
-| Endpoint Type | Window | Max Requests |
-|--------------|--------|-------------|
-| Admin RPC calls | 60s | 100 |
-| Bulk operations | 60s | 10 |
-| Export generation | 300s | 5 |
-| Auth attempts | 300s | 10 |
-| Password reset | 3600s | 3 |
+| Endpoint Type     | Window | Max Requests |
+| ----------------- | ------ | ------------ |
+| Admin RPC calls   | 60s    | 100          |
+| Bulk operations   | 60s    | 10           |
+| Export generation | 300s   | 5            |
+| Auth attempts     | 300s   | 10           |
+| Password reset    | 3600s  | 3            |
 
 ### 6.2 Implementation
 
@@ -238,6 +240,7 @@ Rate limit state is stored in PostgreSQL `rate_limits` table (not in-memory) to 
 ## 7. Idempotency
 
 All mutations implement idempotency to prevent double-execution from:
+
 - Button double-clicks
 - Network retries
 - Edge Function timeout re-runs
@@ -255,6 +258,7 @@ Edge Function checks key in idempotency store
 ```
 
 All mutation hooks generate the key automatically:
+
 ```typescript
 const idempotencyKey = crypto.randomUUID(); // before useMutation call
 ```
@@ -265,12 +269,12 @@ const idempotencyKey = crypto.randomUUID(); // before useMutation call
 
 All inputs are validated at multiple layers:
 
-| Layer | Tool | Scope |
-|-------|------|-------|
-| Frontend form | Zod + React Hook Form | User-facing input |
-| API contract | Zod schema | Request body shape |
-| Database | PostgreSQL CHECK constraints | Column-level rules |
-| RPC function | Internal validation + permission check | Business rules |
+| Layer         | Tool                                   | Scope              |
+| ------------- | -------------------------------------- | ------------------ |
+| Frontend form | Zod + React Hook Form                  | User-facing input  |
+| API contract  | Zod schema                             | Request body shape |
+| Database      | PostgreSQL CHECK constraints           | Column-level rules |
+| RPC function  | Internal validation + permission check | Business rules     |
 
 **SQL Injection prevention:** All queries use parameterised RPC calls via Supabase client. No string concatenation in SQL ever.
 
@@ -282,19 +286,19 @@ All inputs are validated at multiple layers:
 
 ### 9.1 In-Scope Threats
 
-| Threat | Mitigation |
-|--------|-----------|
-| Stolen JWT | Short expiry (1h) + token_version invalidation |
-| XSS | Memory-only JWT storage + CSP headers |
-| CSRF | SameSite=Strict cookies + custom headers |
-| SQL Injection | Parameterised queries only |
-| Privilege escalation | RLS + PermissionService + SECURITY DEFINER |
-| Cross-tenant data leak | Tenant isolation RLS on all tables |
-| Replay attacks | Idempotency keys with 24h TTL |
-| Brute force | Rate limiting (10 attempts / 5 min) + lockout |
-| Data exfiltration | Bulk export requires explicit admin action + audit log |
-| Audit tampering | Hash-chain verification + append-only policy |
-| service_role key leak | Never in browser; only in Edge Function env vars |
+| Threat                 | Mitigation                                             |
+| ---------------------- | ------------------------------------------------------ |
+| Stolen JWT             | Short expiry (1h) + token_version invalidation         |
+| XSS                    | Memory-only JWT storage + CSP headers                  |
+| CSRF                   | SameSite=Strict cookies + custom headers               |
+| SQL Injection          | Parameterised queries only                             |
+| Privilege escalation   | RLS + PermissionService + SECURITY DEFINER             |
+| Cross-tenant data leak | Tenant isolation RLS on all tables                     |
+| Replay attacks         | Idempotency keys with 24h TTL                          |
+| Brute force            | Rate limiting (10 attempts / 5 min) + lockout          |
+| Data exfiltration      | Bulk export requires explicit admin action + audit log |
+| Audit tampering        | Hash-chain verification + append-only policy           |
+| service_role key leak  | Never in browser; only in Edge Function env vars       |
 
 ### 9.2 Out-of-Scope Threats
 

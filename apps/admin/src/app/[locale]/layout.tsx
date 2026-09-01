@@ -11,8 +11,7 @@ import '../globals.css';
 
 export const metadata: Metadata = {
   title: 'EduZone Admin Dashboard',
-  description:
-    'Multi-tenant Learning Management Platform — Admin & Management Control Plane',
+  description: 'Multi-tenant Learning Management Platform — Admin & Management Control Plane',
   keywords: ['EduZone', 'Admin', 'Dashboard', 'LMS', 'Learning Management'],
 };
 
@@ -39,11 +38,7 @@ export default async function RootLayout({
     <html lang={locale} dir={dir} suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin="anonymous"
-        />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
           href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Cairo:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
           rel="stylesheet"

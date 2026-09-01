@@ -1,16 +1,9 @@
 'use client';
 
-import {
-  Search,
-  ExpandMore,
-  ExpandLess,
-  ContentCopy,
-  LinkOutlined,
-} from '@mui/icons-material';
+import { Search, ExpandMore, ExpandLess, ContentCopy, LinkOutlined } from '@mui/icons-material';
 import { Tooltip } from '@mui/material';
 import { useTranslations } from 'next-intl';
 import { useState, useCallback } from 'react';
-
 
 import { ChainVerifier } from './ChainVerifier';
 
@@ -27,14 +20,38 @@ const RISK_CHIPS: Record<RiskLevel, { bg: string; text: string }> = {
 };
 
 const ACTIVITY_TYPES = [
-  'login', 'login_success', 'logout', 'login_failed', 'password_reset', 'device_bind',
-  'course_created', 'course_deleted', 'course_view', 'video_view',
-  'lesson_started', 'lesson_view', 'lesson_content_denied', 'enrollment',
-  'settings_change', 'settings_changed', 'user_lock', 'user_unlock',
-  'user_suspend', 'user_ban', 'warning_issued', 'api_call',
-  'notification_sent', 'notification_auto_sent', 'tenant_suspension_revoked',
-  'permission_denied', 'course_access', 'user_login', 'bulk_action_queued',
-  'bulk_action_completed', 'bulk_action_progress', 'bulk_export_completed'
+  'login',
+  'login_success',
+  'logout',
+  'login_failed',
+  'password_reset',
+  'device_bind',
+  'course_created',
+  'course_deleted',
+  'course_view',
+  'video_view',
+  'lesson_started',
+  'lesson_view',
+  'lesson_content_denied',
+  'enrollment',
+  'settings_change',
+  'settings_changed',
+  'user_lock',
+  'user_unlock',
+  'user_suspend',
+  'user_ban',
+  'warning_issued',
+  'api_call',
+  'notification_sent',
+  'notification_auto_sent',
+  'tenant_suspension_revoked',
+  'permission_denied',
+  'course_access',
+  'user_login',
+  'bulk_action_queued',
+  'bulk_action_completed',
+  'bulk_action_progress',
+  'bulk_export_completed',
 ];
 
 const RISK_LEVELS: RiskLevel[] = ['low', 'medium', 'high', 'critical'];
@@ -124,13 +141,23 @@ export function AuditLogsTab() {
           {/* Date range */}
           <input
             type="date"
-            onChange={(e) => handleDateFilter(e.target.value ? new Date(e.target.value).toISOString() : undefined, filters.dateTo)}
+            onChange={(e) =>
+              handleDateFilter(
+                e.target.value ? new Date(e.target.value).toISOString() : undefined,
+                filters.dateTo,
+              )
+            }
             className="h-9 px-3 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
           />
           <span className="text-xs text-muted-foreground">{t('label_to')}</span>
           <input
             type="date"
-            onChange={(e) => handleDateFilter(filters.dateFrom, e.target.value ? new Date(e.target.value + 'T23:59:59').toISOString() : undefined)}
+            onChange={(e) =>
+              handleDateFilter(
+                filters.dateFrom,
+                e.target.value ? new Date(e.target.value + 'T23:59:59').toISOString() : undefined,
+              )
+            }
             className="h-9 px-3 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
           />
         </div>
@@ -139,13 +166,27 @@ export function AuditLogsTab() {
         {(filters.activity_type || filters.risk_level || filters.user_id) && (
           <div className="flex flex-wrap gap-1.5">
             {filters.user_id && (
-              <Chip label={`${t('label_user_prefix')} ${filters.user_id.slice(0, 8)}…`} onDelete={() => { setSearchInput(''); setFilters((p) => ({ ...p, user_id: undefined })); }} />
+              <Chip
+                label={`${t('label_user_prefix')} ${filters.user_id.slice(0, 8)}…`}
+                onDelete={() => {
+                  setSearchInput('');
+                  setFilters((p) => ({ ...p, user_id: undefined }));
+                }}
+              />
             )}
             {filters.activity_type?.map((type) => (
-              <Chip key={type} label={t(`activity_types.${type}`)} onDelete={() => handleTypeFilter(filters.activity_type!.filter((x) => x !== type))} />
+              <Chip
+                key={type}
+                label={t(`activity_types.${type}`)}
+                onDelete={() => handleTypeFilter(filters.activity_type!.filter((x) => x !== type))}
+              />
             ))}
             {filters.risk_level?.map((r) => (
-              <Chip key={r} label={t(`risk_levels.${r}`)} onDelete={() => handleRiskFilter(filters.risk_level!.filter((x) => x !== r))} />
+              <Chip
+                key={r}
+                label={t(`risk_levels.${r}`)}
+                onDelete={() => handleRiskFilter(filters.risk_level!.filter((x) => x !== r))}
+              />
             ))}
           </div>
         )}
@@ -165,12 +206,24 @@ export function AuditLogsTab() {
             <thead>
               <tr className="border-b border-border bg-muted/30">
                 <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs w-8" />
-                <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">{t('header_seq')}</th>
-                <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">{t('header_time')}</th>
-                <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">{t('header_user')}</th>
-                <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">{t('header_activity')}</th>
-                <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">{t('header_risk')}</th>
-                <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">{t('header_hash')}</th>
+                <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">
+                  {t('header_seq')}
+                </th>
+                <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">
+                  {t('header_time')}
+                </th>
+                <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">
+                  {t('header_user')}
+                </th>
+                <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">
+                  {t('header_activity')}
+                </th>
+                <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">
+                  {t('header_risk')}
+                </th>
+                <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">
+                  {t('header_hash')}
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -235,12 +288,15 @@ function LogRow({
             <ExpandMore className="text-base text-muted-foreground" />
           )}
         </td>
-        <td className="px-4 py-2.5 font-mono text-xs text-foreground font-semibold">
-          {log.seq}
-        </td>
+        <td className="px-4 py-2.5 font-mono text-xs text-foreground font-semibold">{log.seq}</td>
         <td className="px-4 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
           {time.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}{' '}
-          {time.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
+          {time.toLocaleTimeString(undefined, {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false,
+          })}
         </td>
         <td className="px-4 py-2.5 text-xs text-foreground font-mono">
           {log.user_id ? log.user_id.slice(0, 8) + '…' : '—'}
@@ -251,7 +307,13 @@ function LogRow({
           </span>
         </td>
         <td className="px-4 py-2.5">
-          <span className={cn('text-[10px] font-bold uppercase px-2 py-0.5 rounded-md', risk.bg, risk.text)}>
+          <span
+            className={cn(
+              'text-[10px] font-bold uppercase px-2 py-0.5 rounded-md',
+              risk.bg,
+              risk.text,
+            )}
+          >
             {t(`risk_levels.${log.risk_level}`)}
           </span>
         </td>
@@ -271,7 +333,9 @@ function LogRow({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Details JSON */}
               <div>
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">{t('details_title')}</h4>
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">
+                  {t('details_title')}
+                </h4>
                 <pre className="text-[11px] font-mono bg-background rounded-xl p-3 border border-border overflow-x-auto max-h-48 text-foreground">
                   {JSON.stringify(log.details, null, 2)}
                 </pre>
@@ -280,7 +344,9 @@ function LogRow({
               {/* Chain info */}
               <div className="space-y-3">
                 <div>
-                  <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">{t('chain_link_title')}</h4>
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">
+                    {t('chain_link_title')}
+                  </h4>
                   <div className="flex items-center gap-2 text-xs">
                     <LinkOutlined className="text-sm text-muted-foreground" />
                     <span className="text-muted-foreground">{t('prev_hash_label')}</span>
@@ -295,7 +361,9 @@ function LogRow({
                     <LinkOutlined className="text-sm text-primary" />
                     <span className="text-muted-foreground">{t('entry_hash_label')}</span>
                     <Tooltip title={log.entry_hash}>
-                      <span className="font-mono text-foreground cursor-help">{log.entry_hash.slice(0, 16)}…</span>
+                      <span className="font-mono text-foreground cursor-help">
+                        {log.entry_hash.slice(0, 16)}…
+                      </span>
                     </Tooltip>
                     <CopyButton text={log.entry_hash} />
                   </div>
@@ -303,18 +371,32 @@ function LogRow({
 
                 {/* Metadata */}
                 <div>
-                  <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">{t('metadata_title')}</h4>
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">
+                    {t('metadata_title')}
+                  </h4>
                   <div className="space-y-1 text-xs">
                     {log.ip_address && (
-                      <p><span className="text-muted-foreground">{t('ip_label')}</span> <span className="font-mono text-foreground">{log.ip_address}</span></p>
+                      <p>
+                        <span className="text-muted-foreground">{t('ip_label')}</span>{' '}
+                        <span className="font-mono text-foreground">{log.ip_address}</span>
+                      </p>
                     )}
                     {log.device_id && (
-                      <p><span className="text-muted-foreground">{t('device_label')}</span> <span className="font-mono text-foreground">{log.device_id}</span></p>
+                      <p>
+                        <span className="text-muted-foreground">{t('device_label')}</span>{' '}
+                        <span className="font-mono text-foreground">{log.device_id}</span>
+                      </p>
                     )}
                     {log.user_agent && (
-                      <p><span className="text-muted-foreground">{t('ua_label')}</span> <span className="font-mono text-foreground truncate">{log.user_agent}</span></p>
+                      <p>
+                        <span className="text-muted-foreground">{t('ua_label')}</span>{' '}
+                        <span className="font-mono text-foreground truncate">{log.user_agent}</span>
+                      </p>
                     )}
-                    <p><span className="text-muted-foreground">{t('region_label')}</span> <span className="font-mono text-foreground">{log.region_id ?? '—'}</span></p>
+                    <p>
+                      <span className="text-muted-foreground">{t('region_label')}</span>{' '}
+                      <span className="font-mono text-foreground">{log.region_id ?? '—'}</span>
+                    </p>
                   </div>
                 </div>
               </div>
@@ -342,7 +424,9 @@ function CopyButton({ text }: { text: string }) {
         }}
         className="p-0.5 rounded hover:bg-muted transition-colors"
       >
-        <ContentCopy className={cn('text-xs', copied ? 'text-emerald-500' : 'text-muted-foreground')} />
+        <ContentCopy
+          className={cn('text-xs', copied ? 'text-emerald-500' : 'text-muted-foreground')}
+        />
       </button>
     </Tooltip>
   );
@@ -407,14 +491,19 @@ function MultiSelect({
                 <div
                   className={cn(
                     'w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0',
-                    selected.includes(opt)
-                      ? 'bg-primary border-primary'
-                      : 'border-border',
+                    selected.includes(opt) ? 'bg-primary border-primary' : 'border-border',
                   )}
                 >
                   {selected.includes(opt) && (
                     <svg className="w-2.5 h-2.5 text-primary-foreground" viewBox="0 0 12 12">
-                      <path d="M10 3L4.5 8.5L2 6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      <path
+                        d="M10 3L4.5 8.5L2 6"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
                     </svg>
                   )}
                 </div>
@@ -433,7 +522,10 @@ function Chip({ label, onDelete }: { label: string; onDelete: () => void }) {
   return (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-muted text-xs font-medium text-foreground">
       {label}
-      <button onClick={onDelete} className="text-muted-foreground hover:text-foreground transition-colors">
+      <button
+        onClick={onDelete}
+        className="text-muted-foreground hover:text-foreground transition-colors"
+      >
         ×
       </button>
     </span>

@@ -30,13 +30,15 @@ import type { CourseDetail } from '@/domain/types/course.types';
 import { useRouter } from '@/i18n/routing';
 import { cn } from '@/lib/utils';
 
-
 interface CourseInfoFormProps {
   course: CourseDetail;
   hideTeacherSelect?: boolean;
 }
 
-export function CourseInfoForm({ course, hideTeacherSelect: _hideTeacherSelect }: CourseInfoFormProps) {
+export function CourseInfoForm({
+  course,
+  hideTeacherSelect: _hideTeacherSelect,
+}: CourseInfoFormProps) {
   const t = useTranslations('common');
   const router = useRouter();
   const updateMutation = useUpdateCourse();
@@ -131,7 +133,10 @@ export function CourseInfoForm({ course, hideTeacherSelect: _hideTeacherSelect }
   const isFree = watch('is_free');
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
-  const isPending = updateMutation.isPending || saveObjectivesMutation.isPending || savePrerequisitesMutation.isPending;
+  const isPending =
+    updateMutation.isPending ||
+    saveObjectivesMutation.isPending ||
+    savePrerequisitesMutation.isPending;
 
   const onSubmit = async (data: UpdateCourseFormInput) => {
     const payload: Parameters<typeof updateMutation.mutateAsync>[0]['data'] = {};
@@ -151,7 +156,10 @@ export function CourseInfoForm({ course, hideTeacherSelect: _hideTeacherSelect }
       await updateMutation.mutateAsync({ id: course.id, data: payload });
 
       const cleanObjectives = objectives.map((o) => o.trim()).filter(Boolean);
-      await saveObjectivesMutation.mutateAsync({ courseId: course.id, objectives: cleanObjectives });
+      await saveObjectivesMutation.mutateAsync({
+        courseId: course.id,
+        objectives: cleanObjectives,
+      });
       await savePrerequisitesMutation.mutateAsync({
         courseId: course.id,
         prerequisiteCourseIds: prereqIds,
@@ -169,7 +177,6 @@ export function CourseInfoForm({ course, hideTeacherSelect: _hideTeacherSelect }
     <>
       <div className="w-full max-w-4xl mx-auto lg:mx-0">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
-
           <div className="grid grid-cols-1 gap-6">
             <div className="space-y-2">
               <Label htmlFor="title">{t('course_title_label')}</Label>
@@ -187,13 +194,17 @@ export function CourseInfoForm({ course, hideTeacherSelect: _hideTeacherSelect }
                 id="description"
                 rows={4}
                 className={cn(
-                  "flex w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 transition-faang min-h-[120px] resize-none",
-                  errors.description && "border-destructive focus-visible:ring-destructive/30"
+                  'flex w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 transition-faang min-h-[120px] resize-none',
+                  errors.description && 'border-destructive focus-visible:ring-destructive/30',
                 )}
                 placeholder={t('description_placeholder')}
                 {...register('description')}
               />
-              {errors.description && <p className="text-xs font-bold text-destructive uppercase tracking-widest ps-1">{errors.description.message}</p>}
+              {errors.description && (
+                <p className="text-xs font-bold text-destructive uppercase tracking-widest ps-1">
+                  {errors.description.message}
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -222,10 +233,7 @@ export function CourseInfoForm({ course, hideTeacherSelect: _hideTeacherSelect }
                   name="level"
                   control={control}
                   render={({ field }) => (
-                    <Select
-                      value={field.value}
-                      onValueChange={field.onChange}
-                    >
+                    <Select value={field.value} onValueChange={field.onChange}>
                       <SelectItem value="beginner">{t('beginner')}</SelectItem>
                       <SelectItem value="intermediate">{t('intermediate')}</SelectItem>
                       <SelectItem value="advanced">{t('advanced')}</SelectItem>
@@ -241,10 +249,7 @@ export function CourseInfoForm({ course, hideTeacherSelect: _hideTeacherSelect }
                 name="status"
                 control={control}
                 render={({ field }) => (
-                  <Select
-                    value={field.value}
-                    onValueChange={field.onChange}
-                  >
+                  <Select value={field.value} onValueChange={field.onChange}>
                     <SelectItem value="draft">{t('draft_status')}</SelectItem>
                     <SelectItem value="published">{t('published_status')}</SelectItem>
                     <SelectItem value="archived">{t('archived_status')}</SelectItem>
@@ -262,11 +267,11 @@ export function CourseInfoForm({ course, hideTeacherSelect: _hideTeacherSelect }
                   error={errors.slug?.message}
                   placeholder="advanced-react-patterns"
                 />
-                <p className="text-xs text-muted-foreground font-medium ps-1 italic">{t('url_slug_helper')}</p>
+                <p className="text-xs text-muted-foreground font-medium ps-1 italic">
+                  {t('url_slug_helper')}
+                </p>
               </div>
-
             </div>
-
 
             <div className="flex items-center justify-between p-4 rounded-2xl bg-muted/30 border border-border/50">
               <div className="space-y-1">
@@ -277,10 +282,7 @@ export function CourseInfoForm({ course, hideTeacherSelect: _hideTeacherSelect }
                 name="is_free"
                 control={control}
                 render={({ field }) => (
-                  <Switch
-                    checked={!!field.value}
-                    onCheckedChange={field.onChange}
-                  />
+                  <Switch checked={!!field.value} onCheckedChange={field.onChange} />
                 )}
               />
             </div>
@@ -328,7 +330,9 @@ export function CourseInfoForm({ course, hideTeacherSelect: _hideTeacherSelect }
                         key={id}
                         className="flex items-center gap-2 bg-primary/10 border border-primary/20 text-primary px-3 py-1.5 rounded-full text-xs font-bold transition-all hover:bg-primary/20"
                       >
-                        <span>{title} {level ? `(${level})` : ''}</span>
+                        <span>
+                          {title} {level ? `(${level})` : ''}
+                        </span>
                         <button
                           type="button"
                           onClick={() => handleRemovePrereq(id)}
@@ -345,14 +349,13 @@ export function CourseInfoForm({ course, hideTeacherSelect: _hideTeacherSelect }
               {/* Dropdown to add a prerequisite */}
               {availableOptions.length > 0 && (
                 <div className="w-full max-w-md space-y-2">
-                  <Label htmlFor="add-prereq-select" className="text-xs font-semibold text-muted-foreground">
+                  <Label
+                    htmlFor="add-prereq-select"
+                    className="text-xs font-semibold text-muted-foreground"
+                  >
                     {t('select_prerequisites')}
                   </Label>
-                  <Select
-                    id="add-prereq-select"
-                    value=""
-                    onValueChange={handleAddPrereq}
-                  >
+                  <Select id="add-prereq-select" value="" onValueChange={handleAddPrereq}>
                     <SelectItem value="" disabled>
                       {t('select_prerequisites')}
                     </SelectItem>
@@ -380,7 +383,10 @@ export function CourseInfoForm({ course, hideTeacherSelect: _hideTeacherSelect }
 
               <div className="space-y-3">
                 {objectives.map((obj, index) => (
-                  <div key={index} className="flex gap-2 items-center animate-in fade-in duration-200">
+                  <div
+                    key={index}
+                    className="flex gap-2 items-center animate-in fade-in duration-200"
+                  >
                     <span className="text-xs font-bold text-muted-foreground bg-muted h-8 w-8 rounded-full flex items-center justify-center shrink-0">
                       {index + 1}
                     </span>

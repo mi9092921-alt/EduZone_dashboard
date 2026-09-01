@@ -12,13 +12,13 @@ The EduZone Admin Dashboard follows **Clean Architecture** — a software design
 
 ### 1.1 Core Rules
 
-| # | Rule | Enforcement |
-|---|------|-------------|
-| 1 | **Dependency Rule** — outer layers depend on inner; never the reverse | ESLint `import/no-restricted-paths` + `dependency-cruiser` |
-| 2 | **Framework Isolation** — domain/application layers never import React, Next.js, MUI, or Supabase | TypeScript path alias restrictions |
-| 3 | **Dependency Inversion** — application depends on port interfaces (`I*`), not concrete implementations | Constructor/parameter injection |
-| 4 | **Single Responsibility** — each module has one reason to change | Code review checklist |
-| 5 | **Interface Segregation** — ports are small, role-specific interfaces | Max 5–7 methods per port |
+| #   | Rule                                                                                                   | Enforcement                                                |
+| --- | ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
+| 1   | **Dependency Rule** — outer layers depend on inner; never the reverse                                  | ESLint `import/no-restricted-paths` + `dependency-cruiser` |
+| 2   | **Framework Isolation** — domain/application layers never import React, Next.js, MUI, or Supabase      | TypeScript path alias restrictions                         |
+| 3   | **Dependency Inversion** — application depends on port interfaces (`I*`), not concrete implementations | Constructor/parameter injection                            |
+| 4   | **Single Responsibility** — each module has one reason to change                                       | Code review checklist                                      |
+| 5   | **Interface Segregation** — ports are small, role-specific interfaces                                  | Max 5–7 methods per port                                   |
 
 ### 1.2 Dependency Direction
 
@@ -89,6 +89,7 @@ src/domain/
 ```
 
 **Rules:**
+
 - ❌ No imports from `react`, `next`, `@supabase/*`, `@mui/*`, `@tanstack/*`
 - ❌ No `async` functions (no I/O)
 - ❌ No `console.log` (use `ILogger` port in application layer)
@@ -148,23 +149,24 @@ src/application/
 ```
 
 **Use Case Signature Pattern:**
+
 ```typescript
 // Every use case is a pure function with injected dependencies
 export async function suspendUser(
-  repo:     IUserRepo,
+  repo: IUserRepo,
   eventBus: IEventBus,
-  logger:   ILogger,
-  tracer:   ITracer,
-  actorId:  string,
+  logger: ILogger,
+  tracer: ITracer,
+  actorId: string,
   tenantId: string,
-  userId:   string,
-  reason:   string,
+  userId: string,
+  reason: string,
 ): Promise<void> {
   const span = tracer.startSpan('suspendUser');
   try {
     await repo.suspendUser(userId, reason);
     await eventBus.publish(
-      createUserSuspendedEvent(actorId, tenantId, span.traceId, userId, reason)
+      createUserSuspendedEvent(actorId, tenantId, span.traceId, userId, reason),
     );
     logger.info('User suspended', { userId, reason, traceId: span.traceId });
     span.end('ok');
@@ -178,6 +180,7 @@ export async function suspendUser(
 ```
 
 **Rules:**
+
 - ❌ No imports from infrastructure, adapters, or features
 - ❌ No direct Supabase calls — only port interfaces
 - ❌ No React imports
@@ -221,6 +224,7 @@ src/infrastructure/
 ```
 
 **Rules:**
+
 - ✅ Each file implements exactly one port interface
 - ✅ 80% test coverage required
 - ✅ All Supabase-specific code is confined here
@@ -284,6 +288,7 @@ src/adapters/
 ```
 
 **Rules:**
+
 - ✅ Adapters call use cases via the DI container
 - ✅ Hooks encapsulate all React Query / Zustand logic
 - ❌ No direct Supabase imports — use cases and ports only
@@ -349,6 +354,7 @@ src/features/
 ```
 
 **Rules:**
+
 - ✅ Features import from `domain`, `adapters`, and shared UI
 - ❌ Never import from infrastructure directly
 - ❌ Never import from other features (use shared adapters)
@@ -379,21 +385,21 @@ const supabase = createBrowserClient();
 
 export const container = {
   // Repos
-  userRepo:       new SupabaseUserRepo(supabase)       as IUserRepo,
-  courseRepo:      new SupabaseCourseRepo(supabase)      as ICourseRepo,
-  enrollmentRepo: new SupabaseEnrollmentRepo(supabase)  as IEnrollmentRepo,
-  settingsRepo:   new SupabaseSettingsRepo(supabase)    as ISettingsRepo,
-  sessionRepo:    new SupabaseSessionRepo(supabase)     as ISessionRepo,
-  warningRepo:    new SupabaseWarningRepo(supabase)     as IWarningRepo,
-  
+  userRepo: new SupabaseUserRepo(supabase) as IUserRepo,
+  courseRepo: new SupabaseCourseRepo(supabase) as ICourseRepo,
+  enrollmentRepo: new SupabaseEnrollmentRepo(supabase) as IEnrollmentRepo,
+  settingsRepo: new SupabaseSettingsRepo(supabase) as ISettingsRepo,
+  sessionRepo: new SupabaseSessionRepo(supabase) as ISessionRepo,
+  warningRepo: new SupabaseWarningRepo(supabase) as IWarningRepo,
+
   // Services
-  eventBus: new InMemoryEventBus()   as IEventBus,
-  logger:   new ConsoleLogger()      as ILogger,
-  tracer:   new NoopTracer()         as ITracer,
-  metrics:  new NoopMetrics()        as IMetrics,
-  
+  eventBus: new InMemoryEventBus() as IEventBus,
+  logger: new ConsoleLogger() as ILogger,
+  tracer: new NoopTracer() as ITracer,
+  metrics: new NoopMetrics() as IMetrics,
+
   // Context (set after auth)
-  actorId:  '' as string,
+  actorId: '' as string,
   tenantId: '' as string,
 };
 ```
@@ -418,11 +424,13 @@ export const container = {
 ```
 
 ### 4.1 Read Flow (Query)
+
 ```
 UsersPage → useListUsers() → listUsers(repo, ..., filters) → repo.listUsers(filters) → supabase.rpc()
 ```
 
 ### 4.2 Write Flow (Mutation)
+
 ```
 SuspendDialog → useSuspendUser() → suspendUser(repo, eventBus, ...) → repo.suspendUser() → supabase.rpc()
                                                                      → eventBus.publish(UserSuspended)
@@ -433,6 +441,7 @@ SuspendDialog → useSuspendUser() → suspendUser(repo, eventBus, ...) → repo
 ## 5. Port Interface Examples
 
 ### 5.1 IUserRepo
+
 ```typescript
 export interface IUserRepo {
   listUsers(filters: UserFilters, page: number, pageSize: number): Promise<PaginatedResult<User>>;
@@ -447,6 +456,7 @@ export interface IUserRepo {
 ```
 
 ### 5.2 IEventBus
+
 ```typescript
 export interface IEventBus {
   publish<T>(event: DomainEvent<T>): Promise<void>;
@@ -455,6 +465,7 @@ export interface IEventBus {
 ```
 
 ### 5.3 ILogger
+
 ```typescript
 export interface ILogger {
   info(message: string, context?: Record<string, unknown>): void;
@@ -468,33 +479,36 @@ export interface ILogger {
 
 ## 6. Layer Dependency Matrix
 
-| Layer | Can Import | Cannot Import |
-|-------|-----------|---------------|
-| **Domain** | `@eduzone/types` only | Application, Infrastructure, Adapters, Features, React, Supabase |
-| **Application** | Domain, Contracts | Infrastructure, Adapters, Features, React, Supabase |
-| **Infrastructure** | Domain, Application, Contracts, `@supabase/*` | Adapters, Features, React |
-| **Contracts** | Domain | Everything else |
-| **Adapters** | Domain, Application, Contracts, `react`, `@tanstack/*`, `zustand` | Infrastructure, Features |
-| **Features** | Domain, Contracts, Adapters, `react`, `@mui/*` | Infrastructure, Application (direct), other Features |
+| Layer              | Can Import                                                        | Cannot Import                                                    |
+| ------------------ | ----------------------------------------------------------------- | ---------------------------------------------------------------- |
+| **Domain**         | `@eduzone/types` only                                             | Application, Infrastructure, Adapters, Features, React, Supabase |
+| **Application**    | Domain, Contracts                                                 | Infrastructure, Adapters, Features, React, Supabase              |
+| **Infrastructure** | Domain, Application, Contracts, `@supabase/*`                     | Adapters, Features, React                                        |
+| **Contracts**      | Domain                                                            | Everything else                                                  |
+| **Adapters**       | Domain, Application, Contracts, `react`, `@tanstack/*`, `zustand` | Infrastructure, Features                                         |
+| **Features**       | Domain, Contracts, Adapters, `react`, `@mui/*`                    | Infrastructure, Application (direct), other Features             |
 
 ### 6.1 ESLint Enforcement
 
 ```json
 {
   "rules": {
-    "import/no-restricted-paths": ["error", {
-      "zones": [
-        { "target": "./src/domain",      "from": "./src/application" },
-        { "target": "./src/domain",      "from": "./src/infrastructure" },
-        { "target": "./src/domain",      "from": "./src/adapters" },
-        { "target": "./src/domain",      "from": "./src/features" },
-        { "target": "./src/application", "from": "./src/infrastructure" },
-        { "target": "./src/application", "from": "./src/adapters" },
-        { "target": "./src/application", "from": "./src/features" },
-        { "target": "./src/adapters",    "from": "./src/infrastructure" },
-        { "target": "./src/features",    "from": "./src/infrastructure" }
-      ]
-    }]
+    "import/no-restricted-paths": [
+      "error",
+      {
+        "zones": [
+          { "target": "./src/domain", "from": "./src/application" },
+          { "target": "./src/domain", "from": "./src/infrastructure" },
+          { "target": "./src/domain", "from": "./src/adapters" },
+          { "target": "./src/domain", "from": "./src/features" },
+          { "target": "./src/application", "from": "./src/infrastructure" },
+          { "target": "./src/application", "from": "./src/adapters" },
+          { "target": "./src/application", "from": "./src/features" },
+          { "target": "./src/adapters", "from": "./src/infrastructure" },
+          { "target": "./src/features", "from": "./src/infrastructure" }
+        ]
+      }
+    ]
   }
 }
 ```
@@ -503,14 +517,14 @@ export interface ILogger {
 
 ## 7. Testing Strategy per Layer
 
-| Layer | Tool | Mock Strategy | Coverage |
-|-------|------|---------------|----------|
-| **Domain** | Vitest | None needed (pure functions) | 100% |
-| **Application** | Vitest | Mock all ports (`IUserRepo`, `IEventBus`, etc.) | 90% |
-| **Infrastructure** | Vitest | Mock Supabase client | 80% |
-| **Adapters** | Vitest + React Testing Library | Mock use cases via container | 80% |
-| **Features** | Vitest + RTL | Mock adapter hooks | 70% |
-| **E2E** | Playwright | Real Supabase (test project) | Critical paths |
+| Layer              | Tool                           | Mock Strategy                                   | Coverage       |
+| ------------------ | ------------------------------ | ----------------------------------------------- | -------------- |
+| **Domain**         | Vitest                         | None needed (pure functions)                    | 100%           |
+| **Application**    | Vitest                         | Mock all ports (`IUserRepo`, `IEventBus`, etc.) | 90%            |
+| **Infrastructure** | Vitest                         | Mock Supabase client                            | 80%            |
+| **Adapters**       | Vitest + React Testing Library | Mock use cases via container                    | 80%            |
+| **Features**       | Vitest + RTL                   | Mock adapter hooks                              | 70%            |
+| **E2E**            | Playwright                     | Real Supabase (test project)                    | Critical paths |
 
 ---
 

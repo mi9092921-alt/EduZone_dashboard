@@ -16,13 +16,14 @@ export interface YouTubeVideoMetadata {
  */
 export function extractYoutubeId(urlOrId: string): string | null {
   if (!urlOrId) return null;
-  
+
   // If it's already an ID (11 chars, alphanumeric + - _)
   if (/^[a-zA-Z0-9_-]{11}$/.test(urlOrId)) {
     return urlOrId;
   }
 
-  const regex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+  const regex =
+    /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
   const match = urlOrId.match(regex);
   return match ? (match[1] ?? null) : null;
 }
@@ -48,7 +49,9 @@ export function parseISO8601Duration(duration: string): number {
  * Fetches video metadata from YouTube Data API v3.
  * Requires YOUTUBE_API_KEY environment variable.
  */
-export async function getYoutubeVideoDetails(urlOrId: string): Promise<YouTubeVideoMetadata | null> {
+export async function getYoutubeVideoDetails(
+  urlOrId: string,
+): Promise<YouTubeVideoMetadata | null> {
   const videoId = extractYoutubeId(urlOrId);
   if (!videoId) return null;
 
@@ -60,7 +63,7 @@ export async function getYoutubeVideoDetails(urlOrId: string): Promise<YouTubeVi
 
   try {
     const response = await fetch(
-      `https://www.googleapis.com/youtube/v3/videos?id=${videoId}&part=contentDetails,snippet&key=${apiKey}`
+      `https://www.googleapis.com/youtube/v3/videos?id=${videoId}&part=contentDetails,snippet&key=${apiKey}`,
     );
 
     if (!response.ok) {
@@ -76,7 +79,8 @@ export async function getYoutubeVideoDetails(urlOrId: string): Promise<YouTubeVi
     const durationStr = item.contentDetails?.duration; // e.g. "PT1M5S"
     const title = item.snippet?.title;
     const thumbnails = item.snippet?.thumbnails;
-    const thumbnailUrl = thumbnails?.maxres?.url || thumbnails?.high?.url || thumbnails?.default?.url;
+    const thumbnailUrl =
+      thumbnails?.maxres?.url || thumbnails?.high?.url || thumbnails?.default?.url;
 
     return {
       id: videoId,

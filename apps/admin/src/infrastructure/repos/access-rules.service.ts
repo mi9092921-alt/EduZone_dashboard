@@ -15,7 +15,7 @@ import { container } from '@/container';
 export async function getAccessRules(
   tenantId?: string,
   page: number = 1,
-  pageSize: number = 20
+  pageSize: number = 20,
 ): Promise<PaginatedResult<AccessRule>> {
   if (typeof window !== 'undefined') {
     return getAccessRulesAction(tenantId, page, pageSize);
@@ -25,9 +25,7 @@ export async function getAccessRules(
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
-  let query = supabase
-    .from('access_rules')
-    .select('*', { count: 'exact' });
+  let query = supabase.from('access_rules').select('*', { count: 'exact' });
 
   if (tenantId) {
     query = query.eq('tenant_id', tenantId);
@@ -83,10 +81,7 @@ export async function deleteAccessRule(id: string): Promise<void> {
   }
 
   const { supabase } = container;
-  const { error } = await supabase
-    .from('access_rules')
-    .delete()
-    .eq('id', id);
+  const { error } = await supabase.from('access_rules').delete().eq('id', id);
 
   if (error) throw error;
 }

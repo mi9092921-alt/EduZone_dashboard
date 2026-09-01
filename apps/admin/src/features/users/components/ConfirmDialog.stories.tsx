@@ -21,11 +21,18 @@ const DialogDemo = (args: React.ComponentProps<typeof ConfirmDialog>) => {
   return (
     <>
       <Button onClick={() => setOpen(true)}>Open Action Dialog</Button>
-      <ConfirmDialog {...args} open={open} onClose={() => setOpen(false)} onConfirm={() => setOpen(false)}>
-        <p className="text-sm text-muted-foreground">Please provide a reason for this administrative action.</p>
-        <textarea 
+      <ConfirmDialog
+        {...args}
+        open={open}
+        onClose={() => setOpen(false)}
+        onConfirm={() => setOpen(false)}
+      >
+        <p className="text-sm text-muted-foreground">
+          Please provide a reason for this administrative action.
+        </p>
+        <textarea
           aria-label="Action Reason"
-          className="w-full mt-2 p-2 rounded-xl border border-border bg-background/50 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" 
+          className="w-full mt-2 p-2 rounded-xl border border-border bg-background/50 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
           placeholder="E.g., violated terms of service"
           rows={3}
         />
@@ -45,13 +52,13 @@ export const SuspendUser: Story = {
   },
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
-    
+
     await step('Open Dialog', async () => {
       await userEvent.click(canvas.getByRole('button', { name: /Open Action Dialog/i }));
     });
 
-    // The modal mounts outside root by default unless disablePortal is false or we use screen, 
-    // but within(document.body) is often better for MUI modals if portalled. Drawer and Modal we built are 
+    // The modal mounts outside root by default unless disablePortal is false or we use screen,
+    // but within(document.body) is often better for MUI modals if portalled. Drawer and Modal we built are
     // portalled, but for storybook canvas target let's assume body.
     const body = within(document.body);
 

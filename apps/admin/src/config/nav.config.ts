@@ -30,17 +30,53 @@ export interface NavItem {
  * Used by both Sidebar (rendering) and AdminShell (route guard).
  */
 export const NAV_ITEMS: NavItem[] = [
-  { id: 'dashboard', label: 'dashboard', icon: Dashboard, path: '/', roles: ['super_admin', 'admin', 'teacher'] },
-  { id: 'courses', label: 'courses', icon: School, path: '/courses', roles: ['super_admin', 'admin', 'teacher'] },
+  {
+    id: 'dashboard',
+    label: 'dashboard',
+    icon: Dashboard,
+    path: '/',
+    roles: ['super_admin', 'admin', 'teacher'],
+  },
+  {
+    id: 'courses',
+    label: 'courses',
+    icon: School,
+    path: '/courses',
+    roles: ['super_admin', 'admin', 'teacher'],
+  },
   { id: 'users', label: 'users', icon: People, path: '/users', roles: ['super_admin', 'admin'] },
-  { id: 'analytics', label: 'analytics', icon: PieChart, path: '/analytics', roles: ['super_admin', 'admin'] },
-  { id: 'activities', label: 'activities', icon: History, path: '/activities', roles: ['super_admin', 'admin'] },
+  {
+    id: 'analytics',
+    label: 'analytics',
+    icon: PieChart,
+    path: '/analytics',
+    roles: ['super_admin', 'admin'],
+  },
+  {
+    id: 'activities',
+    label: 'activities',
+    icon: History,
+    path: '/activities',
+    roles: ['super_admin', 'admin'],
+  },
   { id: 'audit', label: 'audit', icon: Security, path: '/audit', roles: ['super_admin'] },
   { id: 'jobs', label: 'jobs', icon: WorkOutline, path: '/jobs', roles: ['super_admin'] },
   { id: 'tenants', label: 'tenants', icon: Business, path: '/tenants', roles: ['super_admin'] },
-  { id: 'warnings', label: 'warnings', icon: Warning, path: '/warnings', roles: ['super_admin', 'admin', 'teacher'] },
+  {
+    id: 'warnings',
+    label: 'warnings',
+    icon: Warning,
+    path: '/warnings',
+    roles: ['super_admin', 'admin', 'teacher'],
+  },
   { id: 'flags', label: 'flags', icon: Flag, path: '/flags', roles: ['super_admin'] },
-  { id: 'settings', label: 'settings', icon: Settings, path: '/settings', roles: ['super_admin', 'admin'] },
+  {
+    id: 'settings',
+    label: 'settings',
+    icon: Settings,
+    path: '/settings',
+    roles: ['super_admin', 'admin'],
+  },
 ];
 
 /**

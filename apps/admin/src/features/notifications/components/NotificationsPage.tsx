@@ -13,9 +13,7 @@ import {
   Send as SendIcon,
   SupervisorAccount as SupervisorIcon,
 } from '@mui/icons-material';
-import {
-  EmojiEvents as PermissionIcon,
-} from '@mui/icons-material';
+import { EmojiEvents as PermissionIcon } from '@mui/icons-material';
 import {
   Box,
   Button,
@@ -50,32 +48,30 @@ import {
   TableRow,
   LinearProgress,
 } from '@mui/material';
-import {
-  Autocomplete,
-  ToggleButton,
-  ToggleButtonGroup,
-  Avatar,
-} from '@mui/material';
+import { Autocomplete, ToggleButton, ToggleButtonGroup, Avatar } from '@mui/material';
 import { useTranslations, useLocale } from 'next-intl';
 import { useState } from 'react';
 import { useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 
-import { useSendNotification, useDeleteNotification, SendNotificationInput } from '@/adapters/mutations/notifications.mutations';
+import {
+  useSendNotification,
+  useDeleteNotification,
+  SendNotificationInput,
+} from '@/adapters/mutations/notifications.mutations';
 import { useNotifications, TargetAudience } from '@/adapters/queries/notifications.queries';
 import { useAuthUser } from '@/adapters/stores/auth.store';
 import { useToastStore } from '@/adapters/stores/toast.store';
-import {
-  StatsCard,
-  StatsCardContent,
-  StatsCardIcon
-} from '@/components/ui/Card';
+import { StatsCard, StatsCardContent, StatsCardIcon } from '@/components/ui/Card';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { TablePagination } from '@/components/ui/TablePagination';
 import { PermissionGate } from '@/features/layout/components/PermissionGate';
-import { getAllPermissions, searchUsers, type UserSearchResult } from '@/infrastructure/repos/users.service';
-
+import {
+  getAllPermissions,
+  searchUsers,
+  type UserSearchResult,
+} from '@/infrastructure/repos/users.service';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -100,7 +96,7 @@ function getAllowedAudiences(role: string): TargetAudience[] {
 function AudienceChip({
   audience,
   permission,
-  usersCount
+  usersCount,
 }: {
   audience: TargetAudience;
   permission?: string | null;
@@ -173,11 +169,23 @@ function StatCard({
   return (
     <StatsCard>
       <StatsCardContent>
-        <StatsCardIcon style={{ backgroundColor: 'primary.main', color: 'primary.contrastText', opacity: 0.1 }}>
+        <StatsCardIcon
+          style={{ backgroundColor: 'primary.main', color: 'primary.contrastText', opacity: 0.1 }}
+        >
           {icon}
         </StatsCardIcon>
         <div className="flex flex-col items-center">
-          <Typography variant="overline" color="text.secondary" sx={{ fontWeight: 700, mb: 1, lineHeight: 1.2, textTransform: 'uppercase', fontSize: '0.625rem' }}>
+          <Typography
+            variant="overline"
+            color="text.secondary"
+            sx={{
+              fontWeight: 700,
+              mb: 1,
+              lineHeight: 1.2,
+              textTransform: 'uppercase',
+              fontSize: '0.625rem',
+            }}
+          >
             {label}
           </Typography>
           <Typography variant="h3" color="text.primary" sx={{ fontWeight: 800 }}>
@@ -258,7 +266,9 @@ function SendNotificationDialog({ open, onClose, allowedAudiences, onSuccess }: 
       };
 
       // Role-based safe default for audience (e.g., 'students' for teachers)
-      const defaultAudience = allowedAudiences.includes('students') ? 'students' : (allowedAudiences[0] || 'all');
+      const defaultAudience = allowedAudiences.includes('students')
+        ? 'students'
+        : allowedAudiences[0] || 'all';
 
       if (data.targeting_type === 'role') {
         payload.target_audience = data.target_audience || defaultAudience;
@@ -281,11 +291,26 @@ function SendNotificationDialog({ open, onClose, allowedAudiences, onSuccess }: 
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3, bgcolor: 'background.paper', backgroundImage: 'none' } }}>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="sm"
+      fullWidth
+      PaperProps={{ sx: { borderRadius: 3, bgcolor: 'background.paper', backgroundImage: 'none' } }}
+    >
       <DialogTitle sx={{ p: 3, pb: 2 }}>
         <Stack direction="row" alignItems="center" justifyContent="space-between">
           <Stack direction="row" alignItems="center" gap={1.5}>
-            <Box sx={{ bgcolor: 'primary.main', color: 'primary.contrastText', p: 1, borderRadius: 2, display: 'flex', opacity: 0.9 }}>
+            <Box
+              sx={{
+                bgcolor: 'primary.main',
+                color: 'primary.contrastText',
+                p: 1,
+                borderRadius: 2,
+                display: 'flex',
+                opacity: 0.9,
+              }}
+            >
               <CampaignIcon />
             </Box>
             <Typography variant="h6" sx={{ fontWeight: 800, color: 'text.primary' }}>
@@ -304,7 +329,10 @@ function SendNotificationDialog({ open, onClose, allowedAudiences, onSuccess }: 
         <Stack gap={3}>
           {/* Targeting Type */}
           <Box>
-            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, mb: 1, display: 'block' }}>
+            <Typography
+              variant="caption"
+              sx={{ color: 'text.secondary', fontWeight: 600, mb: 1, display: 'block' }}
+            >
               {t('label_targeting_type')}
             </Typography>
             <Controller
@@ -322,9 +350,15 @@ function SendNotificationDialog({ open, onClose, allowedAudiences, onSuccess }: 
                   }}
                   sx={{ borderRadius: 2 }}
                 >
-                  <ToggleButton value="role" sx={{ textTransform: 'none' }}>{t('targeting_role')}</ToggleButton>
-                  <ToggleButton value="permission" sx={{ textTransform: 'none' }}>{t('targeting_permission')}</ToggleButton>
-                  <ToggleButton value="users" sx={{ textTransform: 'none' }}>{t('targeting_users')}</ToggleButton>
+                  <ToggleButton value="role" sx={{ textTransform: 'none' }}>
+                    {t('targeting_role')}
+                  </ToggleButton>
+                  <ToggleButton value="permission" sx={{ textTransform: 'none' }}>
+                    {t('targeting_permission')}
+                  </ToggleButton>
+                  <ToggleButton value="users" sx={{ textTransform: 'none' }}>
+                    {t('targeting_users')}
+                  </ToggleButton>
                 </ToggleButtonGroup>
               )}
             />
@@ -387,16 +421,20 @@ function SendNotificationDialog({ open, onClose, allowedAudiences, onSuccess }: 
                   options={userOptions}
                   getOptionLabel={(option) => `${option.first_name} ${option.last_name}`}
                   onInputChange={(_, value) => setUserQuery(value)}
-                  onChange={(_, value) => field.onChange(value.map(v => v.id))}
+                  onChange={(_, value) => field.onChange(value.map((v) => v.id))}
                   renderInput={(params) => (
                     <TextField
                       {...params}
                       label={t('label_users')}
                       placeholder={t('placeholder_search_users')}
                       error={!!errors.target_user_ids}
-                      helperText={(errors.target_user_ids?.message as string)}
+                      helperText={errors.target_user_ids?.message as string}
                       size="small"
-                      InputLabelProps={(params.InputLabelProps ?? {}) as NonNullable<React.ComponentProps<typeof TextField>['InputLabelProps']>}
+                      InputLabelProps={
+                        (params.InputLabelProps ?? {}) as NonNullable<
+                          React.ComponentProps<typeof TextField>['InputLabelProps']
+                        >
+                      }
                       InputProps={{ ...params.InputProps, sx: { borderRadius: 2 } }}
                     />
                   )}
@@ -407,7 +445,9 @@ function SendNotificationDialog({ open, onClose, allowedAudiences, onSuccess }: 
                         key={option.id}
                         label={`${option.first_name} ${option.last_name}`}
                         size="small"
-                        avatar={<Avatar sx={{ width: 16, height: 16 }}>{option.first_name?.[0]}</Avatar>}
+                        avatar={
+                          <Avatar sx={{ width: 16, height: 16 }}>{option.first_name?.[0]}</Avatar>
+                        }
                       />
                     ))
                   }
@@ -428,7 +468,9 @@ function SendNotificationDialog({ open, onClose, allowedAudiences, onSuccess }: 
                 fullWidth
                 size="small"
                 error={!!errors.title}
-                helperText={(errors.title?.message as string) ?? `${(field.value || '').length}/100`}
+                helperText={
+                  (errors.title?.message as string) ?? `${(field.value || '').length}/100`
+                }
                 InputProps={{ sx: { borderRadius: 2 } }}
               />
             )}
@@ -456,15 +498,33 @@ function SendNotificationDialog({ open, onClose, allowedAudiences, onSuccess }: 
       </DialogContent>
 
       <DialogActions sx={{ p: 3, pt: 0 }}>
-        <Button onClick={handleClose} variant="outlined" sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600, color: 'text.secondary', borderColor: 'divider' }}>
+        <Button
+          onClick={handleClose}
+          variant="outlined"
+          sx={{
+            borderRadius: 2,
+            textTransform: 'none',
+            fontWeight: 600,
+            color: 'text.secondary',
+            borderColor: 'divider',
+          }}
+        >
           {t('btn_cancel')}
         </Button>
         <Button
           onClick={handleSubmit(onSubmit)}
           variant="contained"
           disabled={isSubmitting || sendMutation.isPending}
-          sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, backgroundColor: 'primary.main', '&:hover': { backgroundColor: 'primary.dark' } }}
-          startIcon={sendMutation.isPending ? <CircularProgress size={16} color="inherit" /> : <SendIcon />}
+          sx={{
+            borderRadius: 2,
+            textTransform: 'none',
+            fontWeight: 700,
+            backgroundColor: 'primary.main',
+            '&:hover': { backgroundColor: 'primary.dark' },
+          }}
+          startIcon={
+            sendMutation.isPending ? <CircularProgress size={16} color="inherit" /> : <SendIcon />
+          }
         >
           {t('btn_send')}
         </Button>
@@ -536,11 +596,16 @@ export default function NotificationsPage() {
   const getAudienceFromTab = (val: number): TargetAudience | 'all' => {
     if (isTeacher) return 'students';
     switch (val) {
-      case 0: return 'all';
-      case 1: return 'students';
-      case 2: return 'teachers';
-      case 3: return 'admins';
-      default: return 'all';
+      case 0:
+        return 'all';
+      case 1:
+        return 'students';
+      case 2:
+        return 'teachers';
+      case 3:
+        return 'admins';
+      default:
+        return 'all';
     }
   };
 
@@ -557,7 +622,6 @@ export default function NotificationsPage() {
     teachers: dbStats?.teachers ?? 0,
     admins: dbStats?.admins ?? 0,
   };
-
 
   return (
     <div className="space-y-6">
@@ -637,7 +701,16 @@ export default function NotificationsPage() {
       )}
 
       {/* Filter Tabs & Table */}
-      <MuiCard sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none', overflow: 'hidden', bgcolor: 'background.paper' }}>
+      <MuiCard
+        sx={{
+          borderRadius: 3,
+          border: '1px solid',
+          borderColor: 'divider',
+          boxShadow: 'none',
+          overflow: 'hidden',
+          bgcolor: 'background.paper',
+        }}
+      >
         <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 2, bgcolor: 'background.default' }}>
           <Tabs
             value={tabValue}
@@ -646,13 +719,30 @@ export default function NotificationsPage() {
               setPage(1);
             }}
           >
-            {!isTeacher && <Tab label={t('tab_all')} sx={{ textTransform: 'none', fontWeight: 600 }} />}
-            <Tab label={t('tab_students')} icon={<SchoolIcon sx={{ fontSize: 18 }} />} iconPosition="start" sx={{ textTransform: 'none', fontWeight: 600 }} />
             {!isTeacher && (
-              <Tab label={t('tab_teachers')} icon={<PersonIcon sx={{ fontSize: 18 }} />} iconPosition="start" sx={{ textTransform: 'none', fontWeight: 600 }} />
+              <Tab label={t('tab_all')} sx={{ textTransform: 'none', fontWeight: 600 }} />
+            )}
+            <Tab
+              label={t('tab_students')}
+              icon={<SchoolIcon sx={{ fontSize: 18 }} />}
+              iconPosition="start"
+              sx={{ textTransform: 'none', fontWeight: 600 }}
+            />
+            {!isTeacher && (
+              <Tab
+                label={t('tab_teachers')}
+                icon={<PersonIcon sx={{ fontSize: 18 }} />}
+                iconPosition="start"
+                sx={{ textTransform: 'none', fontWeight: 600 }}
+              />
             )}
             {isSuperAdmin && (
-              <Tab label={t('tab_admins')} icon={<SupervisorIcon sx={{ fontSize: 18 }} />} iconPosition="start" sx={{ textTransform: 'none', fontWeight: 600 }} />
+              <Tab
+                label={t('tab_admins')}
+                icon={<SupervisorIcon sx={{ fontSize: 18 }} />}
+                iconPosition="start"
+                sx={{ textTransform: 'none', fontWeight: 600 }}
+              />
             )}
           </Tabs>
         </Box>
@@ -661,11 +751,62 @@ export default function NotificationsPage() {
           <Table sx={{ minWidth: 800 }}>
             <TableHead>
               <TableRow sx={{ backgroundColor: 'background.default' }}>
-                <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary', py: 2 }}>{t('header_title')}</TableCell>
-                <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary', py: 2 }}>{t('header_body')}</TableCell>
-                <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary', py: 2 }}>{t('header_audience')}</TableCell>
-                <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary', py: 2 }}>{t('header_date')}</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary', py: 2 }}>{t('header_actions')}</TableCell>
+                <TableCell
+                  sx={{
+                    fontWeight: 800,
+                    textTransform: 'uppercase',
+                    fontSize: '0.75rem',
+                    color: 'text.secondary',
+                    py: 2,
+                  }}
+                >
+                  {t('header_title')}
+                </TableCell>
+                <TableCell
+                  sx={{
+                    fontWeight: 800,
+                    textTransform: 'uppercase',
+                    fontSize: '0.75rem',
+                    color: 'text.secondary',
+                    py: 2,
+                  }}
+                >
+                  {t('header_body')}
+                </TableCell>
+                <TableCell
+                  sx={{
+                    fontWeight: 800,
+                    textTransform: 'uppercase',
+                    fontSize: '0.75rem',
+                    color: 'text.secondary',
+                    py: 2,
+                  }}
+                >
+                  {t('header_audience')}
+                </TableCell>
+                <TableCell
+                  sx={{
+                    fontWeight: 800,
+                    textTransform: 'uppercase',
+                    fontSize: '0.75rem',
+                    color: 'text.secondary',
+                    py: 2,
+                  }}
+                >
+                  {t('header_date')}
+                </TableCell>
+                <TableCell
+                  align="right"
+                  sx={{
+                    fontWeight: 800,
+                    textTransform: 'uppercase',
+                    fontSize: '0.75rem',
+                    color: 'text.secondary',
+                    py: 2,
+                  }}
+                >
+                  {t('header_actions')}
+                </TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -714,11 +855,14 @@ export default function NotificationsPage() {
                       />
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: '0.8125rem' }}>
+                      <Typography
+                        variant="body2"
+                        sx={{ color: 'text.secondary', fontSize: '0.8125rem' }}
+                      >
                         {new Date(row.created_at).toLocaleDateString(locale, {
                           day: 'numeric',
                           month: 'short',
-                          year: 'numeric'
+                          year: 'numeric',
                         })}
                       </Typography>
                     </TableCell>
@@ -728,7 +872,12 @@ export default function NotificationsPage() {
                           <IconButton
                             size="small"
                             onClick={() => setDeleteId(row.id)}
-                            sx={{ color: 'error.main', bgcolor: 'error.main' + '1A', borderRadius: 2, '&:hover': { bgcolor: 'error.main' + '2A' } }}
+                            sx={{
+                              color: 'error.main',
+                              bgcolor: 'error.main' + '1A',
+                              borderRadius: 2,
+                              '&:hover': { bgcolor: 'error.main' + '2A' },
+                            }}
                           >
                             <DeleteIcon fontSize="small" />
                           </IconButton>
@@ -765,7 +914,6 @@ export default function NotificationsPage() {
         onClose={() => setDeleteId(null)}
         onSuccess={(msg) => showToast(msg, 'success')}
       />
-
     </div>
   );
 }

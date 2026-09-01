@@ -25,7 +25,9 @@ async function main() {
   }
 
   if (!dbUrl) {
-    console.error('Error: SUPABASE_DB_URL or DATABASE_URL must be set in environment, or supabase/db_url.txt must exist.');
+    console.error(
+      'Error: SUPABASE_DB_URL or DATABASE_URL must be set in environment, or supabase/db_url.txt must exist.',
+    );
     process.exit(1);
   }
 
@@ -36,10 +38,8 @@ async function main() {
       // Never disable TLS certificate verification for schema deployment.
       // If a private CA is required, provide its PEM via SUPABASE_DB_CA_CERT.
       rejectUnauthorized: true,
-      ...(process.env.SUPABASE_DB_CA_CERT
-        ? { ca: process.env.SUPABASE_DB_CA_CERT }
-        : {}),
-    }
+      ...(process.env.SUPABASE_DB_CA_CERT ? { ca: process.env.SUPABASE_DB_CA_CERT } : {}),
+    },
   });
 
   try {
@@ -50,15 +50,17 @@ async function main() {
     try {
       const vaultCheck = await client.query("SELECT 1 FROM pg_namespace WHERE nspname = 'vault'");
       if (vaultCheck.rowCount > 0) {
-        const secretCheck = await client.query("SELECT 1 FROM vault.decrypted_secrets WHERE name = 'eduzone_kms_key'");
+        const secretCheck = await client.query(
+          "SELECT 1 FROM vault.decrypted_secrets WHERE name = 'eduzone_kms_key'",
+        );
         if (secretCheck.rowCount === 0) {
           const crypto = require('crypto');
           console.log('Provisioning eduzone_kms_key in Supabase Vault...');
           const randomKey = crypto.randomBytes(32).toString('hex');
-          await client.query("SELECT vault.create_secret($1, $2, $3)", [
+          await client.query('SELECT vault.create_secret($1, $2, $3)', [
             randomKey,
             'eduzone_kms_key',
-            'EduZone KMS key for PII encryption (auto-provisioned)'
+            'EduZone KMS key for PII encryption (auto-provisioned)',
           ]);
           console.log('✓ Successfully provisioned eduzone_kms_key in Supabase Vault');
         }
@@ -79,7 +81,7 @@ async function main() {
       'schema/09_rls.sql',
       'schema/10_permissions.sql',
       'schema/11_seed_reference.sql',
-      'schema/VALIDATION.sql'
+      'schema/VALIDATION.sql',
     ];
 
     for (const file of files) {

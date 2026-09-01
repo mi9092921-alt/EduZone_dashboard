@@ -42,21 +42,36 @@ import { useIssueWarning } from '@/adapters/mutations/warnings.mutations';
 import { useTeacherWarnings, useTeacherStudents } from '@/adapters/queries/teacher.queries';
 import { useAuthUser } from '@/adapters/stores/auth.store';
 import { useToastStore } from '@/adapters/stores/toast.store';
-import {
-  StatsCard,
-  StatsCardContent,
-  StatsCardIcon
-} from '@/components/ui/Card';
+import { StatsCard, StatsCardContent, StatsCardIcon } from '@/components/ui/Card';
 import { TablePagination } from '@/components/ui/TablePagination';
 import type { WarningSeverity, WarningFilters } from '@/domain/types/warning.types';
 
-
 function getSeverityTokens(severity: WarningSeverity, theme: Theme) {
   switch (severity) {
-    case 1: return { bg: alpha(theme.palette.success.main, 0.12), text: theme.palette.success.dark, dot: theme.palette.success.main };
-    case 2: return { bg: alpha(theme.palette.warning.main, 0.12), text: theme.palette.warning.dark, dot: theme.palette.warning.main };
-    case 3: return { bg: alpha(theme.palette.error.main, 0.12), text: theme.palette.error.dark, dot: theme.palette.error.main };
-    default: return { bg: alpha(theme.palette.info.main, 0.12), text: theme.palette.info.dark, dot: theme.palette.info.main };
+    case 1:
+      return {
+        bg: alpha(theme.palette.success.main, 0.12),
+        text: theme.palette.success.dark,
+        dot: theme.palette.success.main,
+      };
+    case 2:
+      return {
+        bg: alpha(theme.palette.warning.main, 0.12),
+        text: theme.palette.warning.dark,
+        dot: theme.palette.warning.main,
+      };
+    case 3:
+      return {
+        bg: alpha(theme.palette.error.main, 0.12),
+        text: theme.palette.error.dark,
+        dot: theme.palette.error.main,
+      };
+    default:
+      return {
+        bg: alpha(theme.palette.info.main, 0.12),
+        text: theme.palette.info.dark,
+        dot: theme.palette.info.main,
+      };
   }
 }
 
@@ -131,8 +146,16 @@ export function WarningsPage() {
   );
 
   const severityButtons: { value: WarningSeverity; icon: React.ReactNode; color: string }[] = [
-    { value: 1, icon: <CheckCircle color="success" sx={{ fontSize: 20 }} />, color: 'success.main' },
-    { value: 2, icon: <WarningIcon color="primary" sx={{ fontSize: 20 }} />, color: 'primary.main' },
+    {
+      value: 1,
+      icon: <CheckCircle color="success" sx={{ fontSize: 20 }} />,
+      color: 'success.main',
+    },
+    {
+      value: 2,
+      icon: <WarningIcon color="primary" sx={{ fontSize: 20 }} />,
+      color: 'primary.main',
+    },
     { value: 3, icon: <ErrorIcon color="error" sx={{ fontSize: 20 }} />, color: 'error.main' },
   ];
 
@@ -156,7 +179,9 @@ export function WarningsPage() {
           <Button
             variant="contained"
             startIcon={<ReportProblem />}
-            onClick={() => document.getElementById('warning-form')?.scrollIntoView({ behavior: 'smooth' })}
+            onClick={() =>
+              document.getElementById('warning-form')?.scrollIntoView({ behavior: 'smooth' })
+            }
             sx={{
               textTransform: 'none',
               fontWeight: 600,
@@ -181,17 +206,43 @@ export function WarningsPage() {
           borderRadius: 3,
           p: { xs: 2, md: 2.5 },
           '& .MuiAlert-message': { width: '100%', p: 0 },
-          '& .MuiAlert-icon': { pt: 0.5 }
+          '& .MuiAlert-icon': { pt: 0.5 },
         }}
       >
-        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, gap: 2 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: { xs: 'column', sm: 'row' },
+            justifyContent: 'space-between',
+            alignItems: { xs: 'flex-start', sm: 'center' },
+            gap: 2,
+          }}
+        >
           <Box sx={{ flex: '1 1 auto' }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'warning.dark', fontSize: { xs: '0.85rem', md: '0.9rem' } }}>
+            <Typography
+              variant="subtitle2"
+              sx={{
+                fontWeight: 700,
+                color: 'warning.dark',
+                fontSize: { xs: '0.85rem', md: '0.9rem' },
+              }}
+            >
               {t('policy_title')}
             </Typography>
-            <Typography variant="body2" sx={{ color: 'warning.dark', opacity: 0.9, maxWidth: 600, fontSize: { xs: '0.75rem', md: '0.8rem' }, mt: 0.5 }}>
+            <Typography
+              variant="body2"
+              sx={{
+                color: 'warning.dark',
+                opacity: 0.9,
+                maxWidth: 600,
+                fontSize: { xs: '0.75rem', md: '0.8rem' },
+                mt: 0.5,
+              }}
+            >
               {t.rich('policy_desc', {
-                underline: (chunks) => <strong style={{ textDecoration: 'underline' }}>{chunks}</strong>
+                underline: (chunks) => (
+                  <strong style={{ textDecoration: 'underline' }}>{chunks}</strong>
+                ),
               })}
             </Typography>
           </Box>
@@ -206,7 +257,7 @@ export function WarningsPage() {
               whiteSpace: 'nowrap',
               px: 2,
               minWidth: 'fit-content',
-              fontSize: '0.75rem'
+              fontSize: '0.75rem',
             }}
           >
             {t('btn_full_policy')}
@@ -215,12 +266,35 @@ export function WarningsPage() {
       </Alert>
 
       {/* Grid: Form + Table */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(12, 1fr)' }, gap: 3 }}>
+      <Box
+        sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(12, 1fr)' }, gap: 3 }}
+      >
         {/* Left: Issue Form */}
         {isTeacher && (
-          <MuiCard id="warning-form" sx={{ gridColumn: { xs: 'span 1', md: 'span 5', lg: 'span 4' }, borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none', alignSelf: 'flex-start', bgcolor: 'background.paper' }}>
-            <Box sx={{ p: 2.5, borderBottom: '1px solid', borderColor: 'divider', backgroundColor: 'background.default' }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <MuiCard
+            id="warning-form"
+            sx={{
+              gridColumn: { xs: 'span 1', md: 'span 5', lg: 'span 4' },
+              borderRadius: 3,
+              border: '1px solid',
+              borderColor: 'divider',
+              boxShadow: 'none',
+              alignSelf: 'flex-start',
+              bgcolor: 'background.paper',
+            }}
+          >
+            <Box
+              sx={{
+                p: 2.5,
+                borderBottom: '1px solid',
+                borderColor: 'divider',
+                backgroundColor: 'background.default',
+              }}
+            >
+              <Typography
+                variant="subtitle1"
+                sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}
+              >
                 <ReportProblem sx={{ color: 'primary.main', fontSize: 20 }} />
                 {t('form_title')}
               </Typography>
@@ -239,7 +313,10 @@ export function WarningsPage() {
                     >
                       {(students ?? []).map((s) => (
                         <MenuItem key={`${s.id}-${s.course_title}`} value={s.id}>
-                          {[s.first_name, s.last_name].filter(Boolean).join(' ') || s.email || 'Unknown'} ({s.course_title})
+                          {[s.first_name, s.last_name].filter(Boolean).join(' ') ||
+                            s.email ||
+                            'Unknown'}{' '}
+                          ({s.course_title})
                         </MenuItem>
                       ))}
                     </Select>
@@ -247,8 +324,19 @@ export function WarningsPage() {
 
                   {/* Severity */}
                   <Box>
-                    <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary', mb: 1, fontSize: '0.8rem' }}>{t('label_severity_level')}</Typography>
-                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 1 }}>
+                    <Typography
+                      variant="body2"
+                      sx={{ fontWeight: 600, color: 'text.secondary', mb: 1, fontSize: '0.8rem' }}
+                    >
+                      {t('label_severity_level')}
+                    </Typography>
+                    <Box
+                      sx={{
+                        display: 'grid',
+                        gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' },
+                        gap: 1,
+                      }}
+                    >
                       {severityButtons.map((btn) => (
                         <Box
                           key={btn.value}
@@ -262,32 +350,54 @@ export function WarningsPage() {
                             p: { xs: 1, sm: 1.5 },
                             borderRadius: 2,
                             border: '2px solid',
-                            borderColor: severity === btn.value
-                              ? (btn.value === 3 ? 'error.main' : btn.value === 1 ? 'success.main' : 'primary.main')
-                              : 'divider',
-                            backgroundColor: severity === btn.value
-                              ? alpha(
-                                  btn.value === 3 ? theme.palette.error.main
-                                  : btn.value === 1 ? theme.palette.success.main
-                                  : theme.palette.primary.main,
-                                  0.08
-                                )
-                              : 'transparent',
+                            borderColor:
+                              severity === btn.value
+                                ? btn.value === 3
+                                  ? 'error.main'
+                                  : btn.value === 1
+                                    ? 'success.main'
+                                    : 'primary.main'
+                                : 'divider',
+                            backgroundColor:
+                              severity === btn.value
+                                ? alpha(
+                                    btn.value === 3
+                                      ? theme.palette.error.main
+                                      : btn.value === 1
+                                        ? theme.palette.success.main
+                                        : theme.palette.primary.main,
+                                    0.08,
+                                  )
+                                : 'transparent',
                             cursor: 'pointer',
                             transition: 'all 150ms',
                             '&:hover': {
-                              borderColor: btn.value === 3 ? 'error.main' : btn.value === 1 ? 'success.main' : 'primary.main',
+                              borderColor:
+                                btn.value === 3
+                                  ? 'error.main'
+                                  : btn.value === 1
+                                    ? 'success.main'
+                                    : 'primary.main',
                               backgroundColor: alpha(
-                                btn.value === 3 ? theme.palette.error.main
-                                : btn.value === 1 ? theme.palette.success.main
-                                : theme.palette.primary.main,
-                                0.04
+                                btn.value === 3
+                                  ? theme.palette.error.main
+                                  : btn.value === 1
+                                    ? theme.palette.success.main
+                                    : theme.palette.primary.main,
+                                0.04,
                               ),
                             },
                           }}
                         >
                           {btn.icon}
-                          <Typography variant="caption" sx={{ fontWeight: 700, color: severity === btn.value ? btn.color : 'text.secondary', fontSize: '0.65rem' }}>
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              fontWeight: 700,
+                              color: severity === btn.value ? btn.color : 'text.secondary',
+                              fontSize: '0.65rem',
+                            }}
+                          >
                             {t(`severity_${btn.value}` as Parameters<typeof t>[0])}
                           </Typography>
                         </Box>
@@ -305,7 +415,9 @@ export function WarningsPage() {
                     onChange={(e) => setReason(e.target.value)}
                     size="small"
                     error={reason.length > 0 && reason.length < 20}
-                    helperText={reason.length > 0 && reason.length < 20 ? t('error_reason_min') : ''}
+                    helperText={
+                      reason.length > 0 && reason.length < 20 ? t('error_reason_min') : ''
+                    }
                     sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
                   />
 
@@ -334,7 +446,11 @@ export function WarningsPage() {
                       '&:hover': { backgroundColor: 'text.secondary' },
                     }}
                   >
-                    {issueMutation.isPending ? <CircularProgress size={20} sx={{ color: '#fff' }} /> : t('btn_submit')}
+                    {issueMutation.isPending ? (
+                      <CircularProgress size={20} sx={{ color: '#fff' }} />
+                    ) : (
+                      t('btn_submit')
+                    )}
                   </Button>
                 </Box>
               </form>
@@ -343,9 +459,35 @@ export function WarningsPage() {
         )}
 
         {/* Right: Warnings Table */}
-        <Box sx={{ gridColumn: { xs: 'span 1', md: isTeacher ? 'span 7' : 'span 12', lg: isTeacher ? 'span 8' : 'span 12' } }}>
-          <MuiCard sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none', overflow: 'hidden', bgcolor: 'background.paper' }}>
-            <Box sx={{ p: 2.5, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Box
+          sx={{
+            gridColumn: {
+              xs: 'span 1',
+              md: isTeacher ? 'span 7' : 'span 12',
+              lg: isTeacher ? 'span 8' : 'span 12',
+            },
+          }}
+        >
+          <MuiCard
+            sx={{
+              borderRadius: 3,
+              border: '1px solid',
+              borderColor: 'divider',
+              boxShadow: 'none',
+              overflow: 'hidden',
+              bgcolor: 'background.paper',
+            }}
+          >
+            <Box
+              sx={{
+                p: 2.5,
+                borderBottom: '1px solid',
+                borderColor: 'divider',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
               <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
                 {isTeacher ? t('table_title_mine') : t('table_title_all')}
               </Typography>
@@ -381,11 +523,67 @@ export function WarningsPage() {
               <Table sx={{ minWidth: 600 }}>
                 <TableHead>
                   <TableRow sx={{ backgroundColor: 'background.default' }}>
-                    <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.7rem', color: 'text.secondary', py: 2, whiteSpace: 'nowrap' }}>{t('header_student')}</TableCell>
-                    <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.7rem', color: 'text.secondary', py: 2, whiteSpace: 'nowrap' }}>{t('header_reason')}</TableCell>
-                    <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.7rem', color: 'text.secondary', py: 2, whiteSpace: 'nowrap' }}>{t('header_severity')}</TableCell>
-                    <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.7rem', color: 'text.secondary', py: 2, whiteSpace: 'nowrap' }}>{t('header_date')}</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.7rem', color: 'text.secondary', py: 2, whiteSpace: 'nowrap' }}>{t('header_status')}</TableCell>
+                    <TableCell
+                      sx={{
+                        fontWeight: 800,
+                        textTransform: 'uppercase',
+                        fontSize: '0.7rem',
+                        color: 'text.secondary',
+                        py: 2,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {t('header_student')}
+                    </TableCell>
+                    <TableCell
+                      sx={{
+                        fontWeight: 800,
+                        textTransform: 'uppercase',
+                        fontSize: '0.7rem',
+                        color: 'text.secondary',
+                        py: 2,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {t('header_reason')}
+                    </TableCell>
+                    <TableCell
+                      sx={{
+                        fontWeight: 800,
+                        textTransform: 'uppercase',
+                        fontSize: '0.7rem',
+                        color: 'text.secondary',
+                        py: 2,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {t('header_severity')}
+                    </TableCell>
+                    <TableCell
+                      sx={{
+                        fontWeight: 800,
+                        textTransform: 'uppercase',
+                        fontSize: '0.7rem',
+                        color: 'text.secondary',
+                        py: 2,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {t('header_date')}
+                    </TableCell>
+                    <TableCell
+                      align="right"
+                      sx={{
+                        fontWeight: 800,
+                        textTransform: 'uppercase',
+                        fontSize: '0.7rem',
+                        color: 'text.secondary',
+                        py: 2,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {t('header_status')}
+                    </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -414,7 +612,14 @@ export function WarningsPage() {
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                               <Avatar
                                 src={row.student_avatar_url || ''}
-                                sx={{ width: 32, height: 32, fontSize: '0.7rem', fontWeight: 700, backgroundColor: 'action.selected', color: 'text.secondary' }}
+                                sx={{
+                                  width: 32,
+                                  height: 32,
+                                  fontSize: '0.7rem',
+                                  fontWeight: 700,
+                                  backgroundColor: 'action.selected',
+                                  color: 'text.secondary',
+                                }}
                               >
                                 {getInitials(row.student_name ?? 'U')}
                               </Avatar>
@@ -435,7 +640,14 @@ export function WarningsPage() {
                               size="small"
                               label={
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                                  <Box sx={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: sevColors.dot }} />
+                                  <Box
+                                    sx={{
+                                      width: 6,
+                                      height: 6,
+                                      borderRadius: '50%',
+                                      backgroundColor: sevColors.dot,
+                                    }}
+                                  />
                                   {t(`severity_${row.severity}` as Parameters<typeof t>[0])}
                                 </Box>
                               }
@@ -488,20 +700,53 @@ export function WarningsPage() {
           </MuiCard>
 
           {/* Stats cards */}
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(auto-fit, minmax(200px, 1fr))', md: '1fr 1fr 1fr' }, gap: 3, mt: 3 }}>
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: {
+                xs: '1fr',
+                sm: 'repeat(auto-fit, minmax(200px, 1fr))',
+                md: '1fr 1fr 1fr',
+              },
+              gap: 3,
+              mt: 3,
+            }}
+          >
             <StatsCard className="relative transition-colors hover:bg-muted/20 overflow-hidden">
               <StatsCardContent className="flex flex-row items-center gap-4 p-5">
                 <StatsCardIcon
-                  style={{ backgroundColor: alpha(theme.palette.primary.main, 0.1), color: theme.palette.primary.main }}
+                  style={{
+                    backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                    color: theme.palette.primary.main,
+                  }}
                   className="w-10 h-10 rounded-lg shrink-0 flex items-center justify-center"
                 >
                   <TrendingDown sx={{ fontSize: 20 }} />
                 </StatsCardIcon>
                 <div className="flex flex-col min-w-0 flex-1 pr-6 sm:pr-0">
-                  <Typography variant="overline" sx={{ color: 'text.secondary', fontWeight: 700, mb: 0.5, textTransform: 'uppercase', fontSize: '0.625rem', lineHeight: 1.2 }} className="truncate">
+                  <Typography
+                    variant="overline"
+                    sx={{
+                      color: 'text.secondary',
+                      fontWeight: 700,
+                      mb: 0.5,
+                      textTransform: 'uppercase',
+                      fontSize: '0.625rem',
+                      lineHeight: 1.2,
+                    }}
+                    className="truncate"
+                  >
                     {t('title_active_warnings')}
                   </Typography>
-                  <Typography variant="h3" sx={{ fontWeight: 900, color: 'text.primary', lineHeight: 1, fontSize: { xs: '1.25rem', md: '1.5rem' } }}>
+                  <Typography
+                    variant="h3"
+                    sx={{
+                      fontWeight: 900,
+                      color: 'text.primary',
+                      lineHeight: 1,
+                      fontSize: { xs: '1.25rem', md: '1.5rem' },
+                    }}
+                  >
                     {totalCount.toLocaleString()}
                   </Typography>
                 </div>
@@ -516,7 +761,7 @@ export function WarningsPage() {
                     top: 8,
                     right: 8,
                     backgroundColor: 'primary.main',
-                    color: 'white'
+                    color: 'white',
                   }}
                 />
               </StatsCardContent>
@@ -525,16 +770,38 @@ export function WarningsPage() {
             <StatsCard className="relative transition-colors hover:bg-muted/20 overflow-hidden">
               <StatsCardContent className="flex flex-row items-center gap-4 p-5">
                 <StatsCardIcon
-                  style={{ backgroundColor: alpha(theme.palette.success.main, 0.1), color: theme.palette.success.main }}
+                  style={{
+                    backgroundColor: alpha(theme.palette.success.main, 0.1),
+                    color: theme.palette.success.main,
+                  }}
                   className="w-10 h-10 rounded-lg shrink-0 flex items-center justify-center"
                 >
                   <CheckCircle sx={{ fontSize: 20 }} />
                 </StatsCardIcon>
                 <div className="flex flex-col min-w-0 flex-1 pr-6 sm:pr-0">
-                  <Typography variant="overline" sx={{ color: 'text.secondary', fontWeight: 700, mb: 0.5, textTransform: 'uppercase', fontSize: '0.625rem', lineHeight: 1.2 }} className="truncate">
+                  <Typography
+                    variant="overline"
+                    sx={{
+                      color: 'text.secondary',
+                      fontWeight: 700,
+                      mb: 0.5,
+                      textTransform: 'uppercase',
+                      fontSize: '0.625rem',
+                      lineHeight: 1.2,
+                    }}
+                    className="truncate"
+                  >
                     {t('title_resolved_warnings')}
                   </Typography>
-                  <Typography variant="h3" sx={{ fontWeight: 900, color: 'text.primary', lineHeight: 1, fontSize: { xs: '1.25rem', md: '1.5rem' } }}>
+                  <Typography
+                    variant="h3"
+                    sx={{
+                      fontWeight: 900,
+                      color: 'text.primary',
+                      lineHeight: 1,
+                      fontSize: { xs: '1.25rem', md: '1.5rem' },
+                    }}
+                  >
                     {totalResolved.toLocaleString()}
                   </Typography>
                 </div>
@@ -549,7 +816,7 @@ export function WarningsPage() {
                     top: 8,
                     right: 8,
                     backgroundColor: 'success.main',
-                    color: 'white'
+                    color: 'white',
                   }}
                 />
               </StatsCardContent>
@@ -558,16 +825,38 @@ export function WarningsPage() {
             <StatsCard className="relative transition-colors hover:bg-muted/20 overflow-hidden">
               <StatsCardContent className="flex flex-row items-center gap-4 p-5">
                 <StatsCardIcon
-                  style={{ backgroundColor: alpha(theme.palette.error.main, 0.1), color: theme.palette.error.main }}
+                  style={{
+                    backgroundColor: alpha(theme.palette.error.main, 0.1),
+                    color: theme.palette.error.main,
+                  }}
                   className="w-10 h-10 rounded-lg shrink-0 flex items-center justify-center"
                 >
                   <ReportProblem sx={{ fontSize: 20 }} />
                 </StatsCardIcon>
                 <div className="flex flex-col min-w-0 flex-1 pr-6 sm:pr-0">
-                  <Typography variant="overline" sx={{ color: 'text.secondary', fontWeight: 700, mb: 0.5, textTransform: 'uppercase', fontSize: '0.625rem', lineHeight: 1.2 }} className="truncate">
+                  <Typography
+                    variant="overline"
+                    sx={{
+                      color: 'text.secondary',
+                      fontWeight: 700,
+                      mb: 0.5,
+                      textTransform: 'uppercase',
+                      fontSize: '0.625rem',
+                      lineHeight: 1.2,
+                    }}
+                    className="truncate"
+                  >
                     {t('title_review_needed')}
                   </Typography>
-                  <Typography variant="h3" sx={{ fontWeight: 900, color: 'error.main', lineHeight: 1, fontSize: { xs: '1.25rem', md: '1.5rem' } }}>
+                  <Typography
+                    variant="h3"
+                    sx={{
+                      fontWeight: 900,
+                      color: 'error.main',
+                      lineHeight: 1,
+                      fontSize: { xs: '1.25rem', md: '1.5rem' },
+                    }}
+                  >
                     {totalReviewNeeded.toLocaleString()}
                   </Typography>
                 </div>
@@ -582,7 +871,7 @@ export function WarningsPage() {
                     top: 8,
                     right: 8,
                     backgroundColor: 'error.main',
-                    color: 'white'
+                    color: 'white',
                   }}
                 />
               </StatsCardContent>

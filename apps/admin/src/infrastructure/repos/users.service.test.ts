@@ -65,17 +65,21 @@ describe('users.service', () => {
   it('getUsers applies all filters', async () => {
     const q = setupQuery({ data: [{ id: 'u1' }], count: 1, error: null });
     mockFrom.mockReturnValue(q);
-    
-    await getUsers({
-      search: 'test',
-      primary_role: 'student',
-      account_status: 'active',
-      tenant_id: 't1',
-      region_id: 'US',
-      warning_count_gte: 2,
-      last_login_from: '2020',
-      last_login_to: '2021'
-    }, 1, 10);
+
+    await getUsers(
+      {
+        search: 'test',
+        primary_role: 'student',
+        account_status: 'active',
+        tenant_id: 't1',
+        region_id: 'US',
+        warning_count_gte: 2,
+        last_login_from: '2020',
+        last_login_to: '2021',
+      },
+      1,
+      10,
+    );
 
     expect(q.or).toHaveBeenCalled();
     expect(q.eq).toHaveBeenCalledWith('primary_role', 'student');
@@ -100,7 +104,7 @@ describe('users.service', () => {
       p_reason: 'reason',
       p_suspend_hours: null,
     });
-    
+
     await controlUserAccount('u1', 'suspend', 'reason', 24);
     expect(mockRpc).toHaveBeenCalledWith('control_user_account', {
       p_user_id: 'u1',
@@ -153,7 +157,22 @@ describe('users.service', () => {
 
   it('getUserStats uses get_user_stats_summary RPC', async () => {
     // v13: getUserStats uses RPC instead of mv_user_stats view
-    mockRpc.mockResolvedValue({ data: { total_users: 10, active_users: 8, locked_users: 1, suspended_users: 1, banned_users: 0, student_count: 7, teacher_count: 2, admin_count: 1, dau: 5, wau: 8, mau: 10 }, error: null });
+    mockRpc.mockResolvedValue({
+      data: {
+        total_users: 10,
+        active_users: 8,
+        locked_users: 1,
+        suspended_users: 1,
+        banned_users: 0,
+        student_count: 7,
+        teacher_count: 2,
+        admin_count: 1,
+        dau: 5,
+        wau: 8,
+        mau: 10,
+      },
+      error: null,
+    });
 
     const stats = await getUserStats('t1');
     expect(stats!.total_users).toBe(10);
@@ -163,12 +182,12 @@ describe('users.service', () => {
   it('getDevices, getSessions, getWarnings, searchUsers', async () => {
     const q = setupQuery({ data: [], error: null });
     mockFrom.mockReturnValue(q);
-    
+
     await getDevices('u1');
     await getSessions('u1');
     await getWarnings('u1');
     await searchUsers('query');
-    
+
     // v13: sessions uses sessions base table; searchUsers uses users base table
     expect(mockFrom).toHaveBeenCalledWith('devices');
     expect(mockFrom).toHaveBeenCalledWith('sessions');

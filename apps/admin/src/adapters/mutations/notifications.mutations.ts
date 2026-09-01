@@ -67,9 +67,8 @@ export function useMarkNotificationRead() {
       );
 
       // Also decrement the standalone unread count key
-      queryClient.setQueryData(
-        queryKeys.notifications.unreadCount,
-        (old: number | undefined) => Math.max(0, (old ?? 1) - 1),
+      queryClient.setQueryData(queryKeys.notifications.unreadCount, (old: number | undefined) =>
+        Math.max(0, (old ?? 1) - 1),
       );
 
       return { previous };

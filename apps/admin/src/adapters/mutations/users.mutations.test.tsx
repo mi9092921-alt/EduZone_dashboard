@@ -9,7 +9,7 @@ import { userFactory } from '../../../tests/factories/user.factory';
 vi.mock('@/infrastructure/repos/users.service', () => ({
   // controlUserAccount, terminateUserSessions, and issueWarning are no
   // longer called directly; the mutations now route through Server Actions (v13).
-  resetUserDevices:     vi.fn(),
+  resetUserDevices: vi.fn(),
 }));
 
 // Mock Server Actions (application layer)
@@ -25,14 +25,16 @@ import { controlUserAccountAction, issueWarningAction } from '@/application/acti
 
 // ── Wrapper factory ───────────────────────────────────────────────
 function createWrapper() {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  const qc = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
   return ({ children }: { children: ReactNode }) =>
     createElement(QueryClientProvider, { client: qc }, children);
 }
 
 describe('users.mutations hooks', () => {
-  const mockControl      = controlUserAccountAction as ReturnType<typeof vi.fn>;
-  const mockIssueWarning = issueWarningAction        as ReturnType<typeof vi.fn>;
+  const mockControl = controlUserAccountAction as ReturnType<typeof vi.fn>;
+  const mockIssueWarning = issueWarningAction as ReturnType<typeof vi.fn>;
 
   beforeEach(() => vi.clearAllMocks());
 
@@ -63,7 +65,12 @@ describe('users.mutations hooks', () => {
     const { result } = renderHook(() => useMutateUserAccount(), { wrapper });
 
     await act(async () => {
-      result.current.mutate({ userId: user.id, action: 'suspend', reason: 'Policy violation', suspendHours: 48 });
+      result.current.mutate({
+        userId: user.id,
+        action: 'suspend',
+        reason: 'Policy violation',
+        suspendHours: 48,
+      });
     });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
@@ -97,10 +104,10 @@ describe('users.mutations hooks', () => {
 
     await act(async () => {
       result.current.mutate({
-        userId:   'user-1',
-        reason:   'Repeatedly violating community guidelines',
+        userId: 'user-1',
+        reason: 'Repeatedly violating community guidelines',
         severity: 2,
-        action:   'none',
+        action: 'none',
       });
     });
 
@@ -115,7 +122,11 @@ describe('users.mutations hooks', () => {
 
   it('useMutateWarning — isPending true while in flight', async () => {
     let resolve: (v: unknown) => void;
-    mockIssueWarning.mockReturnValueOnce(new Promise(r => { resolve = r; }));
+    mockIssueWarning.mockReturnValueOnce(
+      new Promise((r) => {
+        resolve = r;
+      }),
+    );
 
     const { useMutateWarning } = await import('./users.mutations');
     const wrapper = createWrapper();

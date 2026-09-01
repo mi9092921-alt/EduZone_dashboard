@@ -99,10 +99,20 @@ describe('feature-flags.service', () => {
     it('returns flag with role and user overrides', async () => {
       const flag = { id: 'f1', key: 'test_flag', is_enabled: true };
       const roleOverrides = [
-        { flag_id: 'f1', role_id: 'r1', is_exclude: false, roles: { name: 'admin', label: 'Admin' } },
+        {
+          flag_id: 'f1',
+          role_id: 'r1',
+          is_exclude: false,
+          roles: { name: 'admin', label: 'Admin' },
+        },
       ];
       const userOverrides = [
-        { flag_id: 'f1', user_id: 'u1', is_exclude: true, users: { email: 'test@test.com', first_name: 'Test', last_name: 'User' } },
+        {
+          flag_id: 'f1',
+          user_id: 'u1',
+          is_exclude: true,
+          users: { email: 'test@test.com', first_name: 'Test', last_name: 'User' },
+        },
       ];
 
       let callCount = 0;
@@ -150,18 +160,19 @@ describe('feature-flags.service', () => {
       const q = setupQuery({ data: null, error: { code: '23505', message: 'unique violation' } });
       mockFrom.mockReturnValue(q);
 
-      await expect(
-        createFeatureFlag({ key: 'existing' } as any),
-      ).rejects.toThrow('FLAG_KEY_EXISTS');
+      await expect(createFeatureFlag({ key: 'existing' } as any)).rejects.toThrow(
+        'FLAG_KEY_EXISTS',
+      );
     });
 
     it('rethrows non-duplicate errors', async () => {
       const q = setupQuery({ data: null, error: { code: '42P01', message: 'table not found' } });
       mockFrom.mockReturnValue(q);
 
-      await expect(
-        createFeatureFlag({ key: 'test' } as any),
-      ).rejects.toEqual({ code: '42P01', message: 'table not found' });
+      await expect(createFeatureFlag({ key: 'test' } as any)).rejects.toEqual({
+        code: '42P01',
+        message: 'table not found',
+      });
     });
   });
 
@@ -200,9 +211,7 @@ describe('feature-flags.service', () => {
       mockFrom.mockReturnValue(q);
 
       await toggleFeatureFlag('f1', true);
-      expect(q.update).toHaveBeenCalledWith(
-        expect.objectContaining({ is_enabled: true }),
-      );
+      expect(q.update).toHaveBeenCalledWith(expect.objectContaining({ is_enabled: true }));
     });
 
     it('toggles flag off', async () => {
@@ -211,9 +220,7 @@ describe('feature-flags.service', () => {
       mockFrom.mockReturnValue(q);
 
       await toggleFeatureFlag('f1', false);
-      expect(q.update).toHaveBeenCalledWith(
-        expect.objectContaining({ is_enabled: false }),
-      );
+      expect(q.update).toHaveBeenCalledWith(expect.objectContaining({ is_enabled: false }));
     });
   });
 
@@ -230,7 +237,9 @@ describe('feature-flags.service', () => {
       }
       if (table === 'tenants') {
         const q = setupQuery({});
-        q.limit = vi.fn().mockReturnValue({ maybeSingle: vi.fn().mockResolvedValue({ data: { id: 't1' } }) });
+        q.limit = vi
+          .fn()
+          .mockReturnValue({ maybeSingle: vi.fn().mockResolvedValue({ data: { id: 't1' } }) });
         return q;
       }
       return setupQuery({});
@@ -261,7 +270,9 @@ describe('feature-flags.service', () => {
       mockFrom.mockImplementation((table: string) => {
         if (table === 'tenants') {
           const q = setupQuery({});
-          q.limit = vi.fn().mockReturnValue({ maybeSingle: vi.fn().mockResolvedValue({ data: null }) });
+          q.limit = vi
+            .fn()
+            .mockReturnValue({ maybeSingle: vi.fn().mockResolvedValue({ data: null }) });
           return q;
         }
         return setupQuery({});
@@ -293,7 +304,7 @@ describe('feature-flags.service', () => {
 
   // ── User overrides ─────────────────────────────────────────
   describe('addUserOverride', () => {
-    it('upserts a user override scoped to the target user\'s tenant', async () => {
+    it("upserts a user override scoped to the target user's tenant", async () => {
       let flagUsersQuery: any;
       mockFrom.mockImplementation((table: string) => {
         if (table === 'feature_flag_users') {

@@ -3,10 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from './keys';
 
 import type { JobFilters } from '@/domain/types/job.types';
-import {
-  getJobs,
-  getJobStatusCounts,
-} from '@/infrastructure/repos/jobs.service';
+import { getJobs, getJobStatusCounts } from '@/infrastructure/repos/jobs.service';
 
 /**
  * React Query hooks for job queue domain data.

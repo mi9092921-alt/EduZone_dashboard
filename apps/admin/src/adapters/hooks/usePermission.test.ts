@@ -39,8 +39,8 @@ describe('usePermission', () => {
 
 describe('useRole', () => {
   it('returns true if user role matches one of the allowed roles', () => {
-    (useAuthStore as any).mockImplementation((selector: any) => 
-      selector({ user: { primary_role: 'admin' } })
+    (useAuthStore as any).mockImplementation((selector: any) =>
+      selector({ user: { primary_role: 'admin' } }),
     );
 
     const { result } = renderHook(() => useRole(['admin', 'super_admin']));
@@ -48,8 +48,8 @@ describe('useRole', () => {
   });
 
   it('returns false if user role does not match', () => {
-    (useAuthStore as any).mockImplementation((selector: any) => 
-      selector({ user: { primary_role: 'student' } })
+    (useAuthStore as any).mockImplementation((selector: any) =>
+      selector({ user: { primary_role: 'student' } }),
     );
 
     const { result } = renderHook(() => useRole(['admin', 'teacher']));
@@ -57,9 +57,7 @@ describe('useRole', () => {
   });
 
   it('returns false if no user is authenticated', () => {
-    (useAuthStore as any).mockImplementation((selector: any) => 
-      selector({ user: null })
-    );
+    (useAuthStore as any).mockImplementation((selector: any) => selector({ user: null }));
 
     const { result } = renderHook(() => useRole(['admin']));
     expect(result.current.hasRole).toBe(false);

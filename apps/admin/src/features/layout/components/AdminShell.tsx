@@ -1,6 +1,5 @@
 'use client';
 
-
 import { Lock } from '@mui/icons-material';
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef } from 'react';
@@ -57,9 +56,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       <Sidebar />
 
       {/* Main content area with fluid margin shift */}
-      <div
-        className="flex flex-col flex-1 min-w-0 h-full overflow-hidden transition-[margin,width,padding] duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]"
-      >
+      <div className="flex flex-col flex-1 min-w-0 h-full overflow-hidden transition-[margin,width,padding] duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]">
         {/* Topbar */}
         <Topbar />
 
@@ -69,7 +66,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
         {/* App Lock Warning Banner */}
         {isAppLocked && (
-          <div 
+          <div
             role="alert"
             aria-live="polite"
             className="bg-destructive text-destructive-foreground px-6 py-2 flex items-center justify-center gap-3 animate-in slide-in-from-top duration-300 font-medium text-sm shrink-0"
@@ -80,10 +77,11 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         )}
 
         {/* Page content wrapper */}
-        <main ref={mainRef} className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden bg-background">
-          <div className="container-faang animate-in fade-in duration-500 pb-10">
-            {children}
-          </div>
+        <main
+          ref={mainRef}
+          className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden bg-background"
+        >
+          <div className="container-faang animate-in fade-in duration-500 pb-10">{children}</div>
         </main>
       </div>
     </div>

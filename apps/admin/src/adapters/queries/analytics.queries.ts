@@ -40,11 +40,22 @@ export function useTeacherDashboardStats() {
           .select('id')
           .eq('teacher_id', teacherId)
           .is('deleted_at', null);
-        
-        const courseIds = teacherCourses?.map(c => c.id) ?? [];
+
+        const courseIds = teacherCourses?.map((c) => c.id) ?? [];
 
         // 2. Fetch all stats in parallel
-        const [publishedRes, draftRes, archivedRes, deletedRes, warningsRes, studentsRes, lessonsRes, viewsRes, enrollmentsRes, devicesRes] = await Promise.all([
+        const [
+          publishedRes,
+          draftRes,
+          archivedRes,
+          deletedRes,
+          warningsRes,
+          studentsRes,
+          lessonsRes,
+          viewsRes,
+          enrollmentsRes,
+          devicesRes,
+        ] = await Promise.all([
           // v13: courses_active already filters deleted_at IS NULL
           supabase
             .from('courses')
@@ -76,7 +87,7 @@ export function useTeacherDashboardStats() {
             .eq('issued_by', teacherId)
             .eq('is_acknowledged', false),
           // v13: enrollments_active filters soft-deleted enrollments
-          courseIds.length > 0 
+          courseIds.length > 0
             ? supabase
                 .from('enrollments')
                 .select('user_id', { count: 'exact', head: true })
@@ -112,58 +123,61 @@ export function useTeacherDashboardStats() {
             ? supabase
                 .from('devices')
                 .select('id', { count: 'exact', head: true })
-                .in('user_id', (
-                  await supabase
-                    .from('enrollments')
-                    .select('user_id')
-                    .in('course_id', courseIds)
-                    .is('deleted_at', null)
-                ).data?.map(e => e.user_id) || []
+                .in(
+                  'user_id',
+                  (
+                    await supabase
+                      .from('enrollments')
+                      .select('user_id')
+                      .in('course_id', courseIds)
+                      .is('deleted_at', null)
+                  ).data?.map((e) => e.user_id) || [],
                 )
-            : Promise.resolve({ count: 0 })
+            : Promise.resolve({ count: 0 }),
         ]);
 
         const enrollmentRows = enrollmentsRes.data as { progress_pct: number | null }[] | null;
         const avgProgress = enrollmentRows?.length
-          ? enrollmentRows.reduce((acc, curr) => acc + (curr.progress_pct || 0), 0) / enrollmentRows.length
+          ? enrollmentRows.reduce((acc, curr) => acc + (curr.progress_pct || 0), 0) /
+            enrollmentRows.length
           : 0;
 
         return {
-          totalUsers:       studentsRes.count ?? 0,
-          activeUsers:      studentsRes.count ?? 0,
-          activeCourses:    publishedRes.count ?? 0,
-          draftCourses:     draftRes.count ?? 0,
-          archivedCourses:  archivedRes.count ?? 0,
-          deletedCourses:   deletedRes.count ?? 0,
+          totalUsers: studentsRes.count ?? 0,
+          activeUsers: studentsRes.count ?? 0,
+          activeCourses: publishedRes.count ?? 0,
+          draftCourses: draftRes.count ?? 0,
+          archivedCourses: archivedRes.count ?? 0,
+          deletedCourses: deletedRes.count ?? 0,
           totalEnrollments: studentsRes.count ?? 0,
-          dailySessions:    0,
-          pendingWarnings:  warningsRes.count ?? 0,
-          totalViews:       viewsRes.count ?? 0,
-          totalProgress:    Math.round(avgProgress),
-          totalTenants:     0,
-          totalLessons:     lessonsRes.count ?? 0,
-          totalTodos:       0,
-          totalDevices:     devicesRes.count ?? 0,
-          refreshedAt:      new Date().toISOString(),
+          dailySessions: 0,
+          pendingWarnings: warningsRes.count ?? 0,
+          totalViews: viewsRes.count ?? 0,
+          totalProgress: Math.round(avgProgress),
+          totalTenants: 0,
+          totalLessons: lessonsRes.count ?? 0,
+          totalTodos: 0,
+          totalDevices: devicesRes.count ?? 0,
+          refreshedAt: new Date().toISOString(),
         };
       } catch {
         return {
-          totalUsers:       0,
-          activeUsers:      0,
-          activeCourses:    0,
-          draftCourses:     0,
-          archivedCourses:  0,
-          deletedCourses:   0,
+          totalUsers: 0,
+          activeUsers: 0,
+          activeCourses: 0,
+          draftCourses: 0,
+          archivedCourses: 0,
+          deletedCourses: 0,
           totalEnrollments: 0,
-          dailySessions:    0,
-          pendingWarnings:  0,
-          totalViews:       0,
-          totalProgress:    0,
-          totalTenants:     0,
-          totalLessons:     0,
-          totalTodos:       0,
-          totalDevices:     0,
-          refreshedAt:      new Date().toISOString(),
+          dailySessions: 0,
+          pendingWarnings: 0,
+          totalViews: 0,
+          totalProgress: 0,
+          totalTenants: 0,
+          totalLessons: 0,
+          totalTodos: 0,
+          totalDevices: 0,
+          refreshedAt: new Date().toISOString(),
         };
       }
     },
@@ -211,14 +225,16 @@ export function useSystemHealth() {
       // DB returns camelCase JSONB keys: { pendingJobs, unflushedActivity, activeTenants, databaseTime }
       const raw = (data ?? {}) as Record<string, unknown>;
       return {
-        pending_jobs:       Number(raw['pendingJobs']       ?? 0),
+        pending_jobs: Number(raw['pendingJobs'] ?? 0),
         unflushed_activity: Number(raw['unflushedActivity'] ?? 0),
-        active_tenants:     Number(raw['activeTenants']     ?? 0),
-        database_time:      String(raw['databaseTime']      ?? new Date().toISOString()),
-        timestamp:          new Date().toISOString(),
-        processing_jobs:    raw['processingJobs'] !== undefined ? Number(raw['processingJobs']) : undefined,
-        failed_jobs:        raw['failedJobs'] !== undefined ? Number(raw['failedJobs']) : undefined,
-        partition_leaks:    raw['partitionLeaks'] !== undefined ? Number(raw['partitionLeaks']) : undefined,
+        active_tenants: Number(raw['activeTenants'] ?? 0),
+        database_time: String(raw['databaseTime'] ?? new Date().toISOString()),
+        timestamp: new Date().toISOString(),
+        processing_jobs:
+          raw['processingJobs'] !== undefined ? Number(raw['processingJobs']) : undefined,
+        failed_jobs: raw['failedJobs'] !== undefined ? Number(raw['failedJobs']) : undefined,
+        partition_leaks:
+          raw['partitionLeaks'] !== undefined ? Number(raw['partitionLeaks']) : undefined,
       };
     },
     refetchInterval: 15000, // Refresh every 15s to monitor health

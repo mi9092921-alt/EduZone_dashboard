@@ -1,19 +1,11 @@
 'use client';
 
-import {
-  MoreVert,
-  Visibility,
-  Edit,
-  Publish,
-  Archive,
-  Delete,
-} from '@mui/icons-material';
+import { MoreVert, Visibility, Edit, Publish, Archive, Delete } from '@mui/icons-material';
 import { useTranslations } from 'next-intl';
 
 import { Button } from '@/components/ui/Button';
 import { Dropdown, DropdownItem, DropdownSeparator } from '@/components/ui/Dropdown';
 import type { Course } from '@/domain/types/course.types';
-
 
 interface CourseRowActionsProps {
   course: Course;
@@ -38,29 +30,33 @@ export function CourseRowActions({
     <Dropdown
       align="end"
       trigger={
-        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+        >
           <MoreVert className="text-xl" />
         </Button>
       }
     >
-      <DropdownItem 
+      <DropdownItem
         onClick={() => onView(course)}
         icon={<Visibility className="text-indigo-500 text-sm" />}
       >
         {t('view_detail')}
       </DropdownItem>
-      <DropdownItem 
+      <DropdownItem
         onClick={() => onEdit(course)}
         icon={<Edit className="text-amber-500 text-sm" />}
       >
         {t('edit')}
       </DropdownItem>
-      
+
       <DropdownSeparator />
-      
+
       {course.status !== 'published' && (
-        <DropdownItem 
-          onClick={() => onPublish(course)} 
+        <DropdownItem
+          onClick={() => onPublish(course)}
           className="text-emerald-600 dark:text-emerald-400"
           icon={<Publish className="text-emerald-500 text-sm" />}
         >
@@ -68,19 +64,19 @@ export function CourseRowActions({
         </DropdownItem>
       )}
       {course.status !== 'archived' && (
-        <DropdownItem 
-          onClick={() => onArchive(course)} 
+        <DropdownItem
+          onClick={() => onArchive(course)}
           className="text-amber-600 dark:text-amber-400"
           icon={<Archive className="text-amber-500 text-sm" />}
         >
           {t('archive')}
         </DropdownItem>
       )}
-      
+
       <DropdownSeparator />
-      
-      <DropdownItem 
-        onClick={() => onDelete(course)} 
+
+      <DropdownItem
+        onClick={() => onDelete(course)}
         variant="destructive"
         icon={<Delete className="text-red-500 text-sm" />}
       >

@@ -67,21 +67,21 @@ export function QueueHealthPanel() {
                 {health?.failed_jobs || 0}
               </span>
             </div>
-            
+
             {/* Partition Leak Tripwire */}
-            {health?.partition_leaks ? health.partition_leaks > 0 && (
-              <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg flex items-center justify-between col-span-2 animate-in fade-in slide-in-from-top-1">
-                <div className="flex items-center gap-2">
-                  <WarningAmber className="w-4 h-4 text-red-500 animate-pulse" />
-                  <span className="text-xs font-bold text-red-700 dark:text-red-400 uppercase tracking-widest">
-                    {t('data_leak_detected') || 'DATA LEAK DETECTED'}
-                  </span>
-                </div>
-                <span className="font-bold text-red-600">
-                  {health.partition_leaks}
-                </span>
-              </div>
-            ) : null}
+            {health?.partition_leaks
+              ? health.partition_leaks > 0 && (
+                  <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg flex items-center justify-between col-span-2 animate-in fade-in slide-in-from-top-1">
+                    <div className="flex items-center gap-2">
+                      <WarningAmber className="w-4 h-4 text-red-500 animate-pulse" />
+                      <span className="text-xs font-bold text-red-700 dark:text-red-400 uppercase tracking-widest">
+                        {t('data_leak_detected') || 'DATA LEAK DETECTED'}
+                      </span>
+                    </div>
+                    <span className="font-bold text-red-600">{health.partition_leaks}</span>
+                  </div>
+                )
+              : null}
           </div>
         )}
       </CardContent>

@@ -97,7 +97,8 @@ export function CoursesPage() {
         showToast(t('bulk_action_success'), 'success');
         setSelectedIds([]);
       } else if (action === 'publish' || action === 'draft' || action === 'archive') {
-        const newStatus: CourseStatus = action === 'publish' ? 'published' : action === 'draft' ? 'draft' : 'archived';
+        const newStatus: CourseStatus =
+          action === 'publish' ? 'published' : action === 'draft' ? 'draft' : 'archived';
         for (const id of selectedIds) {
           await updateMutation.mutateAsync({ id, data: { status: newStatus } });
         }
@@ -111,34 +112,39 @@ export function CoursesPage() {
           const fileName = `${courseDetail.title.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${id.slice(0, 5)}`;
 
           if (action === 'export_json') {
-            const dataStr = JSON.stringify({
-              course: {
-                title: courseDetail.title,
-                description: courseDetail.description,
-                thumbnail_url: courseDetail.thumbnail_url,
-                slug: courseDetail.slug,
-                category: courseDetail.category,
-                level: courseDetail.level,
-                price: courseDetail.price,
-                status: courseDetail.status,
+            const dataStr = JSON.stringify(
+              {
+                course: {
+                  title: courseDetail.title,
+                  description: courseDetail.description,
+                  thumbnail_url: courseDetail.thumbnail_url,
+                  slug: courseDetail.slug,
+                  category: courseDetail.category,
+                  level: courseDetail.level,
+                  price: courseDetail.price,
+                  status: courseDetail.status,
+                },
+                sections: courseDetail.sections?.map((s) => ({
+                  title: s.title,
+                  order_index: s.order_index,
+                  lessons:
+                    s.lessons?.map((l) => {
+                      const content = Array.isArray(l.content) ? l.content[0] : l.content;
+                      const provider = content?.provider || 'youtube';
+                      const path = content?.video_path || '';
+                      return {
+                        title: l.title,
+                        video_url: formatVideoUrl(provider, path),
+                        order_index: l.order_index,
+                        is_preview: l.is_preview || false,
+                        duration_sec: l.duration_sec,
+                      };
+                    }) || [],
+                })),
               },
-              sections: courseDetail.sections?.map(s => ({
-                title: s.title,
-                order_index: s.order_index,
-                lessons: s.lessons?.map(l => {
-                  const content = Array.isArray(l.content) ? l.content[0] : l.content;
-                  const provider = content?.provider || 'youtube';
-                  const path = content?.video_path || '';
-                  return {
-                    title: l.title,
-                    video_url: formatVideoUrl(provider, path),
-                    order_index: l.order_index,
-                    is_preview: l.is_preview || false,
-                    duration_sec: l.duration_sec,
-                  };
-                }) || []
-              }))
-            }, null, 2);
+              null,
+              2,
+            );
             const blob = new Blob([dataStr], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
@@ -154,7 +160,7 @@ export function CoursesPage() {
               courseDetail.status,
               courseDetail.level || '',
               courseDetail.price.toString(),
-              courseDetail.created_at
+              courseDetail.created_at,
             ];
             const csvContent = [headers.join(','), row.join(',')].join('\n');
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
@@ -165,7 +171,7 @@ export function CoursesPage() {
             link.click();
             URL.revokeObjectURL(url);
           }
-          await new Promise(r => setTimeout(r, 300));
+          await new Promise((r) => setTimeout(r, 300));
         }
         showToast(t('export_started'), 'info');
       }
@@ -192,18 +198,11 @@ export function CoursesPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            onClick={() => setImportOpen(true)}
-            className="gap-2"
-          >
+          <Button variant="outline" onClick={() => setImportOpen(true)} className="gap-2">
             <Upload className="text-sm scale-90" />
             {t('import_json')}
           </Button>
-          <Button
-            onClick={() => setCreateOpen(true)}
-            className="gap-2"
-          >
+          <Button onClick={() => setCreateOpen(true)} className="gap-2">
             <Add className="text-sm scale-90" />
             {t('create_course')}
           </Button>

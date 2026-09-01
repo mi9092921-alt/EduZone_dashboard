@@ -50,7 +50,7 @@ describe('audit.service', () => {
   it('getActivityLogs filters and paginates', async () => {
     const q = setupQuery({ data: [{ id: 'l1' }], count: 1, error: null });
     mockFrom.mockReturnValue(q);
-    
+
     const res = await getActivityLogs({}, 1, 10);
     expect(res.data).toHaveLength(1);
     expect(q.range).toHaveBeenCalledWith(0, 9);
@@ -88,10 +88,12 @@ describe('audit.service', () => {
 
   it('flushActivityLogs handles lock contention', async () => {
     const mockQuery = {
-      single: vi.fn().mockResolvedValue({ error: { message: 'could not obtain lock', code: '55P03' } }),
+      single: vi
+        .fn()
+        .mockResolvedValue({ error: { message: 'could not obtain lock', code: '55P03' } }),
     };
     mockRpc.mockReturnValue(mockQuery);
-    
+
     let errorThrown = false;
     try {
       await flushActivityLogs();

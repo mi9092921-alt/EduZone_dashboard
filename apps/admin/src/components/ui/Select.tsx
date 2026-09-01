@@ -1,21 +1,27 @@
-import { KeyboardArrowDown } from "@mui/icons-material"
-import { Select as MuiSelect, MenuItem, MenuItemProps, SelectProps as MuiSelectProps, SelectChangeEvent } from "@mui/material"
-import * as React from "react"
+import { KeyboardArrowDown } from '@mui/icons-material';
+import {
+  Select as MuiSelect,
+  MenuItem,
+  MenuItemProps,
+  SelectProps as MuiSelectProps,
+  SelectChangeEvent,
+} from '@mui/material';
+import * as React from 'react';
 
-import { cn } from "@/lib/utils"
+import { cn } from '@/lib/utils';
 
 export interface SelectProps extends Omit<MuiSelectProps, 'onChange'> {
-  onValueChange?: (value: string) => void
-  className?: string
+  onValueChange?: (value: string) => void;
+  className?: string;
 }
 
 const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
   ({ className, children, onValueChange, value, ...props }, ref) => {
     const [isOpen, setIsOpen] = React.useState(false);
-    
+
     const handleChange = (event: SelectChangeEvent<unknown>) => {
-      onValueChange?.(event.target.value as string)
-    }
+      onValueChange?.(event.target.value as string);
+    };
 
     return (
       <MuiSelect
@@ -26,12 +32,12 @@ const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
         onClose={() => setIsOpen(false)}
         displayEmpty
         IconComponent={(p) => (
-          <KeyboardArrowDown 
-            {...p} 
+          <KeyboardArrowDown
+            {...p}
             className={cn(
-              "!end-3 !top-[calc(50%-8px)] !h-4 !w-4 !text-muted-foreground !absolute transition-transform duration-300 ease-in-out pointer-events-none", 
-              isOpen && "rotate-180"
-            )} 
+              '!end-3 !top-[calc(50%-8px)] !h-4 !w-4 !text-muted-foreground !absolute transition-transform duration-300 ease-in-out pointer-events-none',
+              isOpen && 'rotate-180',
+            )}
           />
         )}
         sx={{
@@ -60,15 +66,15 @@ const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
             fontWeight: 'inherit',
             minHeight: 'auto',
           },
-          ...((props.sx as object) || {})
+          ...((props.sx as object) || {}),
         }}
-        className={cn("transition-faang text-sm bg-background", className)}
+        className={cn('transition-faang text-sm bg-background', className)}
         MenuProps={{
           elevation: 0,
           anchorOrigin: { vertical: 'bottom', horizontal: 'left' },
           transformOrigin: { vertical: 'top', horizontal: 'left' },
           PaperProps: {
-            className: "border border-border/50 shadow-2xl overflow-hidden rounded-xl mt-2",
+            className: 'border border-border/50 shadow-2xl overflow-hidden rounded-xl mt-2',
             sx: {
               backgroundColor: 'hsl(var(--card) / 0.95)',
               backdropFilter: 'blur(12px)',
@@ -76,9 +82,9 @@ const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
               boxShadow: 'var(--inner-glow)',
               maxHeight: '300px',
               '&::-webkit-scrollbar': { width: '4px' },
-              '&::-webkit-scrollbar-thumb': { 
-                backgroundColor: 'hsl(var(--border))', 
-                borderRadius: '10px' 
+              '&::-webkit-scrollbar-thumb': {
+                backgroundColor: 'hsl(var(--border))',
+                borderRadius: '10px',
               },
               '& .MuiList-root': { padding: '6px' },
               '& .MuiMenuItem-root': {
@@ -98,39 +104,34 @@ const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
                   color: 'hsl(var(--primary))',
                   fontWeight: 600,
                   '&::before': {
-                      content: '""',
-                      position: 'absolute',
-                      left: 0,
-                      height: '60%',
-                      width: '3px',
-                      borderRadius: '0 4px 4px 0',
-                      backgroundColor: 'hsl(var(--primary))'
-                  }
-                }
-              }
-            }
-          }
+                    content: '""',
+                    position: 'absolute',
+                    left: 0,
+                    height: '60%',
+                    width: '3px',
+                    borderRadius: '0 4px 4px 0',
+                    backgroundColor: 'hsl(var(--primary))',
+                  },
+                },
+              },
+            },
+          },
         }}
         {...props}
       >
         {children}
       </MuiSelect>
-    )
-  }
-)
-Select.displayName = "Select"
+    );
+  },
+);
+Select.displayName = 'Select';
 
 /**
  * We must use MenuItem directly as children for MuiSelect to correctly track value/display.
  * SelectItem is now just a wrapper that ensures proper styling via className.
  */
 export function SelectItem({ className, ...props }: MenuItemProps) {
-  return (
-    <MenuItem 
-      {...props} 
-      className={cn("truncate", className)}
-    />
-  );
+  return <MenuItem {...props} className={cn('truncate', className)} />;
 }
 
-export { Select }
+export { Select };

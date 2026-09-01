@@ -78,12 +78,7 @@ export async function issueWarning(
   action: string,
 ): Promise<string> {
   const { issueWarningAction } = await import('@/application/actions/user.actions');
-  const result = await issueWarningAction(
-    userId,
-    reason,
-    severity as 1 | 2 | 3,
-    action,
-  );
+  const result = await issueWarningAction(userId, reason, severity as 1 | 2 | 3, action);
   if (!result.success) throw new Error(result.error);
   return result.warningId ?? '';
 }

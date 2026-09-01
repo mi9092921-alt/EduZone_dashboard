@@ -2,7 +2,7 @@ import { container } from '@/container';
 
 /**
  * Stats Service
- * 
+ *
  * Fetches consolidated analytical data and system statistics.
  * Utilizes high-performance SQL views and RPCs to minimize client-side processing.
  */
@@ -31,14 +31,14 @@ export interface DashboardStats {
 /**
  * Fetches high-level dashboard metrics using the optimized get_dashboard_stats RPC.
  * Adheres to RBAC; Super Admins can optionally filter by tenant.
- * 
+ *
  * @param tenantId Optional tenant ID for targeted stats
  */
 export async function getDashboardStats(tenantId?: string): Promise<DashboardStats> {
   const { supabase } = container;
 
   const { data, error } = await supabase.rpc('get_dashboard_stats', {
-    p_tenant_id: tenantId || null
+    p_tenant_id: tenantId || null,
   });
 
   if (error) {
@@ -67,21 +67,21 @@ export async function getDashboardStats(tenantId?: string): Promise<DashboardSta
   const raw = (data ?? {}) as Record<string, unknown>;
 
   return {
-    totalUsers:       Number(raw['total_users']       ?? 0),
-    activeUsers:      Number(raw['total_users']       ?? 0), // no separate active_users in RPC
-    activeCourses:    Number(raw['total_courses']     ?? 0),
-    draftCourses:     Number(raw['draft_courses']     ?? 0),
-    archivedCourses:  0,
+    totalUsers: Number(raw['total_users'] ?? 0),
+    activeUsers: Number(raw['total_users'] ?? 0), // no separate active_users in RPC
+    activeCourses: Number(raw['total_courses'] ?? 0),
+    draftCourses: Number(raw['draft_courses'] ?? 0),
+    archivedCourses: 0,
     totalEnrollments: Number(raw['total_enrollments'] ?? 0),
-    pendingWarnings:  Number(raw['warnings_count']    ?? 0),
-    dailySessions:    Number(raw['active_sessions']   ?? 0),
-    totalViews:       Number(raw['total_views']       ?? 0),
-    totalProgress:    Number(raw['total_progress']    ?? 0),
-    totalTenants:     0,
-    totalLessons:     Number(raw['total_lessons']     ?? 0),
-    totalTodos:       Number(raw['total_todos']       ?? 0),
-    totalDevices:     Number(raw['total_devices']     ?? 0),
-    deletedCourses:   Number(raw['deleted_courses']   ?? 0),
-    refreshedAt:      new Date().toISOString(),
+    pendingWarnings: Number(raw['warnings_count'] ?? 0),
+    dailySessions: Number(raw['active_sessions'] ?? 0),
+    totalViews: Number(raw['total_views'] ?? 0),
+    totalProgress: Number(raw['total_progress'] ?? 0),
+    totalTenants: 0,
+    totalLessons: Number(raw['total_lessons'] ?? 0),
+    totalTodos: Number(raw['total_todos'] ?? 0),
+    totalDevices: Number(raw['total_devices'] ?? 0),
+    deletedCourses: Number(raw['deleted_courses'] ?? 0),
+    refreshedAt: new Date().toISOString(),
   };
 }

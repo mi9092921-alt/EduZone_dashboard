@@ -2,7 +2,7 @@ import { container } from '@/container';
 
 /**
  * Telemetry Service
- * 
+ *
  * Handles non-blocking application telemetry and location logging.
  * Adheres to the RLS-first contract by utilizing secure RPC wrappers.
  */
@@ -19,7 +19,7 @@ export interface TelemetryParams {
 /**
  * Logs the current application open location for the authenticated user.
  * This RPC handles throttling (default 3 mins) on the database side.
- * 
+ *
  * @param params Latitude, longitude and optional device metadata
  */
 export async function logAppLocation(params: TelemetryParams): Promise<void> {

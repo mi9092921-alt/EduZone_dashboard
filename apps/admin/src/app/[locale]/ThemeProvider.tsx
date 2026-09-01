@@ -13,7 +13,7 @@ function MuiThemeBridge({ children }: { children: React.ReactNode }) {
     setMounted(true);
   }, []);
 
-  // Use variables for core surfaces so that even before hydration, 
+  // Use variables for core surfaces so that even before hydration,
   // the server-rendered MUI components pick up the correct colors from CSS.
   // We specify the theme object for non-variable logic (like spacing, specific components).
   const currentTheme = mounted && resolvedTheme === 'dark' ? eduZoneDarkTheme : eduZoneTheme;
@@ -29,10 +29,13 @@ function MuiThemeBridge({ children }: { children: React.ReactNode }) {
 
 export function EduZoneThemeProvider({ children }: { children: React.ReactNode }) {
   return (
-    <NextThemesProvider attribute="data-theme" defaultTheme="system" enableSystem disableTransitionOnChange>
-      <MuiThemeBridge>
-        {children}
-      </MuiThemeBridge>
+    <NextThemesProvider
+      attribute="data-theme"
+      defaultTheme="system"
+      enableSystem
+      disableTransitionOnChange
+    >
+      <MuiThemeBridge>{children}</MuiThemeBridge>
     </NextThemesProvider>
   );
 }

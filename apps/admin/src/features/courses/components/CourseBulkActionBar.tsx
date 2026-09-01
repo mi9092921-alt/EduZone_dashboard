@@ -1,20 +1,19 @@
 'use client';
 
-import {
-  Publish,
-  Drafts,
-  Archive,
-  DeleteForever,
-  FileDownload,
-  Close,
-} from '@mui/icons-material';
+import { Publish, Drafts, Archive, DeleteForever, FileDownload, Close } from '@mui/icons-material';
 import { Tooltip, Menu, MenuItem, ListItemIcon, ListItemText } from '@mui/material';
 import { useTranslations } from 'next-intl';
 import React, { useState } from 'react';
 
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
-export type CourseBulkAction = 'publish' | 'draft' | 'archive' | 'delete' | 'export_json' | 'export_csv';
+export type CourseBulkAction =
+  | 'publish'
+  | 'draft'
+  | 'archive'
+  | 'delete'
+  | 'export_json'
+  | 'export_csv';
 
 interface CourseBulkActionBarProps {
   selectedCount: number;
@@ -27,7 +26,7 @@ export function CourseBulkActionBar({
   selectedCount,
   onClear,
   onAction,
-  isPending = false
+  isPending = false,
 }: CourseBulkActionBarProps) {
   const t = useTranslations('common');
   const [confirmAction, setConfirmAction] = useState<CourseBulkAction | null>(null);
@@ -113,17 +112,37 @@ export function CourseBulkActionBar({
             open={Boolean(exportAnchorEl)}
             onClose={() => setExportAnchorEl(null)}
             PaperProps={{
-              className: "mt-1 shadow-xl border border-border/50 rounded-xl",
-              sx: { minWidth: 160 }
+              className: 'mt-1 shadow-xl border border-border/50 rounded-xl',
+              sx: { minWidth: 160 },
             }}
           >
-            <MenuItem onClick={() => { onAction('export_json'); setExportAnchorEl(null); }}>
-              <ListItemIcon><FileDownload fontSize="small" className="text-orange-500" /></ListItemIcon>
-              <ListItemText primary="JSON Export" primaryTypographyProps={{ className: "text-xs font-bold" }} />
+            <MenuItem
+              onClick={() => {
+                onAction('export_json');
+                setExportAnchorEl(null);
+              }}
+            >
+              <ListItemIcon>
+                <FileDownload fontSize="small" className="text-orange-500" />
+              </ListItemIcon>
+              <ListItemText
+                primary="JSON Export"
+                primaryTypographyProps={{ className: 'text-xs font-bold' }}
+              />
             </MenuItem>
-            <MenuItem onClick={() => { onAction('export_csv'); setExportAnchorEl(null); }}>
-              <ListItemIcon><FileDownload fontSize="small" className="text-emerald-500" /></ListItemIcon>
-              <ListItemText primary="CSV Export" primaryTypographyProps={{ className: "text-xs font-bold" }} />
+            <MenuItem
+              onClick={() => {
+                onAction('export_csv');
+                setExportAnchorEl(null);
+              }}
+            >
+              <ListItemIcon>
+                <FileDownload fontSize="small" className="text-emerald-500" />
+              </ListItemIcon>
+              <ListItemText
+                primary="CSV Export"
+                primaryTypographyProps={{ className: 'text-xs font-bold' }}
+              />
             </MenuItem>
           </Menu>
 

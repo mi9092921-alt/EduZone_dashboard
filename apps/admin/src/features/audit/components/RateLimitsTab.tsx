@@ -1,20 +1,22 @@
 'use client';
 
-import {
-  Block,
-  TrendingUp,
-  Timer,
-  Delete,
-  Shield,
-} from '@mui/icons-material';
+import { Block, TrendingUp, Timer, Delete, Shield } from '@mui/icons-material';
 import { Tooltip } from '@mui/material';
 import { useTranslations } from 'next-intl';
 import { useState, useEffect, useMemo } from 'react';
 
 import { useToggleRateLimitRule, useClearBlock } from '@/adapters/mutations/rate-limits.mutations';
-import { useActiveBlocks, useRateLimitRules, useTopOffenders } from '@/adapters/queries/rate-limits.queries';
+import {
+  useActiveBlocks,
+  useRateLimitRules,
+  useTopOffenders,
+} from '@/adapters/queries/rate-limits.queries';
 import { Switch } from '@/components/ui/Switch';
-import type { RateLimitRule, RateLimitWithEmail, TopOffender } from '@/domain/types/rate-limit.types';
+import type {
+  RateLimitRule,
+  RateLimitWithEmail,
+  TopOffender,
+} from '@/domain/types/rate-limit.types';
 import { cn } from '@/lib/utils';
 
 export function RateLimitsTab() {
@@ -57,16 +59,29 @@ function ActiveBlocksSection() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/10">
-              <th className="text-start px-4 py-2.5 font-semibold text-muted-foreground text-xs">{t('header_user_ip')}</th>
-              <th className="text-start px-4 py-2.5 font-semibold text-muted-foreground text-xs">{t('header_actions')}</th>
-              <th className="text-start px-4 py-2.5 font-semibold text-muted-foreground text-xs">{t('header_hits')}</th>
-              <th className="text-start px-4 py-2.5 font-semibold text-muted-foreground text-xs">{t('header_blocked_until')}</th>
-              <th className="text-end px-4 py-2.5 font-semibold text-muted-foreground text-xs">{t('header_row_actions')}</th>
+              <th className="text-start px-4 py-2.5 font-semibold text-muted-foreground text-xs">
+                {t('header_user_ip')}
+              </th>
+              <th className="text-start px-4 py-2.5 font-semibold text-muted-foreground text-xs">
+                {t('header_actions')}
+              </th>
+              <th className="text-start px-4 py-2.5 font-semibold text-muted-foreground text-xs">
+                {t('header_hits')}
+              </th>
+              <th className="text-start px-4 py-2.5 font-semibold text-muted-foreground text-xs">
+                {t('header_blocked_until')}
+              </th>
+              <th className="text-end px-4 py-2.5 font-semibold text-muted-foreground text-xs">
+                {t('header_row_actions')}
+              </th>
             </tr>
           </thead>
           <tbody>
             {(blocks ?? []).map((block: RateLimitWithEmail) => (
-              <tr key={block.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
+              <tr
+                key={block.id}
+                className="border-b border-border/50 hover:bg-muted/20 transition-colors"
+              >
                 <td className="px-4 py-2.5 text-xs">
                   {block.user_email && (
                     <span className="text-foreground font-medium">{block.user_email}</span>
@@ -132,26 +147,48 @@ function TopOffendersSection() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/10">
-              <th className="text-start px-4 py-2.5 font-semibold text-muted-foreground text-xs">{t('header_rank')}</th>
-              <th className="text-start px-4 py-2.5 font-semibold text-muted-foreground text-xs">{t('header_user_ip')}</th>
-              <th className="text-start px-4 py-2.5 font-semibold text-muted-foreground text-xs">{t('header_total_hits')}</th>
-              <th className="text-start px-4 py-2.5 font-semibold text-muted-foreground text-xs">{t('header_row_actions')}</th>
+              <th className="text-start px-4 py-2.5 font-semibold text-muted-foreground text-xs">
+                {t('header_rank')}
+              </th>
+              <th className="text-start px-4 py-2.5 font-semibold text-muted-foreground text-xs">
+                {t('header_user_ip')}
+              </th>
+              <th className="text-start px-4 py-2.5 font-semibold text-muted-foreground text-xs">
+                {t('header_total_hits')}
+              </th>
+              <th className="text-start px-4 py-2.5 font-semibold text-muted-foreground text-xs">
+                {t('header_row_actions')}
+              </th>
             </tr>
           </thead>
           <tbody>
             {(offenders ?? []).map((o: TopOffender, idx: number) => (
-              <tr key={o.user_id ?? o.ip_address ?? idx} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
-                <td className="px-4 py-2.5 text-xs font-semibold text-muted-foreground">{idx + 1}</td>
+              <tr
+                key={o.user_id ?? o.ip_address ?? idx}
+                className="border-b border-border/50 hover:bg-muted/20 transition-colors"
+              >
+                <td className="px-4 py-2.5 text-xs font-semibold text-muted-foreground">
+                  {idx + 1}
+                </td>
                 <td className="px-4 py-2.5 text-xs">
-                  {o.user_email && <span className="text-foreground font-medium">{o.user_email}</span>}
-                  {o.ip_address && <span className="font-mono text-muted-foreground ms-2">{o.ip_address}</span>}
-                  {!o.user_email && !o.ip_address && <span className="text-muted-foreground">{t('label_unknown')}</span>}
+                  {o.user_email && (
+                    <span className="text-foreground font-medium">{o.user_email}</span>
+                  )}
+                  {o.ip_address && (
+                    <span className="font-mono text-muted-foreground ms-2">{o.ip_address}</span>
+                  )}
+                  {!o.user_email && !o.ip_address && (
+                    <span className="text-muted-foreground">{t('label_unknown')}</span>
+                  )}
                 </td>
                 <td className="px-4 py-2.5 text-xs font-bold text-foreground">{o.total_hits}</td>
                 <td className="px-4 py-2.5">
                   <div className="flex flex-wrap gap-1">
                     {o.actions.map((a) => (
-                      <span key={a} className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-foreground">
+                      <span
+                        key={a}
+                        className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-foreground"
+                      >
                         {a}
                       </span>
                     ))}
@@ -190,16 +227,29 @@ function RateLimitRulesSection() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/10">
-              <th className="text-start px-4 py-2.5 font-semibold text-muted-foreground text-xs">{t('header_actions')}</th>
-              <th className="text-start px-4 py-2.5 font-semibold text-muted-foreground text-xs">{t('header_max_hits')}</th>
-              <th className="text-start px-4 py-2.5 font-semibold text-muted-foreground text-xs">{t('header_window')}</th>
-              <th className="text-start px-4 py-2.5 font-semibold text-muted-foreground text-xs">{t('header_block_duration')}</th>
-              <th className="text-start px-4 py-2.5 font-semibold text-muted-foreground text-xs">{t('header_active')}</th>
+              <th className="text-start px-4 py-2.5 font-semibold text-muted-foreground text-xs">
+                {t('header_actions')}
+              </th>
+              <th className="text-start px-4 py-2.5 font-semibold text-muted-foreground text-xs">
+                {t('header_max_hits')}
+              </th>
+              <th className="text-start px-4 py-2.5 font-semibold text-muted-foreground text-xs">
+                {t('header_window')}
+              </th>
+              <th className="text-start px-4 py-2.5 font-semibold text-muted-foreground text-xs">
+                {t('header_block_duration')}
+              </th>
+              <th className="text-start px-4 py-2.5 font-semibold text-muted-foreground text-xs">
+                {t('header_active')}
+              </th>
             </tr>
           </thead>
           <tbody>
             {(rules ?? []).map((rule: RateLimitRule) => (
-              <tr key={rule.action} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
+              <tr
+                key={rule.action}
+                className="border-b border-border/50 hover:bg-muted/20 transition-colors"
+              >
                 <td className="px-4 py-2.5">
                   <span className="text-xs font-semibold text-foreground">{rule.action}</span>
                 </td>
@@ -213,7 +263,9 @@ function RateLimitRulesSection() {
                 <td className="px-4 py-2.5">
                   <Switch
                     checked={rule.is_active}
-                    onCheckedChange={(checked) => toggleRule.mutate({ action: rule.action, isActive: checked })}
+                    onCheckedChange={(checked) =>
+                      toggleRule.mutate({ action: rule.action, isActive: checked })
+                    }
                   />
                 </td>
               </tr>
@@ -261,7 +313,7 @@ function CountdownTimer({ until }: { until: string }) {
       const h = Math.floor(diff / 3_600_000);
       const m = Math.floor((diff % 3_600_000) / 60_000);
       const s = Math.floor((diff % 60_000) / 1_000);
-      
+
       const parts = [];
       if (h > 0) parts.push(t('hours_short', { h }));
       parts.push(t('minutes_short', { m }));
@@ -280,7 +332,11 @@ function CountdownTimer({ until }: { until: string }) {
     <span
       className={cn(
         'text-xs font-mono font-semibold',
-        remaining === t('label_expired') ? 'text-muted-foreground' : isExpiringSoon ? 'text-amber-500' : 'text-destructive',
+        remaining === t('label_expired')
+          ? 'text-muted-foreground'
+          : isExpiringSoon
+            ? 'text-amber-500'
+            : 'text-destructive',
       )}
     >
       {remaining}

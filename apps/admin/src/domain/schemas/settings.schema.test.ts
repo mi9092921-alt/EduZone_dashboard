@@ -19,10 +19,14 @@ describe('settings domain schemas', () => {
     const s = getMaintenanceModeSchema(mockT);
     const futureDate = new Date();
     futureDate.setDate(futureDate.getDate() + 1);
-    
+
     expect(s.safeParse({ message: 'bad', ends_at: futureDate.toISOString() }).success).toBe(false); // short message
-    expect(s.safeParse({ message: 'Valid message here', ends_at: '2020-01-01T00:00:00.000Z' }).success).toBe(false); // past date
-    expect(s.safeParse({ message: 'Valid message here', ends_at: futureDate.toISOString() }).success).toBe(true);
+    expect(
+      s.safeParse({ message: 'Valid message here', ends_at: '2020-01-01T00:00:00.000Z' }).success,
+    ).toBe(false); // past date
+    expect(
+      s.safeParse({ message: 'Valid message here', ends_at: futureDate.toISOString() }).success,
+    ).toBe(true);
   });
 
   it('validates feature flag schema', () => {

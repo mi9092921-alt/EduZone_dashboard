@@ -1,12 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-import {
-  getJobs,
-  getJobStatusCounts,
-  retryJob,
-  cancelJob,
-  releaseStaleJobs,
-} from './jobs.service';
+import { getJobs, getJobStatusCounts, retryJob, cancelJob, releaseStaleJobs } from './jobs.service';
 
 import {
   getJobsAction,

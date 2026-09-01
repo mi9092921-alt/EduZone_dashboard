@@ -54,7 +54,10 @@ describe('analytics.service', () => {
   });
 
   it('getUserStats uses fallback on empty MV', async () => {
-    mockRpc.mockResolvedValue({ data: null, error: { code: '42501', message: 'permission denied' } });
+    mockRpc.mockResolvedValue({
+      data: null,
+      error: { code: '42501', message: 'permission denied' },
+    });
 
     const res = await getUserStats('t1');
     expect(res.total_users).toBe(0);
@@ -90,13 +93,15 @@ describe('analytics.service', () => {
     const today = new Date().toISOString().split('T')[0]!;
     mockFrom.mockReturnValue(setupQuery({ data: [{ created_at: today + 'T12:00:00Z' }] }));
     const res = await getUserRegistrationTrend(1);
-    expect(res.find(r => r.date === today)?.count).toBe(1);
+    expect(res.find((r) => r.date === today)?.count).toBe(1);
   });
 
   it('getGeographicDistribution sorts counts', async () => {
-    mockFrom.mockReturnValue(setupQuery({
-      data: [{ region_id: 'US' }, { region_id: 'US' }, { region_id: 'EG' }]
-    }));
+    mockFrom.mockReturnValue(
+      setupQuery({
+        data: [{ region_id: 'US' }, { region_id: 'US' }, { region_id: 'EG' }],
+      }),
+    );
     const res = await getGeographicDistribution('t1');
     expect(res).toHaveLength(2);
     expect(res[0]).toEqual({ country_code: 'US', user_count: 2 });

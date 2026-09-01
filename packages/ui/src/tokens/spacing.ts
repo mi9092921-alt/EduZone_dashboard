@@ -5,11 +5,11 @@
 
 export const spacing = {
   unit: 8,
-  xs: 4,    // 0.5 unit
-  sm: 8,    // 1 unit
-  md: 16,   // 2 units
-  lg: 24,   // 3 units
-  xl: 32,   // 4 units
+  xs: 4, // 0.5 unit
+  sm: 8, // 1 unit
+  md: 16, // 2 units
+  lg: 24, // 3 units
+  xl: 32, // 4 units
   '2xl': 48, // 6 units
   '3xl': 64, // 8 units
 } as const;

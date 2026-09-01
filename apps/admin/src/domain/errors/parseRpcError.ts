@@ -44,10 +44,5 @@ export function parseRpcError(raw: unknown): AppError {
 function isPostgresError(
   err: unknown,
 ): err is { code: string; message: string; details?: string; hint?: string } {
-  return (
-    typeof err === 'object' &&
-    err !== null &&
-    'code' in err &&
-    'message' in err
-  );
+  return typeof err === 'object' && err !== null && 'code' in err && 'message' in err;
 }

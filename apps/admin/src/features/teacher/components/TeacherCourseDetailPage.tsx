@@ -1,12 +1,6 @@
 'use client';
 
-import {
-  ArrowBack,
-  MenuBook,
-  People,
-  BarChart,
-  Settings,
-} from '@mui/icons-material';
+import { ArrowBack, MenuBook, People, BarChart, Settings } from '@mui/icons-material';
 import {
   Box,
   Typography,
@@ -23,8 +17,6 @@ import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 
-
-
 import { CourseAnalyticsPage } from './CourseAnalyticsPage';
 import { StudentProgressPage } from './StudentProgressPage';
 
@@ -32,7 +24,6 @@ import { useCourseById } from '@/adapters/queries/courses.queries';
 import { CourseInfoForm } from '@/features/courses/components/CourseInfoForm';
 import { CurriculumBuilder } from '@/features/courses/components/CurriculumBuilder';
 import { useRouter } from '@/i18n/routing';
-
 
 export function TeacherCourseDetailPage() {
   const t = useTranslations('common');
@@ -57,8 +48,8 @@ export function TeacherCourseDetailPage() {
         <Typography variant="h5" color="error" gutterBottom>
           {t('course_not_found')}
         </Typography>
-        <Button 
-          startIcon={<ArrowBack sx={{ '[dir="rtl"] &': { transform: 'scaleX(-1)' } }} />} 
+        <Button
+          startIcon={<ArrowBack sx={{ '[dir="rtl"] &': { transform: 'scaleX(-1)' } }} />}
           onClick={() => router.push('/courses')}
         >
           {t('back_to_courses')}
@@ -90,7 +81,15 @@ export function TeacherCourseDetailPage() {
           </Typography>
         </Breadcrumbs>
 
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 2,
+          }}
+        >
           <Box>
             <Typography
               variant="h4"
@@ -153,10 +152,26 @@ export function TeacherCourseDetailPage() {
             },
           }}
         >
-          <Tab icon={<People sx={{ fontSize: 20 }} />} iconPosition="start" label={t('students_tab')} />
-          <Tab icon={<MenuBook sx={{ fontSize: 20 }} />} iconPosition="start" label={t('curriculum_tab')} />
-          <Tab icon={<BarChart sx={{ fontSize: 20 }} />} iconPosition="start" label={t('analytics_tab')} />
-          <Tab icon={<Settings sx={{ fontSize: 20 }} />} iconPosition="start" label={t('details_tab')} />
+          <Tab
+            icon={<People sx={{ fontSize: 20 }} />}
+            iconPosition="start"
+            label={t('students_tab')}
+          />
+          <Tab
+            icon={<MenuBook sx={{ fontSize: 20 }} />}
+            iconPosition="start"
+            label={t('curriculum_tab')}
+          />
+          <Tab
+            icon={<BarChart sx={{ fontSize: 20 }} />}
+            iconPosition="start"
+            label={t('analytics_tab')}
+          />
+          <Tab
+            icon={<Settings sx={{ fontSize: 20 }} />}
+            iconPosition="start"
+            label={t('details_tab')}
+          />
         </Tabs>
         <Divider sx={{ position: 'absolute', bottom: 0, width: '100%', zIndex: -1 }} />
       </Box>
@@ -172,7 +187,16 @@ export function TeacherCourseDetailPage() {
         )}
         {activeTab === 1 && (
           <Fade in timeout={400}>
-            <Box sx={{ p: 4, borderRadius: 4, backgroundColor: 'background.paper', border: '1px solid', borderColor: 'divider', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+            <Box
+              sx={{
+                p: 4,
+                borderRadius: 4,
+                backgroundColor: 'background.paper',
+                border: '1px solid',
+                borderColor: 'divider',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+              }}
+            >
               <CurriculumBuilder courseId={course!.id} sections={course!.sections} />
             </Box>
           </Fade>

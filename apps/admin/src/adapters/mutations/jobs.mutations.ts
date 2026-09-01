@@ -1,11 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { queryKeys } from '@/adapters/queries/keys';
-import {
-  retryJob,
-  cancelJob,
-  releaseStaleJobs,
-} from '@/infrastructure/repos/jobs.service';
+import { retryJob, cancelJob, releaseStaleJobs } from '@/infrastructure/repos/jobs.service';
 
 /**
  * Mutation hooks for job queue actions.

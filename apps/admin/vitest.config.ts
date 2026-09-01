@@ -19,9 +19,9 @@ export default defineConfig({
       reporter: ['text', 'lcov', 'html'],
       // CI gate thresholds
       thresholds: {
-        lines:      80,
-        branches:   55,   // 59.55% currently; raise to 75% once staging E2E is added
-        functions:  70,
+        lines: 80,
+        branches: 55, // 59.55% currently; raise to 75% once staging E2E is added
+        functions: 70,
         statements: 80,
       },
       exclude: [
@@ -60,11 +60,11 @@ export default defineConfig({
       {
         extends: true,
         test: {
-          name:         'unit',
-          environment:  'jsdom',
-          globals:      true,
-          setupFiles:   ['./vitest.setup.ts'],
-          exclude:      ['**/node_modules/**', '**/dist/**', '**/*.stories.tsx', '**/cypress/**'],
+          name: 'unit',
+          environment: 'jsdom',
+          globals: true,
+          setupFiles: ['./vitest.setup.ts'],
+          exclude: ['**/node_modules/**', '**/dist/**', '**/*.stories.tsx', '**/cypress/**'],
           alias: {
             '@': path.resolve(dirname, './src'),
           },
@@ -78,11 +78,11 @@ export default defineConfig({
           }),
         ],
         test: {
-          name:    'storybook',
+          name: 'storybook',
           browser: {
-            enabled:   true,
-            headless:  true,
-            provider:  playwright({}),
+            enabled: true,
+            headless: true,
+            provider: playwright({}),
             instances: [{ browser: 'chromium' }],
           },
         },

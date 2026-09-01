@@ -4,7 +4,11 @@ import { Upload, ContentCopy, CheckCircle, ErrorOutline, HelpOutline } from '@mu
 import { useTranslations, useLocale } from 'next-intl';
 import { useState, useRef } from 'react';
 
-import { useCreateCourse, useCreateSection, useCreateLessons } from '@/adapters/mutations/courses.mutations';
+import {
+  useCreateCourse,
+  useCreateSection,
+  useCreateLessons,
+} from '@/adapters/mutations/courses.mutations';
 import { useToast } from '@/adapters/stores/toast.store';
 import { Button } from '@/components/ui/Button';
 import { Label } from '@/components/ui/Label';
@@ -12,7 +16,6 @@ import { Modal } from '@/components/ui/Modal';
 import { getErrorMessage } from '@/domain/errors';
 import type { CourseStatus } from '@/domain/types/course.types';
 import { useRouter } from '@/i18n/routing';
-
 
 interface ImportCourseDialogProps {
   open: boolean;
@@ -65,30 +68,30 @@ interface ValidationResult {
 
 const TEMPLATE_JSON = {
   course: {
-    title: "UI/UX Fundamentals",
-    description: "Design thinking and Figma basics.",
-    thumbnail_url: "https://example.com/thumbnail.png",
-    slug: "ui-ux-fundamentals",
-    category: "Design",
-    level: "beginner",
+    title: 'UI/UX Fundamentals',
+    description: 'Design thinking and Figma basics.',
+    thumbnail_url: 'https://example.com/thumbnail.png',
+    slug: 'ui-ux-fundamentals',
+    category: 'Design',
+    level: 'beginner',
     price: 0,
-    status: "draft"
+    status: 'draft',
   },
   sections: [
     {
-      "title": "01. Introduction",
-      "order_index": 1,
-      "lessons": [
+      title: '01. Introduction',
+      order_index: 1,
+      lessons: [
         {
-          "title": "Ocular 1",
-          "video_url": "https://youtu.be/0bX9vHKPgX8",
-          "order_index": 1,
-          "is_preview": true,
-          "duration_sec": 1637
-        }
-      ]
-    }
-  ]
+          title: 'Ocular 1',
+          video_url: 'https://youtu.be/0bX9vHKPgX8',
+          order_index: 1,
+          is_preview: true,
+          duration_sec: 1637,
+        },
+      ],
+    },
+  ],
 };
 
 export function ImportCourseDialog({ open, onClose }: ImportCourseDialogProps) {
@@ -97,7 +100,7 @@ export function ImportCourseDialog({ open, onClose }: ImportCourseDialogProps) {
   const isRtl = locale === 'ar';
   const router = useRouter();
   const { showToast } = useToast();
-  
+
   const createCourse = useCreateCourse();
   const createSection = useCreateSection();
   const createLessons = useCreateLessons();
@@ -131,10 +134,11 @@ export function ImportCourseDialog({ open, onClose }: ImportCourseDialogProps) {
         }
         if (data.course.thumbnail_url) {
           const thumbLower = data.course.thumbnail_url.toLowerCase();
-          const isValidThumb = thumbLower.endsWith('.jpg') || 
-                               thumbLower.endsWith('.jpeg') || 
-                               thumbLower.endsWith('.png') || 
-                               thumbLower.endsWith('.webp');
+          const isValidThumb =
+            thumbLower.endsWith('.jpg') ||
+            thumbLower.endsWith('.jpeg') ||
+            thumbLower.endsWith('.png') ||
+            thumbLower.endsWith('.webp');
           if (!isValidThumb) {
             errors.push(t('import_course.error_invalid_thumbnail_url'));
           }
@@ -159,15 +163,27 @@ export function ImportCourseDialog({ open, onClose }: ImportCourseDialogProps) {
           }
           if (sec.lessons) {
             if (!Array.isArray(sec.lessons)) {
-              errors.push(t('import_course.error_lessons_not_array', { title: sec.title || (sIdx + 1) }));
+              errors.push(
+                t('import_course.error_lessons_not_array', { title: sec.title || sIdx + 1 }),
+              );
             } else {
               totalLessons += sec.lessons.length;
               sec.lessons.forEach((les: RawImportLesson, lIdx: number) => {
                 if (!les.title) {
-                  errors.push(t('import_course.error_lesson_missing_title', { index: lIdx + 1, title: sec.title || (sIdx + 1) }));
+                  errors.push(
+                    t('import_course.error_lesson_missing_title', {
+                      index: lIdx + 1,
+                      title: sec.title || sIdx + 1,
+                    }),
+                  );
                 }
                 if (!les.video_url) {
-                  errors.push(t('import_course.error_lesson_missing_video_url', { index: lIdx + 1, title: sec.title || (sIdx + 1) }));
+                  errors.push(
+                    t('import_course.error_lesson_missing_video_url', {
+                      index: lIdx + 1,
+                      title: sec.title || sIdx + 1,
+                    }),
+                  );
                 }
               });
             }
@@ -186,8 +202,8 @@ export function ImportCourseDialog({ open, onClose }: ImportCourseDialogProps) {
         summary: {
           title: data.course.title,
           sectionsCount: data.sections?.length || 0,
-          lessonsCount: totalLessons
-        }
+          lessonsCount: totalLessons,
+        },
       };
     } catch {
       return { isValid: false, errors: [t('import_course.error_invalid_json_format')] };
@@ -224,9 +240,9 @@ export function ImportCourseDialog({ open, onClose }: ImportCourseDialogProps) {
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
+    if (e.type === 'dragenter' || e.type === 'dragover') {
       setDragActive(true);
-    } else if (e.type === "dragleave") {
+    } else if (e.type === 'dragleave') {
       setDragActive(false);
     }
   };
@@ -236,7 +252,7 @@ export function ImportCourseDialog({ open, onClose }: ImportCourseDialogProps) {
     e.stopPropagation();
     setDragActive(false);
     const file = e.dataTransfer.files?.[0];
-    if (file && file.type === "application/json") {
+    if (file && file.type === 'application/json') {
       processFile(file);
     } else {
       setValidation({ isValid: false, errors: [t('import_course.error_json_only')] });
@@ -272,18 +288,20 @@ export function ImportCourseDialog({ open, onClose }: ImportCourseDialogProps) {
         for (let sIdx = 0; sIdx < parsedData.sections.length; sIdx++) {
           const sec = parsedData.sections[sIdx];
           if (!sec) continue;
-          setImportStatus(t('import_course.status_inserting_section', {
-            title: sec.title || (sIdx + 1),
-            current: sIdx + 1,
-            total: parsedData.sections.length
-          }));
-          
+          setImportStatus(
+            t('import_course.status_inserting_section', {
+              title: sec.title || sIdx + 1,
+              current: sIdx + 1,
+              total: parsedData.sections.length,
+            }),
+          );
+
           const newSec = await createSection.mutateAsync({
             courseId: newCourse.id,
             data: {
               title: sec.title || `Section ${sIdx + 1}`,
               order_index: sec.order_index ?? sec.order ?? sIdx,
-            }
+            },
           });
 
           if (sec.lessons && Array.isArray(sec.lessons)) {
@@ -306,13 +324,12 @@ export function ImportCourseDialog({ open, onClose }: ImportCourseDialogProps) {
 
       setImportStatus(t('import_course.status_import_completed'));
       showToast(t('import_course.toast_import_success'), 'success');
-      
+
       // Cleanup & Redirect
       setTimeout(() => {
         onClose();
         router.push(`/courses/${newCourse.id}`);
       }, 800);
-
     } catch (err: unknown) {
       console.error(err);
       showToast(getErrorMessage(err) || t('import_course.toast_import_error'), 'error');
@@ -364,7 +381,9 @@ export function ImportCourseDialog({ open, onClose }: ImportCourseDialogProps) {
               <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
               <div className="absolute w-8 h-8 bg-primary/10 rounded-full animate-ping"></div>
             </div>
-            <p className="text-lg font-bold text-foreground animate-pulse text-center">{importStatus}</p>
+            <p className="text-lg font-bold text-foreground animate-pulse text-center">
+              {importStatus}
+            </p>
             <p className="text-xs text-muted-foreground">{t('import_course.warning_dont_close')}</p>
           </div>
         )}
@@ -381,20 +400,24 @@ export function ImportCourseDialog({ open, onClose }: ImportCourseDialogProps) {
               {showInstructions ? t('import_course.hide') : t('import_course.show')}
             </span>
           </button>
-          
+
           {showInstructions && (
             <div className="p-4 bg-muted/10 border-t border-border/40 space-y-3 animate-in slide-in-from-top-1 duration-200">
               <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10 space-y-3">
                 <div className="flex items-start gap-3">
                   <HelpOutline className="text-primary mt-0.5 shrink-0" />
                   <div className="space-y-1">
-                    <h4 className="text-sm font-bold text-primary">{t('import_course.instructions_title')}</h4>
+                    <h4 className="text-sm font-bold text-primary">
+                      {t('import_course.instructions_title')}
+                    </h4>
                     <p className="text-xs text-muted-foreground leading-relaxed">
                       {t('import_course.instructions_desc')}
                     </p>
                   </div>
                 </div>
-                <div className={`border-t border-primary/10 pt-2 text-xs space-y-1 text-muted-foreground ${isRtl ? 'pr-8' : 'pl-8'}`}>
+                <div
+                  className={`border-t border-primary/10 pt-2 text-xs space-y-1 text-muted-foreground ${isRtl ? 'pr-8' : 'pl-8'}`}
+                >
                   <p className="font-bold text-foreground">{t('import_course.guidelines_title')}</p>
                   <ul className="list-disc list-inside space-y-1 mt-1 pr-1">
                     <li>{t('import_course.guideline_level')}</li>
@@ -458,7 +481,9 @@ export function ImportCourseDialog({ open, onClose }: ImportCourseDialogProps) {
               <Upload />
             </div>
             <div className="text-center space-y-1">
-              <p className="text-sm font-bold text-foreground">{t('import_course.drag_drop_zone')}</p>
+              <p className="text-sm font-bold text-foreground">
+                {t('import_course.drag_drop_zone')}
+              </p>
               <p className="text-xs text-muted-foreground">{t('import_course.browse_files')}</p>
             </div>
           </div>
@@ -479,11 +504,13 @@ export function ImportCourseDialog({ open, onClose }: ImportCourseDialogProps) {
 
         {/* Validation Results UI */}
         {validation && (
-          <div className={`p-4 rounded-xl border animate-in fade-in-50 duration-300 ${
-            validation.isValid
-              ? 'bg-success/5 border-success/20 text-success'
-              : 'bg-destructive/5 border-destructive/20 text-destructive'
-          }`}>
+          <div
+            className={`p-4 rounded-xl border animate-in fade-in-50 duration-300 ${
+              validation.isValid
+                ? 'bg-success/5 border-success/20 text-success'
+                : 'bg-destructive/5 border-destructive/20 text-destructive'
+            }`}
+          >
             <div className="flex items-start gap-2.5">
               {validation.isValid ? (
                 <>
@@ -491,9 +518,24 @@ export function ImportCourseDialog({ open, onClose }: ImportCourseDialogProps) {
                   <div className="space-y-1">
                     <h5 className="text-sm font-bold">{t('import_course.ready_to_import')}</h5>
                     <div className="text-xs text-muted-foreground space-y-0.5">
-                      <p>✓ {t('import_course.summary_course')} <span className="font-semibold text-foreground">{validation.summary?.title}</span></p>
-                      <p>✓ {t('import_course.summary_sections')} <span className="font-semibold text-foreground">{validation.summary?.sectionsCount}</span></p>
-                      <p>✓ {t('import_course.summary_lessons')} <span className="font-semibold text-foreground">{validation.summary?.lessonsCount}</span></p>
+                      <p>
+                        ✓ {t('import_course.summary_course')}{' '}
+                        <span className="font-semibold text-foreground">
+                          {validation.summary?.title}
+                        </span>
+                      </p>
+                      <p>
+                        ✓ {t('import_course.summary_sections')}{' '}
+                        <span className="font-semibold text-foreground">
+                          {validation.summary?.sectionsCount}
+                        </span>
+                      </p>
+                      <p>
+                        ✓ {t('import_course.summary_lessons')}{' '}
+                        <span className="font-semibold text-foreground">
+                          {validation.summary?.lessonsCount}
+                        </span>
+                      </p>
                     </div>
                   </div>
                 </>
@@ -501,10 +543,14 @@ export function ImportCourseDialog({ open, onClose }: ImportCourseDialogProps) {
                 <>
                   <ErrorOutline className="text-destructive mt-0.5 shrink-0" />
                   <div className="space-y-1 flex-1">
-                    <h5 className="text-sm font-bold">{t('import_course.found_structural_errors')}</h5>
+                    <h5 className="text-sm font-bold">
+                      {t('import_course.found_structural_errors')}
+                    </h5>
                     <ul className="list-disc list-inside text-xs text-muted-foreground space-y-1 mt-1 pr-1 leading-relaxed">
                       {validation.errors.map((err, idx) => (
-                        <li key={idx} className="text-destructive font-medium">{err}</li>
+                        <li key={idx} className="text-destructive font-medium">
+                          {err}
+                        </li>
                       ))}
                     </ul>
                   </div>
@@ -526,11 +572,13 @@ export function ImportCourseDialog({ open, onClose }: ImportCourseDialogProps) {
               {showSchema ? t('import_course.hide') : t('import_course.show')}
             </span>
           </button>
-          
+
           {showSchema && (
             <div className="p-4 bg-muted/10 border-t border-border/40 space-y-3 animate-in slide-in-from-top-1 duration-200">
               <div className="flex items-center justify-between">
-                <p className="text-[11px] text-muted-foreground">{t('import_course.use_template_base')}</p>
+                <p className="text-[11px] text-muted-foreground">
+                  {t('import_course.use_template_base')}
+                </p>
                 <Button
                   type="button"
                   variant="outline"
@@ -542,7 +590,10 @@ export function ImportCourseDialog({ open, onClose }: ImportCourseDialogProps) {
                   <span>{t('import_course.copy_template')}</span>
                 </Button>
               </div>
-              <pre className="p-3 rounded-lg bg-black text-[10px] text-green-400 font-mono overflow-x-auto max-h-[160px]" dir="ltr">
+              <pre
+                className="p-3 rounded-lg bg-black text-[10px] text-green-400 font-mono overflow-x-auto max-h-[160px]"
+                dir="ltr"
+              >
                 {JSON.stringify(TEMPLATE_JSON, null, 2)}
               </pre>
             </div>

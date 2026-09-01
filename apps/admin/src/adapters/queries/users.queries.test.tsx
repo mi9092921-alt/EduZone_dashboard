@@ -7,21 +7,17 @@ import { userFactory } from '../../../tests/factories/user.factory';
 
 // ── Mock the infrastructure service ──────────────────────────────
 vi.mock('@/infrastructure/repos/users.service', () => ({
-  getUsers:              vi.fn(),
-  getUserById:           vi.fn(),
-  getDevices:            vi.fn(),
-  getSessions:           vi.fn(),
-  getWarnings:           vi.fn(),
+  getUsers: vi.fn(),
+  getUserById: vi.fn(),
+  getDevices: vi.fn(),
+  getSessions: vi.fn(),
+  getWarnings: vi.fn(),
   getEffectivePermissions: vi.fn(),
-  getUserRoles:          vi.fn(),
-  getUserStats:          vi.fn(),
+  getUserRoles: vi.fn(),
+  getUserStats: vi.fn(),
 }));
 
-import {
-  getUsers,
-  getUserById,
-  getUserStats,
-} from '@/infrastructure/repos/users.service';
+import { getUsers, getUserById, getUserStats } from '@/infrastructure/repos/users.service';
 
 // ── Query wrapper helper ──────────────────────────────────────────
 function createWrapper() {
@@ -35,9 +31,9 @@ function createWrapper() {
 }
 
 describe('users.queries hooks', () => {
-  const mockGetUsers    = getUsers    as ReturnType<typeof vi.fn>;
-  const mockGetById     = getUserById as ReturnType<typeof vi.fn>;
-  const mockGetStats    = getUserStats as ReturnType<typeof vi.fn>;
+  const mockGetUsers = getUsers as ReturnType<typeof vi.fn>;
+  const mockGetById = getUserById as ReturnType<typeof vi.fn>;
+  const mockGetStats = getUserStats as ReturnType<typeof vi.fn>;
 
   beforeEach(() => vi.clearAllMocks());
 
@@ -45,7 +41,11 @@ describe('users.queries hooks', () => {
   it('useUsers — fetches user list with correct filters', async () => {
     const mockUsers = userFactory.buildList(3, { primary_role: 'student' });
     mockGetUsers.mockResolvedValueOnce({
-      data: mockUsers, count: 3, page: 1, pageSize: 50, totalPages: 1,
+      data: mockUsers,
+      count: 3,
+      page: 1,
+      pageSize: 50,
+      totalPages: 1,
     });
 
     const { useUsers } = await import('./users.queries');
@@ -61,7 +61,11 @@ describe('users.queries hooks', () => {
 
   it('useUsers — returns previous data while fetching (keepPreviousData)', async () => {
     const firstPage = {
-      data: userFactory.buildList(2), count: 2, page: 1, pageSize: 50, totalPages: 1,
+      data: userFactory.buildList(2),
+      count: 2,
+      page: 1,
+      pageSize: 50,
+      totalPages: 1,
     };
     mockGetUsers.mockResolvedValue(firstPage);
 
@@ -113,13 +117,15 @@ describe('users.queries hooks', () => {
   // ── useUserStats ────────────────────────────────────────────────
   it('useUserStats — has 60s staleTime (does not refetch immediately)', async () => {
     mockGetStats.mockResolvedValueOnce({
-      tenant_id:       'tenantA',
-      total_users:     500,
-      active_users:    450,
-      locked_users:    10,
+      tenant_id: 'tenantA',
+      total_users: 500,
+      active_users: 450,
+      locked_users: 10,
       suspended_users: 5,
-      banned_users:    2,
-      dau: 100, wau: 300, mau: 450,
+      banned_users: 2,
+      dau: 100,
+      wau: 300,
+      mau: 450,
       refreshed_at: new Date().toISOString(),
     });
 

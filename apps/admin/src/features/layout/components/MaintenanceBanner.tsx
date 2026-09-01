@@ -12,7 +12,7 @@ import { useSetting } from '@/adapters/queries/settings.queries';
 export function MaintenanceBanner() {
   const { data: maintenanceMode } = useSetting('maintenance_mode');
   const t = useTranslations('layout');
-  
+
   const isActive = maintenanceMode === 'true';
 
   if (!isActive) return null;

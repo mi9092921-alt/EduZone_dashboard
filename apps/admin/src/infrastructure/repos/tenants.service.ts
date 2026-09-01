@@ -95,11 +95,7 @@ export async function getTenants(
 // ── Get single tenant ───────────────────────────────────────────
 export async function getTenantById(id: string): Promise<Tenant> {
   const { supabase } = container;
-  const { data, error } = await supabase
-    .from('tenants')
-    .select('*')
-    .eq('id', id)
-    .single();
+  const { data, error } = await supabase.from('tenants').select('*').eq('id', id).single();
 
   if (error) throw error;
   const [tenant] = await withTenantUsage([data as Tenant]);

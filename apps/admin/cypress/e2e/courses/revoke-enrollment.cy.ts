@@ -10,10 +10,10 @@ describe('Course Management: Revoke Enrollment Flow (Cloud Safe)', () => {
       req.reply((res) => {
         if (!res.body) res.body = [];
         if (res.body.length === 0) {
-          res.body.push({ 
-            id: 'mock-enroll-123', 
+          res.body.push({
+            id: 'mock-enroll-123',
             user: { first_name: 'John', last_name: 'Doe', email: 'johndoe@eduzone.app' },
-            status: 'active'
+            status: 'active',
           });
         }
       });
@@ -21,7 +21,7 @@ describe('Course Management: Revoke Enrollment Flow (Cloud Safe)', () => {
 
     // Direct visit to a generic course detail ID
     cy.visit('/courses/123-uuid');
-    
+
     cy.contains(/Enrollments|Students/i).click();
     cy.wait('@getEnrollments');
 
@@ -32,7 +32,9 @@ describe('Course Management: Revoke Enrollment Flow (Cloud Safe)', () => {
     cy.contains('li', /Revoke|Drop/i).click();
 
     // Wait for the modal/drawer to open
-    cy.get('h2').contains(/Revoke|Remove/).should('be.visible');
+    cy.get('h2')
+      .contains(/Revoke|Remove/)
+      .should('be.visible');
 
     // Provide a reason if required
     cy.get('textarea, input[name="reason"]').type('Cypress Automated testing');
@@ -40,11 +42,13 @@ describe('Course Management: Revoke Enrollment Flow (Cloud Safe)', () => {
     // Intercept the PATCH to soft-delete
     cy.intercept('PATCH', '**/rest/v1/enrollments*', {
       statusCode: 200,
-      body: [{ id: 'mock-enroll-123', status: 'revoked' }]
+      body: [{ id: 'mock-enroll-123', status: 'revoked' }],
     }).as('patchRevoke');
 
     // Submit
-    cy.get('button').contains(/Revoke|Proceed/i).click();
+    cy.get('button')
+      .contains(/Revoke|Proceed/i)
+      .click();
 
     // Ensure the dialog closed and we have a success toast
     cy.contains(/revoked successfully|dropped/i, { timeout: 5000 }).should('be.visible');

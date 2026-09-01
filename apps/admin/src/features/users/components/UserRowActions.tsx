@@ -14,13 +14,8 @@ import {
 } from '@mui/icons-material';
 import { useTranslations } from 'next-intl';
 
-import {
-  Dropdown,
-  DropdownItem,
-  DropdownSeparator,
-} from '@/components/ui/Dropdown';
+import { Dropdown, DropdownItem, DropdownSeparator } from '@/components/ui/Dropdown';
 import type { User, AccountAction } from '@/domain/types/user.types';
-
 
 interface UserRowActionsProps {
   user: User;
@@ -54,7 +49,9 @@ export function UserRowActions({
       className="w-60"
     >
       <div className="px-3 py-2 border-b border-border/50 mb-1">
-        <p className="text-[10px] font-extrabold text-muted-foreground uppercase tracking-wider">{t('actions_user_options')}</p>
+        <p className="text-[10px] font-extrabold text-muted-foreground uppercase tracking-wider">
+          {t('actions_user_options')}
+        </p>
       </div>
 
       <DropdownItem
@@ -68,9 +65,11 @@ export function UserRowActions({
 
       {/* Account Control Section */}
       <div className="px-3 py-1.5">
-        <p className="text-[10px] font-extrabold text-muted-foreground uppercase tracking-wider">{t('actions_account_status')}</p>
+        <p className="text-[10px] font-extrabold text-muted-foreground uppercase tracking-wider">
+          {t('actions_account_status')}
+        </p>
       </div>
-      
+
       {user.account_status === 'locked' ? (
         <DropdownItem
           onClick={() => onAction(user, 'unlock')}
@@ -118,7 +117,9 @@ export function UserRowActions({
 
       {/* Security Actions Section */}
       <div className="px-3 py-1.5">
-        <p className="text-[10px] font-extrabold text-muted-foreground uppercase tracking-wider">{t('actions_security_devices')}</p>
+        <p className="text-[10px] font-extrabold text-muted-foreground uppercase tracking-wider">
+          {t('actions_security_devices')}
+        </p>
       </div>
 
       <DropdownItem

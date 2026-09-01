@@ -1,5 +1,5 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -10,7 +10,7 @@ const corsHeaders = {
 function jsonResponse(body: unknown, status: number) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 }
 
@@ -37,17 +37,17 @@ serve(async (req) => {
   try {
     const { lesson_id, device_id } = await req.json();
 
-    if (!lesson_id || typeof lesson_id !== "string") {
-      return jsonResponse({ error: "Missing lesson_id" }, 400);
+    if (!lesson_id || typeof lesson_id !== 'string') {
+      return jsonResponse({ error: 'Missing lesson_id' }, 400);
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
 
-    const authHeader = req.headers.get("Authorization");
+    const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      return jsonResponse({ error: "Missing Authorization header" }, 401);
+      return jsonResponse({ error: 'Missing Authorization header' }, 401);
     }
 
     // SECTION-09 CRITICAL FIX: access control must be evaluated, and the
@@ -80,30 +80,27 @@ serve(async (req) => {
 
     const { data: userData, error: userError } = await userClient.auth.getUser();
     if (userError || !userData.user) {
-      return jsonResponse({ error: "Unauthorized" }, 401);
+      return jsonResponse({ error: 'Unauthorized' }, 401);
     }
 
-    const { data: lessonContent, error: accessError } = await userClient.rpc(
-      "get_lesson_content",
-      {
-        p_lesson_id: lesson_id,
-        p_ip: parseClientIp(req.headers.get('x-forwarded-for')),
-        p_device_id: typeof device_id === "string" ? device_id : null,
-      },
-    );
+    const { data: lessonContent, error: accessError } = await userClient.rpc('get_lesson_content', {
+      p_lesson_id: lesson_id,
+      p_ip: parseClientIp(req.headers.get('x-forwarded-for')),
+      p_device_id: typeof device_id === 'string' ? device_id : null,
+    });
 
     if (accessError || !lessonContent) {
-      const reason = accessError?.message ?? "";
-      if (reason.includes("AUTH_REQUIRED")) {
-        return jsonResponse({ error: "Unauthorized" }, 401);
+      const reason = accessError?.message ?? '';
+      if (reason.includes('AUTH_REQUIRED')) {
+        return jsonResponse({ error: 'Unauthorized' }, 401);
       }
-      if (reason.includes("LESSON_NOT_FOUND")) {
-        return jsonResponse({ error: "Lesson not found" }, 404);
+      if (reason.includes('LESSON_NOT_FOUND')) {
+        return jsonResponse({ error: 'Lesson not found' }, 404);
       }
       // ACCESS_DENIED and any other unexpected failure are both a 403 from
       // the caller's point of view -- do not leak the raw Postgres error
       // (schema/constraint/internal detail) to the client.
-      return jsonResponse({ error: "Access denied" }, 403);
+      return jsonResponse({ error: 'Access denied' }, 403);
     }
 
     const videoPath: string | null = lessonContent.videoPath ?? null;
@@ -120,14 +117,14 @@ serve(async (req) => {
 
     if (provider !== 'youtube' && videoPath) {
       const { data: signedVideo } = await adminClient.storage
-        .from("videos")
+        .from('videos')
         .createSignedUrl(videoPath, 180);
 
       if (signedVideo) videoUrl = signedVideo.signedUrl;
 
       if (captionsPath) {
         const { data: signedCaptions } = await adminClient.storage
-          .from("videos")
+          .from('videos')
           .createSignedUrl(captionsPath, 180);
 
         if (signedCaptions) captionsUrl = signedCaptions.signedUrl;
@@ -145,7 +142,7 @@ serve(async (req) => {
       200,
     );
   } catch (error) {
-    console.error("Unhandled error in get-lesson-content:", error);
-    return jsonResponse({ error: "Internal server error" }, 500);
+    console.error('Unhandled error in get-lesson-content:', error);
+    return jsonResponse({ error: 'Internal server error' }, 500);
   }
 });

@@ -11,9 +11,5 @@ export default function DashboardPage() {
 
   if (!user) return null;
 
-  return (
-    <AdminShell>
-      {isTeacher ? <TeacherDashboard /> : <AdminDashboard />}
-    </AdminShell>
-  );
+  return <AdminShell>{isTeacher ? <TeacherDashboard /> : <AdminDashboard />}</AdminShell>;
 }

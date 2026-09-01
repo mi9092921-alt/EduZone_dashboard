@@ -10,7 +10,7 @@ const teacherEmail = process.env.TEST_TEACHER_EMAIL;
 const teacherPassword = process.env.TEST_TEACHER_PASSWORD;
 
 if (!supabaseUrl || !supabaseAnonKey || !teacherEmail || !teacherPassword) {
-  console.error("Missing required .env.test variables to run permissions tests");
+  console.error('Missing required .env.test variables to run permissions tests');
   process.exit(1);
 }
 
@@ -43,11 +43,11 @@ async function runPermissionTests() {
     email: teacherEmail!,
     password: teacherPassword!,
   });
-  
+
   if (authError) throw new Error(`Auth failed: ${authError.message}`);
 
   const { data: userData } = await client.auth.getUser();
-  if (!userData?.user) throw new Error("Could not get user data");
+  if (!userData?.user) throw new Error('Could not get user data');
 
   const teacherUserId = userData.user.id;
 
@@ -104,7 +104,7 @@ async function runPermissionTests() {
 }
 
 // Execute
-runPermissionTests().catch(err => {
+runPermissionTests().catch((err) => {
   console.error(err);
   process.exit(1);
 });

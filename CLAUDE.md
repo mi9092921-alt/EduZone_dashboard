@@ -60,14 +60,14 @@ The admin app follows strict **Clean Architecture** with dependency rules:
 Domain → Application → Infrastructure → Adapters → Features → App (pages)
 ```
 
-| Layer | Path | Responsibility |
-|-------|------|----------------|
-| **Domain** | `src/domain/` | Types (`*.types.ts`), Zod schemas (`*.schema.ts`), constants, pure services |
-| **Application** | `src/application/` | Use cases, port interfaces (`IEventBus`, `ILogger`, `ITracer`), event handlers |
+| Layer              | Path                  | Responsibility                                                                         |
+| ------------------ | --------------------- | -------------------------------------------------------------------------------------- |
+| **Domain**         | `src/domain/`         | Types (`*.types.ts`), Zod schemas (`*.schema.ts`), constants, pure services            |
+| **Application**    | `src/application/`    | Use cases, port interfaces (`IEventBus`, `ILogger`, `ITracer`), event handlers         |
 | **Infrastructure** | `src/infrastructure/` | Supabase clients (browser/server/middleware), repository services, RPC, event-bus impl |
-| **Adapters** | `src/adapters/` | React Query queries/mutations, Zustand stores, form adapters, hooks |
-| **Features** | `src/features/` | Feature slices with components (UI) — each feature is self-contained |
-| **Components** | `src/components/` | Shared, feature-agnostic UI primitives |
+| **Adapters**       | `src/adapters/`       | React Query queries/mutations, Zustand stores, form adapters, hooks                    |
+| **Features**       | `src/features/`       | Feature slices with components (UI) — each feature is self-contained                   |
+| **Components**     | `src/components/`     | Shared, feature-agnostic UI primitives                                                 |
 
 ### Dependency Injection
 
@@ -125,23 +125,23 @@ features/<name>/
 └── index.ts        # Barrel export
 ```
 
-| Feature | Description | Roles |
-|---------|-------------|-------|
-| `dashboard` | Stats cards, recent activity, overview | all |
-| `courses` | CRUD, curriculum builder (sections/lessons), import/export | all |
-| `users` | User management, bulk ops, devices, sessions | admin+ |
-| `auth` | Login, session check, role-based guards | all |
-| `analytics` | Charts, registration trends, geographic data | admin+ |
-| `settings` | System settings, maintenance mode | admin+ |
-| `tenants` | Multi-tenant management | super_admin |
-| `audit` | Audit log viewer, hash-chain verification | super_admin |
-| `jobs` | Background job queue monitoring | super_admin |
-| `notifications` | In-app notification system | all |
-| `warnings` | User warning management | all |
-| `activities` | Activity log browser | admin+ |
-| `teacher` | Teacher-specific course/student views | teacher |
-| `layout` | Sidebar, header, AdminShell, navigation | all |
-| `admin` | Admin-specific views | admin+ |
+| Feature         | Description                                                | Roles       |
+| --------------- | ---------------------------------------------------------- | ----------- |
+| `dashboard`     | Stats cards, recent activity, overview                     | all         |
+| `courses`       | CRUD, curriculum builder (sections/lessons), import/export | all         |
+| `users`         | User management, bulk ops, devices, sessions               | admin+      |
+| `auth`          | Login, session check, role-based guards                    | all         |
+| `analytics`     | Charts, registration trends, geographic data               | admin+      |
+| `settings`      | System settings, maintenance mode                          | admin+      |
+| `tenants`       | Multi-tenant management                                    | super_admin |
+| `audit`         | Audit log viewer, hash-chain verification                  | super_admin |
+| `jobs`          | Background job queue monitoring                            | super_admin |
+| `notifications` | In-app notification system                                 | all         |
+| `warnings`      | User warning management                                    | all         |
+| `activities`    | Activity log browser                                       | admin+      |
+| `teacher`       | Teacher-specific course/student views                      | teacher     |
+| `layout`        | Sidebar, header, AdminShell, navigation                    | all         |
+| `admin`         | Admin-specific views                                       | admin+      |
 
 ---
 
@@ -218,18 +218,18 @@ Three roles: `super_admin` > `admin` > `teacher`
 
 ## 📁 Important Files
 
-| File | Purpose |
-|------|---------|
-| `container.ts` | DI wiring — singleton Supabase, logger, eventBus |
-| `middleware.ts` | Auth guard + i18n routing composition |
-| `config/nav.config.ts` | Navigation items with role-based access |
-| `adapters/queries/keys.ts` | React Query key factory |
-| `infrastructure/repos/courses.service.ts` | Course CRUD, curriculum, sections, lessons |
-| `lib/env.ts` | Zod-validated environment variables |
-| `app/globals.css` | Design tokens, RTL fixes, Tailwind theme |
-| `i18n/routing.ts` | Locale definitions and navigation helpers |
-| `supabase/schema/` | Canonical production database schema (11 files, applied in order) |
-| `project_documents/implementation_plan.md` | Full implementation roadmap |
+| File                                       | Purpose                                                           |
+| ------------------------------------------ | ----------------------------------------------------------------- |
+| `container.ts`                             | DI wiring — singleton Supabase, logger, eventBus                  |
+| `middleware.ts`                            | Auth guard + i18n routing composition                             |
+| `config/nav.config.ts`                     | Navigation items with role-based access                           |
+| `adapters/queries/keys.ts`                 | React Query key factory                                           |
+| `infrastructure/repos/courses.service.ts`  | Course CRUD, curriculum, sections, lessons                        |
+| `lib/env.ts`                               | Zod-validated environment variables                               |
+| `app/globals.css`                          | Design tokens, RTL fixes, Tailwind theme                          |
+| `i18n/routing.ts`                          | Locale definitions and navigation helpers                         |
+| `supabase/schema/`                         | Canonical production database schema (11 files, applied in order) |
+| `project_documents/implementation_plan.md` | Full implementation roadmap                                       |
 
 ---
 
@@ -290,12 +290,12 @@ Key tables: `users`, `courses`, `sections`, `lessons`, `lesson_contents`, `enrol
 
 Located in `supabase/functions/` (Deno runtime):
 
-| Function | Purpose |
-|----------|---------|
-| `bulk-action` | Execute bulk operations (delete, suspend, etc.) |
-| `bulk-export` | Export data as CSV/JSON |
-| `bulk-worker` | Background worker for long-running bulk jobs |
-| `create-user` | Admin user creation (bypasses client-side auth) |
-| `export-report` | Generate and export analytics reports |
+| Function        | Purpose                                         |
+| --------------- | ----------------------------------------------- |
+| `bulk-action`   | Execute bulk operations (delete, suspend, etc.) |
+| `bulk-export`   | Export data as CSV/JSON                         |
+| `bulk-worker`   | Background worker for long-running bulk jobs    |
+| `create-user`   | Admin user creation (bypasses client-side auth) |
+| `export-report` | Generate and export analytics reports           |
 
 Shared utilities in `supabase/functions/_shared/`.

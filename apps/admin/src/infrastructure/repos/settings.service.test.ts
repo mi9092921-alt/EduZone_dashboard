@@ -34,15 +34,15 @@ describe('settings.service', () => {
 
   const setupMockQuery = (resolvedValue: any) => {
     const mockQuery = {
-      select:      vi.fn().mockReturnThis(),
-      order:       vi.fn().mockReturnThis(),
-      eq:          vi.fn().mockReturnThis(),
-      single:      vi.fn().mockResolvedValue(resolvedValue),
+      select: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue(resolvedValue),
       maybeSingle: vi.fn().mockResolvedValue(resolvedValue),
-      update:      vi.fn().mockReturnThis(),
-      insert:      vi.fn().mockReturnThis(),
-      delete:      vi.fn().mockReturnThis(),
-      upsert:      vi.fn().mockReturnThis(),
+      update: vi.fn().mockReturnThis(),
+      insert: vi.fn().mockReturnThis(),
+      delete: vi.fn().mockReturnThis(),
+      upsert: vi.fn().mockReturnThis(),
       // Mock thenable chain for terminal methods without single()
       then: vi.fn().mockImplementation((cb: (v: unknown) => unknown) => cb(resolvedValue)),
     };
@@ -58,7 +58,13 @@ describe('settings.service', () => {
   });
 
   it('getSettingsByCategory groups logic', async () => {
-    setupMockQuery({ data: [{ key: '1', category: 'general' }, { key: '2', category: 'security' }], error: null });
+    setupMockQuery({
+      data: [
+        { key: '1', category: 'general' },
+        { key: '2', category: 'security' },
+      ],
+      error: null,
+    });
     const res = await getSettingsByCategory();
     expect(res.general).toHaveLength(1);
     expect(res.security).toHaveLength(1);
@@ -92,7 +98,9 @@ describe('settings.service', () => {
     q.eq.mockResolvedValue({ error: null });
 
     await setSetting('k', 'v', 'string');
-    expect(q.update).toHaveBeenCalledWith(expect.objectContaining({ value: 'v', updated_by: 'admin1' }));
+    expect(q.update).toHaveBeenCalledWith(
+      expect.objectContaining({ value: 'v', updated_by: 'admin1' }),
+    );
   });
 
   it('createSetting and deleteSetting', async () => {
@@ -110,11 +118,19 @@ describe('settings.service', () => {
   it('maintenance mode toggles', async () => {
     mockAuth.mockResolvedValue({ data: { user: { id: 'u' } } });
     const q = setupMockQuery({ error: null });
-    await enableMaintenanceMode({ message: 'off', ends_at: 'now', exclude_roles: ['admin'], exclude_users: ['1'] });
+    await enableMaintenanceMode({
+      message: 'off',
+      ends_at: 'now',
+      exclude_roles: ['admin'],
+      exclude_users: ['1'],
+    });
     expect(q.upsert).toHaveBeenCalledTimes(5);
 
     await disableMaintenanceMode();
-    expect(q.upsert).toHaveBeenCalledWith(expect.objectContaining({ key: 'maintenance_mode', value: false }), { onConflict: 'key' });
+    expect(q.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ key: 'maintenance_mode', value: false }),
+      { onConflict: 'key' },
+    );
   });
 
   it('app locks', async () => {
@@ -124,6 +140,9 @@ describe('settings.service', () => {
     expect(q.upsert).toHaveBeenCalledTimes(2);
 
     await unlockApp();
-    expect(q.upsert).toHaveBeenCalledWith(expect.objectContaining({ key: 'app_locked', value: false }), { onConflict: 'key' });
+    expect(q.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ key: 'app_locked', value: false }),
+      { onConflict: 'key' },
+    );
   });
 });

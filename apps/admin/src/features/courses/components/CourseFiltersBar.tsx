@@ -72,7 +72,10 @@ export function CourseFiltersBar({
     onFiltersChange({});
   }, [onFiltersChange]);
 
-  const updateFilter = <K extends keyof CourseFilters>(key: K, value: CourseFilters[K] | '' | undefined) => {
+  const updateFilter = <K extends keyof CourseFilters>(
+    key: K,
+    value: CourseFilters[K] | '' | undefined,
+  ) => {
     const newFilters = { ...filters };
     if (value === '' || value === undefined) {
       delete newFilters[key];
@@ -105,7 +108,9 @@ export function CourseFiltersBar({
         </Button>
       </div>
 
-      <div className={`flex flex-wrap items-center gap-3 ${showFilters ? 'flex' : 'hidden lg:flex'}`}>
+      <div
+        className={`flex flex-wrap items-center gap-3 ${showFilters ? 'flex' : 'hidden lg:flex'}`}
+      >
         {/* Status Filter */}
         <div className="w-full sm:w-[160px]">
           <Select

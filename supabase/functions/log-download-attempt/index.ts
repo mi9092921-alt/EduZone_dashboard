@@ -1,5 +1,5 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 // Called by Flutter after a download completes successfully, purely to
 // write an analytics/audit record. Offline playback itself is authorized
@@ -12,11 +12,11 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+};
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
@@ -24,7 +24,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       { global: { headers: { Authorization: req.headers.get('Authorization')! } } },
-    )
+    );
 
     // SECTION-12 FIX: `access_expires_at` used to be taken verbatim from the
     // request body and written straight into download_logs -- an
@@ -38,21 +38,24 @@ serve(async (req) => {
     // The client-supplied value is no longer trusted; it is only read as a
     // hint for logging when the real server-side lookup below can't
     // resolve one (e.g. a legitimately preview/free lesson has none).
-    const { lesson_id, quality, access_expires_at: clientReportedExpiresAt } = await req.json()
+    const { lesson_id, quality, access_expires_at: clientReportedExpiresAt } = await req.json();
 
     if (!lesson_id || !quality) {
-      return new Response(
-        JSON.stringify({ error: 'lesson_id and quality are required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      )
+      return new Response(JSON.stringify({ error: 'lesson_id and quality are required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser()
+    const {
+      data: { user },
+      error: userError,
+    } = await supabaseClient.auth.getUser();
     if (userError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      )
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     // Resolve course_id from lesson.
@@ -67,13 +70,13 @@ serve(async (req) => {
       .from('lessons')
       .select('id, course_id')
       .eq('id', lesson_id)
-      .single()
+      .single();
 
     if (lessonError || !lesson) {
-      return new Response(
-        JSON.stringify({ error: 'Lesson not found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      )
+      return new Response(JSON.stringify({ error: 'Lesson not found' }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     // Re-derive the real entitlement expiry server-side instead of trusting
@@ -83,7 +86,7 @@ serve(async (req) => {
     // enrollment here (e.g. a preview lesson, or entitlement revoked
     // between the earlier validate-course-access call and this one) simply
     // logs a null expiry rather than the caller's claimed one.
-    const now = new Date().toISOString()
+    const now = new Date().toISOString();
     const { data: enrollments } = await supabaseClient
       .from('enrollments')
       .select('expires_at')
@@ -92,50 +95,42 @@ serve(async (req) => {
       .eq('status', 'active')
       .or(`expires_at.is.null,expires_at.gte.${now}`)
       .order('expires_at', { ascending: false, nullsFirst: false })
-      .limit(1)
+      .limit(1);
 
-    const serverVerifiedExpiresAt = enrollments && enrollments.length > 0
-      ? (enrollments[0].expires_at ?? null)
-      : null
+    const serverVerifiedExpiresAt =
+      enrollments && enrollments.length > 0 ? (enrollments[0].expires_at ?? null) : null;
 
-    if (
-      clientReportedExpiresAt &&
-      serverVerifiedExpiresAt !== clientReportedExpiresAt
-    ) {
+    if (clientReportedExpiresAt && serverVerifiedExpiresAt !== clientReportedExpiresAt) {
       console.warn(
         'log-download-attempt: client-reported access_expires_at did not ' +
-        'match server-verified enrollment expiry; using server value',
+          'match server-verified enrollment expiry; using server value',
         { lesson_id, user_id: user.id },
-      )
+      );
     }
 
     // Insert download log
-    const { error: logError } = await supabaseClient
-      .from('download_logs')
-      .insert({
-        user_id:           user.id,
-        lesson_id,
-        course_id:         lesson.course_id,
-        quality,
-        downloaded_at:     new Date().toISOString(),
-        access_expires_at: serverVerifiedExpiresAt,
-      })
+    const { error: logError } = await supabaseClient.from('download_logs').insert({
+      user_id: user.id,
+      lesson_id,
+      course_id: lesson.course_id,
+      quality,
+      downloaded_at: new Date().toISOString(),
+      access_expires_at: serverVerifiedExpiresAt,
+    });
 
     if (logError) {
       // Download already succeeded — log the error but don't fail the request
-      console.error('Log insert failed:', logError)
+      console.error('Log insert failed:', logError);
     }
 
-    return new Response(
-      JSON.stringify({ success: true }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-    )
-
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   } catch (error) {
-    console.error('log-download-attempt unexpected failure', error)
-    return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-    )
+    console.error('log-download-attempt unexpected failure', error);
+    return new Response(JSON.stringify({ error: 'Internal server error' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
-})
+});

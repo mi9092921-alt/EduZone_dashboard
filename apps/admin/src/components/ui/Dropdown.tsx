@@ -1,25 +1,25 @@
-import { Menu, MenuItem, Divider, MenuItemProps } from "@mui/material"
-import * as React from "react"
+import { Menu, MenuItem, Divider, MenuItemProps } from '@mui/material';
+import * as React from 'react';
 
-import { cn } from "@/lib/utils"
+import { cn } from '@/lib/utils';
 
 interface DropdownProps {
-  trigger: React.ReactNode
-  children: React.ReactNode
-  align?: "start" | "end"
-  className?: string
+  trigger: React.ReactNode;
+  children: React.ReactNode;
+  align?: 'start' | 'end';
+  className?: string;
 }
 
-export function Dropdown({ trigger, children, align = "end", className }: DropdownProps) {
-  const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null)
-  const open = Boolean(anchorEl)
+export function Dropdown({ trigger, children, align = 'end', className }: DropdownProps) {
+  const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+  const open = Boolean(anchorEl);
 
   const handleClick = (event: React.MouseEvent<HTMLElement>) => {
-    setAnchorEl(event.currentTarget)
-  }
+    setAnchorEl(event.currentTarget);
+  };
   const handleClose = () => {
-    setAnchorEl(null)
-  }
+    setAnchorEl(null);
+  };
 
   return (
     <>
@@ -42,8 +42,8 @@ export function Dropdown({ trigger, children, align = "end", className }: Dropdo
         slotProps={{
           paper: {
             className: cn(
-              "mt-2 min-w-[200px] rounded-xl border border-border/50 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150",
-              className
+              'mt-2 min-w-[200px] rounded-xl border border-border/50 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150',
+              className,
             ),
             sx: {
               boxShadow: 'var(--inner-glow)',
@@ -53,36 +53,42 @@ export function Dropdown({ trigger, children, align = "end", className }: Dropdo
               color: 'hsl(var(--foreground))',
               '& .MuiList-root': { padding: '6px' },
               '&::-webkit-scrollbar': { width: '4px' },
-              '&::-webkit-scrollbar-thumb': { 
-                backgroundColor: 'hsl(var(--border))', 
-                borderRadius: '10px' 
+              '&::-webkit-scrollbar-thumb': {
+                backgroundColor: 'hsl(var(--border))',
+                borderRadius: '10px',
               },
               zIndex: 9999,
-            }
-          }
+            },
+          },
         }}
         disablePortal={false}
       >
         {children}
       </Menu>
     </>
-  )
+  );
 }
 
 interface DropdownItemProps extends MenuItemProps {
-  variant?: "default" | "destructive"
-  icon?: React.ReactNode
+  variant?: 'default' | 'destructive';
+  icon?: React.ReactNode;
 }
 
-export function DropdownItem({ children, icon, variant = "default", className, ...props }: DropdownItemProps) {
+export function DropdownItem({
+  children,
+  icon,
+  variant = 'default',
+  className,
+  ...props
+}: DropdownItemProps) {
   return (
     <MenuItem
       className={cn(
-        "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 cursor-pointer outline-none select-none my-0.5 mx-1",
-        variant === "destructive" 
-          ? "text-destructive hover:bg-destructive/10 focus:bg-destructive/10"  
-          : "text-foreground hover:bg-muted focus:bg-muted",
-        className
+        'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 cursor-pointer outline-none select-none my-0.5 mx-1',
+        variant === 'destructive'
+          ? 'text-destructive hover:bg-destructive/10 focus:bg-destructive/10'
+          : 'text-foreground hover:bg-muted focus:bg-muted',
+        className,
       )}
       sx={{
         '&.MuiMenuItem-root': {
@@ -90,16 +96,20 @@ export function DropdownItem({ children, icon, variant = "default", className, .
           margin: '1px 4px',
           transition: 'all 0.15s ease',
           color: 'inherit',
-        }
+        },
       }}
       {...props}
     >
-      {icon && <span className="flex-shrink-0 opacity-70 group-hover:opacity-100 transition-opacity">{icon}</span>}
+      {icon && (
+        <span className="flex-shrink-0 opacity-70 group-hover:opacity-100 transition-opacity">
+          {icon}
+        </span>
+      )}
       <span className="flex-1 truncate">{children}</span>
     </MenuItem>
-  )
+  );
 }
 
 export function DropdownSeparator() {
-  return <Divider className="my-1 border-border/50 opacity-50" />
+  return <Divider className="my-1 border-border/50 opacity-50" />;
 }

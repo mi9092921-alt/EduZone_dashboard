@@ -148,4 +148,3 @@ export async function getBulkJobProgress(
 
   return { status: job.status, progress };
 }
-

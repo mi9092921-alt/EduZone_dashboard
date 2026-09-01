@@ -36,7 +36,12 @@ import { alpha, useTheme } from '@mui/material/styles';
 import { useState, useEffect } from 'react';
 
 import { useToastStore } from '@/adapters/stores/toast.store';
-import { getAccessRules, upsertAccessRule, deleteAccessRule, toggleAccessRule } from '@/infrastructure/repos/access-rules.service';
+import {
+  getAccessRules,
+  upsertAccessRule,
+  deleteAccessRule,
+  toggleAccessRule,
+} from '@/infrastructure/repos/access-rules.service';
 
 export function AccessRulesManager({ tenantId }: { tenantId?: string }) {
   const theme = useTheme();
@@ -65,7 +70,7 @@ export function AccessRulesManager({ tenantId }: { tenantId?: string }) {
   const handleToggle = async (id: string, current: boolean) => {
     try {
       await toggleAccessRule(id, !current);
-      setRules(rules.map(r => r.id === id ? { ...r, is_active: !current } : r));
+      setRules(rules.map((r) => (r.id === id ? { ...r, is_active: !current } : r)));
       showToast('Rule status updated', 'success');
     } catch {
       showToast('Failed to update rule status', 'error');
@@ -76,7 +81,7 @@ export function AccessRulesManager({ tenantId }: { tenantId?: string }) {
     if (!confirm('Are you sure you want to delete this access rule?')) return;
     try {
       await deleteAccessRule(id);
-      setRules(rules.filter(r => r.id !== id));
+      setRules(rules.filter((r) => r.id !== id));
       showToast('Rule deleted', 'success');
     } catch {
       showToast('Failed to delete rule', 'error');
@@ -105,13 +110,21 @@ export function AccessRulesManager({ tenantId }: { tenantId?: string }) {
     device_type: <Devices />,
   };
 
-  if (isLoading) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress size={24} /></Box>;
+  if (isLoading)
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+        <CircularProgress size={24} />
+      </Box>
+    );
 
   return (
     <Box sx={{ mt: 4 }}>
       <Box sx={{ display: 'flex', justifyContent: 'between', alignItems: 'center', mb: 3 }}>
         <Box>
-          <Typography variant="h6" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Typography
+            variant="h6"
+            sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}
+          >
             <Security color="primary" /> Access & Gating Rules
           </Typography>
           <Typography variant="caption" color="text.secondary">
@@ -131,22 +144,41 @@ export function AccessRulesManager({ tenantId }: { tenantId?: string }) {
         </Button>
       </Box>
 
-      <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3 }}>
+      <TableContainer
+        component={Paper}
+        elevation={0}
+        sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3 }}
+      >
         <Table>
           <TableHead>
             <TableRow sx={{ bgcolor: 'action.hover' }}>
-              <TableCell sx={{ fontWeight: 800, fontSize: '0.7rem', textTransform: 'uppercase' }}>Type</TableCell>
-              <TableCell sx={{ fontWeight: 800, fontSize: '0.7rem', textTransform: 'uppercase' }}>Config</TableCell>
-              <TableCell sx={{ fontWeight: 800, fontSize: '0.7rem', textTransform: 'uppercase' }}>Status</TableCell>
-              <TableCell sx={{ fontWeight: 800, fontSize: '0.7rem', textTransform: 'uppercase' }}>Created</TableCell>
-              <TableCell align="right" sx={{ fontWeight: 800, fontSize: '0.7rem', textTransform: 'uppercase' }}>Actions</TableCell>
+              <TableCell sx={{ fontWeight: 800, fontSize: '0.7rem', textTransform: 'uppercase' }}>
+                Type
+              </TableCell>
+              <TableCell sx={{ fontWeight: 800, fontSize: '0.7rem', textTransform: 'uppercase' }}>
+                Config
+              </TableCell>
+              <TableCell sx={{ fontWeight: 800, fontSize: '0.7rem', textTransform: 'uppercase' }}>
+                Status
+              </TableCell>
+              <TableCell sx={{ fontWeight: 800, fontSize: '0.7rem', textTransform: 'uppercase' }}>
+                Created
+              </TableCell>
+              <TableCell
+                align="right"
+                sx={{ fontWeight: 800, fontSize: '0.7rem', textTransform: 'uppercase' }}
+              >
+                Actions
+              </TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {rules.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} align="center" sx={{ py: 6 }}>
-                  <Typography variant="body2" color="text.secondary italic">No active access rules found.</Typography>
+                  <Typography variant="body2" color="text.secondary italic">
+                    No active access rules found.
+                  </Typography>
                 </TableCell>
               </TableRow>
             ) : (
@@ -154,14 +186,33 @@ export function AccessRulesManager({ tenantId }: { tenantId?: string }) {
                 <TableRow key={rule.id} hover>
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Box sx={{ p: 0.5, borderRadius: 1, bgcolor: alpha(theme.palette.primary.main, 0.1), color: 'primary.main', display: 'flex' }}>
+                      <Box
+                        sx={{
+                          p: 0.5,
+                          borderRadius: 1,
+                          bgcolor: alpha(theme.palette.primary.main, 0.1),
+                          color: 'primary.main',
+                          display: 'flex',
+                        }}
+                      >
                         {RULE_ICONS[rule.rule_type] || <Security />}
                       </Box>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>{rule.rule_type.replace('_', ' ')}</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {rule.rule_type.replace('_', ' ')}
+                      </Typography>
                     </Box>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="caption" sx={{ fontFamily: 'monospace', bgcolor: 'action.hover', px: 1, py: 0.5, borderRadius: 1 }}>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        fontFamily: 'monospace',
+                        bgcolor: 'action.hover',
+                        px: 1,
+                        py: 0.5,
+                        borderRadius: 1,
+                      }}
+                    >
                       {JSON.stringify(rule.rule_value)}
                     </Typography>
                   </TableCell>
@@ -191,7 +242,9 @@ export function AccessRulesManager({ tenantId }: { tenantId?: string }) {
 
       {/* Rule Dialog */}
       <Dialog open={isDialogOpen} onClose={() => setIsDialogOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 800 }}>{editingRule?.id ? 'Edit Rule' : 'New Access Rule'}</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 800 }}>
+          {editingRule?.id ? 'Edit Rule' : 'New Access Rule'}
+        </DialogTitle>
         <DialogContent sx={{ pt: 1 }}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, mt: 1 }}>
             <TextField
@@ -200,7 +253,12 @@ export function AccessRulesManager({ tenantId }: { tenantId?: string }) {
               fullWidth
               autoFocus
               value={editingRule?.rule_type || ''}
-              onChange={(e) => setEditingRule({ ...editingRule, rule_type: e.target.value as AccessRule['rule_type'] })}
+              onChange={(e) =>
+                setEditingRule({
+                  ...editingRule,
+                  rule_type: e.target.value as AccessRule['rule_type'],
+                })
+              }
             >
               <MenuItem value="ip_whitelist">IP Whitelist (CIDR)</MenuItem>
               <MenuItem value="geo_location">Geo Location (ISO Country Codes)</MenuItem>
@@ -226,17 +284,39 @@ export function AccessRulesManager({ tenantId }: { tenantId?: string }) {
               helperText="Must be valid JSON configuration for the selected rule type."
             />
 
-            <Box sx={{ p: 2, borderRadius: 2, bgcolor: alpha(theme.palette.info.main, 0.05), border: '1px solid', borderColor: alpha(theme.palette.info.main, 0.2), display: 'flex', gap: 2 }}>
+            <Box
+              sx={{
+                p: 2,
+                borderRadius: 2,
+                bgcolor: alpha(theme.palette.info.main, 0.05),
+                border: '1px solid',
+                borderColor: alpha(theme.palette.info.main, 0.2),
+                display: 'flex',
+                gap: 2,
+              }}
+            >
               <InfoOutlined color="info" fontSize="small" />
               <Typography variant="caption" color="info.main">
-                Rules are applied in order of creation. Whitelists are restrictive (deny by default).
+                Rules are applied in order of creation. Whitelists are restrictive (deny by
+                default).
               </Typography>
             </Box>
           </Box>
         </DialogContent>
         <DialogActions sx={{ p: 3, pt: 0 }}>
-          <Button onClick={() => setIsDialogOpen(false)} sx={{ fontWeight: 700, textTransform: 'none' }}>Cancel</Button>
-          <Button variant="contained" onClick={handleSave} sx={{ fontWeight: 700, textTransform: 'none', px: 3 }}>Save Rule</Button>
+          <Button
+            onClick={() => setIsDialogOpen(false)}
+            sx={{ fontWeight: 700, textTransform: 'none' }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleSave}
+            sx={{ fontWeight: 700, textTransform: 'none', px: 3 }}
+          >
+            Save Rule
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>

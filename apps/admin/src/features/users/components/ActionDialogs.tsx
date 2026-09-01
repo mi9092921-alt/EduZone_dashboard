@@ -39,7 +39,6 @@ import {
 import type { User } from '@/domain/types/user.types';
 import { getUserDisplayName } from '@/domain/types/user.types';
 
-
 // ── Lock Dialog ──────────────────────────────────────────────────
 export function LockUserDialog({
   user,
@@ -137,9 +136,7 @@ export function SuspendUserDialog({
 
   const { showToast } = useToastStore();
   const hours = watch('suspend_hours');
-  const untilDate = hours
-    ? new Date(Date.now() + hours * 3600_000).toLocaleString()
-    : null;
+  const untilDate = hours ? new Date(Date.now() + hours * 3600_000).toLocaleString() : null;
 
   const onSubmit = (data: SuspendUserInput) => {
     if (!user) return;
@@ -407,10 +404,7 @@ export function IssueWarningDialog({
               name="action"
               control={control}
               render={({ field }) => (
-                <Select
-                  value={field.value || 'none'}
-                  onValueChange={field.onChange}
-                >
+                <Select value={field.value || 'none'} onValueChange={field.onChange}>
                   <SelectItem value="none">{t('action_none')}</SelectItem>
                   <SelectItem value="notify">{t('action_notify')}</SelectItem>
                   <SelectItem value="restrict">{t('action_restrict')}</SelectItem>
@@ -446,16 +440,21 @@ export function TerminateSessionsDialog({
         if (!user) return;
         mutation.mutate(
           { userId: user.id },
-          { 
+          {
             onSuccess: () => {
-              showToast(t('terminate_sessions_success', { name: getUserDisplayName(user) }), 'success');
+              showToast(
+                t('terminate_sessions_success', { name: getUserDisplayName(user) }),
+                'success',
+              );
               onClose();
-            } 
+            },
           },
         );
       }}
       title={t('terminate_sessions_title')}
-      description={t('terminate_sessions_desc', { name: user ? getUserDisplayName(user) : 'this user' })}
+      description={t('terminate_sessions_desc', {
+        name: user ? getUserDisplayName(user) : 'this user',
+      })}
       confirmLabel={t('terminate_sessions_btn')}
       confirmColor="error"
       isLoading={mutation.isPending}
@@ -487,11 +486,11 @@ export function ResetDevicesDialog({
         if (!user) return;
         mutation.mutate(
           { userId: user.id },
-          { 
+          {
             onSuccess: () => {
               showToast(t('reset_devices_success', { name: getUserDisplayName(user) }), 'success');
               onClose();
-            } 
+            },
           },
         );
       }}

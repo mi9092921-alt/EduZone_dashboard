@@ -11,7 +11,9 @@ export default async function UsersRoute() {
 
   // Initialize server client to fetch admin's current tenant context
   const supabase = await createServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (user) {
     // Determine tenant_id from the base table.

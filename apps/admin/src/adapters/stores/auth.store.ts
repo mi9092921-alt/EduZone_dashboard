@@ -43,9 +43,9 @@ export const useAuthStore = create<AuthState>((set) => ({
   setUser: (user) => set({ user, isLoading: false }),
   setInitialized: () => set({ isInitialized: true }),
   setLoading: (isLoading) => set({ isLoading }),
-  setPermissions: (permissions) => 
+  setPermissions: (permissions) =>
     set((state) => ({
-      user: state.user ? { ...state.user, permissions } : null
+      user: state.user ? { ...state.user, permissions } : null,
     })),
   logout: () => set({ user: null, isLoading: false }),
 }));
@@ -55,12 +55,7 @@ export const useAuthUser = () => useAuthStore((s) => s.user);
 export const useIsAuthenticated = () => useAuthStore((s) => s.user !== null);
 export const useIsAdmin = () =>
   useAuthStore((s) => s.user?.primary_role === 'admin' || s.user?.primary_role === 'super_admin');
-export const useIsSuperAdmin = () =>
-  useAuthStore((s) => s.user?.primary_role === 'super_admin');
-export const useIsTeacher = () =>
-  useAuthStore((s) => s.user?.primary_role === 'teacher');
-export const useAuthPermissions = () =>
-  useAuthStore((s) => s.user?.permissions || []);
-export const useAuthLoading = () =>
-  useAuthStore((s) => s.isLoading || !s.isInitialized);
-
+export const useIsSuperAdmin = () => useAuthStore((s) => s.user?.primary_role === 'super_admin');
+export const useIsTeacher = () => useAuthStore((s) => s.user?.primary_role === 'teacher');
+export const useAuthPermissions = () => useAuthStore((s) => s.user?.permissions || []);
+export const useAuthLoading = () => useAuthStore((s) => s.isLoading || !s.isInitialized);

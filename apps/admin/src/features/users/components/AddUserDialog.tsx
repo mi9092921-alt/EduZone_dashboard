@@ -14,7 +14,6 @@ import { Select, SelectItem } from '@/components/ui/Select';
 import { getErrorMessage } from '@/domain/errors';
 import { createUserSchema, type CreateUserInput } from '@/domain/schemas/user.schema';
 
-
 interface AddUserDialogProps {
   open: boolean;
   onClose: () => void;
@@ -99,7 +98,12 @@ export function AddUserDialog({ open, onClose }: AddUserDialogProps) {
         </>
       }
     >
-      <form id="add-user-form" onSubmit={handleSubmit(onSubmit)} className="space-y-6" autoComplete="off">
+      <form
+        id="add-user-form"
+        onSubmit={handleSubmit(onSubmit)}
+        className="space-y-6"
+        autoComplete="off"
+      >
         {error && (
           <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm font-semibold animate-in fade-in duration-300">
             {error}
@@ -178,10 +182,7 @@ export function AddUserDialog({ open, onClose }: AddUserDialogProps) {
             name="primary_role"
             control={control}
             render={({ field }) => (
-              <Select
-                value={field.value}
-                onValueChange={field.onChange}
-              >
+              <Select value={field.value} onValueChange={field.onChange}>
                 {ROLE_OPTIONS.map((r) => (
                   <SelectItem key={r.value} value={r.value}>
                     {r.label}

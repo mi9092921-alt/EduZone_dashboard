@@ -34,7 +34,7 @@ export const createCourseBaseSchema = z.object({
     .url('Invalid image URL format')
     .regex(
       /\.(jpg|jpeg|png|webp|avif|gif|svg|bmp)(\?.*)?$/i,
-      'Must be a valid image URL (jpg, png, etc.)'
+      'Must be a valid image URL (jpg, png, etc.)',
     )
     .optional()
     .or(z.literal('')),
@@ -73,10 +73,7 @@ export const lessonSchema = z.object({
   video_url: z
     .string()
     .url('Invalid URL format')
-    .regex(
-      /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.*$/,
-      'Must be a valid YouTube URL',
-    ),
+    .regex(/^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.*$/, 'Must be a valid YouTube URL'),
   order_index: z.number().int().min(0).optional(),
   is_published: z.boolean().default(true),
   duration_sec: z

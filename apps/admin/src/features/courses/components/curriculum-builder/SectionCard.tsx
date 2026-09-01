@@ -92,16 +92,13 @@ export function SectionCard({
   const [importingJson, setImportingJson] = useState(false);
 
   const [localLessons, setLocalLessons] = useState(section.lessons || []);
-  useEffect(() => { setLocalLessons(section.lessons || []); }, [section.lessons]);
+  useEffect(() => {
+    setLocalLessons(section.lessons || []);
+  }, [section.lessons]);
 
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: section.id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: section.id,
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -113,7 +110,7 @@ export function SectionCard({
   const lessonSensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 15 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 300, tolerance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
   const handleLessonDragEnd = async (event: DragEndEvent) => {
@@ -140,7 +137,11 @@ export function SectionCard({
     const newValue = !localPublished;
     setLocalPublished(newValue);
     try {
-      await updateSection.mutateAsync({ id: section.id, courseId, data: { is_published: newValue } });
+      await updateSection.mutateAsync({
+        id: section.id,
+        courseId,
+        data: { is_published: newValue },
+      });
     } catch (err) {
       setLocalPublished(!newValue);
       console.error(err);
@@ -194,8 +195,6 @@ export function SectionCard({
     }
   };
 
-
-
   return (
     <Box
       ref={setNodeRef}
@@ -241,21 +240,18 @@ export function SectionCard({
             <DragIndicator sx={{ fontSize: 18, color: 'text.disabled' }} />
           </Box>
           {editingTitle ? (
-            <Box
-              sx={{ display: 'flex', gap: 1, flexGrow: 1 }}
-              onClick={(e) => e.stopPropagation()}
-            >
+            <Box sx={{ display: 'flex', gap: 1, flexGrow: 1 }} onClick={(e) => e.stopPropagation()}>
               <TextField
                 size="small"
                 fullWidth
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                sx={{ 
-                  '& .MuiOutlinedInput-root': { 
+                sx={{
+                  '& .MuiOutlinedInput-root': {
                     borderRadius: 1.5,
                     backgroundColor: 'background.paper',
-                    '& fieldset': { borderColor: 'primary.main' }
-                  } 
+                    '& fieldset': { borderColor: 'primary.main' },
+                  },
                 }}
               />
               <Button
@@ -361,8 +357,15 @@ export function SectionCard({
 
       <Collapse in={expanded} timeout="auto" unmountOnExit>
         <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
-          <DndContext sensors={lessonSensors} collisionDetection={closestCenter} onDragEnd={handleLessonDragEnd}>
-            <SortableContext items={localLessons.map((l: Lesson) => l.id)} strategy={verticalListSortingStrategy}>
+          <DndContext
+            sensors={lessonSensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleLessonDragEnd}
+          >
+            <SortableContext
+              items={localLessons.map((l: Lesson) => l.id)}
+              strategy={verticalListSortingStrategy}
+            >
               {localLessons.map((lesson, i) => (
                 <LessonRow key={lesson.id} lesson={lesson} courseId={courseId} index={i} />
               ))}
@@ -420,7 +423,10 @@ export function SectionCard({
                 fullWidth
               />
               <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 1 }}>
-                <Typography variant="body2" sx={{ color: 'text.secondary', flexGrow: 1, fontWeight: 500 }}>
+                <Typography
+                  variant="body2"
+                  sx={{ color: 'text.secondary', flexGrow: 1, fontWeight: 500 }}
+                >
                   {t('is_preview_label') || 'Free Preview'}
                 </Typography>
                 <Switch

@@ -17,7 +17,7 @@ import type {
 // ── User stats from RPC ──────────────────────────────────────────
 export async function getUserStats(tenantId?: string): Promise<UserStats> {
   const { supabase } = container;
-  
+
   const { data, error } = await supabase.rpc('get_user_stats_summary', {
     p_tenant_id: tenantId,
   });
@@ -51,15 +51,12 @@ export async function getCourseStats(tenantId?: string): Promise<CourseWithStats
 }
 
 // ── Daily activity from RPC ──────────────────────────────────────
-export async function getDailyActivity(
-  tenantId?: string,
-  days = 30,
-): Promise<MvDailyRevenue[]> {
+export async function getDailyActivity(tenantId?: string, days = 30): Promise<MvDailyRevenue[]> {
   const { supabase } = container;
 
   const { data, error } = await supabase.rpc('get_daily_activity', {
     p_tenant_id: tenantId,
-    p_days: days
+    p_days: days,
   });
 
   if (error || !data) return [];

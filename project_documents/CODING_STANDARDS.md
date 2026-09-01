@@ -63,17 +63,17 @@ enum UserStatus { Active, Suspended } // avoid
 
 ### 2.3 Naming Conventions
 
-| Item | Convention | Example |
-|------|-----------|---------|
-| Types / Interfaces | PascalCase | `UserFilters`, `IUserRepo` |
-| Variables / Functions | camelCase | `suspendUser`, `userId` |
-| Constants (module-level) | SCREAMING_SNAKE_CASE | `MAX_BULK_SIZE` |
-| Files (components) | PascalCase | `UserTable.tsx` |
-| Files (non-components) | camelCase | `suspendUser.ts`, `useListUsers.ts` |
-| CSS classes | kebab-case | `user-table__action-cell` |
-| Ports (interfaces) | `I` prefix | `IUserRepo`, `IEventBus` |
-| Hooks | `use` prefix | `useListUsers`, `useSuspendUser` |
-| Event handlers | `on` prefix | `onUserSuspended`, `onClick` |
+| Item                     | Convention           | Example                             |
+| ------------------------ | -------------------- | ----------------------------------- |
+| Types / Interfaces       | PascalCase           | `UserFilters`, `IUserRepo`          |
+| Variables / Functions    | camelCase            | `suspendUser`, `userId`             |
+| Constants (module-level) | SCREAMING_SNAKE_CASE | `MAX_BULK_SIZE`                     |
+| Files (components)       | PascalCase           | `UserTable.tsx`                     |
+| Files (non-components)   | camelCase            | `suspendUser.ts`, `useListUsers.ts` |
+| CSS classes              | kebab-case           | `user-table__action-cell`           |
+| Ports (interfaces)       | `I` prefix           | `IUserRepo`, `IEventBus`            |
+| Hooks                    | `use` prefix         | `useListUsers`, `useSuspendUser`    |
+| Event handlers           | `on` prefix          | `onUserSuspended`, `onClick`        |
 
 ---
 
@@ -163,9 +163,10 @@ export function UserTable() {}
 export function useListUsers(filters: UserFilters) {
   return useQuery({
     queryKey: ['users', filters],
-    queryFn: () => listUsers(container.userRepo, container.metrics, container.tracer, container.logger, filters),
-    staleTime: 30_000,       // 30 seconds
-    gcTime: 5 * 60_000,      // 5 minutes
+    queryFn: () =>
+      listUsers(container.userRepo, container.metrics, container.tracer, container.logger, filters),
+    staleTime: 30_000, // 30 seconds
+    gcTime: 5 * 60_000, // 5 minutes
   });
 }
 
@@ -174,8 +175,16 @@ export function useSuspendUser() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ userId, reason }: { userId: string; reason: string }) =>
-      suspendUser(container.userRepo, container.eventBus, container.logger, container.tracer,
-                  container.actorId, container.tenantId, userId, reason),
+      suspendUser(
+        container.userRepo,
+        container.eventBus,
+        container.logger,
+        container.tracer,
+        container.actorId,
+        container.tenantId,
+        userId,
+        reason,
+      ),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
     onError: (error) => toast.error(parseRpcError(error).message),
   });
@@ -184,12 +193,12 @@ export function useSuspendUser() {
 
 ### 4.3 State Management Rules
 
-| State Type | Tool |
-|-----------|------|
-| Server/async data | React Query |
-| UI-only transient state | `useState` / `useReducer` |
-| Cross-component UI state (e.g. filters, selected rows) | Zustand |
-| Form state | React Hook Form + Zod |
+| State Type                                             | Tool                      |
+| ------------------------------------------------------ | ------------------------- |
+| Server/async data                                      | React Query               |
+| UI-only transient state                                | `useState` / `useReducer` |
+| Cross-component UI state (e.g. filters, selected rows) | Zustand                   |
+| Form state                                             | React Hook Form + Zod     |
 
 **Rule:** Never put server data in Zustand. Never put UI state in React Query.
 
@@ -216,7 +225,9 @@ export async function suspendUser(
   const span = tracer.startSpan('suspendUser');
   try {
     await repo.suspendUser(userId, reason);
-    await eventBus.publish(createUserSuspendedEvent(actorId, tenantId, span.traceId, userId, reason));
+    await eventBus.publish(
+      createUserSuspendedEvent(actorId, tenantId, span.traceId, userId, reason),
+    );
     logger.info('User suspended', { userId, reason, traceId: span.traceId });
     span.end('ok');
   } catch (raw) {
@@ -229,6 +240,7 @@ export async function suspendUser(
 ```
 
 **Rules for use cases:**
+
 - No direct imports from infrastructure (only ports)
 - No React imports
 - No `console.log` (use ILogger)
@@ -278,7 +290,7 @@ try {
 onError: (error) => {
   const appError = parseRpcError(error);
   toast.error(appError.message); // Localised, human-readable
-}
+};
 
 // ❌ Never swallow errors silently
 try {
@@ -292,13 +304,13 @@ try {
 
 ### 7.1 Coverage Requirements
 
-| Layer | Minimum Coverage |
-|-------|----------------|
-| Domain services | 100% |
-| Application use cases | 90% |
-| Infrastructure repos | 80% |
-| React hooks | 80% |
-| Components | 70% (happy path + error state) |
+| Layer                 | Minimum Coverage               |
+| --------------------- | ------------------------------ |
+| Domain services       | 100%                           |
+| Application use cases | 90%                            |
+| Infrastructure repos  | 80%                            |
+| React hooks           | 80%                            |
+| Components            | 70% (happy path + error state) |
 
 ### 7.2 Test File Location & Naming
 
@@ -334,9 +346,18 @@ describe('PermissionService', () => {
 
 // ✅ Test use cases with injected mocks
 it('suspendUser publishes UserSuspendedEvent', async () => {
-  await suspendUser(mockRepo, mockEventBus, mockLogger, mockTracer, 'actor-1', 'tenant-1', 'user-1', 'reason');
+  await suspendUser(
+    mockRepo,
+    mockEventBus,
+    mockLogger,
+    mockTracer,
+    'actor-1',
+    'tenant-1',
+    'user-1',
+    'reason',
+  );
   expect(mockEventBus.publish).toHaveBeenCalledWith(
-    expect.objectContaining({ name: 'user.suspended' })
+    expect.objectContaining({ name: 'user.suspended' }),
   );
 });
 ```

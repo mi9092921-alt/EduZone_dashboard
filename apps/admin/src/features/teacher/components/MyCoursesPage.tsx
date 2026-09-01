@@ -16,19 +16,20 @@ import {
 import { useTranslations } from 'next-intl';
 import { useState, useCallback } from 'react';
 
-
 import { useTeacherCourses } from '@/adapters/queries/teacher.queries';
 import type { CourseFilters, CourseStatus } from '@/domain/types/course.types';
 import { CreateCourseDialog } from '@/features/courses/components/CreateCourseDialog';
 import { ImportCourseDialog } from '@/features/courses/components/ImportCourseDialog';
 import { useRouter } from '@/i18n/routing';
 
-
 const getStatusColors = (status: string, opacity: string = '1A') => {
   switch (status) {
-    case 'published': return { bg: 'success.main', text: 'success.main', alpha: 'success.main' + opacity };
-    case 'archived': return { bg: 'error.main', text: 'error.main', alpha: 'error.main' + opacity };
-    default: return { bg: 'text.secondary', text: 'text.secondary', alpha: 'text.secondary' + '1A' };
+    case 'published':
+      return { bg: 'success.main', text: 'success.main', alpha: 'success.main' + opacity };
+    case 'archived':
+      return { bg: 'error.main', text: 'error.main', alpha: 'error.main' + opacity };
+    default:
+      return { bg: 'text.secondary', text: 'text.secondary', alpha: 'text.secondary' + '1A' };
   }
 };
 
@@ -51,7 +52,14 @@ export function MyCoursesPage() {
     setStatusFilter(map[val]);
   }, []);
 
-  const tabValue = statusFilter === 'published' ? 1 : statusFilter === 'draft' ? 2 : statusFilter === 'archived' ? 3 : 0;
+  const tabValue =
+    statusFilter === 'published'
+      ? 1
+      : statusFilter === 'draft'
+        ? 2
+        : statusFilter === 'archived'
+          ? 3
+          : 0;
 
   return (
     <Box>
@@ -171,15 +179,15 @@ export function MyCoursesPage() {
               <Card
                 key={course.id}
                 onClick={() => router.push(`/courses/${course.id}`)}
-              sx={{
-                cursor: 'pointer',
-                borderRadius: 3,
-                border: '1px solid',
-                borderColor: 'divider',
-                bgcolor: 'background.paper',
-                boxShadow: 'none',
-                transition: 'all 300ms ease',
-                overflow: 'hidden',
+                sx={{
+                  cursor: 'pointer',
+                  borderRadius: 3,
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  bgcolor: 'background.paper',
+                  boxShadow: 'none',
+                  transition: 'all 300ms ease',
+                  overflow: 'hidden',
                   display: 'flex',
                   flexDirection: 'column',
                   '&:hover': {
@@ -276,13 +284,27 @@ export function MyCoursesPage() {
                       gap: 2,
                     }}
                   >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'text.secondary' }}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                        color: 'text.secondary',
+                      }}
+                    >
                       <PlayCircleOutline sx={{ fontSize: 18 }} />
                       <Typography variant="body2" sx={{ fontWeight: 500, fontSize: '0.8125rem' }}>
                         {t('lessons_count', { count: course.enrollment_count ?? 0 })}
                       </Typography>
                     </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'text.secondary' }}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                        color: 'text.secondary',
+                      }}
+                    >
                       <People sx={{ fontSize: 18 }} />
                       <Typography variant="body2" sx={{ fontWeight: 500, fontSize: '0.8125rem' }}>
                         {t('students_count', { count: course.enrollment_count ?? 0 })}
@@ -293,7 +315,6 @@ export function MyCoursesPage() {
               </Card>
             );
           })}
-
         </Box>
       )}
 

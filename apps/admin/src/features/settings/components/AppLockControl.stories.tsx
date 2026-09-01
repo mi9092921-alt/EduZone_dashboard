@@ -54,9 +54,7 @@ export const Locked: Story = {
 export const Loading: Story = {
   args: {
     settings: {
-      maintenance: [
-        { key: 'app_locked', value: 'false' },
-      ],
+      maintenance: [{ key: 'app_locked', value: 'false' }],
     } as any,
   },
   parameters: {

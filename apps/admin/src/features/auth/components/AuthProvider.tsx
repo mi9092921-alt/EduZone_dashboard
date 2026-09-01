@@ -20,7 +20,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const user = useAuthUser();
   const { isInitialized, isLoading, setUser, setInitialized, setLoading, logout } = useAuthStore();
-  
+
   // Use session check hook to monitor session health (optional but kept as per original)
   useSessionCheck();
 
@@ -34,7 +34,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const hydrateAuth = async () => {
       try {
         setLoading(true);
-        const { data: { session }, error } = await supabase.auth.getSession();
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession();
 
         if (error) throw error;
 
@@ -49,8 +52,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // v13: Use the SECURITY DEFINER RPC to bypass RLS token_version validation.
         // Direct SELECT on users fails if JWT lacks token_version/tenant_id custom claims.
-        const { data: accessResult, error: accessError } = await supabase
-          .rpc('check_dashboard_access');
+        const { data: accessResult, error: accessError } =
+          await supabase.rpc('check_dashboard_access');
 
         if (accessError) {
           console.error('[AuthProvider] check_dashboard_access RPC failed:', {
@@ -108,7 +111,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.error('[AuthProvider] Permissions fetch failed:', permError);
         }
 
-        const permissions = ((permissionRows ?? []) as { permission_name: string }[]).map(p => p.permission_name) as PermissionName[];
+        const permissions = ((permissionRows ?? []) as { permission_name: string }[]).map(
+          (p) => p.permission_name,
+        ) as PermissionName[];
 
         // Fallback: if RLS still blocks the direct query, build from RPC result
         const resolvedUser = userRecord ?? {
@@ -139,7 +144,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setLoading(false);
         }
       } catch (err: unknown) {
-        const errObj = err as { message?: string; code?: string; details?: string; hint?: string; status?: number } | null;
+        const errObj = err as {
+          message?: string;
+          code?: string;
+          details?: string;
+          hint?: string;
+          status?: number;
+        } | null;
         console.error('[AuthProvider] Initialization failed:', {
           message: errObj?.message || String(err) || 'Unknown error',
           code: errObj?.code,
@@ -160,19 +171,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     hydrateAuth();
 
     // 2. Auth State Change Listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, _session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, _session) => {
       if (event === 'SIGNED_OUT') {
         container.actorId = '';
         container.tenantId = '';
         clearBrowserSessionId();
         logout();
-        
+
         if (typeof window !== 'undefined') {
-          // Attempting clean localized redirect. If it feels sluggish, 
+          // Attempting clean localized redirect. If it feels sluggish,
           // we use window.location.href for a full state reset.
           console.log('[AuthProvider] SIGNED_OUT detected, redirecting...');
           router.replace('/login');
-          
+
           // Safety fallback: if URL doesn't change after 1.5s, force it.
           setTimeout(() => {
             if (window.location.pathname.includes('/login')) return;

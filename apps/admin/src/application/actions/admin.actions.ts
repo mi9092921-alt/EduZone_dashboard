@@ -4,11 +4,12 @@ import type { AccessRule, PaginatedResult } from '@eduzone/types';
 import { createClient } from '@supabase/supabase-js';
 
 import type { SendNotificationInput } from '@/adapters/mutations/notifications.mutations';
-import type { Notification, UserNotification, TargetAudience } from '@/adapters/queries/notifications.queries';
 import type {
-  CourseWithStats,
-  MvCourseStats,
-} from '@/domain/types/analytics.types';
+  Notification,
+  UserNotification,
+  TargetAudience,
+} from '@/adapters/queries/notifications.queries';
+import type { CourseWithStats, MvCourseStats } from '@/domain/types/analytics.types';
 import type { ActivityLogQueueEntry } from '@/domain/types/audit.types';
 import type { CourseStats } from '@/domain/types/course.types';
 import type {
@@ -96,7 +97,9 @@ function roleAllowsPermissions(role: string | undefined, permissions: string[]) 
   }
 
   if (role === 'student') {
-    return permissions.some((permission) => permission === 'courses.read' || permission === 'reports.read');
+    return permissions.some(
+      (permission) => permission === 'courses.read' || permission === 'reports.read',
+    );
   }
 
   return false;
@@ -147,7 +150,8 @@ async function getTargetUserIds(
 
   if (input.target_audience === 'students') query = query.eq('primary_role', 'student');
   if (input.target_audience === 'teachers') query = query.eq('primary_role', 'teacher');
-  if (input.target_audience === 'admins') query = query.in('primary_role', ['admin', 'super_admin']);
+  if (input.target_audience === 'admins')
+    query = query.in('primary_role', ['admin', 'super_admin']);
 
   const { data, error } = await query;
   if (error) throw error;
@@ -167,7 +171,9 @@ export async function getAccessRulesAction(
   let query = admin.from('access_rules').select('*', { count: 'exact' });
   if (tenantId) query = query.eq('tenant_id', tenantId);
 
-  const { data, error, count } = await query.order('created_at', { ascending: false }).range(from, to);
+  const { data, error, count } = await query
+    .order('created_at', { ascending: false })
+    .range(from, to);
   if (error) throw error;
 
   const total = count ?? 0;
@@ -275,7 +281,10 @@ export async function createFeatureFlagAction(input: CreateFeatureFlagInput): Pr
   return mapDbRowToFeatureFlag(data);
 }
 
-export async function updateFeatureFlagAction(id: string, input: UpdateFeatureFlagInput): Promise<FeatureFlag> {
+export async function updateFeatureFlagAction(
+  id: string,
+  input: UpdateFeatureFlagInput,
+): Promise<FeatureFlag> {
   await requirePermission('feature_flags.manage');
   const admin = createAdminClient();
 
@@ -314,7 +323,11 @@ export async function toggleFeatureFlagAction(id: string, enabled: boolean): Pro
   if (error) throw error;
 }
 
-export async function addRoleOverrideAction(flagId: string, roleId: string, _isExclude = false): Promise<void> {
+export async function addRoleOverrideAction(
+  flagId: string,
+  roleId: string,
+  _isExclude = false,
+): Promise<void> {
   const { tenantId: userTenantId } = await requirePermission('feature_flags.manage');
   const admin = createAdminClient();
 
@@ -332,7 +345,7 @@ export async function addRoleOverrideAction(flagId: string, roleId: string, _isE
     .from('feature_flag_roles')
     .upsert(
       { tenant_id: tenantId, flag_id: flagId, role_id: roleId },
-      { onConflict: 'tenant_id,flag_id,role_id' }
+      { onConflict: 'tenant_id,flag_id,role_id' },
     );
   if (error) throw error;
 }
@@ -340,17 +353,29 @@ export async function addRoleOverrideAction(flagId: string, roleId: string, _isE
 export async function removeRoleOverrideAction(flagId: string, roleId: string): Promise<void> {
   await requirePermission('feature_flags.manage');
   const admin = createAdminClient();
-  const { error } = await admin.from('feature_flag_roles').delete().eq('flag_id', flagId).eq('role_id', roleId);
+  const { error } = await admin
+    .from('feature_flag_roles')
+    .delete()
+    .eq('flag_id', flagId)
+    .eq('role_id', roleId);
   if (error) throw error;
 }
 
-export async function addUserOverrideAction(flagId: string, userId: string, _isExclude = false): Promise<void> {
+export async function addUserOverrideAction(
+  flagId: string,
+  userId: string,
+  _isExclude = false,
+): Promise<void> {
   const { tenantId: userTenantId } = await requirePermission('feature_flags.manage');
   const admin = createAdminClient();
 
   let tenantId = userTenantId;
   if (!tenantId) {
-    const { data: userData } = await admin.from('users').select('tenant_id').eq('id', userId).maybeSingle();
+    const { data: userData } = await admin
+      .from('users')
+      .select('tenant_id')
+      .eq('id', userId)
+      .maybeSingle();
     tenantId = userData?.tenant_id ?? null;
   }
 
@@ -367,7 +392,7 @@ export async function addUserOverrideAction(flagId: string, userId: string, _isE
     .from('feature_flag_users')
     .upsert(
       { tenant_id: tenantId, flag_id: flagId, user_id: userId },
-      { onConflict: 'tenant_id,flag_id,user_id' }
+      { onConflict: 'tenant_id,flag_id,user_id' },
     );
   if (error) throw error;
 }
@@ -375,7 +400,11 @@ export async function addUserOverrideAction(flagId: string, userId: string, _isE
 export async function removeUserOverrideAction(flagId: string, userId: string): Promise<void> {
   await requirePermission('feature_flags.manage');
   const admin = createAdminClient();
-  const { error } = await admin.from('feature_flag_users').delete().eq('flag_id', flagId).eq('user_id', userId);
+  const { error } = await admin
+    .from('feature_flag_users')
+    .delete()
+    .eq('flag_id', flagId)
+    .eq('user_id', userId);
   if (error) throw error;
 }
 
@@ -384,7 +413,11 @@ export async function getAllRolesAction(): Promise<{ id: string; name: string; k
   const admin = createAdminClient();
   const { data, error } = await admin.from('roles').select('id, name, label').order('name');
   if (error) throw error;
-  return (data ?? []).map((r: { id: string; name: string; label: string | null }) => ({ id: r.id, name: r.label || r.name, key: r.name }));
+  return (data ?? []).map((r: { id: string; name: string; label: string | null }) => ({
+    id: r.id,
+    name: r.label || r.name,
+    key: r.name,
+  }));
 }
 
 export async function getJobsAction(
@@ -428,28 +461,30 @@ export async function getJobsAction(
   const total = results.length > 0 ? Number(results[0]!.full_count) : 0;
 
   // Remap SQL column aliases → Job domain field names
-  const jobs: Job[] = results.map(({ full_count: _, ...row }): Job => ({
-    id: row.id,
-    tenant_id: row.tenant_id ?? null,
-    job_type: row.job_type,
-    payload: row.payload,
-    status: row.status,
-    priority: row.priority,
-    attempts: row.attempts,
-    max_attempts: row.max_attempts,
-    // SQL returns locked_by (text alias) — map to domain field
-    locked_by_worker_id: row.locked_by ?? null,
-    locked_at: row.locked_at ?? null,
-    lock_expires_at: row.lock_expires_at ?? null,
-    run_at: row.run_at,
-    started_at: row.started_at ?? null,
-    // SQL returns completed_at alias — map to domain field
-    finished_at: row.completed_at ?? null,
-    // SQL returns error_msg alias — map to domain field
-    error_message: row.error_msg ?? null,
-    created_at: row.created_at,
-    updated_at: row.created_at, // job_queue RPC doesn't return updated_at
-  }));
+  const jobs: Job[] = results.map(
+    ({ full_count: _, ...row }): Job => ({
+      id: row.id,
+      tenant_id: row.tenant_id ?? null,
+      job_type: row.job_type,
+      payload: row.payload,
+      status: row.status,
+      priority: row.priority,
+      attempts: row.attempts,
+      max_attempts: row.max_attempts,
+      // SQL returns locked_by (text alias) — map to domain field
+      locked_by_worker_id: row.locked_by ?? null,
+      locked_at: row.locked_at ?? null,
+      lock_expires_at: row.lock_expires_at ?? null,
+      run_at: row.run_at,
+      started_at: row.started_at ?? null,
+      // SQL returns completed_at alias — map to domain field
+      finished_at: row.completed_at ?? null,
+      // SQL returns error_msg alias — map to domain field
+      error_message: row.error_msg ?? null,
+      created_at: row.created_at,
+      updated_at: row.created_at, // job_queue RPC doesn't return updated_at
+    }),
+  );
 
   return {
     data: jobs,
@@ -490,26 +525,21 @@ export async function releaseStaleJobsAction(): Promise<number> {
   return (data as number) ?? 0;
 }
 
-
-
 export async function getNotificationsAction(
   page: number,
   pageSize: number,
   audience?: TargetAudience | 'all',
-): Promise<{ 
-  data: Notification[]; 
-  count: number; 
-  stats: { all: number; students: number; teachers: number; admins: number } 
+): Promise<{
+  data: Notification[];
+  count: number;
+  stats: { all: number; students: number; teachers: number; admins: number };
 }> {
   await requirePermission(['notifications.send', 'settings.write']);
   const admin = createAdminClient();
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
-  let query = admin
-    .from('notifications')
-    .select('*', { count: 'exact' })
-    .is('deleted_at', null);
+  let query = admin.from('notifications').select('*', { count: 'exact' }).is('deleted_at', null);
 
   if (audience && audience !== 'all') {
     query = query.eq('target_audience', audience);
@@ -529,15 +559,15 @@ export async function getNotificationsAction(
 
   const stats = {
     all: allAudienceData.length,
-    students: allAudienceData.filter(n => n.target_audience === 'students').length,
-    teachers: allAudienceData.filter(n => n.target_audience === 'teachers').length,
-    admins: allAudienceData.filter(n => n.target_audience === 'admins').length,
+    students: allAudienceData.filter((n) => n.target_audience === 'students').length,
+    teachers: allAudienceData.filter((n) => n.target_audience === 'teachers').length,
+    admins: allAudienceData.filter((n) => n.target_audience === 'admins').length,
   };
 
-  return { 
-    data: (data ?? []) as Notification[], 
+  return {
+    data: (data ?? []) as Notification[],
     count: count ?? 0,
-    stats 
+    stats,
   };
 }
 
@@ -628,21 +658,23 @@ export async function getMyNotificationsAction(
     if (countError) throw countError;
 
     return {
-      data: (data ?? []).map((row: {
-        id: string;
-        user_id: string;
-        notification_id: string;
-        is_read: boolean;
-        created_at: string;
-        notifications?: { title: string; body: string } | null;
-      }) => ({
-        ...row,
-        title: row.notifications?.title ?? '',
-        body: row.notifications?.body ?? '',
-        type: 'system_alert',
-        link_to: null,
-        notifications: undefined,
-      })) as UserNotification[],
+      data: (data ?? []).map(
+        (row: {
+          id: string;
+          user_id: string;
+          notification_id: string;
+          is_read: boolean;
+          created_at: string;
+          notifications?: { title: string; body: string } | null;
+        }) => ({
+          ...row,
+          title: row.notifications?.title ?? '',
+          body: row.notifications?.body ?? '',
+          type: 'system_alert',
+          link_to: null,
+          notifications: undefined,
+        }),
+      ) as UserNotification[],
       unreadCount: count ?? 0,
     };
   } catch (error) {
@@ -654,14 +686,22 @@ export async function getMyNotificationsAction(
 export async function markNotificationAsReadAction(id: string): Promise<void> {
   const userId = await requireUser();
   const admin = createAdminClient();
-  const { error } = await admin.from('user_notifications').update({ is_read: true }).eq('id', id).eq('user_id', userId);
+  const { error } = await admin
+    .from('user_notifications')
+    .update({ is_read: true })
+    .eq('id', id)
+    .eq('user_id', userId);
   if (error) throw error;
 }
 
 export async function markAllNotificationsAsReadAction(): Promise<void> {
   const userId = await requireUser();
   const admin = createAdminClient();
-  const { error } = await admin.from('user_notifications').update({ is_read: true }).eq('user_id', userId).eq('is_read', false);
+  const { error } = await admin
+    .from('user_notifications')
+    .update({ is_read: true })
+    .eq('user_id', userId)
+    .eq('is_read', false);
   if (error) throw error;
 }
 
@@ -735,19 +775,13 @@ export async function getActiveBlocksAction(): Promise<RateLimitWithEmail[]> {
 export async function getRateLimitRulesAction(): Promise<RateLimitRule[]> {
   await requirePermission(['audit.read', 'settings.write']);
   const admin = createAdminClient();
-  const { data, error } = await admin
-    .from('rate_limit_rules')
-    .select('*')
-    .order('action');
+  const { data, error } = await admin.from('rate_limit_rules').select('*').order('action');
 
   if (error) throw error;
   return (data ?? []) as RateLimitRule[];
 }
 
-export async function toggleRateLimitRuleAction(
-  action: string,
-  isActive: boolean,
-): Promise<void> {
+export async function toggleRateLimitRuleAction(action: string, isActive: boolean): Promise<void> {
   await requirePermission('settings.write');
   const admin = createAdminClient();
   const { error } = await admin
@@ -813,9 +847,7 @@ function aggregateTopOffenders(rows: Record<string, unknown>[]): TopOffender[] {
     .slice(0, 20);
 }
 
-export async function getAnalyticsCourseStatsAction(
-  tenantId?: string,
-): Promise<CourseWithStats[]> {
+export async function getAnalyticsCourseStatsAction(tenantId?: string): Promise<CourseWithStats[]> {
   await requirePermission(['reports.read', 'courses.read', 'audit.read']);
   const admin = createAdminClient();
 
@@ -832,7 +864,9 @@ export async function getAnalyticsCourseStatsAction(
     .in('id', courseIds)
     .is('deleted_at', null);
 
-  const titleMap = new Map((courses ?? []).map((c: { id: string; title: string }) => [c.id, c.title]));
+  const titleMap = new Map(
+    (courses ?? []).map((c: { id: string; title: string }) => [c.id, c.title]),
+  );
 
   return data.map((d: MvCourseStats) => ({
     ...d,

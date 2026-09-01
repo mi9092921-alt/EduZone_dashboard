@@ -4,9 +4,6 @@ import { Add } from '@mui/icons-material';
 import { useTranslations } from 'next-intl';
 import { useState, useCallback } from 'react';
 
-
-
-
 import {
   LockUserDialog,
   SuspendUserDialog,
@@ -30,7 +27,6 @@ import { Button } from '@/components/ui/Button';
 import type { BulkAction } from '@/domain/types/bulk.types';
 import type { User, UserFilters, AccountAction } from '@/domain/types/user.types';
 import { downloadJson } from '@/lib/utils';
-
 
 type DialogType =
   | 'lock'
@@ -69,14 +65,17 @@ export function UsersPage() {
     setDrawerUser(user);
   }, []);
 
-  const handleAction = useCallback((user: User, action: AccountAction) => {
-    if (action === 'unlock') {
-      unlock.mutate({ userId: user.id, action: 'unlock' });
-      return;
-    }
-    setDialogUser(user);
-    setDialogType(action as DialogType);
-  }, [unlock]);
+  const handleAction = useCallback(
+    (user: User, action: AccountAction) => {
+      if (action === 'unlock') {
+        unlock.mutate({ userId: user.id, action: 'unlock' });
+        return;
+      }
+      setDialogUser(user);
+      setDialogType(action as DialogType);
+    },
+    [unlock],
+  );
 
   const handleDeleteUser = useCallback((user: User) => {
     setDialogUser(user);
@@ -166,10 +165,7 @@ export function UsersPage() {
           )}
         </div>
         <div className="flex items-center gap-3">
-          <Button
-            onClick={() => setAddUserOpen(true)}
-            className="gap-2"
-          >
+          <Button onClick={() => setAddUserOpen(true)} className="gap-2">
             <Add className="text-sm scale-90" />
             {t('create_user_btn')}
           </Button>
@@ -202,11 +198,7 @@ export function UsersPage() {
         />
       )}
       {bulkJobId && bulkAction && (
-        <BulkProgressPanel
-          jobId={bulkJobId}
-          action={bulkAction}
-          onDone={handleBulkJobDone}
-        />
+        <BulkProgressPanel jobId={bulkJobId} action={bulkAction} onDone={handleBulkJobDone} />
       )}
 
       {/* Table */}
@@ -241,26 +233,10 @@ export function UsersPage() {
       />
 
       {/* Action Dialogs */}
-      <LockUserDialog
-        user={dialogUser}
-        open={dialogType === 'lock'}
-        onClose={closeDialog}
-      />
-      <SuspendUserDialog
-        user={dialogUser}
-        open={dialogType === 'suspend'}
-        onClose={closeDialog}
-      />
-      <BanUserDialog
-        user={dialogUser}
-        open={dialogType === 'ban'}
-        onClose={closeDialog}
-      />
-      <IssueWarningDialog
-        user={dialogUser}
-        open={dialogType === 'warning'}
-        onClose={closeDialog}
-      />
+      <LockUserDialog user={dialogUser} open={dialogType === 'lock'} onClose={closeDialog} />
+      <SuspendUserDialog user={dialogUser} open={dialogType === 'suspend'} onClose={closeDialog} />
+      <BanUserDialog user={dialogUser} open={dialogType === 'ban'} onClose={closeDialog} />
+      <IssueWarningDialog user={dialogUser} open={dialogType === 'warning'} onClose={closeDialog} />
       <TerminateSessionsDialog
         user={dialogUser}
         open={dialogType === 'terminateSessions'}
@@ -271,17 +247,10 @@ export function UsersPage() {
         open={dialogType === 'resetDevices'}
         onClose={closeDialog}
       />
-      <DeleteUserDialog
-        user={dialogUser}
-        open={dialogType === 'delete'}
-        onClose={closeDialog}
-      />
+      <DeleteUserDialog user={dialogUser} open={dialogType === 'delete'} onClose={closeDialog} />
 
       {/* Add User Dialog */}
-      <AddUserDialog
-        open={addUserOpen}
-        onClose={() => setAddUserOpen(false)}
-      />
+      <AddUserDialog open={addUserOpen} onClose={() => setAddUserOpen(false)} />
     </div>
   );
 }

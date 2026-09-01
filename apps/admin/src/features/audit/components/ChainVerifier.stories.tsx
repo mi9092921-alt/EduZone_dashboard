@@ -26,7 +26,7 @@ const meta: Meta<typeof ChainVerifier> = {
   tags: ['autodocs'],
   parameters: {
     layout: 'centered',
-  }
+  },
 };
 
 export default meta;
@@ -56,7 +56,10 @@ export const Verified: Story = {
     msw: {
       handlers: [
         http.get('*/rpc/get_audit_chain_state', () => {
-            return HttpResponse.json({ data: { last_seq: 2, last_hash: 'h2', updated_at: new Date().toISOString() }, error: null });
+          return HttpResponse.json({
+            data: { last_seq: 2, last_hash: 'h2', updated_at: new Date().toISOString() },
+            error: null,
+          });
         }),
         http.get('*/rest/v1/rpc/get_activity_logs_for_verification', () => {
           return HttpResponse.json([]);
@@ -66,10 +69,10 @@ export const Verified: Story = {
   },
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
-    
+
     await step('Click Verify', async () => {
       const verifyBtn = await canvas.findByRole('button', { name: /verify/i });
-      await userEvent.click(verifyBtn);      
+      await userEvent.click(verifyBtn);
     });
 
     // We passed an empty array, so it immediately returns Valid.
@@ -77,7 +80,7 @@ export const Verified: Story = {
       // The translation key is status_chain_intact
       expect(await canvas.findByText(/intact/i)).toBeInTheDocument();
     });
-  }
+  },
 };
 
 export const Tampered: Story = {
@@ -85,7 +88,10 @@ export const Tampered: Story = {
     msw: {
       handlers: [
         http.get('*/rpc/get_audit_chain_state', () => {
-            return HttpResponse.json({ data: { last_seq: 2, last_hash: 'h2', updated_at: new Date().toISOString() }, error: null });
+          return HttpResponse.json({
+            data: { last_seq: 2, last_hash: 'h2', updated_at: new Date().toISOString() },
+            error: null,
+          });
         }),
         http.get('*/rest/v1/rpc/get_activity_logs_for_verification', () => {
           return HttpResponse.json([
@@ -97,10 +103,10 @@ export const Tampered: Story = {
   },
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
-    
+
     await step('Click Verify', async () => {
       const verifyBtn = await canvas.findByRole('button', { name: /verify/i });
-      await userEvent.click(verifyBtn);      
+      await userEvent.click(verifyBtn);
     });
 
     // We passed invalid hashes, verifyHashChain will fail validation
@@ -108,5 +114,5 @@ export const Tampered: Story = {
       // status_tamper_detected
       expect(await canvas.findByText(/tamper/i)).toBeInTheDocument();
     });
-  }
+  },
 };

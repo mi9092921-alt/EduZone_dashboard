@@ -37,9 +37,12 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   const getConfirmVariant = () => {
     switch (confirmColor) {
-      case 'error': return 'destructive';
-      case 'warning': return 'outline'; // We don't have a warning variant in Button, using outline or default
-      default: return 'primary';
+      case 'error':
+        return 'destructive';
+      case 'warning':
+        return 'outline'; // We don't have a warning variant in Button, using outline or default
+      default:
+        return 'primary';
     }
   };
 
@@ -55,12 +58,16 @@ export function ConfirmDialog({
         {/* Optional Icon & Additional Title handling if modal doesn't do it enough */}
         {icon && (
           <div className="flex justify-center mb-2">
-            <div className={cn(
-              "p-3 rounded-2xl",
-              confirmColor === 'error' ? "bg-red-50 text-red-500" :
-              confirmColor === 'warning' ? "bg-amber-50 text-amber-500" :
-              "bg-primary/10 text-primary"
-            )}>
+            <div
+              className={cn(
+                'p-3 rounded-2xl',
+                confirmColor === 'error'
+                  ? 'bg-red-50 text-red-500'
+                  : confirmColor === 'warning'
+                    ? 'bg-amber-50 text-amber-500'
+                    : 'bg-primary/10 text-primary',
+              )}
+            >
               {icon}
             </div>
           </div>
@@ -90,8 +97,8 @@ export function ConfirmDialog({
             onClick={onConfirm}
             isLoading={isLoading}
             className={cn(
-              "min-w-[120px] font-bold uppercase tracking-wider text-[11px]",
-              confirmColor === 'warning' && "border-amber-500/50 text-amber-600 hover:bg-amber-50"
+              'min-w-[120px] font-bold uppercase tracking-wider text-[11px]',
+              confirmColor === 'warning' && 'border-amber-500/50 text-amber-600 hover:bg-amber-50',
             )}
           >
             {confirmLabel}

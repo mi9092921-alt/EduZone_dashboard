@@ -26,7 +26,9 @@ export async function recordCurrentSessionAction(sessionId: string): Promise<{
   active?: boolean;
   error?: string;
 }> {
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(sessionId)) {
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(sessionId)
+  ) {
     return { success: false, error: 'Invalid session id' };
   }
 
@@ -73,10 +75,7 @@ export async function recordCurrentSessionAction(sessionId: string): Promise<{
       .eq('user_id', userData.user.id);
 
     if (!touchError) {
-      await supabaseAdmin
-        .from('users')
-        .update({ last_login: now })
-        .eq('id', userData.user.id);
+      await supabaseAdmin.from('users').update({ last_login: now }).eq('id', userData.user.id);
     }
 
     return touchError
@@ -84,19 +83,17 @@ export async function recordCurrentSessionAction(sessionId: string): Promise<{
       : { success: true, active: true };
   }
 
-  const { error: insertError } = await supabaseAdmin
-    .from('sessions')
-    .insert({
-      id: sessionId,
-      user_id: userData.user.id,
-      tenant_id: profile.tenant_id,
-      region_id: profile.region_id,
-      ip_address: getClientIp(headerStore),
-      user_agent: headerStore.get('user-agent'),
-      is_active: true,
-      started_at: now,
-      updated_at: now,
-    });
+  const { error: insertError } = await supabaseAdmin.from('sessions').insert({
+    id: sessionId,
+    user_id: userData.user.id,
+    tenant_id: profile.tenant_id,
+    region_id: profile.region_id,
+    ip_address: getClientIp(headerStore),
+    user_agent: headerStore.get('user-agent'),
+    is_active: true,
+    started_at: now,
+    updated_at: now,
+  });
 
   if (insertError) {
     return { success: false, error: insertError.message };

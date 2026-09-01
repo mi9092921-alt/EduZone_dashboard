@@ -11,14 +11,14 @@ EduZone Admin Dashboard is a multi-tenant, enterprise-grade control plane built 
 
 ### 1.1 Design Goals
 
-| Goal | Target |
-|------|--------|
-| **Availability** | 99.9% uptime (< 8.7 hrs/year downtime) |
-| **API Response** | P99 < 500ms for all RPC calls |
-| **Page Load** | LCP < 2.5s on 4G connection |
-| **Concurrent Users** | 10,000+ simultaneous admin sessions |
-| **Data Isolation** | Zero cross-tenant data leakage (RLS-enforced) |
-| **Audit Coverage** | 100% of write operations logged |
+| Goal                 | Target                                        |
+| -------------------- | --------------------------------------------- |
+| **Availability**     | 99.9% uptime (< 8.7 hrs/year downtime)        |
+| **API Response**     | P99 < 500ms for all RPC calls                 |
+| **Page Load**        | LCP < 2.5s on 4G connection                   |
+| **Concurrent Users** | 10,000+ simultaneous admin sessions           |
+| **Data Isolation**   | Zero cross-tenant data leakage (RLS-enforced) |
+| **Audit Coverage**   | 100% of write operations logged               |
 
 ---
 
@@ -73,18 +73,19 @@ Domain → Application → Infrastructure → Adapters → Features
   ↑____________contracts__________________|
 ```
 
-| Layer | Can Import From | Cannot Import From |
-|-------|----------------|-------------------|
-| **Domain** | Domain only | Everything else |
-| **Application** | Domain, Contracts | Infrastructure, Adapters, Features |
-| **Infrastructure** | Domain, Application, Contracts | Adapters, Features |
-| **Contracts** | Domain | Everything else |
-| **Adapters** | Domain, Application, Contracts | Infrastructure, Features |
-| **Features** | Domain, Contracts, Adapters | Infrastructure, other Features |
+| Layer              | Can Import From                | Cannot Import From                 |
+| ------------------ | ------------------------------ | ---------------------------------- |
+| **Domain**         | Domain only                    | Everything else                    |
+| **Application**    | Domain, Contracts              | Infrastructure, Adapters, Features |
+| **Infrastructure** | Domain, Application, Contracts | Adapters, Features                 |
+| **Contracts**      | Domain                         | Everything else                    |
+| **Adapters**       | Domain, Application, Contracts | Infrastructure, Features           |
+| **Features**       | Domain, Contracts, Adapters    | Infrastructure, other Features     |
 
 ### 3.2 Layer Responsibilities
 
 **Domain Layer** — Pure business logic, zero dependencies:
+
 - `types/` — User, Course, Tenant, Auth TypeScript types
 - `schemas/` — Zod validation schemas + inferred DTOs
 - `events/` — Domain events (UserSuspended, CoursePublished, etc.)
@@ -93,11 +94,13 @@ Domain → Application → Infrastructure → Adapters → Features
 - `logger.ts` — ILogger port
 
 **Application Layer** — Use case orchestration:
+
 - `ports/` — IUserRepo, ICourseRepo, IEventBus, IJobQueue, etc.
 - `use-cases/` — suspendUser, listUsers, publishCourse, etc.
 - `events/handlers/` — onUserSuspended, onCoursePublished, etc.
 
 **Infrastructure Layer** — External integrations:
+
 - `repos/` — SupabaseUserRepo, SupabaseCourseRepo, etc.
 - `rpc/client.ts` — Centralised RPC wrapper (retry + metrics + logging)
 - `event-bus/` — InMemoryEventBus implementation
@@ -105,6 +108,7 @@ Domain → Application → Infrastructure → Adapters → Features
 - `http/retry.ts` — Exponential backoff with jitter
 
 **Contracts Layer** — Versioned API schemas:
+
 - `rpc/v1/` — Frozen, never modified
 - `rpc/v2/` — Active development version
 - `common/` — Idempotency, pagination contracts
@@ -127,25 +131,25 @@ tenants (1) ──────────────── (N) users
 
 ### 4.2 Key Tables
 
-| Table | Purpose | RLS Policy |
-|-------|---------|-----------|
-| `users` | All platform users | Tenant-scoped + role-based |
-| `tenants` | Isolated tenant organisations | super_admin only |
-| `courses` | Course catalogue | Tenant-scoped |
-| `sessions` | Active user sessions (partitioned) | Owner + admin |
-| `activity_logs` | Immutable audit trail | Append-only, hash-chained |
-| `job_queue` | Async job tracking | Admin only |
-| `settings_kv` | System configuration | super_admin only |
-| `feature_flags` | Feature gating | Role + user targeting |
-| `rate_limits` | Per-user/endpoint throttling | Internal only |
+| Table           | Purpose                            | RLS Policy                 |
+| --------------- | ---------------------------------- | -------------------------- |
+| `users`         | All platform users                 | Tenant-scoped + role-based |
+| `tenants`       | Isolated tenant organisations      | super_admin only           |
+| `courses`       | Course catalogue                   | Tenant-scoped              |
+| `sessions`      | Active user sessions (partitioned) | Owner + admin              |
+| `activity_logs` | Immutable audit trail              | Append-only, hash-chained  |
+| `job_queue`     | Async job tracking                 | Admin only                 |
+| `settings_kv`   | System configuration               | super_admin only           |
+| `feature_flags` | Feature gating                     | Role + user targeting      |
+| `rate_limits`   | Per-user/endpoint throttling       | Internal only              |
 
 ### 4.3 Materialised Views (Analytics)
 
-| View | Refresh | Purpose |
-|------|---------|---------|
-| `mv_user_stats` | Every 15min | User activity aggregates |
-| `mv_course_stats` | Every 15min | Course completion metrics |
-| `mv_daily_activity` | Daily | Platform-wide activity trends |
+| View                | Refresh     | Purpose                       |
+| ------------------- | ----------- | ----------------------------- |
+| `mv_user_stats`     | Every 15min | User activity aggregates      |
+| `mv_course_stats`   | Every 15min | Course completion metrics     |
+| `mv_daily_activity` | Daily       | Platform-wide activity trends |
 
 ---
 
@@ -154,6 +158,7 @@ tenants (1) ──────────────── (N) users
 ### 5.1 Two-Surface Backend
 
 **Supabase RPC (anon key + JWT):**
+
 - Standard CRUD operations
 - User account management
 - Settings & feature flags
@@ -161,6 +166,7 @@ tenants (1) ──────────────── (N) users
 - Activity logging
 
 **Edge Functions (Deno, anon key + JWT):**
+
 - Bulk user operations (suspend/ban/export N users)
 - Data export generation (CSV, JSON)
 - Session revocation (requires service_role internally)
@@ -187,11 +193,11 @@ Browser → React Query hook
 
 ```typescript
 interface RpcError {
-  code: RpcErrorCode;     // e.g. "ADMIN_ONLY", "NOT_FOUND"
-  message: string;        // Human-readable, shown in UI toast
-  detail?: string;        // Optional extra context
-  hint?: string;          // Optional fix suggestion
-  ref: string;            // x-request-id for Sentry correlation
+  code: RpcErrorCode; // e.g. "ADMIN_ONLY", "NOT_FOUND"
+  message: string; // Human-readable, shown in UI toast
+  detail?: string; // Optional extra context
+  hint?: string; // Optional fix suggestion
+  ref: string; // x-request-id for Sentry correlation
 }
 ```
 
@@ -216,14 +222,14 @@ suspendUser use-case
 
 All heavy async work goes through IJobQueue:
 
-| Job Name | Trigger | Description |
-|----------|---------|-------------|
-| `send-suspension-email` | UserSuspendedEvent | Email to suspended user |
-| `revoke-user-sessions` | UserSuspended/BannedEvent | Kill all active sessions |
-| `bulk-user-action` | Admin bulk operation | Process N users in batches |
-| `bulk-export` | Admin export request | Generate CSV/JSON file |
-| `analytics-refresh` | Schedule / on-demand | Refresh materialised views |
-| `tenant-provision` | Tenant creation | Set up isolated tenant environment |
+| Job Name                | Trigger                   | Description                        |
+| ----------------------- | ------------------------- | ---------------------------------- |
+| `send-suspension-email` | UserSuspendedEvent        | Email to suspended user            |
+| `revoke-user-sessions`  | UserSuspended/BannedEvent | Kill all active sessions           |
+| `bulk-user-action`      | Admin bulk operation      | Process N users in batches         |
+| `bulk-export`           | Admin export request      | Generate CSV/JSON file             |
+| `analytics-refresh`     | Schedule / on-demand      | Refresh materialised views         |
+| `tenant-provision`      | Tenant creation           | Set up isolated tenant environment |
 
 ---
 
@@ -287,11 +293,11 @@ CREATE POLICY tenant_isolation ON users
 
 Feature flags support three targeting modes:
 
-| Mode | Scope | Example Use Case |
-|------|-------|-----------------|
-| **Global** | All users | Maintenance mode, emergency kill switch |
-| **Role-based** | By `primary_role` | Beta features for admins only |
-| **User-based** | Specific user IDs | Internal testing, canary rollout |
+| Mode           | Scope             | Example Use Case                        |
+| -------------- | ----------------- | --------------------------------------- |
+| **Global**     | All users         | Maintenance mode, emergency kill switch |
+| **Role-based** | By `primary_role` | Beta features for admins only           |
+| **User-based** | Specific user IDs | Internal testing, canary rollout        |
 
 Flags are cached in `settings_cache` and checked via `is_feature_enabled(flag_name)` RPC.
 
@@ -311,13 +317,13 @@ Three pillars of observability:
 
 ## 12. Technology Decision Summary
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Monorepo | Turborepo | Shared packages, fast incremental builds |
-| Framework | Next.js 15 | App Router, RSC, edge-ready |
-| Database | Supabase / PostgreSQL 16 | RLS, realtime, RPCs, managed |
-| State | React Query + Zustand | Server state separate from UI state |
-| Validation | Zod | Runtime + compile-time type safety |
-| Architecture | Clean Architecture | Testable, swappable, dependency-inverted |
-| Async | Domain Events + Job Queue | Decoupled, scalable side-effects |
-| Testing | Vitest + Playwright | Fast unit + reliable E2E |
+| Decision     | Choice                    | Rationale                                |
+| ------------ | ------------------------- | ---------------------------------------- |
+| Monorepo     | Turborepo                 | Shared packages, fast incremental builds |
+| Framework    | Next.js 15                | App Router, RSC, edge-ready              |
+| Database     | Supabase / PostgreSQL 16  | RLS, realtime, RPCs, managed             |
+| State        | React Query + Zustand     | Server state separate from UI state      |
+| Validation   | Zod                       | Runtime + compile-time type safety       |
+| Architecture | Clean Architecture        | Testable, swappable, dependency-inverted |
+| Async        | Domain Events + Job Queue | Decoupled, scalable side-effects         |
+| Testing      | Vitest + Playwright       | Fast unit + reliable E2E                 |

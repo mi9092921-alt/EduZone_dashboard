@@ -44,7 +44,11 @@ export interface UserNotification {
 // ─── Admin Query Hooks ─────────────────────────────────────────────────────────
 
 /** Paginated admin broadcast list */
-export function useNotifications(page: number, pageSize: number, audience?: TargetAudience | 'all') {
+export function useNotifications(
+  page: number,
+  pageSize: number,
+  audience?: TargetAudience | 'all',
+) {
   return useQuery({
     queryKey: queryKeys.notifications.list(page, pageSize, audience),
     queryFn: () => getNotifications(page, pageSize, audience),
@@ -86,7 +90,9 @@ export function useUnreadNotificationCount() {
  */
 export function useRealtimeNotifications() {
   const queryClient = useQueryClient();
-  const channelRef = useRef<ReturnType<ReturnType<typeof createBrowserClient>['channel']> | null>(null);
+  const channelRef = useRef<ReturnType<ReturnType<typeof createBrowserClient>['channel']> | null>(
+    null,
+  );
 
   useEffect(() => {
     let isMounted = true;

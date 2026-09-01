@@ -25,9 +25,7 @@ export function LanguageSwitcher() {
       className="flex items-center gap-2 px-3 transition-faang"
     >
       <Translate className="text-sm" />
-      <span className="font-medium uppercase">
-        {locale === 'en' ? 'عربي' : 'EN'}
-      </span>
+      <span className="font-medium uppercase">{locale === 'en' ? 'عربي' : 'EN'}</span>
     </Button>
   );
 }

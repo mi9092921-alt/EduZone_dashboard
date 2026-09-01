@@ -72,7 +72,9 @@ interface UserFilterQuery {
   in(column: string, values: unknown[]): UserFilterQuery;
   eq(column: string, value: unknown): UserFilterQuery;
   or(filters: string): UserFilterQuery;
-  limit(count: number): PromiseLike<{ data: Record<string, unknown>[] | null; error: { message: string } | null }>;
+  limit(
+    count: number,
+  ): PromiseLike<{ data: Record<string, unknown>[] | null; error: { message: string } | null }>;
 }
 
 function applyUserFilters(
@@ -111,12 +113,16 @@ function applyUserFilters(
   return query;
 }
 
-async function updateBulkJob(admin: SupabaseClient, jobId: string, opts: {
-  status?: string;
-  errorMessage?: string;
-  finishedAt?: string;
-  releaseLock?: boolean;
-}) {
+async function updateBulkJob(
+  admin: SupabaseClient,
+  jobId: string,
+  opts: {
+    status?: string;
+    errorMessage?: string;
+    finishedAt?: string;
+    releaseLock?: boolean;
+  },
+) {
   const { error } = await admin.rpc('worker_update_bulk_job', {
     p_id: jobId,
     p_status: opts.status ?? null,
@@ -137,7 +143,9 @@ async function processInlineBulkJob(
   const { data: users, error } = await applyUserFilters(
     admin
       .from('users')
-      .select('id, tenant_id, email, first_name, last_name, phone, primary_role, account_status, warning_count, login_count, token_version, created_at, last_login, last_seen_at, region_id')
+      .select(
+        'id, tenant_id, email, first_name, last_name, phone, primary_role, account_status, warning_count, login_count, token_version, created_at, last_login, last_seen_at, region_id',
+      )
       .is('deleted_at', null) as unknown as UserFilterQuery,
     body.filters,
     restrictTenantId,
@@ -229,7 +237,9 @@ async function processInlineUserAction(
       // Best-effort: remove from Auth. Failures are silently ignored because:
       // 1. The user may not exist in Auth (e.g. created without auth record).
       // 2. Auth deletion is not the source of truth for our data model.
-      await admin.auth.admin.deleteUser(user.id as string).catch(() => { /* best-effort */ });
+      await admin.auth.admin.deleteUser(user.id as string).catch(() => {
+        /* best-effort */
+      });
       break;
     }
     case 'lock':
@@ -237,10 +247,13 @@ async function processInlineUserAction(
     case 'suspend':
     case 'ban': {
       const status =
-        action === 'unlock' ? 'active' :
-        action === 'lock' ? 'locked' :
-        action === 'suspend' ? 'suspended' :
-        'banned';
+        action === 'unlock'
+          ? 'active'
+          : action === 'lock'
+            ? 'locked'
+            : action === 'suspend'
+              ? 'suspended'
+              : 'banned';
       const suspendHours = Number(params.suspend_hours ?? 24);
       const { error } = await admin
         .from('users')
@@ -249,9 +262,10 @@ async function processInlineUserAction(
           lock_reason: action === 'unlock' ? null : reason,
           locked_at: action === 'lock' || action === 'ban' ? now : null,
           locked_by: action === 'lock' || action === 'ban' ? initiatorId : null,
-          suspension_until: action === 'suspend'
-            ? new Date(Date.now() + suspendHours * 3600_000).toISOString()
-            : null,
+          suspension_until:
+            action === 'suspend'
+              ? new Date(Date.now() + suspendHours * 3600_000).toISOString()
+              : null,
           token_version: Number(user.token_version ?? 0) + 1,
           updated_at: now,
         })
@@ -347,13 +361,29 @@ async function exportUsers(
 }
 
 function generateCsv(users: Record<string, unknown>[]) {
-  const fields = ['id', 'email', 'first_name', 'last_name', 'phone', 'primary_role', 'account_status', 'warning_count', 'login_count', 'created_at', 'last_login', 'tenant_id'];
+  const fields = [
+    'id',
+    'email',
+    'first_name',
+    'last_name',
+    'phone',
+    'primary_role',
+    'account_status',
+    'warning_count',
+    'login_count',
+    'created_at',
+    'last_login',
+    'tenant_id',
+  ];
   const escape = (value: unknown) => {
     if (value == null) return '';
     const text = String(value);
     return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
   };
-  return [fields.join(','), ...users.map((user) => fields.map((field) => escape(user[field])).join(','))].join('\n');
+  return [
+    fields.join(','),
+    ...users.map((user) => fields.map((field) => escape(user[field])).join(',')),
+  ].join('\n');
 }
 
 export async function POST(request: NextRequest) {
@@ -430,9 +460,7 @@ export async function POST(request: NextRequest) {
     // tenant's id and act on/export users outside their own tenant.
     // super_admin is the only role allowed to choose/omit a tenant filter.
     const isSuperAdmin = callerProfile.primary_role === 'super_admin';
-    const restrictTenantId: string | undefined = isSuperAdmin
-      ? undefined
-      : callerProfile.tenant_id;
+    const restrictTenantId: string | undefined = isSuperAdmin ? undefined : callerProfile.tenant_id;
 
     // ── Count matching users ──────────────────────────────────
     // v13: users_with_pii_access includes decrypted email for search;
@@ -500,25 +528,28 @@ export async function POST(request: NextRequest) {
     // ── Insert job into queue ─────────────────────────────────
     const jobType = body.action === 'export' ? 'bulk_export' : `bulk_${body.action}`;
 
-    const { data: job, error: insertErr } = await admin
-      .rpc('admin_enqueue_bulk_job', {
-        p_job_type: jobType,
-        p_payload: {
-          action: body.action,
-          filters: body.filters,
-          params: body.params ?? {},
-          initiator_id: userData.user.id,
-          estimated_count: count,
-        },
-        p_initiator_id: userData.user.id,
-      });
+    const { data: job, error: insertErr } = await admin.rpc('admin_enqueue_bulk_job', {
+      p_job_type: jobType,
+      p_payload: {
+        action: body.action,
+        filters: body.filters,
+        params: body.params ?? {},
+        initiator_id: userData.user.id,
+        estimated_count: count,
+      },
+      p_initiator_id: userData.user.id,
+    });
 
     if (insertErr) {
       if (insertErr.message.includes('JOB_QUEUE_FULL')) {
         return errorJson('JOB_QUEUE_FULL', 'Too many pending jobs. Please try again later.', 429);
       }
       if (insertErr.message.includes('uq_job_dedupe')) {
-        return errorJson('DUPLICATE_JOB', 'An identical bulk action is already processing. Please wait for it to finish.', 409);
+        return errorJson(
+          'DUPLICATE_JOB',
+          'An identical bulk action is already processing. Please wait for it to finish.',
+          409,
+        );
       }
       return errorJson('QUEUE_ERROR', insertErr.message, 500);
     }

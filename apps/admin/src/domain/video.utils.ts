@@ -15,15 +15,13 @@ export function parseVideoUrl(url: string): ParsedVideo {
   const cleanUrl = url.trim();
 
   // YouTube
-  if (
-    cleanUrl.includes('youtube.com') ||
-    cleanUrl.includes('youtu.be')
-  ) {
-    const regex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+  if (cleanUrl.includes('youtube.com') || cleanUrl.includes('youtu.be')) {
+    const regex =
+      /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
     const match = cleanUrl.match(regex);
     return {
       provider: 'youtube',
-      video_path: (match && match[1]) ? match[1] : cleanUrl,
+      video_path: match && match[1] ? match[1] : cleanUrl,
     };
   }
 
@@ -33,7 +31,7 @@ export function parseVideoUrl(url: string): ParsedVideo {
     const match = cleanUrl.match(regex);
     return {
       provider: 'vimeo',
-      video_path: (match && match[1]) ? match[1] : cleanUrl,
+      video_path: match && match[1] ? match[1] : cleanUrl,
     };
   }
 
@@ -41,8 +39,9 @@ export function parseVideoUrl(url: string): ParsedVideo {
   if (cleanUrl.includes('stream.mux.com') || cleanUrl.includes('mux.com')) {
     const regex = /(?:https?:\/\/)?stream\.mux\.com\/([a-zA-Z0-9_-]+)(?:\.m3u8)?/;
     const match = cleanUrl.match(regex);
-    let path = (match && match[1]) ? match[1] : cleanUrl;
-    if (path.startsWith('https://')) path = path.replace('https://stream.mux.com/', '').replace('.m3u8', '');
+    let path = match && match[1] ? match[1] : cleanUrl;
+    if (path.startsWith('https://'))
+      path = path.replace('https://stream.mux.com/', '').replace('.m3u8', '');
     return {
       provider: 'mux',
       video_path: path,
@@ -51,9 +50,10 @@ export function parseVideoUrl(url: string): ParsedVideo {
 
   // Bunny (video.bunnycdn.com)
   if (cleanUrl.includes('bunnycdn.com') || cleanUrl.includes('b-cdn.net')) {
-    const regex = /(?:https?:\/\/)?(?:video\.bunnycdn\.com\/play\/|.*?\.b-cdn\.net\/)([a-zA-Z0-9_-]+)/;
+    const regex =
+      /(?:https?:\/\/)?(?:video\.bunnycdn\.com\/play\/|.*?\.b-cdn\.net\/)([a-zA-Z0-9_-]+)/;
     const match = cleanUrl.match(regex);
-    let path = (match && match[1]) ? match[1] : cleanUrl;
+    let path = match && match[1] ? match[1] : cleanUrl;
     if (path.startsWith('https://')) path = path.replace('https://video.bunnycdn.com/play/', '');
     return {
       provider: 'bunny',
@@ -65,8 +65,8 @@ export function parseVideoUrl(url: string): ParsedVideo {
   if (cleanUrl.includes('s3.amazonaws.com') || cleanUrl.includes('s3.')) {
     let path = cleanUrl;
     if (path.startsWith('https://')) {
-       // Just strip the protocol to keep it relative, or extract bucket/key
-       path = path.replace(/^https?:\/\//, '');
+      // Just strip the protocol to keep it relative, or extract bucket/key
+      path = path.replace(/^https?:\/\//, '');
     }
     return {
       provider: 's3',
@@ -82,7 +82,7 @@ export function parseVideoUrl(url: string): ParsedVideo {
   // Default fallback
   let path = cleanUrl;
   if (path.startsWith('https://') || path.startsWith('http://')) {
-      path = path.replace(/^https?:\/\//, '');
+    path = path.replace(/^https?:\/\//, '');
   }
   return { provider: 'youtube', video_path: path };
 }

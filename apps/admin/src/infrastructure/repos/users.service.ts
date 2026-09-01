@@ -112,10 +112,7 @@ export async function controlUserAccount(
 }
 
 // ── Terminate sessions ───────────────────────────────────────────
-export async function terminateUserSessions(
-  userId: string,
-  reason?: string,
-): Promise<number> {
+export async function terminateUserSessions(userId: string, reason?: string): Promise<number> {
   const { supabase } = container;
   const { data, error } = await supabase.rpc('terminate_user_sessions', {
     p_user_id: userId,
@@ -219,9 +216,7 @@ export async function getWarnings(userId: string): Promise<Warning[]> {
 }
 
 // ── Get effective permissions ────────────────────────────────────
-export async function getEffectivePermissions(
-  userId: string,
-): Promise<PermissionCacheEntry[]> {
+export async function getEffectivePermissions(userId: string): Promise<PermissionCacheEntry[]> {
   const { supabase } = container;
   const { data, error } = await supabase
     .from('user_permission_cache')
@@ -315,17 +310,13 @@ export async function getUserStats(tenantId?: string): Promise<UserStats | null>
   } as UserStats;
 }
 
-
 // ── Get all unique permissions ──────────────────────────────────
 export async function getAllPermissions(): Promise<string[]> {
   const { supabase } = container;
-  const { data, error } = await supabase
-    .from('permissions')
-    .select('name')
-    .order('name');
+  const { data, error } = await supabase.from('permissions').select('name').order('name');
 
   if (error) throw error;
-  return (data ?? []).map(p => p.name);
+  return (data ?? []).map((p) => p.name);
 }
 
 // ── Search users for targeting ───────────────────────────────────
@@ -339,7 +330,12 @@ export interface UserSearchResult {
   last_login: string | null;
 }
 
-export async function searchUsers(query: string, limit = 20, tenantId?: string, role?: string): Promise<UserSearchResult[]> {
+export async function searchUsers(
+  query: string,
+  limit = 20,
+  tenantId?: string,
+  role?: string,
+): Promise<UserSearchResult[]> {
   const { supabase } = container;
 
   let q = supabase
@@ -363,7 +359,8 @@ export async function searchUsers(query: string, limit = 20, tenantId?: string, 
   }
 
   // Sort by most recent activity/creation
-  q = q.order('last_login', { ascending: false, nullsFirst: false })
+  q = q
+    .order('last_login', { ascending: false, nullsFirst: false })
     .order('created_at', { ascending: false });
 
   const { data, error } = await q.limit(limit);

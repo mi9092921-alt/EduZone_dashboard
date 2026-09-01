@@ -6,14 +6,14 @@ test.describe('Authentication & Session Heartbeat', () => {
 
   test('successfully logs in and redirects to dashboard', async ({ page }) => {
     await page.goto('/login');
-    
+
     await page.getByLabel(/email/i).fill('admin@eduzone-test.com');
     await page.getByLabel(/password/i).fill('Password123');
     await page.getByRole('button', { name: /login/i }).click();
 
     // Verify redirect
     await expect(page).toHaveURL(/.*activities/);
-    
+
     // Verify toast or profile presence
     await expect(page.getByRole('button', { name: /profile|user/i })).toBeVisible();
   });
@@ -21,13 +21,13 @@ test.describe('Authentication & Session Heartbeat', () => {
   test('logs out successfully', async ({ page }) => {
     // Start with logged in state (using the setup state)
     test.use({ storageState: 'playwright/.auth/user.json' });
-    
+
     await page.goto('/activities');
-    
+
     // Click profile and logout
     await page.getByRole('button', { name: /profile|user/i }).click();
     await page.getByRole('menuitem', { name: /logout/i }).click();
-    
+
     // Should redirect back to login
     await expect(page).toHaveURL(/.*login/);
   });

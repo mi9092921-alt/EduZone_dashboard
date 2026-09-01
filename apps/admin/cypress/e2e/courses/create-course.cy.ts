@@ -11,7 +11,7 @@ describe('Course Creation Flow', () => {
         email: 'admin@eduzone.com',
       },
     };
-    
+
     // Set mock session in localStorage (simulating being logged in)
     window.localStorage.setItem('sb-auth-token', JSON.stringify(session));
 
@@ -25,7 +25,13 @@ describe('Course Creation Flow', () => {
       statusCode: 200,
       body: {
         data: [
-          { id: 't1', email: 'teacher@eduzone.com', first_name: 'Sarah', last_name: 'Drasner', primary_role: 'teacher' },
+          {
+            id: 't1',
+            email: 'teacher@eduzone.com',
+            first_name: 'Sarah',
+            last_name: 'Drasner',
+            primary_role: 'teacher',
+          },
         ],
         count: 1,
       },
@@ -37,7 +43,7 @@ describe('Course Creation Flow', () => {
 
   it('should create a new course successfully', () => {
     cy.contains('button', /Create Course/i).click();
-    
+
     // Check if modal is open
     cy.contains('h2', /Create New Course/i).should('be.visible');
 
@@ -63,7 +69,7 @@ describe('Course Creation Flow', () => {
 
   it('should show validation errors for empty title', () => {
     cy.contains('button', /Create Course/i).click();
-    
+
     // Click submit without filling required title
     cy.get('button[type="submit"]').click();
 

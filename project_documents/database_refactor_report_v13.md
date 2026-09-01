@@ -1,6 +1,7 @@
 # Database Refactor Report (v13)
 
 ## Current Issues
+
 - Canonical schema drift: `Eduzone_schema_v13.sql` كان غير متزامن مع `supabase/migrations/20260517..20260523` لبعض RPCs.
 - Job queue root-cause mismatch: `internal.job_queue` يستخدم `locked_by_worker_id` بينما وظائف مثل `internal.dequeue_job` و`public.release_stale_job_locks` كانت تحدث عمود `locked_by`.
 - Invalid status transition: `public.admin_cancel_job` كان يكتب `cancelled` رغم أن قيد `internal.job_queue.status` يسمح بـ `pending|processing|done|failed|dead`.
@@ -11,6 +12,7 @@
 - Patch-bloat indicators: وجود integrated patch sections وعبارات grant/drop متكررة يزيد تكلفة الصيانة ويرفع احتمالية drift.
 
 ## Structural Improvements
+
 - توحيد منطق Job Queue ليتبع بنية الجدول الفعلية (`locked_by_worker_id`) في كل الدوال الحرجة.
 - إدخال RPCs الناقصة في الـ baseline (`Eduzone_schema_v13.sql`) لإلغاء الاعتماد التشغيلي على patch migrations المتسلسلة.
 - إزالة التكرار الواضح في تعريفات الـ views والإبقاء على canonical definition واحدة.
@@ -22,6 +24,7 @@
 - إنشاء ملفات تقسيم بنيوي في `supabase/schema/01..11` كمنظور تنظيمي مشتق من المصدر الرئيسي.
 
 ## Removed Redundancies
+
 > لا يوجد حذف فعلي لملفات migrations أو ملفات مقدسة في هذه المرحلة.
 
 - تمت إزالة التكرار الداخلي لتعريفات active views ضمن `Eduzone_schema_v13.sql` (الإبقاء على النسخة canonical).
@@ -36,6 +39,7 @@
 - سبب الترشيح: وظائفها تم نقلها/توحيدها داخل الـ canonical baseline لتقليل patch chain.
 
 ## Migration Strategy
+
 1. اعتماد `Eduzone_schema_v13.sql` + `Eduzone_seed_qa.sql` كمصدر وحيد للحقيقة.
 2. دمج fixes/RPCs الحرجة في baseline أولًا (تم).
 3. إعادة تهيئة Supabase local عبر `config.toml` لاستهلاك المصدر الرئيسي مباشرة (تم).
@@ -46,6 +50,7 @@
 6. تنفيذ smoke tests على RPCs الأساسية قبل أي تنظيف نهائي.
 
 ## Final Architecture
+
 - Canonical source:
   - `Eduzone_schema_v13.sql`
   - `Eduzone_seed_qa.sql`
@@ -66,6 +71,7 @@
   - Admin/worker RPCs موجودة داخل baseline بدل الاعتماد على hotfix migrations.
 
 ## Risk Assessment
+
 - Medium: إضافة/تعديل RPCs واسعة التأثير قد تؤثر على clients التي تعتمد signatures قديمة.
 - Medium: `security_invoker` على views قد يغير سلوك وصول متوقع في بعض الاستعلامات غير المحمية.
 - Low-Medium: ملفات `supabase/schema/01..11` هي مشتقات تنظيمية؛ يجب إعادة توليدها عند أي تعديل على canonical.
@@ -73,6 +79,7 @@
 - High if skipped: عدم اختبار job queue end-to-end قد يُبقي تعارضات تشغيلية غير مكتشفة.
 
 ## Validation Checklist
+
 - Verify `internal.dequeue_job` writes `locked_by_worker_id`.
 - Verify `public.release_stale_job_locks` clears `locked_by_worker_id`.
 - Verify `public.admin_cancel_job` writes status `dead`.

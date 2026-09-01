@@ -1,9 +1,9 @@
 'use client';
 
-import { Close } from "@mui/icons-material";
-import * as React from "react";
+import { Close } from '@mui/icons-material';
+import * as React from 'react';
 
-import { cn } from "@/lib/utils";
+import { cn } from '@/lib/utils';
 
 interface DrawerProps {
   open: boolean;
@@ -12,7 +12,7 @@ interface DrawerProps {
   title?: string;
   description?: string;
   className?: string;
-  side?: "start" | "end";
+  side?: 'start' | 'end';
 }
 
 export function Drawer({
@@ -22,20 +22,20 @@ export function Drawer({
   title,
   description,
   className,
-  side = "end",
+  side = 'end',
 }: DrawerProps) {
   // Handle ESC key
   React.useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === 'Escape') onClose();
     };
     if (open) {
-      window.addEventListener("keydown", handleEsc);
-      document.body.style.overflow = "hidden";
+      window.addEventListener('keydown', handleEsc);
+      document.body.style.overflow = 'hidden';
     }
     return () => {
-      window.removeEventListener("keydown", handleEsc);
-      document.body.style.overflow = "auto";
+      window.removeEventListener('keydown', handleEsc);
+      document.body.style.overflow = 'auto';
     };
   }, [open, onClose]);
 
@@ -44,8 +44,8 @@ export function Drawer({
       {/* Backdrop */}
       <div
         className={cn(
-          "fixed inset-0 z-[var(--z-modal)] bg-black/60 backdrop-blur-sm transition-opacity duration-300",
-          open ? "opacity-100" : "opacity-0 pointer-events-none"
+          'fixed inset-0 z-[var(--z-modal)] bg-black/60 backdrop-blur-sm transition-opacity duration-300',
+          open ? 'opacity-100' : 'opacity-0 pointer-events-none',
         )}
         onClick={onClose}
       />
@@ -53,13 +53,17 @@ export function Drawer({
       {/* Drawer content */}
       <div
         className={cn(
-          "fixed inset-y-0 z-[var(--z-modal)] flex flex-col bg-background shadow-2xl transition-transform duration-300 ease-in-out",
-          side === "end" ? "end-0" : "start-0",
-          side === "end"
-            ? (open ? "translate-x-0" : "ltr:translate-x-full rtl:-translate-x-full")
-            : (open ? "translate-x-0" : "ltr:-translate-x-full rtl:translate-x-full"),
-          "w-full md:w-[520px] max-w-full",
-          className
+          'fixed inset-y-0 z-[var(--z-modal)] flex flex-col bg-background shadow-2xl transition-transform duration-300 ease-in-out',
+          side === 'end' ? 'end-0' : 'start-0',
+          side === 'end'
+            ? open
+              ? 'translate-x-0'
+              : 'ltr:translate-x-full rtl:-translate-x-full'
+            : open
+              ? 'translate-x-0'
+              : 'ltr:-translate-x-full rtl:translate-x-full',
+          'w-full md:w-[520px] max-w-full',
+          className,
         )}
       >
         {/* Header (Optional) */}
@@ -79,9 +83,7 @@ export function Drawer({
         )}
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto">
-          {children}
-        </div>
+        <div className="flex-1 overflow-y-auto">{children}</div>
       </div>
     </>
   );

@@ -68,7 +68,7 @@ function formatRelativeTime(isoString: string, locale: string): string {
     numeric: 'auto',
   });
 
-  if (absS < 60)  return rtf.format(Math.sign(diffSec) * absS, 'second');
+  if (absS < 60) return rtf.format(Math.sign(diffSec) * absS, 'second');
   if (absS < 3600) return rtf.format(Math.sign(diffSec) * Math.round(absS / 60), 'minute');
   if (absS < 86400) return rtf.format(Math.sign(diffSec) * Math.round(absS / 3600), 'hour');
   if (absS < 2592000) return rtf.format(Math.sign(diffSec) * Math.round(absS / 86400), 'day');
@@ -79,21 +79,31 @@ function formatRelativeTime(isoString: string, locale: string): string {
 
 function getNotifIcon(type: string) {
   switch (type) {
-    case 'account_action': return <AccountActionIcon sx={{ fontSize: 16 }} />;
-    case 'warning_issued': return <WarningIcon       sx={{ fontSize: 16 }} />;
-    case 'course_update':  return <CourseUpdateIcon  sx={{ fontSize: 16 }} />;
-    case 'system_alert':   return <SystemAlertIcon   sx={{ fontSize: 16 }} />;
-    default:               return <BellOutlineIcon   sx={{ fontSize: 16 }} />;
+    case 'account_action':
+      return <AccountActionIcon sx={{ fontSize: 16 }} />;
+    case 'warning_issued':
+      return <WarningIcon sx={{ fontSize: 16 }} />;
+    case 'course_update':
+      return <CourseUpdateIcon sx={{ fontSize: 16 }} />;
+    case 'system_alert':
+      return <SystemAlertIcon sx={{ fontSize: 16 }} />;
+    default:
+      return <BellOutlineIcon sx={{ fontSize: 16 }} />;
   }
 }
 
 function getNotifColor(type: string): string {
   switch (type) {
-    case 'account_action': return 'hsl(217 91% 60%)';   // blue
-    case 'warning_issued': return 'hsl(38 92% 50%)';    // amber
-    case 'course_update':  return 'hsl(142 71% 45%)';   // green
-    case 'system_alert':   return 'hsl(262 80% 60%)';   // purple
-    default:               return 'hsl(var(--muted-foreground))';
+    case 'account_action':
+      return 'hsl(217 91% 60%)'; // blue
+    case 'warning_issued':
+      return 'hsl(38 92% 50%)'; // amber
+    case 'course_update':
+      return 'hsl(142 71% 45%)'; // green
+    case 'system_alert':
+      return 'hsl(262 80% 60%)'; // purple
+    default:
+      return 'hsl(var(--muted-foreground))';
   }
 }
 
@@ -101,7 +111,7 @@ function groupByDate(
   items: UserNotification[],
   locale: string,
 ): Array<{ label: string; items: UserNotification[] }> {
-  const today     = new Date();
+  const today = new Date();
   const yesterday = new Date(today);
   yesterday.setDate(today.getDate() - 1);
 
@@ -111,11 +121,13 @@ function groupByDate(
   for (const item of items) {
     const d = new Date(item.created_at);
     let key: string;
-    if (fmt(d) === fmt(today))          key = locale === 'ar' ? 'اليوم' : 'Today';
-    else if (fmt(d) === fmt(yesterday)) key = locale === 'ar' ? 'أمس'   : 'Yesterday';
-    else key = d.toLocaleDateString(locale === 'ar' ? 'ar-SA' : 'en-US', {
-      day: 'numeric', month: 'short',
-    });
+    if (fmt(d) === fmt(today)) key = locale === 'ar' ? 'اليوم' : 'Today';
+    else if (fmt(d) === fmt(yesterday)) key = locale === 'ar' ? 'أمس' : 'Yesterday';
+    else
+      key = d.toLocaleDateString(locale === 'ar' ? 'ar-SA' : 'en-US', {
+        day: 'numeric',
+        month: 'short',
+      });
     (groups[key] ??= []).push(item);
   }
 
@@ -225,16 +237,16 @@ export function NotificationBell() {
 
   const [open, setOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const panelRef  = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   // Data
   const { data, isLoading } = useMyNotifications(20, false);
   const notifications = data?.data ?? [];
-  const unreadCount   = data?.unreadCount ?? 0;
-  const badgeLabel    = unreadCount > 99 ? '99+' : unreadCount;
+  const unreadCount = data?.unreadCount ?? 0;
+  const badgeLabel = unreadCount > 99 ? '99+' : unreadCount;
 
   // Mutations
-  const markRead    = useMarkNotificationRead();
+  const markRead = useMarkNotificationRead();
   const markAllRead = useMarkAllNotificationsRead();
 
   // Realtime subscription (mounted once here, syncs the cache globally)
@@ -245,8 +257,10 @@ export function NotificationBell() {
     if (!open) return;
     function handleClick(e: MouseEvent) {
       if (
-        panelRef.current  && !panelRef.current.contains(e.target as Node) &&
-        buttonRef.current && !buttonRef.current.contains(e.target as Node)
+        panelRef.current &&
+        !panelRef.current.contains(e.target as Node) &&
+        buttonRef.current &&
+        !buttonRef.current.contains(e.target as Node)
       ) {
         setOpen(false);
       }
@@ -258,16 +272,21 @@ export function NotificationBell() {
   // Close on Escape
   useEffect(() => {
     if (!open) return;
-    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
   }, [open]);
 
-  const handleNotifClick = useCallback((id: string, linkTo: string | null) => {
-    markRead.mutate(id);
-    if (linkTo) router.push(linkTo as Parameters<typeof router.push>[0]);
-    setOpen(false);
-  }, [markRead, router]);
+  const handleNotifClick = useCallback(
+    (id: string, linkTo: string | null) => {
+      markRead.mutate(id);
+      if (linkTo) router.push(linkTo as Parameters<typeof router.push>[0]);
+      setOpen(false);
+    },
+    [markRead, router],
+  );
 
   const handleMarkAll = useCallback(() => {
     markAllRead.mutate();
@@ -314,11 +333,7 @@ export function NotificationBell() {
               },
             }}
           >
-            {open ? (
-              <BellIcon sx={{ fontSize: 20 }} />
-            ) : (
-              <BellOutlineIcon sx={{ fontSize: 20 }} />
-            )}
+            {open ? <BellIcon sx={{ fontSize: 20 }} /> : <BellOutlineIcon sx={{ fontSize: 20 }} />}
           </Badge>
         </IconButton>
       </Tooltip>
@@ -347,7 +362,7 @@ export function NotificationBell() {
             animation: 'fadeSlideDown 0.15s ease',
             '@keyframes fadeSlideDown': {
               from: { opacity: 0, transform: 'translateY(-6px)' },
-              to:   { opacity: 1, transform: 'translateY(0)' },
+              to: { opacity: 1, transform: 'translateY(0)' },
             },
           }}
           role="dialog"
@@ -438,7 +453,12 @@ export function NotificationBell() {
                 >
                   <InboxIcon sx={{ fontSize: 28, color: 'text.disabled' }} />
                 </Box>
-                <Typography variant="body2" color="text.secondary" textAlign="center" fontWeight={600}>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  textAlign="center"
+                  fontWeight={600}
+                >
                   {t('no_new_notifications')}
                 </Typography>
               </Box>

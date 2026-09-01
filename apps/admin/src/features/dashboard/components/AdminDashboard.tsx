@@ -12,7 +12,7 @@ import {
   Domain,
   PlayLesson,
   Assignment,
-  Devices
+  Devices,
 } from '@mui/icons-material';
 import { useTranslations } from 'next-intl';
 
@@ -25,13 +25,23 @@ import { cn } from '@/lib/utils';
 
 // ── Semantic Wrappers for KPI Grid ──────────────────────────────
 const StatsCard = ({ children, className }: { children: React.ReactNode; className?: string }) => (
-  <Card className={cn("overflow-hidden", className)}>{children}</Card>
+  <Card className={cn('overflow-hidden', className)}>{children}</Card>
 );
-const StatsCardContent = ({ children, className }: { children: React.ReactNode; className?: string }) => (
-  <CardContent className={cn("p-0", className)}>{children}</CardContent>
-);
-const StatsCardIcon = ({ children, className }: { children: React.ReactNode; className?: string }) => (
-  <div className={cn("flex items-center justify-center rounded-xl", className)}>{children}</div>
+const StatsCardContent = ({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) => <CardContent className={cn('p-0', className)}>{children}</CardContent>;
+const StatsCardIcon = ({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) => (
+  <div className={cn('flex items-center justify-center rounded-xl', className)}>{children}</div>
 );
 
 export function AdminDashboard() {
@@ -68,7 +78,7 @@ export function AdminDashboard() {
   const secondaryStats = [
     {
       label: t('unpublished_courses'),
-      value: stats ? (stats.archivedCourses + stats.draftCourses) : '—',
+      value: stats ? stats.archivedCourses + stats.draftCourses : '—',
       icon: VisibilityOff,
       colorClass: 'text-slate-600 bg-slate-100 dark:bg-slate-500/10 dark:text-slate-400',
     },
@@ -120,7 +130,9 @@ export function AdminDashboard() {
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
       <div className="flex flex-col gap-1">
         <h1 className="text-3xl font-bold tracking-tight text-foreground">{t('dashboard')}</h1>
-        <p className="text-sm text-muted-foreground font-medium opacity-80">{t('welcome', { name: 'EduZone' })}</p>
+        <p className="text-sm text-muted-foreground font-medium opacity-80">
+          {t('welcome', { name: 'EduZone' })}
+        </p>
       </div>
 
       {/* Primary KPI Cards Grid (Hero) */}
@@ -128,13 +140,24 @@ export function AdminDashboard() {
         {primaryStats.map((stat) => {
           const Icon = stat.icon;
           return (
-            <StatsCard key={stat.label} className="transition-all hover:translate-y-[-2px] hover:shadow-lg border-border/40">
+            <StatsCard
+              key={stat.label}
+              className="transition-all hover:translate-y-[-2px] hover:shadow-lg border-border/40"
+            >
               <StatsCardContent className="flex flex-row items-center gap-4 p-5">
-                <StatsCardIcon className={cn("w-10 h-10 rounded-xl shrink-0 flex items-center justify-center shadow-inner", stat.colorClass)}>
+                <StatsCardIcon
+                  className={cn(
+                    'w-10 h-10 rounded-xl shrink-0 flex items-center justify-center shadow-inner',
+                    stat.colorClass,
+                  )}
+                >
                   <Icon sx={{ fontSize: 22 }} />
                 </StatsCardIcon>
                 <div className="flex flex-col min-w-0 flex-1">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 truncate w-full" title={stat.label}>
+                  <p
+                    className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 truncate w-full"
+                    title={stat.label}
+                  >
                     {stat.label}
                   </p>
                   <div className="flex items-baseline">
@@ -166,7 +189,9 @@ export function AdminDashboard() {
             <CardContent className="h-[300px] flex items-center justify-center m-4">
               <div className="flex flex-col items-center justify-center text-center space-y-2 p-8 rounded-xl border border-dashed border-border/60 bg-muted/20 w-full h-full">
                 <Analytics className="text-muted-foreground/40 w-8 h-8 mb-2" />
-                <p className="text-sm font-medium text-muted-foreground">{t('activity_empty_state')}</p>
+                <p className="text-sm font-medium text-muted-foreground">
+                  {t('activity_empty_state')}
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -182,35 +207,57 @@ export function AdminDashboard() {
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="p-4 rounded-xl bg-indigo-50/50 dark:bg-indigo-500/5 border border-indigo-500/10 text-sm transition-all hover:bg-indigo-50 dark:hover:bg-indigo-500/10 cursor-default">
-                <p className="font-bold text-indigo-900 dark:text-indigo-200">{t('insights_course_up')}</p>
-                <p className="text-xs text-indigo-600/80 dark:text-indigo-400/80 mt-1 font-medium">{t('compared_last_week')}</p>
+                <p className="font-bold text-indigo-900 dark:text-indigo-200">
+                  {t('insights_course_up')}
+                </p>
+                <p className="text-xs text-indigo-600/80 dark:text-indigo-400/80 mt-1 font-medium">
+                  {t('compared_last_week')}
+                </p>
               </div>
               <div className="p-4 rounded-xl bg-emerald-50/50 dark:bg-emerald-500/5 border border-emerald-500/10 text-sm transition-all hover:bg-emerald-50 dark:hover:bg-emerald-500/10 cursor-default">
-                <p className="font-bold text-emerald-900 dark:text-emerald-200">{t('insights_users_peak')}</p>
-                <p className="text-xs text-emerald-600/80 dark:text-emerald-400/80 mt-1 font-medium">{t('sessions_increased')}</p>
+                <p className="font-bold text-emerald-900 dark:text-emerald-200">
+                  {t('insights_users_peak')}
+                </p>
+                <p className="text-xs text-emerald-600/80 dark:text-emerald-400/80 mt-1 font-medium">
+                  {t('sessions_increased')}
+                </p>
               </div>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">{t('operational_metrics')}</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                {t('operational_metrics')}
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 gap-3">
                 {secondaryStats.map((stat) => {
                   const Icon = stat.icon;
                   return (
-                    <div key={stat.label} className="flex items-center gap-3 p-3 rounded-xl border border-border/40 bg-muted/10 transition-colors hover:bg-muted/20">
-                      <div className={`flex items-center justify-center w-8 h-8 rounded-lg shrink-0 ${stat.colorClass}`}>
+                    <div
+                      key={stat.label}
+                      className="flex items-center gap-3 p-3 rounded-xl border border-border/40 bg-muted/10 transition-colors hover:bg-muted/20"
+                    >
+                      <div
+                        className={`flex items-center justify-center w-8 h-8 rounded-lg shrink-0 ${stat.colorClass}`}
+                      >
                         <Icon fontSize="small" />
                       </div>
                       <div className="flex flex-col min-w-0 flex-1">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground truncate w-full" title={stat.label}>
+                        <span
+                          className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground truncate w-full"
+                          title={stat.label}
+                        >
                           {stat.label}
                         </span>
                         <span className="text-sm font-bold text-foreground truncate w-full">
-                          {isLoading ? <div className="h-4 w-8 bg-muted animate-pulse rounded-sm mt-0.5" /> : stat.value}
+                          {isLoading ? (
+                            <div className="h-4 w-8 bg-muted animate-pulse rounded-sm mt-0.5" />
+                          ) : (
+                            stat.value
+                          )}
                         </span>
                       </div>
                     </div>

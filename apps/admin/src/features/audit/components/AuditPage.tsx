@@ -1,11 +1,6 @@
 'use client';
 
-import {
-  Security,
-  Speed,
-  CleaningServices,
-  Stream,
-} from '@mui/icons-material';
+import { Security, Speed, CleaningServices, Stream } from '@mui/icons-material';
 import { Tooltip } from '@mui/material';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
@@ -26,7 +21,10 @@ export function AuditPage() {
   const [streamOpen, setStreamOpen] = useState(false);
 
   const flush = useFlushActivityLogs();
-  const [flushResult, setFlushResult] = useState<{ key: string; params?: { count: number } } | null>(null);
+  const [flushResult, setFlushResult] = useState<{
+    key: string;
+    params?: { count: number };
+  } | null>(null);
 
   const handleFlush = async () => {
     setFlushResult(null);
@@ -55,21 +53,20 @@ export function AuditPage() {
         </div>
         <div className="flex items-center gap-2">
           {flushResult && (
-            <span className={cn(
-              'text-xs font-medium px-3 py-1.5 rounded-lg',
-              flushResult.key === 'status_flushed' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-amber-500/10 text-amber-600',
-            )}>
+            <span
+              className={cn(
+                'text-xs font-medium px-3 py-1.5 rounded-lg',
+                flushResult.key === 'status_flushed'
+                  ? 'bg-emerald-500/10 text-emerald-600'
+                  : 'bg-amber-500/10 text-amber-600',
+              )}
+            >
               {t(flushResult.key, flushResult.params)}
             </span>
           )}
           <Tooltip title={t('tooltip_flush')}>
             <span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleFlush}
-                isLoading={flush.isPending}
-              >
+              <Button variant="outline" size="sm" onClick={handleFlush} isLoading={flush.isPending}>
                 <CleaningServices className="text-sm" />
                 {t('btn_flush_queue')}
               </Button>

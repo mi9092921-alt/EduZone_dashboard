@@ -49,9 +49,9 @@ const preview: Preview = {
       appDirectory: true,
     },
     // Chromatic visual regression settings
-    chromatic: { 
-      pauseAnimationAtEnd: true, 
-      delay: 300 // Slight delay to let fonts/MUI load
+    chromatic: {
+      pauseAnimationAtEnd: true,
+      delay: 300, // Slight delay to let fonts/MUI load
     },
     // Background toggles for testing Glassmorphism
     backgrounds: {

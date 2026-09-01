@@ -2,11 +2,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-import type {
-  Tenant,
-  CreateTenantInput,
-  UpdateTenantInput,
-} from '@/domain/types/tenant.types';
+import type { Tenant, CreateTenantInput, UpdateTenantInput } from '@/domain/types/tenant.types';
 import { createServerClient } from '@/infrastructure/supabase/server';
 
 function createAdminClient() {

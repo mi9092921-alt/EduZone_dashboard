@@ -27,7 +27,8 @@ export const queryKeys = {
     overviewStats: ['courses', 'overviewStats'] as const,
     objectives: (courseId: string) => ['courses', 'objectives', courseId] as const,
     prerequisites: (courseId: string) => ['courses', 'prerequisites', courseId] as const,
-    prerequisiteOptions: (courseId: string) => ['courses', 'prerequisiteOptions', courseId] as const,
+    prerequisiteOptions: (courseId: string) =>
+      ['courses', 'prerequisiteOptions', courseId] as const,
   },
   enrollments: {
     all: ['enrollments'] as const,
@@ -88,11 +89,13 @@ export const queryKeys = {
     all: ['tenants'] as const,
     list: (filters: Record<string, unknown>) => ['tenants', 'list', filters] as const,
     detail: (id: string) => ['tenants', 'detail', id] as const,
-    audit: (id: string, filters: Record<string, unknown>) => ['tenants', 'audit', id, filters] as const,
+    audit: (id: string, filters: Record<string, unknown>) =>
+      ['tenants', 'audit', id, filters] as const,
   },
   notifications: {
     all: ['notifications'] as const,
-    list: (page: number, size: number, audience?: string) => ['notifications', 'list', page, size, audience] as const,
+    list: (page: number, size: number, audience?: string) =>
+      ['notifications', 'list', page, size, audience] as const,
     // Per-user inbox keys
     allMine: ['notifications', 'mine'] as const,
     mine: (limit: number, unreadOnly: boolean) =>

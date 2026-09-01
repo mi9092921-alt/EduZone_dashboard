@@ -62,21 +62,22 @@ psql $SUPABASE_DB_URL < Eduzone_seed_qa.sql
 
 Directory: `supabase/schema/` (11 files, READ-ONLY)
 
-| File | Objects | Status |
-|------|---------|--------|
-| `01_extensions.sql` | Schema, extensions, roles | ✅ Stable |
-| `02_types.sql` | Domain types, custom types | ✅ Stable |
-| `03_tables.sql` | All tables, PKs (excluding FKs) | ✅ Stable |
-| `04_constraints.sql` | FKs, unique, check, exclude | ✅ Stable |
-| `05_indexes.sql` | All indexes, index metadata | ✅ Stable |
-| `06_views.sql` | Views, materialized views | ✅ Stable |
-| `07_functions.sql` | Functions, procedures, helpers | ✅ Hardened |
-| `08_triggers.sql` | Triggers, trigger functions | ✅ Stable |
-| `09_rls.sql` | RLS policies, policy grants | ✅ Security-Audited |
-| `10_permissions.sql` | GRANT/REVOKE, default privileges | ✅ Hardened |
-| `11_seed_reference.sql` | Reference seed data only | ✅ Fixed |
+| File                    | Objects                          | Status              |
+| ----------------------- | -------------------------------- | ------------------- |
+| `01_extensions.sql`     | Schema, extensions, roles        | ✅ Stable           |
+| `02_types.sql`          | Domain types, custom types       | ✅ Stable           |
+| `03_tables.sql`         | All tables, PKs (excluding FKs)  | ✅ Stable           |
+| `04_constraints.sql`    | FKs, unique, check, exclude      | ✅ Stable           |
+| `05_indexes.sql`        | All indexes, index metadata      | ✅ Stable           |
+| `06_views.sql`          | Views, materialized views        | ✅ Stable           |
+| `07_functions.sql`      | Functions, procedures, helpers   | ✅ Hardened         |
+| `08_triggers.sql`       | Triggers, trigger functions      | ✅ Stable           |
+| `09_rls.sql`            | RLS policies, policy grants      | ✅ Security-Audited |
+| `10_permissions.sql`    | GRANT/REVOKE, default privileges | ✅ Hardened         |
+| `11_seed_reference.sql` | Reference seed data only         | ✅ Fixed            |
 
 **Dependency Order (Apply in sequence):**
+
 ```
 01 → 02 → 03 → 04 → 05 → 06 → 07 → 08 → 09 → 10 → 11
 ```
@@ -130,12 +131,14 @@ ON CONFLICT DO NOTHING;
 ### Auth Hydration (Ensures check_dashboard_access() RPC works)
 
 The `check_dashboard_access()` RPC verifies:
+
 1. User exists and is not deleted
 2. Account status is 'active'
 3. JWT tenant_id matches user's tenant_id (or user is admin in that tenant)
 4. Returns: `{ allowed: bool, tenant_id: uuid, role: string, token_version: int }`
 
 **If this RPC fails:**
+
 - ❌ Ensure system tenant exists
 - ❌ Ensure user record exists in public.users
 - ❌ Verify account_status = 'active'
@@ -161,12 +164,12 @@ The `check_dashboard_access()` RPC verifies:
 
 ```sql
 -- Check RLS is enabled on all mutable tables
-SELECT tablename FROM pg_tables WHERE tablename LIKE 'users' OR tablename LIKE 'courses' 
+SELECT tablename FROM pg_tables WHERE tablename LIKE 'users' OR tablename LIKE 'courses'
   AND NOT EXISTS (SELECT 1 FROM pg_policies WHERE table_name = pg_tables.tablename);
 
 -- Verify no anon access to sensitive functions
-SELECT grantee, privilege_type 
-FROM role_table_grants 
+SELECT grantee, privilege_type
+FROM role_table_grants
 WHERE table_schema = 'public' AND grantee = 'anon';
 ```
 
@@ -174,7 +177,7 @@ WHERE table_schema = 'public' AND grantee = 'anon';
 
 ```sql
 -- Check that authenticated users can execute check_dashboard_access()
-SELECT grantee, privilege_type 
+SELECT grantee, privilege_type
 FROM information_schema.role_routine_grants
 WHERE routine_name = 'check_dashboard_access';
 -- Expected: authenticated=EXECUTE, service_role=EXECUTE, anon=NONE
@@ -210,6 +213,7 @@ if (error) {
 ### Issue: `[AuthProvider] check_dashboard_access RPC failed: {}`
 
 **Diagnosis:**
+
 ```sql
 -- Check if system tenant exists
 SELECT COUNT(*) FROM public.tenants WHERE id = '00000000-0000-0000-0000-000000000001';
@@ -222,6 +226,7 @@ SELECT * FROM public.users WHERE id = current_user_id();
 ```
 
 **Solution:**
+
 1. Verify system tenant: If count = 0, manually insert it (see above)
 2. Verify roles: If count = 0, re-run role INSERT
 3. Re-run seed: `supabase db execute Eduzone_seed_qa.sql`
@@ -229,14 +234,16 @@ SELECT * FROM public.users WHERE id = current_user_id();
 ### Issue: Permission Denied on RPC
 
 **Check grants:**
+
 ```sql
-SELECT grantee, privilege_type 
+SELECT grantee, privilege_type
 FROM information_schema.role_routine_grants
 WHERE routine_name = 'check_dashboard_access'
 AND grantee IN ('authenticated', 'anon');
 ```
 
 **Fix (if missing):**
+
 ```sql
 REVOKE EXECUTE ON FUNCTION public.check_dashboard_access() FROM anon;
 GRANT EXECUTE ON FUNCTION public.check_dashboard_access() TO authenticated, service_role;
@@ -245,6 +252,7 @@ GRANT EXECUTE ON FUNCTION public.check_dashboard_access() TO authenticated, serv
 ### Issue: Roles Not Found on User Insert
 
 **Check query:**
+
 ```sql
 SELECT u.id, u.primary_role, r.id
 FROM public.users u
@@ -253,6 +261,7 @@ WHERE u.id IN ('aaaaaaaa-0000-0000-0000-000000000001');
 ```
 
 **If r.id IS NULL:**
+
 - System tenant may not exist
 - Roles may not be created
 - Solution: Re-run system tenant + role creation

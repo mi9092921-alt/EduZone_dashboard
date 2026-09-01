@@ -1,10 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { queryKeys } from '@/adapters/queries/keys';
-import {
-  toggleRateLimitRule,
-  clearBlock,
-} from '@/infrastructure/repos/rate-limits.service';
+import { toggleRateLimitRule, clearBlock } from '@/infrastructure/repos/rate-limits.service';
 
 /**
  * Mutation hooks for rate limit actions.

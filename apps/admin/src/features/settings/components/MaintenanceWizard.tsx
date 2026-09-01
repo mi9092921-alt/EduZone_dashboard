@@ -1,12 +1,6 @@
 'use client';
 
-import {
-  Build,
-  NavigateNext,
-  NavigateBefore,
-  Check,
-  Warning,
-} from '@mui/icons-material';
+import { Build, NavigateNext, NavigateBefore, Check, Warning } from '@mui/icons-material';
 import {
   Box,
   Typography,
@@ -50,11 +44,14 @@ export function MaintenanceWizard({ settings }: MaintenanceWizardProps) {
   const t = useTranslations('settings.maintenance_wizard');
   const tVal = useTranslations('validation');
   const STEPS = getSteps(t);
-  
+
   const maintenanceSettings = settings?.maintenance ?? [];
-  const isCurrentlyEnabled = maintenanceSettings.find((s) => s.key === 'maintenance_mode')?.value === 'true';
-  const currentMessage = maintenanceSettings.find((s) => s.key === 'maintenance_message')?.value ?? '';
-  const currentEndsAt = maintenanceSettings.find((s) => s.key === 'maintenance_ends_at')?.value ?? '';
+  const isCurrentlyEnabled =
+    maintenanceSettings.find((s) => s.key === 'maintenance_mode')?.value === 'true';
+  const currentMessage =
+    maintenanceSettings.find((s) => s.key === 'maintenance_message')?.value ?? '';
+  const currentEndsAt =
+    maintenanceSettings.find((s) => s.key === 'maintenance_ends_at')?.value ?? '';
 
   const [activeStep, setActiveStep] = useState(0);
   const [enabled, setEnabled] = useState(isCurrentlyEnabled);
@@ -92,7 +89,9 @@ export function MaintenanceWizard({ settings }: MaintenanceWizardProps) {
       if (enabled) {
         const payload: MaintenanceModeParams = {
           message,
-          ends_at: endsAt ? new Date(endsAt).toISOString() : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          ends_at: endsAt
+            ? new Date(endsAt).toISOString()
+            : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
         };
         if (messageEn) payload.message_en = messageEn;
         if (excludeRoles.length) payload.exclude_roles = excludeRoles;
@@ -132,11 +131,15 @@ export function MaintenanceWizard({ settings }: MaintenanceWizardProps) {
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
         <Box
           sx={{
-            width: 40, height: 40, borderRadius: 2,
+            width: 40,
+            height: 40,
+            borderRadius: 2,
             background: isCurrentlyEnabled
               ? 'linear-gradient(135deg, #DC2626, #EF4444)'
               : 'linear-gradient(135deg, #6366F1, #818CF8)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
           <Build sx={{ color: '#fff', fontSize: 20 }} />
@@ -169,12 +172,7 @@ export function MaintenanceWizard({ settings }: MaintenanceWizardProps) {
           icon={<Warning />}
           sx={{ mb: 3, borderRadius: 2 }}
           action={
-            <Button
-              size="small"
-              color="inherit"
-              onClick={handleDisable}
-              disabled={isPending}
-            >
+            <Button size="small" color="inherit" onClick={handleDisable} disabled={isPending}>
               تعطيل الآن
             </Button>
           }
@@ -200,7 +198,11 @@ export function MaintenanceWizard({ settings }: MaintenanceWizardProps) {
         ))}
       </Stepper>
 
-      {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
+      {error && (
+        <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
+          {error}
+        </Alert>
+      )}
 
       {/* Step Content */}
       <Box sx={{ minHeight: 120, mb: 3 }}>
@@ -278,11 +280,19 @@ export function MaintenanceWizard({ settings }: MaintenanceWizardProps) {
               renderInput={(params) => {
                 const { InputLabelProps, size, ...restParams } = params;
                 return (
-                  <TextField 
-                    {...restParams} 
-                    size={(size ?? 'medium') as NonNullable<React.ComponentProps<typeof TextField>['size']>}
-                    InputLabelProps={(InputLabelProps ?? {}) as NonNullable<React.ComponentProps<typeof TextField>['InputLabelProps']>}
-                    label={t('label_roles')} 
+                  <TextField
+                    {...restParams}
+                    size={
+                      (size ?? 'medium') as NonNullable<
+                        React.ComponentProps<typeof TextField>['size']
+                      >
+                    }
+                    InputLabelProps={
+                      (InputLabelProps ?? {}) as NonNullable<
+                        React.ComponentProps<typeof TextField>['InputLabelProps']
+                      >
+                    }
+                    label={t('label_roles')}
                   />
                 );
               }}
@@ -356,7 +366,9 @@ export function MaintenanceWizard({ settings }: MaintenanceWizardProps) {
             onClick={handleNext}
             endIcon={<NavigateNext />}
             sx={{
-              textTransform: 'none', fontWeight: 600, borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 600,
+              borderRadius: 2,
               backgroundColor: '#6366F1',
               '&:hover': { backgroundColor: '#4F46E5' },
             }}
@@ -370,7 +382,9 @@ export function MaintenanceWizard({ settings }: MaintenanceWizardProps) {
             endIcon={isPending ? <CircularProgress size={16} color="inherit" /> : <Check />}
             disabled={isPending}
             sx={{
-              textTransform: 'none', fontWeight: 600, borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 600,
+              borderRadius: 2,
               backgroundColor: enabled ? '#DC2626' : '#16A34A',
               '&:hover': { backgroundColor: enabled ? '#B91C1C' : '#15803D' },
             }}

@@ -2,7 +2,9 @@
  * Simplified utility for conditionally joining classNames.
  * Replacement for clsx + tailwind-merge to avoid new dependencies.
  */
-export function cn(...inputs: (string | boolean | undefined | null | { [key: string]: boolean | undefined | null })[]) {
+export function cn(
+  ...inputs: (string | boolean | undefined | null | { [key: string]: boolean | undefined | null })[]
+) {
   return inputs
     .filter(Boolean)
     .map((input) => {

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",
+    "start": "pnpm --filter @eduzone/admin start",
     "lint": "turbo lint",
     "test": "turbo test",
     "test:coverage": "turbo test -- --coverage",

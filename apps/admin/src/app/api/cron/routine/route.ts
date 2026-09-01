@@ -43,7 +43,9 @@ export async function GET(request: Request) {
     results['manage_partitions'] = 'Success';
 
     // 2. Prune Expired Cache
-    const { data: prunedData, error: pruneErr } = await supabaseAdmin.rpc('prune_expired_access_cache');
+    const { data: prunedData, error: pruneErr } = await supabaseAdmin.rpc(
+      'prune_expired_access_cache',
+    );
     if (pruneErr) throw new Error(`prune_expired_access_cache failed: ${pruneErr.message}`);
     results['pruned_count'] = prunedData;
 
@@ -66,10 +68,13 @@ export async function GET(request: Request) {
     // 4. Process Cache Purges from Job Queue
     // Generate a unique worker ID to maintain lease ownership and avoid race conditions
     const workerId = crypto.randomUUID();
-    const { data: processedJobs, error: purgeErr } = await supabaseAdmin.rpc('process_cache_purges', {
-      p_worker_id: workerId,
-      p_limit: 1000
-    });
+    const { data: processedJobs, error: purgeErr } = await supabaseAdmin.rpc(
+      'process_cache_purges',
+      {
+        p_worker_id: workerId,
+        p_limit: 1000,
+      },
+    );
 
     if (purgeErr) throw new Error(`process_cache_purges failed: ${purgeErr.message}`);
     results['jobs_processed'] = processedJobs;
@@ -141,7 +146,7 @@ export async function GET(request: Request) {
               status: 'failed',
               error_message: 'Invalid payload: missing notification_id or tenant_id',
               finished_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
+              updated_at: new Date().toISOString(),
             })
             .eq('id', job.id);
           continue;
@@ -172,15 +177,17 @@ export async function GET(request: Request) {
               .select('user_id')
               .eq('notification_id', notifId);
 
-            const existingUserIds = new Set((existingNotifs || []).map((un: { user_id: string }) => un.user_id));
+            const existingUserIds = new Set(
+              (existingNotifs || []).map((un: { user_id: string }) => un.user_id),
+            );
 
             const insertRows = users
-              .filter(u => !existingUserIds.has(u.id))
-              .map(u => ({
+              .filter((u) => !existingUserIds.has(u.id))
+              .map((u) => ({
                 user_id: u.id,
                 notification_id: notifId,
                 tenant_id: tenantId,
-                is_read: false
+                is_read: false,
               }));
 
             if (insertRows.length > 0) {
@@ -197,7 +204,7 @@ export async function GET(request: Request) {
             .update({
               status: 'done',
               finished_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
+              updated_at: new Date().toISOString(),
             })
             .eq('id', job.id);
 
@@ -215,7 +222,7 @@ export async function GET(request: Request) {
               locked_by_worker_id: null,
               locked_at: null,
               lock_expires_at: null,
-              updated_at: new Date().toISOString()
+              updated_at: new Date().toISOString(),
             })
             .eq('id', job.id);
         }
@@ -233,15 +240,18 @@ export async function GET(request: Request) {
     return NextResponse.json({
       success: true,
       timestamp: new Date().toISOString(),
-      results
+      results,
     });
   } catch (err: unknown) {
     console.error('[CRON_ROUTINE_ERROR]', err);
     // Return 500 to signal a cron failure out to Next.js Error Monitoring (e.g. Sentry)
-    return NextResponse.json({
-      success: false,
-      error: 'Cron worker failed',
-      timestamp: new Date().toISOString()
-    }, { status: 500 });
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Cron worker failed',
+        timestamp: new Date().toISOString(),
+      },
+      { status: 500 },
+    );
   }
 }

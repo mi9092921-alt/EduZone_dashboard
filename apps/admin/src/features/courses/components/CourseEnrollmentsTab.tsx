@@ -31,14 +31,11 @@ import type { Enrollment } from '@/domain/types/course.types';
 import { getEnrollmentStudentName } from '@/domain/types/course.types';
 import { getAllCourseEnrollments } from '@/infrastructure/repos/courses.service';
 
-
-
-
-const STATUS_CONFIG: Record<string, "success" | "primary" | "error" | "warning"> = {
-  active: "success",
-  completed: "primary",
-  revoked: "error",
-  expired: "warning",
+const STATUS_CONFIG: Record<string, 'success' | 'primary' | 'error' | 'warning'> = {
+  active: 'success',
+  completed: 'primary',
+  revoked: 'error',
+  expired: 'warning',
 };
 
 interface CourseEnrollmentsTabProps {
@@ -60,9 +57,10 @@ export function CourseEnrollmentsTab({ courseId }: CourseEnrollmentsTabProps) {
 
   // Simple client-side search filter for displayed results
   const filtered = search
-    ? enrollments.filter((e) =>
-        getEnrollmentStudentName(e).toLowerCase().includes(search.toLowerCase()) ||
-        (e.user_email?.toLowerCase().includes(search.toLowerCase()))
+    ? enrollments.filter(
+        (e) =>
+          getEnrollmentStudentName(e).toLowerCase().includes(search.toLowerCase()) ||
+          e.user_email?.toLowerCase().includes(search.toLowerCase()),
       )
     : enrollments;
 
@@ -70,13 +68,13 @@ export function CourseEnrollmentsTab({ courseId }: CourseEnrollmentsTabProps) {
     try {
       setIsExporting(true);
       const allEnrollments = await getAllCourseEnrollments(courseId);
-      
+
       const headers = [
         t('student_header'),
         'Email',
         t('enrollment_date_header'),
         t('status_header'),
-        t('progress_header') + ' (%)'
+        t('progress_header') + ' (%)',
       ];
       const rows = allEnrollments.map((e) => [
         `"${getEnrollmentStudentName(e)}"`,
@@ -86,10 +84,10 @@ export function CourseEnrollmentsTab({ courseId }: CourseEnrollmentsTabProps) {
         `"${e.progress_pct || 0}"`,
       ]);
 
-      const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+      const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
-      
+
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', `course_${courseId}_students.csv`);
@@ -180,11 +178,62 @@ export function CourseEnrollmentsTab({ courseId }: CourseEnrollmentsTabProps) {
         <Table sx={{ minWidth: 800 }}>
           <TableHead>
             <TableRow sx={{ backgroundColor: 'background.default' }}>
-              <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary', py: 2 }}>{t('student_header')}</TableCell>
-              <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary', py: 2 }}>{t('enrollment_date_header')}</TableCell>
-              <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary', py: 2 }}>{t('progress_header')}</TableCell>
-              <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary', py: 2 }}>{t('status_header')}</TableCell>
-              <TableCell align="right" sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary', py: 2 }}>{t('actions_header')}</TableCell>
+              <TableCell
+                sx={{
+                  fontWeight: 800,
+                  textTransform: 'uppercase',
+                  fontSize: '0.75rem',
+                  color: 'text.secondary',
+                  py: 2,
+                }}
+              >
+                {t('student_header')}
+              </TableCell>
+              <TableCell
+                sx={{
+                  fontWeight: 800,
+                  textTransform: 'uppercase',
+                  fontSize: '0.75rem',
+                  color: 'text.secondary',
+                  py: 2,
+                }}
+              >
+                {t('enrollment_date_header')}
+              </TableCell>
+              <TableCell
+                sx={{
+                  fontWeight: 800,
+                  textTransform: 'uppercase',
+                  fontSize: '0.75rem',
+                  color: 'text.secondary',
+                  py: 2,
+                }}
+              >
+                {t('progress_header')}
+              </TableCell>
+              <TableCell
+                sx={{
+                  fontWeight: 800,
+                  textTransform: 'uppercase',
+                  fontSize: '0.75rem',
+                  color: 'text.secondary',
+                  py: 2,
+                }}
+              >
+                {t('status_header')}
+              </TableCell>
+              <TableCell
+                align="right"
+                sx={{
+                  fontWeight: 800,
+                  textTransform: 'uppercase',
+                  fontSize: '0.75rem',
+                  color: 'text.secondary',
+                  py: 2,
+                }}
+              >
+                {t('actions_header')}
+              </TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -207,7 +256,12 @@ export function CourseEnrollmentsTab({ courseId }: CourseEnrollmentsTabProps) {
             ) : (
               filtered.map((enrollment) => {
                 const name = getEnrollmentStudentName(enrollment);
-                const initials = name.split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2);
+                const initials = name
+                  .split(' ')
+                  .map((w) => w[0])
+                  .join('')
+                  .toUpperCase()
+                  .slice(0, 2);
                 const progress = enrollment.progress_pct ?? 0;
                 const statusColor = STATUS_CONFIG[enrollment.status] ?? 'default';
                 return (
@@ -228,17 +282,26 @@ export function CourseEnrollmentsTab({ courseId }: CourseEnrollmentsTabProps) {
                           {initials}
                         </Avatar>
                         <Box>
-                          <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.875rem', color: 'text.primary' }}>
+                          <Typography
+                            variant="body2"
+                            sx={{ fontWeight: 600, fontSize: '0.875rem', color: 'text.primary' }}
+                          >
                             {name}
                           </Typography>
-                          <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.75rem' }}>
+                          <Typography
+                            variant="caption"
+                            sx={{ color: 'text.secondary', fontSize: '0.75rem' }}
+                          >
                             {enrollment.user_email ?? '—'}
                           </Typography>
                         </Box>
                       </Box>
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: '0.8125rem' }}>
+                      <Typography
+                        variant="body2"
+                        sx={{ color: 'text.secondary', fontSize: '0.8125rem' }}
+                      >
                         {new Date(enrollment.enrolled_at).toLocaleDateString(undefined, {
                           month: 'short',
                           day: 'numeric',
@@ -248,7 +311,16 @@ export function CourseEnrollmentsTab({ courseId }: CourseEnrollmentsTabProps) {
                     </TableCell>
                     <TableCell>
                       <Box sx={{ width: 120 }}>
-                        <Typography variant="caption" sx={{ fontWeight: 700, fontSize: '0.625rem', color: 'text.secondary', display: 'block', mb: 0.5 }}>
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            fontWeight: 700,
+                            fontSize: '0.625rem',
+                            color: 'text.secondary',
+                            display: 'block',
+                            mb: 0.5,
+                          }}
+                        >
                           {progress}%
                         </Typography>
                         <LinearProgress
@@ -270,7 +342,9 @@ export function CourseEnrollmentsTab({ courseId }: CourseEnrollmentsTabProps) {
                       <Chip
                         label={(enrollment.status || 'active').toUpperCase()}
                         size="small"
-                        color={statusColor as 'success' | 'primary' | 'error' | 'warning' | 'default'}
+                        color={
+                          statusColor as 'success' | 'primary' | 'error' | 'warning' | 'default'
+                        }
                         variant="outlined"
                         sx={{
                           height: 22,

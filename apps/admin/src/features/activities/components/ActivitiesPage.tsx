@@ -53,9 +53,7 @@ export function ActivitiesPage() {
                   <History className="text-3xl" />
                 </div>
                 <h3 className="text-xl font-bold text-foreground mb-2">{t('select_user')}</h3>
-                <p className="text-muted-foreground text-sm max-w-sm">
-                  {t('select_user_desc')}
-                </p>
+                <p className="text-muted-foreground text-sm max-w-sm">{t('select_user_desc')}</p>
               </CardContent>
             </Card>
           </motion.div>
@@ -73,20 +71,25 @@ export function ActivitiesPage() {
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as 'views' | 'locations')}
                   className={cn(
-                    "relative flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-300",
+                    'relative flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-300',
                     activeTab === tab.id
-                      ? "text-primary shadow-lg"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                      ? 'text-primary shadow-lg'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/60',
                   )}
                 >
                   {activeTab === tab.id && (
                     <motion.div
                       layoutId="active-tab"
                       className="absolute inset-0 bg-card rounded-xl shadow-md border border-border/40 z-0 shadow-inner-glow"
-                      transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                      transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
                     />
                   )}
-                  <tab.icon className={cn("text-lg relative z-10", activeTab === tab.id ? "text-primary" : "text-muted-foreground")} />
+                  <tab.icon
+                    className={cn(
+                      'text-lg relative z-10',
+                      activeTab === tab.id ? 'text-primary' : 'text-muted-foreground',
+                    )}
+                  />
                   <span className="relative z-10">{tab.label}</span>
                 </button>
               ))}

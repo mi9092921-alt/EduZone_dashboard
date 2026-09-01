@@ -49,12 +49,12 @@ describe('Notifications Service', () => {
       let paginatedChain: any;
       // First call: the paginated `notifications` query. Second call: the
       // unpaginated stats query (getNotifications fetches both).
-      vi.mocked(mockSupabase.from).mockImplementationOnce(() => {
-        paginatedChain = createThenableChain({ data: mockData, error: null, count: 1 });
-        return paginatedChain;
-      }).mockImplementationOnce(() =>
-        createThenableChain({ data: mockData, error: null }),
-      );
+      vi.mocked(mockSupabase.from)
+        .mockImplementationOnce(() => {
+          paginatedChain = createThenableChain({ data: mockData, error: null, count: 1 });
+          return paginatedChain;
+        })
+        .mockImplementationOnce(() => createThenableChain({ data: mockData, error: null }));
 
       // Service uses 1-indexed pages: page=1 → from=0, to=9
       const result = await getNotifications(1, 10);
@@ -120,7 +120,10 @@ describe('Notifications Service', () => {
     });
 
     it('should throw error if RPC fails', async () => {
-      vi.mocked(mockSupabase.rpc).mockResolvedValue({ data: null, error: { code: 'PGRST204', message: 'RPC Error' } } as any);
+      vi.mocked(mockSupabase.rpc).mockResolvedValue({
+        data: null,
+        error: { code: 'PGRST204', message: 'RPC Error' },
+      } as any);
 
       await expect(sendNotification({ title: 'T', body: 'B' })).rejects.toThrow('RPC Error');
     });
@@ -138,7 +141,9 @@ describe('Notifications Service', () => {
     });
 
     it('should throw error if delete RPC fails', async () => {
-      vi.mocked(mockSupabase.rpc).mockResolvedValue({ error: { code: 'PGRST205', message: 'Delete Failed' } } as any);
+      vi.mocked(mockSupabase.rpc).mockResolvedValue({
+        error: { code: 'PGRST205', message: 'Delete Failed' },
+      } as any);
 
       await expect(deleteNotification('id')).rejects.toThrow('Delete Failed');
     });

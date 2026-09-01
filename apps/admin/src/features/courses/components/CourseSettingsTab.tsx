@@ -7,7 +7,6 @@ import { useTranslations } from 'next-intl';
 import { useUpdateCourse } from '@/adapters/mutations/courses.mutations';
 import type { CourseDetail } from '@/domain/types/course.types';
 
-
 interface CourseSettingsTabProps {
   course: CourseDetail;
 }
@@ -29,7 +28,9 @@ export function CourseSettingsTab({ course }: CourseSettingsTabProps) {
   };
 
   const publishedSections = course.sections.filter((s) => s.is_published);
-  const publishedLessons = course.sections.flatMap((s) => (s.lessons ?? []).filter((l) => l.is_published));
+  const publishedLessons = course.sections.flatMap((s) =>
+    (s.lessons ?? []).filter((l) => l.is_published),
+  );
   const canPublish = publishedSections.length > 0 && publishedLessons.length > 0;
 
   return (
@@ -163,25 +164,41 @@ export function CourseSettingsTab({ course }: CourseSettingsTabProps) {
         </Typography>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-            <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600 }}>{t('id_label')}</Typography>
-            <Typography variant="caption" sx={{ color: '#475569', fontFamily: 'JetBrains Mono' }}>{course.id}</Typography>
+            <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600 }}>
+              {t('id_label')}
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#475569', fontFamily: 'JetBrains Mono' }}>
+              {course.id}
+            </Typography>
           </Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-            <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600 }}>{t('url_slug')}</Typography>
-            <Typography variant="caption" sx={{ color: '#475569' }}>{course.slug ?? '—'}</Typography>
+            <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600 }}>
+              {t('url_slug')}
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#475569' }}>
+              {course.slug ?? '—'}
+            </Typography>
           </Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-            <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600 }}>{t('region_label')}</Typography>
-            <Typography variant="caption" sx={{ color: '#475569' }}>{course.region_id}</Typography>
+            <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600 }}>
+              {t('region_label')}
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#475569' }}>
+              {course.region_id}
+            </Typography>
           </Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-            <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600 }}>{t('created_label')}</Typography>
+            <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600 }}>
+              {t('created_label')}
+            </Typography>
             <Typography variant="caption" sx={{ color: '#475569' }}>
               {new Date(course.created_at).toLocaleString()}
             </Typography>
           </Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-            <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600 }}>{t('updated_label')}</Typography>
+            <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600 }}>
+              {t('updated_label')}
+            </Typography>
             <Typography variant="caption" sx={{ color: '#475569' }}>
               {new Date(course.updated_at).toLocaleString()}
             </Typography>

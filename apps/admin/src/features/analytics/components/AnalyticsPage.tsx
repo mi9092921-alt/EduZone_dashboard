@@ -9,7 +9,10 @@ import {
   Download,
   AccessTime,
 } from '@mui/icons-material';
-import { TrendingUp as TrendingUpIcon, TrendingDown as TrendingDownIcon } from '@mui/icons-material';
+import {
+  TrendingUp as TrendingUpIcon,
+  TrendingDown as TrendingDownIcon,
+} from '@mui/icons-material';
 import { Typography, Box, Tooltip } from '@mui/material';
 import { useTranslations, useLocale } from 'next-intl';
 import { useState, useMemo } from 'react';
@@ -24,15 +27,9 @@ import {
   useGeographicDistribution,
   useGlobalCoordinates,
 } from '@/adapters/queries/analytics-mv.queries';
-import {
-  Card,
-  StatsCard,
-  StatsCardContent,
-  StatsCardIcon
-} from '@/components/ui/Card';
+import { Card, StatsCard, StatsCardContent, StatsCardIcon } from '@/components/ui/Card';
 import type { CourseWithStats, MvDailyRevenue, DailyCount } from '@/domain/types/analytics.types';
 import { cn } from '@/lib/utils';
-
 
 export function AnalyticsPage() {
   const { data: userStats, isLoading: userStatsLoading } = useUserStats();
@@ -51,7 +48,10 @@ export function AnalyticsPage() {
   const handleExportCsv = (sectionName: string, data: Record<string, unknown>[]) => {
     if (!data || data.length === 0) return;
     const keys = Object.keys(data[0]!);
-    const csv = [keys.join(','), ...data.map((row) => keys.map((k) => JSON.stringify(row[k] ?? '')).join(','))].join('\n');
+    const csv = [
+      keys.join(','),
+      ...data.map((row) => keys.map((k) => JSON.stringify(row[k] ?? '')).join(',')),
+    ].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -76,8 +76,14 @@ export function AnalyticsPage() {
       <section className="space-y-4">
         <SectionHeader
           title={ta('section_users')}
-          refreshedAt={(userStats as unknown as Record<string, string> | null)?.refreshed_at ?? userStats?.last_updated}
-          onExport={() => userStats && handleExportCsv('user-metrics', [userStats as unknown as Record<string, unknown>])}
+          refreshedAt={
+            (userStats as unknown as Record<string, string> | null)?.refreshed_at ??
+            userStats?.last_updated
+          }
+          onExport={() =>
+            userStats &&
+            handleExportCsv('user-metrics', [userStats as unknown as Record<string, unknown>])
+          }
           locale={locale}
           ta={ta}
         />
@@ -141,7 +147,9 @@ export function AnalyticsPage() {
         {/* Registration trend */}
         {trend && trend.length > 0 && (
           <Card className="rounded-2xl border border-border bg-card shadow-sm p-5 border-border/50">
-            <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-3 text-center">{ta('registration_trend_title')}</h4>
+            <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-3 text-center">
+              {ta('registration_trend_title')}
+            </h4>
             <MiniLineChart data={trend} height={140} />
           </Card>
         )}
@@ -149,7 +157,9 @@ export function AnalyticsPage() {
         {/* Status distribution */}
         {userStats && (
           <Card className="rounded-2xl border border-border bg-card shadow-sm p-5 border-border/50">
-            <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-3 text-center">{ta('status_distribution_title')}</h4>
+            <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-3 text-center">
+              {ta('status_distribution_title')}
+            </h4>
             <StatusDistribution
               active={userStats.active_users}
               locked={userStats.locked_users}
@@ -166,21 +176,28 @@ export function AnalyticsPage() {
         <SectionHeader
           title={ta('section_courses')}
           refreshedAt={courseStats?.[0]?.refreshed_at}
-          onExport={() => courseStats && handleExportCsv('course-metrics', courseStats as unknown as Record<string, unknown>[])}
+          onExport={() =>
+            courseStats &&
+            handleExportCsv('course-metrics', courseStats as unknown as Record<string, unknown>[])
+          }
           locale={locale}
           ta={ta}
         />
 
         {courseStats && courseStats.length > 0 && (
           <Card className="rounded-2xl border border-border bg-card shadow-sm p-5 border-border/50">
-            <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-3 text-center">{ta('top_courses_title')}</h4>
+            <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-3 text-center">
+              {ta('top_courses_title')}
+            </h4>
             <HorizontalBarChart data={courseStats.slice(0, 10)} />
           </Card>
         )}
 
         {courseStats && courseStats.length > 0 && (
           <Card className="rounded-2xl border border-border bg-card shadow-sm p-5 border-border/50">
-            <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-4 text-center">{ta('course_engagement_title')}</h4>
+            <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-4 text-center">
+              {ta('course_engagement_title')}
+            </h4>
             <div className="space-y-3">
               {courseStats.slice(0, 10).map((c) => (
                 <ProgressRow key={c.course_id} course={c} ta={ta} />
@@ -194,7 +211,10 @@ export function AnalyticsPage() {
       <section className="space-y-4">
         <SectionHeader
           title={ta('section_activity')}
-          onExport={() => activity && handleExportCsv('activity-heatmap', activity as unknown as Record<string, unknown>[])}
+          onExport={() =>
+            activity &&
+            handleExportCsv('activity-heatmap', activity as unknown as Record<string, unknown>[])
+          }
           locale={locale}
           ta={ta}
         />
@@ -204,7 +224,9 @@ export function AnalyticsPage() {
             onClick={() => setRiskFilter(null)}
             className={cn(
               'text-[10px] font-bold px-2 py-1 rounded-md transition-all',
-              !riskFilter ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80',
+              !riskFilter
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground hover:bg-muted/80',
             )}
           >
             All
@@ -215,7 +237,9 @@ export function AnalyticsPage() {
               onClick={() => setRiskFilter(level)}
               className={cn(
                 'text-[10px] font-bold px-2 py-1 rounded-md transition-all capitalize',
-                riskFilter === level ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80',
+                riskFilter === level
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-muted-foreground hover:bg-muted/80',
               )}
             >
               {level}
@@ -241,7 +265,10 @@ export function AnalyticsPage() {
       <section className="space-y-4">
         <SectionHeader
           title={ta('section_geo')}
-          onExport={() => geoData && handleExportCsv('geographic', geoData as unknown as Record<string, unknown>[])}
+          onExport={() =>
+            geoData &&
+            handleExportCsv('geographic', geoData as unknown as Record<string, unknown>[])
+          }
           locale={locale}
           ta={ta}
         />
@@ -250,7 +277,7 @@ export function AnalyticsPage() {
           {/* Map Visualization */}
           <Card className="rounded-2xl border border-border bg-card shadow-sm p-4 border-border/50 flex flex-col items-center justify-center min-h-[400px]">
             {globalPoints && globalPoints.length > 0 ? (
-               <GeoDistributionMap points={globalPoints} height={380} />
+              <GeoDistributionMap points={globalPoints} height={380} />
             ) : (
               <div className="flex flex-col items-center justify-center opacity-30 py-20">
                 <Public className="text-6xl mb-4" />
@@ -266,10 +293,18 @@ export function AnalyticsPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border bg-muted/30">
-                      <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">#</th>
-                      <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">Region / Country</th>
-                      <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">Users</th>
-                      <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">Share</th>
+                      <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">
+                        #
+                      </th>
+                      <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">
+                        Region / Country
+                      </th>
+                      <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">
+                        Users
+                      </th>
+                      <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">
+                        Share
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/30">
@@ -279,14 +314,23 @@ export function AnalyticsPage() {
                       return (
                         <tr key={g.country_code} className="hover:bg-muted/20 transition-colors">
                           <td className="px-4 py-2.5 text-xs text-muted-foreground">{i + 1}</td>
-                          <td className="px-4 py-2.5 text-xs font-semibold text-foreground uppercase tracking-tight">{g.country_code}</td>
-                          <td className="px-4 py-2.5 text-xs font-bold text-foreground">{g.user_count.toLocaleString()}</td>
+                          <td className="px-4 py-2.5 text-xs font-semibold text-foreground uppercase tracking-tight">
+                            {g.country_code}
+                          </td>
+                          <td className="px-4 py-2.5 text-xs font-bold text-foreground">
+                            {g.user_count.toLocaleString()}
+                          </td>
                           <td className="px-4 py-2.5">
                             <div className="flex items-center gap-2">
                               <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden max-w-[120px]">
-                                <div className="h-full bg-primary rounded-full" style={{ width: `${pct}%` }} />
+                                <div
+                                  className="h-full bg-primary rounded-full"
+                                  style={{ width: `${pct}%` }}
+                                />
                               </div>
-                              <span className="text-[10px] font-mono text-muted-foreground">{pct}%</span>
+                              <span className="text-[10px] font-mono text-muted-foreground">
+                                {pct}%
+                              </span>
                             </div>
                           </td>
                         </tr>
@@ -309,7 +353,19 @@ export function AnalyticsPage() {
 }
 
 // ── Section Header ───────────────────────────────────────────────
-function SectionHeader({ title, refreshedAt, onExport, locale, ta }: { title: string; refreshedAt?: string | undefined; onExport?: (() => void) | undefined; locale: string; ta: ReturnType<typeof useTranslations> }) {
+function SectionHeader({
+  title,
+  refreshedAt,
+  onExport,
+  locale,
+  ta,
+}: {
+  title: string;
+  refreshedAt?: string | undefined;
+  onExport?: (() => void) | undefined;
+  locale: string;
+  ta: ReturnType<typeof useTranslations>;
+}) {
   return (
     <div className="flex items-center justify-between">
       <h2 className="text-sm font-bold text-foreground">{title}</h2>
@@ -318,7 +374,10 @@ function SectionHeader({ title, refreshedAt, onExport, locale, ta }: { title: st
           <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
             <AccessTime className="text-xs" />
             {ta('updated_label', {
-              time: new Date(refreshedAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })
+              time: new Date(refreshedAt).toLocaleTimeString(locale, {
+                hour: '2-digit',
+                minute: '2-digit',
+              }),
             })}
           </span>
         )}
@@ -363,16 +422,45 @@ function KpiCard({
 }: KpiCardProps) {
   const content = (
     <StatsCardContent className="flex flex-row items-center gap-4 p-5">
-      <StatsCardIcon style={{ backgroundColor: bgColor || `${color}15`, color: color }} className="w-10 h-10 rounded-lg shrink-0 flex items-center justify-center">
+      <StatsCardIcon
+        style={{ backgroundColor: bgColor || `${color}15`, color: color }}
+        className="w-10 h-10 rounded-lg shrink-0 flex items-center justify-center"
+      >
         <Icon sx={{ fontSize: 20 }} />
       </StatsCardIcon>
       <div className="flex flex-col min-w-0 flex-1">
-        <Typography variant="overline" color="text.secondary" sx={{ fontWeight: 700, mb: 0.5, lineHeight: 1.2, textTransform: 'uppercase', fontSize: 'clamp(0.6rem, 1vw, 0.65rem)' }} className="truncate w-full">
+        <Typography
+          variant="overline"
+          color="text.secondary"
+          sx={{
+            fontWeight: 700,
+            mb: 0.5,
+            lineHeight: 1.2,
+            textTransform: 'uppercase',
+            fontSize: 'clamp(0.6rem, 1vw, 0.65rem)',
+          }}
+          className="truncate w-full"
+        >
           {label}
         </Typography>
-        <Typography variant="h3" color="text.primary" sx={{ fontWeight: 800, fontSize: 'clamp(1.25rem, 3vw, 1.75rem)', lineHeight: 1.1 }} className="truncate w-full">
+        <Typography
+          variant="h3"
+          color="text.primary"
+          sx={{ fontWeight: 800, fontSize: 'clamp(1.25rem, 3vw, 1.75rem)', lineHeight: 1.1 }}
+          className="truncate w-full"
+        >
           {loading ? (
-            <Box component="span" sx={{ height: 24, width: 48, bgcolor: 'neutral.100', display: 'inline-block', animation: 'pulse 1.5s infinite', borderRadius: 1 }} />
+            <Box
+              component="span"
+              sx={{
+                height: 24,
+                width: 48,
+                bgcolor: 'neutral.100',
+                display: 'inline-block',
+                animation: 'pulse 1.5s infinite',
+                borderRadius: 1,
+              }}
+            />
           ) : (
             (value ?? 0).toLocaleString()
           )}
@@ -387,7 +475,11 @@ function KpiCard({
               color: trend.isPositive ? 'success.main' : 'error.main',
             }}
           >
-            {trend.isPositive ? <TrendingUpIcon sx={{ fontSize: 12 }} /> : <TrendingDownIcon sx={{ fontSize: 12 }} />}
+            {trend.isPositive ? (
+              <TrendingUpIcon sx={{ fontSize: 12 }} />
+            ) : (
+              <TrendingDownIcon sx={{ fontSize: 12 }} />
+            )}
             <Typography variant="caption" sx={{ fontWeight: 700, fontSize: '10px' }}>
               {trend.value}
             </Typography>
@@ -401,9 +493,7 @@ function KpiCard({
     <StatsCard className="transition-all duration-300 hover:bg-muted/20 active:scale-[0.98]">
       {tooltip ? (
         <Tooltip title={tooltip} arrow placement="top">
-          <div className="w-full h-full cursor-help">
-            {content}
-          </div>
+          <div className="w-full h-full cursor-help">{content}</div>
         </Tooltip>
       ) : (
         content
@@ -413,8 +503,18 @@ function KpiCard({
 }
 
 // ── Status Distribution Bar ──────────────────────────────────────
-function StatusDistribution({ active, locked, suspended, banned, t }: {
-  active: number; locked: number; suspended: number; banned: number; t: ReturnType<typeof useTranslations>;
+function StatusDistribution({
+  active,
+  locked,
+  suspended,
+  banned,
+  t,
+}: {
+  active: number;
+  locked: number;
+  suspended: number;
+  banned: number;
+  t: ReturnType<typeof useTranslations>;
 }) {
   const total = active + locked + suspended + banned || 1;
   const segments = [
@@ -427,16 +527,17 @@ function StatusDistribution({ active, locked, suspended, banned, t }: {
   return (
     <div>
       <div className="flex h-4 rounded-full overflow-hidden bg-muted mb-3">
-        {segments.map((s) => (
-          s.value > 0 && (
-            <div
-              key={s.label}
-              className={cn('h-full transition-all', s.color)}
-              style={{ width: `${(s.value / total) * 100}%` }}
-              title={`${s.label}: ${s.value}`}
-            />
-          )
-        ))}
+        {segments.map(
+          (s) =>
+            s.value > 0 && (
+              <div
+                key={s.label}
+                className={cn('h-full transition-all', s.color)}
+                style={{ width: `${(s.value / total) * 100}%` }}
+                title={`${s.label}: ${s.value}`}
+              />
+            ),
+        )}
       </div>
       <div className="flex items-center gap-4 flex-wrap">
         {segments.map((s) => (
@@ -444,7 +545,9 @@ function StatusDistribution({ active, locked, suspended, banned, t }: {
             <div className={cn('h-2.5 w-2.5 rounded-full', s.color)} />
             <span className="text-xs text-muted-foreground">{s.label}</span>
             <span className="text-xs font-bold text-foreground">{s.value.toLocaleString()}</span>
-            <span className="text-[10px] text-muted-foreground">({((s.value / total) * 100).toFixed(1)}%)</span>
+            <span className="text-[10px] text-muted-foreground">
+              ({((s.value / total) * 100).toFixed(1)}%)
+            </span>
           </div>
         ))}
       </div>
@@ -459,18 +562,26 @@ function MiniLineChart({ data, height = 120 }: { data: DailyCount[]; height?: nu
   const h = height;
   const padding = 2;
 
-  const points = data.map((d, i) => {
-    const x = padding + (i / Math.max(data.length - 1, 1)) * (w - 2 * padding);
-    const y = h - padding - (d.count / maxVal) * (h - 2 * padding);
-    return `${x},${y}`;
-  }).join(' ');
+  const points = data
+    .map((d, i) => {
+      const x = padding + (i / Math.max(data.length - 1, 1)) * (w - 2 * padding);
+      const y = h - padding - (d.count / maxVal) * (h - 2 * padding);
+      return `${x},${y}`;
+    })
+    .join(' ');
 
   const areaPoints = `${padding},${h - padding} ${points} ${w - padding},${h - padding}`;
 
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className="w-full" style={{ height }} preserveAspectRatio="none">
       <polygon points={areaPoints} fill="url(#areaGradient)" opacity={0.2} />
-      <polyline points={points} fill="none" stroke="var(--primary)" strokeWidth="0.5" vectorEffect="non-scaling-stroke" />
+      <polyline
+        points={points}
+        fill="none"
+        stroke="var(--primary)"
+        strokeWidth="0.5"
+        vectorEffect="non-scaling-stroke"
+      />
       <defs>
         <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="var(--primary)" />
@@ -498,7 +609,9 @@ function HorizontalBarChart({ data }: { data: CourseWithStats[] }) {
               style={{ width: `${(c.enrolled / maxEnrolled) * 100}%` }}
             />
           </div>
-          <span className="text-xs font-bold text-foreground min-w-[40px] text-end">{c.enrolled}</span>
+          <span className="text-xs font-bold text-foreground min-w-[40px] text-end">
+            {c.enrolled}
+          </span>
         </div>
       ))}
     </div>
@@ -506,8 +619,15 @@ function HorizontalBarChart({ data }: { data: CourseWithStats[] }) {
 }
 
 // ── Progress Row ─────────────────────────────────────────────────
-function ProgressRow({ course, ta }: { course: CourseWithStats; ta: ReturnType<typeof useTranslations> }) {
-  const completionRate = course.enrolled > 0 ? ((course.completed / course.enrolled) * 100).toFixed(0) : '0';
+function ProgressRow({
+  course,
+  ta,
+}: {
+  course: CourseWithStats;
+  ta: ReturnType<typeof useTranslations>;
+}) {
+  const completionRate =
+    course.enrolled > 0 ? ((course.completed / course.enrolled) * 100).toFixed(0) : '0';
 
   return (
     <div className="flex items-center gap-3">
@@ -517,19 +637,38 @@ function ProgressRow({ course, ta }: { course: CourseWithStats; ta: ReturnType<t
       <div className="flex-1 h-3 bg-muted rounded-full overflow-hidden">
         <div className="h-full flex">
           <div className="bg-emerald-500 h-full" style={{ width: `${completionRate}%` }} />
-          <div className="bg-primary/30 h-full" style={{ width: `${Math.max(0, (course.avg_progress ?? 0) - Number(completionRate))}%` }} />
+          <div
+            className="bg-primary/30 h-full"
+            style={{
+              width: `${Math.max(0, (course.avg_progress ?? 0) - Number(completionRate))}%`,
+            }}
+          />
         </div>
       </div>
       <div className="flex items-center gap-2 min-w-[100px] justify-end">
-        <span className="text-[10px] text-emerald-600 font-bold">{ta('percent_done', { pct: completionRate })}</span>
-        <span className="text-[10px] text-muted-foreground">{ta('avg_label', { val: course.avg_progress })}</span>
+        <span className="text-[10px] text-emerald-600 font-bold">
+          {ta('percent_done', { pct: completionRate })}
+        </span>
+        <span className="text-[10px] text-muted-foreground">
+          {ta('avg_label', { val: course.avg_progress })}
+        </span>
       </div>
     </div>
   );
 }
 
 // ── Activity Heatmap ─────────────────────────────────────────────
-function ActivityHeatmap({ data, riskFilter: _riskFilter, ta, locale }: { data: MvDailyRevenue[]; riskFilter: string | null; ta: ReturnType<typeof useTranslations>; locale: string }) {
+function ActivityHeatmap({
+  data,
+  riskFilter: _riskFilter,
+  ta,
+  locale,
+}: {
+  data: MvDailyRevenue[];
+  riskFilter: string | null;
+  ta: ReturnType<typeof useTranslations>;
+  locale: string;
+}) {
   const filtered = useMemo(() => {
     // Note: v13 vw_daily_revenue does not have risk_level, it tracks financial activity.
     // We display all daily revenue events here.

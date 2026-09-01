@@ -21,16 +21,20 @@ describe('User Management: Ban User Flow (Cloud Safe)', () => {
     cy.contains('button', /Security/i).click();
     cy.contains('button', /Ban Permanently/i).click();
 
-    cy.get('h2').contains(/Ban User/i).should('be.visible');
+    cy.get('h2')
+      .contains(/Ban User/i)
+      .should('be.visible');
     cy.get('textarea[aria-label="Action Reason"]').type('Permanent violation E2E');
-    
+
     // Check for hard prompt
     cy.get('input[placeholder*="BAN"]').type('BAN');
 
     cy.intercept('POST', '**/rest/v1/rpc/*ban*', { statusCode: 200, body: {} }).as('rpcBan');
     cy.intercept('PATCH', '**/rest/v1/users*', { statusCode: 200, body: [{}] }).as('patchBan');
 
-    cy.get('button').contains(/Ban Permanently/i).click();
+    cy.get('button')
+      .contains(/Ban Permanently/i)
+      .click();
 
     cy.contains(/banned successfully/i, { timeout: 5000 }).should('be.visible');
   });

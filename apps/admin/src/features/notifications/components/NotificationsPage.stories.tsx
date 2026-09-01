@@ -12,37 +12,40 @@ const meta: Meta<typeof NotificationsPage> = {
         // getNotifications
         http.get('*/rest/v1/notifications*', async ({ request }) => {
           await delay(800);
-          return HttpResponse.json([
+          return HttpResponse.json(
+            [
+              {
+                id: '1',
+                title: 'Welcome to Eduzone',
+                body: 'We are glad to have you here. This is a system-wide announcement for all students and teachers.',
+                target_audience: 'all',
+                target_permission: null,
+                target_user_ids: null,
+                created_at: new Date().toISOString(),
+              },
+              {
+                id: '2',
+                title: 'New Course Available',
+                body: 'Advanced Mathematics is now open for enrollment.',
+                target_audience: 'students',
+                target_permission: null,
+                target_user_ids: null,
+                created_at: new Date(Date.now() - 3600000).toISOString(),
+              },
+              {
+                id: '3',
+                title: 'Server Maintenance',
+                body: 'The server will be down for maintenance at 2 AM UTC.',
+                target_audience: 'admins',
+                target_permission: 'settings.manage',
+                target_user_ids: null,
+                created_at: new Date(Date.now() - 7200000).toISOString(),
+              },
+            ],
             {
-              id: '1',
-              title: 'Welcome to Eduzone',
-              body: 'We are glad to have you here. This is a system-wide announcement for all students and teachers.',
-              target_audience: 'all',
-              target_permission: null,
-              target_user_ids: null,
-              created_at: new Date().toISOString(),
+              headers: { 'Content-Range': '0-2/3', 'x-content-range': '0-2/3' },
             },
-            {
-              id: '2',
-              title: 'New Course Available',
-              body: 'Advanced Mathematics is now open for enrollment.',
-              target_audience: 'students',
-              target_permission: null,
-              target_user_ids: null,
-              created_at: new Date(Date.now() - 3600000).toISOString(),
-            },
-            {
-              id: '3',
-              title: 'Server Maintenance',
-              body: 'The server will be down for maintenance at 2 AM UTC.',
-              target_audience: 'admins',
-              target_permission: 'settings.manage',
-              target_user_ids: null,
-              created_at: new Date(Date.now() - 7200000).toISOString(),
-            },
-          ], { 
-            headers: { 'Content-Range': '0-2/3', 'x-content-range': '0-2/3' } 
-          });
+          );
         }),
         // send_notification RPC
         http.post('*/rest/v1/rpc/send_notification', async () => {

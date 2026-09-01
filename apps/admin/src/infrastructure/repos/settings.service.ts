@@ -114,19 +114,17 @@ export async function getSetting(key: string): Promise<string | null> {
 // WRITE
 // ══════════════════════════════════════════════════
 
-export async function setSetting(
-  key: string,
-  value: string,
-  valueType?: string,
-): Promise<void> {
+export async function setSetting(key: string, value: string, valueType?: string): Promise<void> {
   const { supabase } = container;
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) throw new Error('ADMIN_ONLY');
 
   let parsedValue: unknown = value;
   if (valueType === 'boolean') {
-    parsedValue = (value === 'true' || value === '1' || value === 'yes');
+    parsedValue = value === 'true' || value === '1' || value === 'yes';
   } else if (valueType === 'integer') {
     const intVal = parseInt(value, 10);
     parsedValue = isNaN(intVal) ? 0 : intVal;
@@ -144,10 +142,7 @@ export async function setSetting(
     updated_at: new Date().toISOString(),
   };
 
-  const { error } = await supabase
-    .from('settings_kv')
-    .update(updatePayload)
-    .eq('key', key);
+  const { error } = await supabase.from('settings_kv').update(updatePayload).eq('key', key);
 
   if (error) {
     if (error.code === 'PGRST116') throw new Error('SETTING_NOT_FOUND');
@@ -155,16 +150,20 @@ export async function setSetting(
   }
 }
 
-export async function createSetting(setting: Partial<SettingKv> & { key: string; value: string }): Promise<SettingKv> {
+export async function createSetting(
+  setting: Partial<SettingKv> & { key: string; value: string },
+): Promise<SettingKv> {
   const { supabase } = container;
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) throw new Error('ADMIN_ONLY');
 
   let parsedValue: unknown = setting.value;
   const valueType = setting.value_type;
   if (valueType === 'boolean') {
-    parsedValue = (setting.value === 'true' || setting.value === '1');
+    parsedValue = setting.value === 'true' || setting.value === '1';
   } else if (valueType === 'integer') {
     const intVal = parseInt(setting.value, 10);
     parsedValue = isNaN(intVal) ? 0 : intVal;
@@ -199,10 +198,7 @@ export async function createSetting(setting: Partial<SettingKv> & { key: string;
 
 export async function deleteSetting(key: string): Promise<void> {
   const { supabase } = container;
-  const { error } = await supabase
-    .from('settings_kv')
-    .delete()
-    .eq('key', key);
+  const { error } = await supabase.from('settings_kv').delete().eq('key', key);
 
   if (error) throw error;
 }
@@ -242,7 +238,9 @@ export async function enableMaintenanceMode(params: MaintenanceModeParams): Prom
     });
   }
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   for (const s of settings) {
     const { error } = await supabase
@@ -257,20 +255,20 @@ export async function enableMaintenanceMode(params: MaintenanceModeParams): Prom
 
 export async function disableMaintenanceMode(): Promise<void> {
   const { supabase } = container;
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  const { error } = await supabase
-    .from('settings_kv')
-    .upsert(
-      {
-        key: 'maintenance_mode',
-        value: false,
-        category: 'maintenance',
-        updated_by: user?.id,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'key' },
-    );
+  const { error } = await supabase.from('settings_kv').upsert(
+    {
+      key: 'maintenance_mode',
+      value: false,
+      category: 'maintenance',
+      updated_by: user?.id,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'key' },
+  );
 
   if (error) throw error;
 }
@@ -281,7 +279,9 @@ export async function disableMaintenanceMode(): Promise<void> {
 
 export async function lockApp(message: string): Promise<void> {
   const { supabase } = container;
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   const settings = [
     { key: 'app_locked', value: true, category: 'maintenance' },
@@ -301,21 +301,20 @@ export async function lockApp(message: string): Promise<void> {
 
 export async function unlockApp(): Promise<void> {
   const { supabase } = container;
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  const { error } = await supabase
-    .from('settings_kv')
-    .upsert(
-      {
-        key: 'app_locked',
-        value: false,
-        category: 'maintenance',
-        updated_by: user?.id,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'key' },
-    );
+  const { error } = await supabase.from('settings_kv').upsert(
+    {
+      key: 'app_locked',
+      value: false,
+      category: 'maintenance',
+      updated_by: user?.id,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'key' },
+  );
 
   if (error) throw error;
 }
-

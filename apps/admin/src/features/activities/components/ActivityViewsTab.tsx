@@ -4,7 +4,6 @@ import React from 'react';
 
 import { useVideoViews } from '@/adapters/queries/courses.queries';
 
-
 interface ActivityViewsTabProps {
   userId: string;
 }
@@ -48,7 +47,7 @@ export function ActivityViewsTab({ userId }: ActivityViewsTabProps) {
     const hrs = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
-    
+
     if (hrs > 0) {
       return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     }
@@ -61,9 +60,15 @@ export function ActivityViewsTab({ userId }: ActivityViewsTabProps) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/30">
-              <th className="text-start px-5 py-3 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">{t('header_content')}</th>
-              <th className="text-start px-5 py-3 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">{t('header_duration')}</th>
-              <th className="text-start px-5 py-3 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">{t('header_date')}</th>
+              <th className="text-start px-5 py-3 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">
+                {t('header_content')}
+              </th>
+              <th className="text-start px-5 py-3 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">
+                {t('header_duration')}
+              </th>
+              <th className="text-start px-5 py-3 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">
+                {t('header_date')}
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/30">
@@ -92,10 +97,14 @@ export function ActivityViewsTab({ userId }: ActivityViewsTabProps) {
                 <td className="px-5 py-4 whitespace-nowrap">
                   <div className="flex flex-col text-[11px]">
                     <span className="text-foreground font-bold">
-                      {new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(view.viewed_at))}
+                      {new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(
+                        new Date(view.viewed_at),
+                      )}
                     </span>
                     <span className="text-muted-foreground mt-0.5 uppercase">
-                      {new Intl.DateTimeFormat(locale, { timeStyle: 'short' }).format(new Date(view.viewed_at))}
+                      {new Intl.DateTimeFormat(locale, { timeStyle: 'short' }).format(
+                        new Date(view.viewed_at),
+                      )}
                     </span>
                   </div>
                 </td>

@@ -1,10 +1,6 @@
 'use client';
 
-import {
-  VerifiedUser,
-  ErrorOutline,
-  PlayArrow,
-} from '@mui/icons-material';
+import { VerifiedUser, ErrorOutline, PlayArrow } from '@mui/icons-material';
 import { LinearProgress, Tooltip } from '@mui/material';
 import { useTranslations } from 'next-intl';
 import { useState, useCallback } from 'react';
@@ -50,11 +46,7 @@ export function ChainVerifier({ dateFrom, dateTo }: ChainVerifierProps) {
       // The genesis hash for the first log is its prev_hash
       const genesisHash = logs[0]?.prev_hash ?? 'GENESIS_BLOCK';
 
-      const verification = await verifyHashChain(
-        logs,
-        genesisHash,
-        (pct) => setProgress(pct),
-      );
+      const verification = await verifyHashChain(logs, genesisHash, (pct) => setProgress(pct));
 
       setResult(verification);
     } catch (err) {
@@ -69,9 +61,17 @@ export function ChainVerifier({ dateFrom, dateTo }: ChainVerifierProps) {
       {/* Chain state info */}
       {chainState && (
         <div className="flex items-center gap-4 text-xs text-muted-foreground">
-          <span>{t('label_last_seq')} <strong className="text-foreground font-mono">{chainState.last_seq}</strong></span>
+          <span>
+            {t('label_last_seq')}{' '}
+            <strong className="text-foreground font-mono">{chainState.last_seq}</strong>
+          </span>
           <Tooltip title={chainState.last_hash}>
-            <span>{t('label_last_hash')} <strong className="text-foreground font-mono">{chainState.last_hash.slice(0, 12)}…</strong></span>
+            <span>
+              {t('label_last_hash')}{' '}
+              <strong className="text-foreground font-mono">
+                {chainState.last_hash.slice(0, 12)}…
+              </strong>
+            </span>
           </Tooltip>
         </div>
       )}

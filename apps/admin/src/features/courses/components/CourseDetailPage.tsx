@@ -15,8 +15,6 @@ import {
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 
-
-
 import { CourseEnrollmentsTab } from './CourseEnrollmentsTab';
 import { CourseInfoForm } from './CourseInfoForm';
 import { CourseSettingsTab } from './CourseSettingsTab';
@@ -28,7 +26,6 @@ import { useRouter } from '@/i18n/routing';
 interface CourseDetailPageProps {
   courseId: string;
 }
-
 
 export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
   const t = useTranslations('common');
@@ -77,9 +74,7 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
   return (
     <Box>
       {/* Breadcrumbs */}
-      <Breadcrumbs
-        sx={{ mb: 1.5, '& .MuiBreadcrumbs-separator': { color: '#CBD5E1' } }}
-      >
+      <Breadcrumbs sx={{ mb: 1.5, '& .MuiBreadcrumbs-separator': { color: '#CBD5E1' } }}>
         <MuiLink
           underline="hover"
           color="#64748B"
@@ -185,9 +180,7 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
       {/* Tab Content */}
       <Box sx={{ maxWidth: '100%' }}>
         {activeTab === 0 && <CourseInfoForm course={course} />}
-        {activeTab === 1 && (
-          <CurriculumBuilder courseId={course.id} sections={course.sections} />
-        )}
+        {activeTab === 1 && <CurriculumBuilder courseId={course.id} sections={course.sections} />}
         {activeTab === 2 && <CourseEnrollmentsTab courseId={course.id} />}
         {activeTab === 3 && <CourseSettingsTab course={course} />}
       </Box>

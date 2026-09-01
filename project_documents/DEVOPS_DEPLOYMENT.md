@@ -7,12 +7,12 @@
 
 ## 1. Environments
 
-| Environment | Purpose | URL | Branch |
-|-------------|---------|-----|--------|
-| **Local** | Developer sandbox | `localhost:3000` | any |
-| **Development** | Integration testing | `dev-admin.eduzone.io` | `develop` |
-| **Staging** | Pre-production validation | `staging-admin.eduzone.io` | `staging` |
-| **Production** | Live platform | `admin.eduzone.io` | `main` |
+| Environment     | Purpose                   | URL                        | Branch    |
+| --------------- | ------------------------- | -------------------------- | --------- |
+| **Local**       | Developer sandbox         | `localhost:3000`           | any       |
+| **Development** | Integration testing       | `dev-admin.eduzone.io`     | `develop` |
+| **Staging**     | Pre-production validation | `staging-admin.eduzone.io` | `staging` |
+| **Production**  | Live platform             | `admin.eduzone.io`         | `main`    |
 
 ---
 
@@ -133,22 +133,22 @@ jobs:
   quality:
     steps:
       - pnpm install --frozen-lockfile
-      - pnpm typecheck              # tsc --noEmit (zero errors)
-      - pnpm lint                   # eslint --max-warnings=0
-      - pnpm test                   # Vitest unit tests
-      - pnpm test:coverage          # Coverage ≥ 80% gate
-      - pnpm build                  # Next.js build (no type errors)
+      - pnpm typecheck # tsc --noEmit (zero errors)
+      - pnpm lint # eslint --max-warnings=0
+      - pnpm test # Vitest unit tests
+      - pnpm test:coverage # Coverage ≥ 80% gate
+      - pnpm build # Next.js build (no type errors)
 
   dependency-check:
     steps:
-      - dependency-cruiser          # Enforce layer boundaries
-      - madge --circular            # No circular dependencies
+      - dependency-cruiser # Enforce layer boundaries
+      - madge --circular # No circular dependencies
       - pnpm audit --audit-level=high # No high/critical vulnerabilities
 
   migration-check:
     steps:
-      - supabase db diff            # Detect unapplied migrations
-      - supabase db lint            # SQL linting
+      - supabase db diff # Detect unapplied migrations
+      - supabase db lint # SQL linting
 ```
 
 **PR blocked if any job fails.** No exceptions.
@@ -187,7 +187,7 @@ jobs:
 ```yaml
 jobs:
   deploy-prod:
-    environment: production    # Requires approval from 2 engineers
+    environment: production # Requires approval from 2 engineers
     steps:
       - Run PR checks
       - Create DB backup snapshot
@@ -230,6 +230,7 @@ supabase db diff     # Should show no diff after push
 ### 5.3 Migration Review Checklist
 
 Before merging a migration PR:
+
 - [ ] Migration is idempotent where possible (`IF NOT EXISTS`, `IF EXISTS`)
 - [ ] RLS policies added for new tables
 - [ ] Indexes added for foreign keys + filtered columns
@@ -243,13 +244,13 @@ Before merging a migration PR:
 
 ### 6.1 Secret Hierarchy
 
-| Secret | Stored In | Accessible By |
-|--------|----------|--------------|
+| Secret                      | Stored In                  | Accessible By       |
+| --------------------------- | -------------------------- | ------------------- |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase Edge Function env | Edge Functions only |
-| `SUPABASE_ANON_KEY` | Vercel env (public) | Browser + server |
-| `SENTRY_AUTH_TOKEN` | GitHub Actions secrets | CI only |
-| `VERCEL_TOKEN` | GitHub Actions secrets | CI only |
-| `DATADOG_API_KEY` | Vercel env (server) | Server-side only |
+| `SUPABASE_ANON_KEY`         | Vercel env (public)        | Browser + server    |
+| `SENTRY_AUTH_TOKEN`         | GitHub Actions secrets     | CI only             |
+| `VERCEL_TOKEN`              | GitHub Actions secrets     | CI only             |
+| `DATADOG_API_KEY`           | Vercel env (server)        | Server-side only    |
 
 ### 6.2 Environment Variable Naming Convention
 
@@ -263,6 +264,7 @@ NEXT_PUBLIC_*    → Exposed to browser (safe for public values only)
 ### 6.3 Rotating Secrets
 
 When a secret is compromised:
+
 1. Revoke old secret immediately at the provider
 2. Generate new secret
 3. Update in all environments (Vercel + GitHub Actions + Supabase)
@@ -341,21 +343,21 @@ Issue detected in production
 
 ### 8.2 Supabase Configuration
 
-| Setting | Value |
-|---------|-------|
-| Connection pool size | 100 (PgBouncer) |
-| Max DB connections | 500 |
-| Edge Function timeout | 30s |
-| Realtime max connections | 10,000 |
-| Storage bucket max size | 5GB |
+| Setting                  | Value           |
+| ------------------------ | --------------- |
+| Connection pool size     | 100 (PgBouncer) |
+| Max DB connections       | 500             |
+| Edge Function timeout    | 30s             |
+| Realtime max connections | 10,000          |
+| Storage bucket max size  | 5GB             |
 
 ### 8.3 Scaling Triggers
 
-| Metric | Threshold | Action |
-|--------|-----------|--------|
-| DB CPU > 80% | 5min sustained | Scale up Supabase plan |
-| Response time P99 > 2s | 10min sustained | Investigate + add indexes |
-| Error rate > 1% | 5min sustained | PagerDuty alert → on-call |
+| Metric                 | Threshold       | Action                          |
+| ---------------------- | --------------- | ------------------------------- |
+| DB CPU > 80%           | 5min sustained  | Scale up Supabase plan          |
+| Response time P99 > 2s | 10min sustained | Investigate + add indexes       |
+| Error rate > 1%        | 5min sustained  | PagerDuty alert → on-call       |
 | Job queue depth > 1000 | 15min sustained | Scale Edge Function concurrency |
 
 ---
@@ -364,12 +366,12 @@ Issue detected in production
 
 ### 9.1 Incident Severity Levels
 
-| Level | Description | Response Time | Escalation |
-|-------|-------------|--------------|-----------|
-| P0 | Full outage — dashboard inaccessible | 15 min | CTO + Engineering Lead |
-| P1 | Critical feature broken (auth, user mgmt) | 30 min | Engineering Lead |
-| P2 | Important feature degraded | 2 hours | On-call engineer |
-| P3 | Minor issue / cosmetic bug | Next business day | Ticket created |
+| Level | Description                               | Response Time     | Escalation             |
+| ----- | ----------------------------------------- | ----------------- | ---------------------- |
+| P0    | Full outage — dashboard inaccessible      | 15 min            | CTO + Engineering Lead |
+| P1    | Critical feature broken (auth, user mgmt) | 30 min            | Engineering Lead       |
+| P2    | Important feature degraded                | 2 hours           | On-call engineer       |
+| P3    | Minor issue / cosmetic bug                | Next business day | Ticket created         |
 
 ### 9.2 First Response Checklist
 

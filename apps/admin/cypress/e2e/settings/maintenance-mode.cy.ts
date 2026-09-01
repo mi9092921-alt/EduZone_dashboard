@@ -28,7 +28,7 @@ describe('Maintenance Mode Flow (Cloud Safe)', () => {
     // Intercept the save mutation
     cy.intercept('PATCH', '**/rest/v1/config*', {
       statusCode: 200,
-      body: [{ maintenance_mode: true }]
+      body: [{ maintenance_mode: true }],
     }).as('patchConfig');
 
     // Click to Toggle
@@ -36,7 +36,7 @@ describe('Maintenance Mode Flow (Cloud Safe)', () => {
 
     // Verify it saved
     cy.contains(/settings saved|maintenance updated/i, { timeout: 5000 }).should('be.visible');
-    
+
     // Switch should reflect checked
     cy.get('@maintSwitch').should('have.attr', 'aria-checked', 'true');
   });

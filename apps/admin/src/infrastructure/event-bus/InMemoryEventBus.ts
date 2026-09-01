@@ -19,10 +19,7 @@ export class InMemoryEventBus implements IEventBus {
     );
   }
 
-  subscribe<T>(
-    eventName: string,
-    handler: (event: DomainEvent<T>) => Promise<void>,
-  ): void {
+  subscribe<T>(eventName: string, handler: (event: DomainEvent<T>) => Promise<void>): void {
     const existing = this.handlers.get(eventName) ?? [];
     existing.push(handler as EventHandler);
     this.handlers.set(eventName, existing);

@@ -9,9 +9,5 @@ export default function CoursesRoute() {
   const user = useAuthUser();
   const isTeacher = user?.primary_role === 'teacher';
 
-  return (
-    <AdminShell>
-      {isTeacher ? <MyCoursesPage /> : <CoursesPage />}
-    </AdminShell>
-  );
+  return <AdminShell>{isTeacher ? <MyCoursesPage /> : <CoursesPage />}</AdminShell>;
 }

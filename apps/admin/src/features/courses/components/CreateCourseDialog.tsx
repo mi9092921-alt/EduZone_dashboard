@@ -16,7 +16,6 @@ import { Switch } from '@/components/ui/Switch';
 import { createCourseSchema, type CreateCourseFormInput } from '@/domain/schemas/course.schema';
 import type { CreateCourseInput } from '@/domain/types/course.types';
 
-
 interface CreateCourseDialogProps {
   open: boolean;
   onClose: () => void;
@@ -115,16 +114,17 @@ export function CreateCourseDialog({ open, onClose }: CreateCourseDialogProps) {
       }
     >
       <form id="create-course-form" onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-
         <div className="space-y-2">
           <Label htmlFor="title">{t('course_title_label')}</Label>
           <Input
             id="title"
             placeholder={t('course_title_placeholder')}
             {...register('title')}
-            className={errors.title ? "border-destructive" : ""}
+            className={errors.title ? 'border-destructive' : ''}
           />
-          {errors.title && <p className="text-xs text-destructive font-medium">{errors.title.message}</p>}
+          {errors.title && (
+            <p className="text-xs text-destructive font-medium">{errors.title.message}</p>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -136,7 +136,9 @@ export function CreateCourseDialog({ open, onClose }: CreateCourseDialogProps) {
             placeholder={t('description_placeholder')}
             {...register('description')}
           />
-          {errors.description && <p className="text-xs text-destructive font-medium">{errors.description.message}</p>}
+          {errors.description && (
+            <p className="text-xs text-destructive font-medium">{errors.description.message}</p>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -145,15 +147,21 @@ export function CreateCourseDialog({ open, onClose }: CreateCourseDialogProps) {
             id="thumbnail_url"
             placeholder={t('thumbnail_url_placeholder')}
             {...register('thumbnail_url')}
-            className={errors.thumbnail_url ? "border-destructive" : ""}
+            className={errors.thumbnail_url ? 'border-destructive' : ''}
           />
-          {errors.thumbnail_url && <p className="text-xs text-destructive font-medium">{errors.thumbnail_url.message}</p>}
+          {errors.thumbnail_url && (
+            <p className="text-xs text-destructive font-medium">{errors.thumbnail_url.message}</p>
+          )}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <div className="space-y-2">
             <Label htmlFor="category">{t('category_label')}</Label>
-            <Input id="category" placeholder={t('category_placeholder')} {...register('category')} />
+            <Input
+              id="category"
+              placeholder={t('category_placeholder')}
+              {...register('category')}
+            />
           </div>
 
           <div className="space-y-2">
@@ -162,10 +170,7 @@ export function CreateCourseDialog({ open, onClose }: CreateCourseDialogProps) {
               name="level"
               control={control}
               render={({ field }) => (
-                <Select
-                  value={field.value}
-                  onValueChange={field.onChange}
-                >
+                <Select value={field.value} onValueChange={field.onChange}>
                   {levelOptions.map((opt) => (
                     <SelectItem key={opt.value} value={opt.value}>
                       {opt.label}
@@ -177,7 +182,6 @@ export function CreateCourseDialog({ open, onClose }: CreateCourseDialogProps) {
           </div>
         </div>
 
-
         <div className="p-4 rounded-2xl bg-muted/30 border border-border/50 flex items-center justify-between gap-4">
           <div className="space-y-0.5">
             <Label className="text-base">{t('free_course_label')}</Label>
@@ -187,10 +191,7 @@ export function CreateCourseDialog({ open, onClose }: CreateCourseDialogProps) {
             name="is_free"
             control={control}
             render={({ field }) => (
-              <Switch
-                checked={field.value}
-                onCheckedChange={field.onChange}
-              />
+              <Switch checked={field.value} onCheckedChange={field.onChange} />
             )}
           />
         </div>
@@ -206,7 +207,9 @@ export function CreateCourseDialog({ open, onClose }: CreateCourseDialogProps) {
               placeholder="0"
               {...register('price', { valueAsNumber: true })}
             />
-            {errors.price && <p className="text-xs text-destructive font-medium">{errors.price.message}</p>}
+            {errors.price && (
+              <p className="text-xs text-destructive font-medium">{errors.price.message}</p>
+            )}
           </div>
         )}
       </form>

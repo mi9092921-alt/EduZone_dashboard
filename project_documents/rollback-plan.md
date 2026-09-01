@@ -2,7 +2,7 @@
 
 **Version:** 1.0  
 **Date:** 2026-03-28  
-**Owner:** Tech Lead  
+**Owner:** Tech Lead
 
 ---
 
@@ -13,6 +13,7 @@
 **Trigger Condition:** Sentry error-rate > 5% OR Vercel Health Check fails.
 
 **Steps:**
+
 1. Go to **Vercel Dashboard** → Project: `eduzone-admin`
 2. Navigate to **Deployments** tab
 3. Find the last successful deployment (green checkmark)
@@ -33,11 +34,13 @@
 > **Take a manual snapshot BEFORE every migration run.** This is the only way to guarantee a clean rollback point.
 
 **Pre-Migration Snapshot:**
+
 1. Supabase Dashboard → **Database** → **Backups**
 2. Click **Create Backup** — label it with the migration name (e.g., `pre-cron-jobs-20260328`)
 3. Wait for completion (~2-5 min)
 
 **Rollback Steps:**
+
 1. Supabase Dashboard → **Database** → **Backups**
 2. Select the pre-migration backup
 3. Click **Restore** → Confirm
@@ -64,6 +67,7 @@ supabase functions deploy <function-name>
 ```
 
 **Example — rolling back `create-user`:**
+
 ```bash
 git log supabase/functions/create-user/ --oneline -5
 # Pick the previous commit SHA
@@ -78,6 +82,7 @@ supabase functions deploy create-user
 ### Scenario: A cron job goes rogue (e.g., deleting too many rows)
 
 **Steps via SQL Editor:**
+
 ```sql
 -- Disable a specific job immediately
 SELECT cron.unschedule('flush_logs_minutely');
@@ -95,13 +100,14 @@ $$);
 
 ## 5. Communication & Escalation
 
-| Severity | Response Time | Action |
-|---|---|---|
-| **P0** — Site down | 15 min | Immediate rollback + Notify PM + Tech Lead |
-| **P1** — Major feature broken | 1 hour | Hotfix or rollback |
-| **P2** — Minor degradation | 4 hours | Scheduled fix in next deploy |
+| Severity                      | Response Time | Action                                     |
+| ----------------------------- | ------------- | ------------------------------------------ |
+| **P0** — Site down            | 15 min        | Immediate rollback + Notify PM + Tech Lead |
+| **P1** — Major feature broken | 1 hour        | Hotfix or rollback                         |
+| **P2** — Minor degradation    | 4 hours       | Scheduled fix in next deploy               |
 
 **Escalation Order:**
+
 1. On-Call Engineer → Slack `#incidents`
 2. Tech Lead → Direct message
 3. PM → Status page update

@@ -1,10 +1,10 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
   --radius-2xl: 1rem;
   --radius-xl: 0.75rem;
@@ -72,8 +72,8 @@
   --foreground: 222.2 84% 4.9%;
 
   /* MUI Theme Bridge Variables */
-  --mui-background: #F8FAFC;
-  --mui-paper: #FFFFFF;
+  --mui-background: #f8fafc;
+  --mui-paper: #ffffff;
 
   --card: 0 0% 100%;
   --card-foreground: 222.2 84% 4.9%;
@@ -117,37 +117,37 @@
   --z-toast: 70;
 }
 
-[data-theme="dark"] {
+[data-theme='dark'] {
   color-scheme: dark;
-  --background: 223 49% 7%;      /* Level 0: Pure Deep Space (#090E1A) */
+  --background: 223 49% 7%; /* Level 0: Pure Deep Space (#090E1A) */
   --foreground: 210 40% 98%;
 
   /* MUI Theme Bridge Variables - Synchronized with EduZone Dark Theme */
-  --mui-background: #090E1A;
-  --mui-paper: #161F30;
+  --mui-background: #090e1a;
+  --mui-paper: #161f30;
 
-  --card: 220 37% 14%;           /* Level 2: Elevated Surface (#161F30) */
+  --card: 220 37% 14%; /* Level 2: Elevated Surface (#161F30) */
   --card-foreground: 210 40% 98%;
 
-  --popover: 221 39% 11%;        /* Level 1: Sidebar/Topbar Tone (#111827) */
+  --popover: 221 39% 11%; /* Level 1: Sidebar/Topbar Tone (#111827) */
   --popover-foreground: 210 40% 98%;
 
   --primary: 221.2 83.2% 45%;
   --primary-foreground: 210 40% 98%;
 
-  --secondary: 221 39% 11%;      /* Level 1 Alignment */
+  --secondary: 221 39% 11%; /* Level 1 Alignment */
   --secondary-foreground: 210 40% 98%;
 
-  --muted: 221 39% 11%;          /* Level 1 Alignment */
-  --muted-foreground: 215 20.2% 75%;    /* Brighter for small text readability */
+  --muted: 221 39% 11%; /* Level 1 Alignment */
+  --muted-foreground: 215 20.2% 75%; /* Brighter for small text readability */
 
   --accent: 217.2 32.6% 17.5%;
   --accent-foreground: 210 40% 98%;
 
-  --destructive: 0 84% 60%;      /* Brighter red for dark mode visibility */
+  --destructive: 0 84% 60%; /* Brighter red for dark mode visibility */
   --destructive-foreground: 210 40% 98%;
 
-  --border: 217.2 32.6% 22.5%;   /* Slightly lighter borders for better definition */
+  --border: 217.2 32.6% 22.5%; /* Slightly lighter borders for better definition */
   --input: 217.2 32.6% 17.5%;
   --ring: 224.3 76.3% 48%;
 
@@ -156,9 +156,9 @@
 }
 
 /* Fix MUI Dark Mode Elevation Gradients overriding Tailwind background cards */
-html[data-theme="dark"] .MuiPaper-root,
-html[data-theme="dark"] .MuiMenu-paper,
-html[data-theme="dark"] .MuiPopover-paper {
+html[data-theme='dark'] .MuiPaper-root,
+html[data-theme='dark'] .MuiMenu-paper,
+html[data-theme='dark'] .MuiPopover-paper {
   background-image: none !important;
 }
 
@@ -275,7 +275,7 @@ body,
 
 /* Stat cards: numbers use Arabic-Indic via font-feature or Intl.NumberFormat */
 [dir='rtl'] .font-mono {
-  font-family: "JetBrains Mono", "Cairo", ui-monospace, monospace;
+  font-family: 'JetBrains Mono', 'Cairo', ui-monospace, monospace;
 }
 
 /* Drawer: slide from left in LTR, from right in RTL */

@@ -76,9 +76,7 @@ describe('tenants.service', () => {
       mockFrom.mockReturnValue(q);
 
       await getTenants({ search: 'academy' }, 1, 10);
-      expect(q.or).toHaveBeenCalledWith(
-        expect.stringContaining('name.ilike.%academy%'),
-      );
+      expect(q.or).toHaveBeenCalledWith(expect.stringContaining('name.ilike.%academy%'));
     });
 
     it('applies plan filter', async () => {
@@ -159,9 +157,9 @@ describe('tenants.service', () => {
       const { createTenantAction } = await import('@/application/actions/tenants.actions');
       (createTenantAction as any).mockRejectedValue(new Error('SLUG_TAKEN'));
 
-      await expect(
-        createTenant({ slug: 'existing', name: 'Existing' } as any),
-      ).rejects.toThrow('SLUG_TAKEN');
+      await expect(createTenant({ slug: 'existing', name: 'Existing' } as any)).rejects.toThrow(
+        'SLUG_TAKEN',
+      );
     });
   });
 
@@ -219,7 +217,12 @@ describe('tenants.service', () => {
 
       await getTenantAuditLogs(
         't1',
-        { activity_type: ['login'], risk_level: ['high'], dateFrom: '2026-01-01', dateTo: '2026-12-31' },
+        {
+          activity_type: ['login'],
+          risk_level: ['high'],
+          dateFrom: '2026-01-01',
+          dateTo: '2026-12-31',
+        },
         1,
         10,
       );

@@ -25,7 +25,7 @@ describe('verifyHashChain', () => {
       activity_type: 'LOGIN',
       details: { ip: '127.0.0.1' },
       prev_hash: genesis,
-      entry_hash: ''
+      entry_hash: '',
     };
     log1.entry_hash = await sha256(`1log1userALOGIN{"ip": "127.0.0.1"}${genesis}`);
 
@@ -36,16 +36,18 @@ describe('verifyHashChain', () => {
       activity_type: 'SYSTEM_CRON',
       details: null,
       prev_hash: log1.entry_hash,
-      entry_hash: ''
+      entry_hash: '',
     };
     log2.entry_hash = await sha256(`2log2systemSYSTEM_CRONnull${log1.entry_hash}`);
 
     const logs = [log1, log2] as any;
-    
+
     // Test progress callback
     let progress = 0;
-    const result = await verifyHashChain(logs, genesis, (pct) => { progress = pct; });
-    
+    const result = await verifyHashChain(logs, genesis, (pct) => {
+      progress = pct;
+    });
+
     expect(result).toEqual({ valid: true, entriesVerified: 2 });
     expect(progress).toBe(100);
   });
@@ -59,7 +61,7 @@ describe('verifyHashChain', () => {
       activity_type: 'LOGIN',
       details: { ip: '127.0.0.1' },
       prev_hash: genesis,
-      entry_hash: 'fake_hash'
+      entry_hash: 'fake_hash',
     };
 
     const logs = [log1] as any;
@@ -76,7 +78,7 @@ describe('verifyHashChain', () => {
       activity_type: 'LOGIN',
       details: { ip: '127.0.0.1' },
       prev_hash: 'wrong_prev',
-      entry_hash: ''
+      entry_hash: '',
     };
     // compute correct hash for wrong prev_hash payload
     log1.entry_hash = await sha256(`1log1userALOGIN{"ip":"127.0.0.1"}wrong_prev`);

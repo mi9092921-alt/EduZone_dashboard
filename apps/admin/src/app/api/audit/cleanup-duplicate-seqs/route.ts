@@ -83,9 +83,7 @@ export async function POST() {
 
       // Keep the row whose entry_hash is used as prev_hash by a later entry
       // (i.e. it is part of the chain that continues).  Fall back to oldest.
-      const keeper =
-        rows.find((r) => referencedAsParent.has(r.entry_hash)) ??
-        rows[0]!; // already sorted by created_at ASC
+      const keeper = rows.find((r) => referencedAsParent.has(r.entry_hash)) ?? rows[0]!; // already sorted by created_at ASC
 
       for (const row of rows) {
         if (row.id !== keeper.id) {
@@ -103,16 +101,10 @@ export async function POST() {
     const BATCH = 100;
     for (let i = 0; i < toDelete.length; i += BATCH) {
       const batch = toDelete.slice(i, i + BATCH);
-      const { error: delErr } = await admin
-        .from('activity_logs')
-        .delete()
-        .in('id', batch);
+      const { error: delErr } = await admin.from('activity_logs').delete().in('id', batch);
 
       if (delErr) {
-        return NextResponse.json(
-          { error: delErr.message, deleted },
-          { status: 500 },
-        );
+        return NextResponse.json({ error: delErr.message, deleted }, { status: 500 });
       }
       deleted += batch.length;
     }

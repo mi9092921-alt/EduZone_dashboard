@@ -1,22 +1,11 @@
 'use client';
 
-import {
-  Warning,
-  Security,
-  History,
-  InfoOutlined,
-  ReportProblem
-} from '@mui/icons-material';
+import { Warning, Security, History, InfoOutlined, ReportProblem } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import { useTranslations } from 'next-intl';
 
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/Card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { container } from '@/container';
 import { cn } from '@/lib/utils';
 
@@ -53,7 +42,9 @@ export function SecurityAlertPanel() {
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <div className="flex items-center gap-2">
           <ReportProblem className="text-red-500 w-5 h-5" />
-          <CardTitle className="text-sm font-bold uppercase tracking-wider">{t('security_alerts')}</CardTitle>
+          <CardTitle className="text-sm font-bold uppercase tracking-wider">
+            {t('security_alerts')}
+          </CardTitle>
         </div>
         <div className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
       </CardHeader>
@@ -70,13 +61,13 @@ export function SecurityAlertPanel() {
         ) : (
           <div className="space-y-3">
             {alerts?.map((alert) => (
-              <div 
+              <div
                 key={alert.id}
                 className={cn(
-                  "p-3 rounded-lg border transition-all hover:translate-x-1 cursor-default",
-                  alert.risk_level === 'critical' 
-                    ? "bg-red-500/10 border-red-500/20 text-red-900 dark:text-red-100" 
-                    : "bg-amber-500/10 border-amber-500/20 text-amber-900 dark:text-amber-100"
+                  'p-3 rounded-lg border transition-all hover:translate-x-1 cursor-default',
+                  alert.risk_level === 'critical'
+                    ? 'bg-red-500/10 border-red-500/20 text-red-900 dark:text-red-100'
+                    : 'bg-amber-500/10 border-amber-500/20 text-amber-900 dark:text-amber-100',
                 )}
               >
                 <div className="flex items-start gap-3">
@@ -90,7 +81,9 @@ export function SecurityAlertPanel() {
                       {alert.activity_type.replace(/_/g, ' ').toUpperCase()}
                     </p>
                     <p className="text-[10px] opacity-80 mt-0.5">
-                      {(alert.details as { reason?: string; message?: string } | null)?.reason || (alert.details as { reason?: string; message?: string } | null)?.message || t('suspicious_activity_detected')}
+                      {(alert.details as { reason?: string; message?: string } | null)?.reason ||
+                        (alert.details as { reason?: string; message?: string } | null)?.message ||
+                        t('suspicious_activity_detected')}
                     </p>
                     <div className="flex items-center gap-1.5 mt-2 opacity-60">
                       <History className="w-3 h-3" />

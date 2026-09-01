@@ -27,8 +27,8 @@ export function usePermission(permission: PermissionName) {
  * Hook to check if the user has any of the listed roles.
  */
 export function useRole(roles: string[]) {
-  const user = useAuthStore(state => state.user);
-  
+  const user = useAuthStore((state) => state.user);
+
   const hasRole = user ? roles.includes(user.primary_role) : false;
 
   return {

@@ -1,5 +1,9 @@
 import type { SendNotificationInput } from '@/adapters/mutations/notifications.mutations';
-import type { Notification, UserNotification, TargetAudience } from '@/adapters/queries/notifications.queries';
+import type {
+  Notification,
+  UserNotification,
+  TargetAudience,
+} from '@/adapters/queries/notifications.queries';
 import {
   getNotificationsAction,
   sendNotificationAction,
@@ -26,10 +30,10 @@ export async function getNotifications(
   page: number,
   pageSize: number,
   audience?: TargetAudience | 'all',
-): Promise<{ 
-  data: Notification[]; 
-  count: number; 
-  stats: { all: number; students: number; teachers: number; admins: number } 
+): Promise<{
+  data: Notification[];
+  count: number;
+  stats: { all: number; students: number; teachers: number; admins: number };
 }> {
   if (typeof window !== 'undefined') {
     return getNotificationsAction(page, pageSize, audience);
@@ -39,10 +43,7 @@ export async function getNotifications(
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
-  let query = supabase
-    .from('notifications')
-    .select('*', { count: 'exact' })
-    .is('deleted_at', null);
+  let query = supabase.from('notifications').select('*', { count: 'exact' }).is('deleted_at', null);
 
   if (audience && audience !== 'all') {
     query = query.eq('target_audience', audience);
@@ -63,9 +64,9 @@ export async function getNotifications(
 
   const stats = {
     all: allAudienceData.length,
-    students: allAudienceData.filter(n => n.target_audience === 'students').length,
-    teachers: allAudienceData.filter(n => n.target_audience === 'teachers').length,
-    admins: allAudienceData.filter(n => n.target_audience === 'admins').length,
+    students: allAudienceData.filter((n) => n.target_audience === 'students').length,
+    teachers: allAudienceData.filter((n) => n.target_audience === 'teachers').length,
+    admins: allAudienceData.filter((n) => n.target_audience === 'admins').length,
   };
 
   return {
@@ -75,9 +76,7 @@ export async function getNotifications(
   };
 }
 
-export async function sendNotification(
-  input: SendNotificationInput,
-): Promise<string> {
+export async function sendNotification(input: SendNotificationInput): Promise<string> {
   if (typeof window !== 'undefined') {
     return sendNotificationAction(input);
   }

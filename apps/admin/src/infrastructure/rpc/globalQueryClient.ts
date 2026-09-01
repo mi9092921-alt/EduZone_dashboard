@@ -14,8 +14,8 @@ function makeQueryClient(): QueryClient {
   return new QueryClient({
     defaultOptions: {
       queries: {
-        staleTime: 30_000,      // 30 seconds
-        gcTime: 5 * 60_000,     // 5 minutes
+        staleTime: 30_000, // 30 seconds
+        gcTime: 5 * 60_000, // 5 minutes
         retry: (failureCount, error) => {
           const appError = parseRpcError(error);
           // Don't retry on auth/permission errors

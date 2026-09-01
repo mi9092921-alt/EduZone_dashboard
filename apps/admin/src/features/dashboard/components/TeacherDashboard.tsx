@@ -12,9 +12,8 @@ import {
   CardTitle,
   StatsCard,
   StatsCardContent,
-  StatsCardIcon
+  StatsCardIcon,
 } from '@/components/ui/Card';
-
 
 export function TeacherDashboard() {
   const t = useTranslations('common');
@@ -64,18 +63,50 @@ export function TeacherDashboard() {
           const Icon = stat.icon;
 
           return (
-            <StatsCard key={stat.label} className="transition-all duration-300 hover:bg-muted/20 active:scale-[0.98]">
+            <StatsCard
+              key={stat.label}
+              className="transition-all duration-300 hover:bg-muted/20 active:scale-[0.98]"
+            >
               <StatsCardContent className="flex flex-row items-center gap-4 p-5">
-                <StatsCardIcon style={{ backgroundColor: stat.color + '1A', color: stat.color }} className="w-10 h-10 rounded-lg shrink-0 flex items-center justify-center">
+                <StatsCardIcon
+                  style={{ backgroundColor: stat.color + '1A', color: stat.color }}
+                  className="w-10 h-10 rounded-lg shrink-0 flex items-center justify-center"
+                >
                   <Icon sx={{ fontSize: 20 }} />
                 </StatsCardIcon>
                 <div className="flex flex-col min-w-0 flex-1">
-                  <Typography variant="overline" color="text.secondary" sx={{ fontWeight: 700, mb: 0.5, lineHeight: 1.2, textTransform: 'uppercase', fontSize: '0.625rem' }} className="truncate w-full">
+                  <Typography
+                    variant="overline"
+                    color="text.secondary"
+                    sx={{
+                      fontWeight: 700,
+                      mb: 0.5,
+                      lineHeight: 1.2,
+                      textTransform: 'uppercase',
+                      fontSize: '0.625rem',
+                    }}
+                    className="truncate w-full"
+                  >
                     {stat.label}
                   </Typography>
-                  <Typography variant="h3" color="text.primary" sx={{ fontWeight: 800, fontSize: '1.5rem', lineHeight: 1.1 }} className="truncate w-full">
+                  <Typography
+                    variant="h3"
+                    color="text.primary"
+                    sx={{ fontWeight: 800, fontSize: '1.5rem', lineHeight: 1.1 }}
+                    className="truncate w-full"
+                  >
                     {isLoading ? (
-                      <Box component="span" sx={{ height: 24, width: 48, bgcolor: 'neutral.100', display: 'inline-block', animation: 'pulse 1.5s infinite', borderRadius: 1 }} />
+                      <Box
+                        component="span"
+                        sx={{
+                          height: 24,
+                          width: 48,
+                          bgcolor: 'neutral.100',
+                          display: 'inline-block',
+                          animation: 'pulse 1.5s infinite',
+                          borderRadius: 1,
+                        }}
+                      />
                     ) : (
                       stat.value
                     )}
@@ -105,11 +136,15 @@ export function TeacherDashboard() {
           <CardContent className="space-y-4">
             <div className="p-4 rounded-xl bg-indigo-50/30 border border-indigo-100 text-sm">
               <p className="font-bold text-indigo-700">{t('course_creation')}</p>
-              <p className="text-[11px] text-indigo-600/70 font-medium">{t('course_creation_desc')}</p>
+              <p className="text-[11px] text-indigo-600/70 font-medium">
+                {t('course_creation_desc')}
+              </p>
             </div>
             <div className="p-4 rounded-xl bg-emerald-50/30 border border-emerald-100 text-sm">
               <p className="font-bold text-emerald-700">{t('student_outreach')}</p>
-              <p className="text-[11px] text-emerald-600/70 font-medium">{t('student_outreach_desc')}</p>
+              <p className="text-[11px] text-emerald-600/70 font-medium">
+                {t('student_outreach_desc')}
+              </p>
             </div>
           </CardContent>
         </Card>

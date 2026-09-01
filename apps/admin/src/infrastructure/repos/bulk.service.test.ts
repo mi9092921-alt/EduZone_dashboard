@@ -9,7 +9,7 @@ import { container } from '@/container';
 vi.mock('@/container', () => ({
   container: {
     supabase: {
-      rpc:  vi.fn(),
+      rpc: vi.fn(),
       from: vi.fn(),
       auth: {
         getSession: vi.fn().mockResolvedValue({
@@ -61,7 +61,7 @@ describe('bulk.service', () => {
 
     server.use(
       http.post(BULK_PATTERN, async ({ request }) => {
-        capturedBody = await request.json() as Record<string, unknown>;
+        capturedBody = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ estimated_count: 3, dry_run: true as const });
       }),
     );
@@ -70,8 +70,7 @@ describe('bulk.service', () => {
 
     expect(capturedBody).not.toBeNull();
     expect(capturedBody!.dry_run).toBe(true);
-    expect((capturedBody!.filters as Record<string, unknown>).user_ids)
-      .toEqual(['u1', 'u2', 'u3']);
+    expect((capturedBody!.filters as Record<string, unknown>).user_ids).toEqual(['u1', 'u2', 'u3']);
   });
 
   it('dryRunBulkAction — throws on non-ok HTTP response', async () => {
@@ -91,12 +90,12 @@ describe('bulk.service', () => {
 
     server.use(
       http.post(BULK_PATTERN, async ({ request }) => {
-        capturedBody = await request.json() as Record<string, unknown>;
+        capturedBody = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({
-          job_id:          MOCK_JOB_ID,
+          job_id: MOCK_JOB_ID,
           estimated_count: 5,
-          status:          'pending',
-          created_at:      new Date().toISOString(),
+          status: 'pending',
+          created_at: new Date().toISOString(),
         });
       }),
     );

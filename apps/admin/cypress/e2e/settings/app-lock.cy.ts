@@ -19,17 +19,19 @@ describe('Global App Lock Flow (Cloud Safe)', () => {
       body: true,
     }).as('rpcLockApp');
 
-    cy.get('button').contains(/Proceed|Lock/i).click();
+    cy.get('button')
+      .contains(/Proceed|Lock/i)
+      .click();
 
     cy.wait('@rpcLockApp').its('request.body').should('have.property', '_message');
-    
+
     cy.contains(/App locked successfully/i, { timeout: 5000 }).should('be.visible');
   });
 
   it('Displays Global Lock Screen if check_dashboard_access returns app_locked', () => {
     cy.intercept('POST', '**/rest/v1/rpc/check_dashboard_access', {
       statusCode: 200,
-      body: { status: 'app_locked', error: 'Cypress Lockdown active' }
+      body: { status: 'app_locked', error: 'Cypress Lockdown active' },
     }).as('checkAccessLocked');
 
     cy.visit('/dashboard');

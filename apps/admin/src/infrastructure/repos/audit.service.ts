@@ -95,9 +95,7 @@ export async function getAuditChainState(): Promise<AuditChainState> {
 }
 
 // ── Flush activity logs (RPC) ────────────────────────────────────
-export async function flushActivityLogs(
-  batchSize: number = 200,
-): Promise<number> {
+export async function flushActivityLogs(batchSize: number = 200): Promise<number> {
   const { supabase } = container;
   const { data, error } = await supabase
     .rpc('flush_activity_logs', { p_batch_size: batchSize })
@@ -116,12 +114,8 @@ export async function flushActivityLogs(
 // activity_log_queue has REVOKE ALL for anon/authenticated + a deny-all RLS policy.
 // Direct browser-client queries always return 403 Forbidden.
 // We delegate to a 'use server' action that runs with the service-role key.
-export async function getQueuedActivities(
-  limit: number = 200,
-): Promise<ActivityLogQueueEntry[]> {
+export async function getQueuedActivities(limit: number = 200): Promise<ActivityLogQueueEntry[]> {
   // Dynamic import avoids bundling 'use server' code in the client bundle
-  const { getQueuedActivitiesAction } = await import(
-    '@/application/actions/admin.actions'
-  );
+  const { getQueuedActivitiesAction } = await import('@/application/actions/admin.actions');
   return getQueuedActivitiesAction(limit);
 }

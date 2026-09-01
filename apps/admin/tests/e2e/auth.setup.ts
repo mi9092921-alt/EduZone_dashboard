@@ -14,7 +14,7 @@ setup('authenticate', async ({ page }) => {
 
   // Wait for redirect to dashboard or localized home with generous timeout
   await expect(page).toHaveURL(/.*(dashboard|activities|en|ar)$/, { timeout: 20000 });
-  
+
   // Wait for sidebar to be visible (evidence of successful auth)
   await expect(page.getByRole('navigation')).toBeVisible();
 

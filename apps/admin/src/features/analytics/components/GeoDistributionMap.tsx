@@ -23,7 +23,7 @@ export function GeoDistributionMap({ points, height = 400 }: GeoDistributionMapP
   const t = useTranslations('analytics');
 
   // World path (Simplified Mercator Projection)
-  // Note: For a true world map, we'd need a multi-continent geoJSON path. 
+  // Note: For a true world map, we'd need a multi-continent geoJSON path.
   // I will use a placeholder but high-fidelity looking projection or a solid stylized map.
 
   // Project lat/lng to SVG coordinates (Miller projection simplified)
@@ -38,13 +38,13 @@ export function GeoDistributionMap({ points, height = 400 }: GeoDistributionMapP
     return points.map((p, i) => {
       const { x, y } = project(p.lat, p.lng);
       return (
-        <circle 
-          key={i} 
-          cx={x} 
-          cy={y} 
-          r="1.5" 
-          fill="var(--primary)" 
-          className="animate-pulse" 
+        <circle
+          key={i}
+          cx={x}
+          cy={y}
+          r="1.5"
+          fill="var(--primary)"
+          className="animate-pulse"
           style={{ animationDelay: `${(i % 20) * 100}ms` }}
         />
       );
@@ -71,14 +71,27 @@ export function GeoDistributionMap({ points, height = 400 }: GeoDistributionMapP
         </g>
 
         {/* The data points */}
-        <g>
-          {mapPoints}
-        </g>
+        <g>{mapPoints}</g>
       </svg>
-      
+
       {/* Legend */}
-      <Box sx={{ position: 'absolute', bottom: 16, right: 16, bgcolor: 'background.paper', p: 1, borderRadius: 1, border: '1px solid', borderColor: 'divider', boxShadow: 1 }}>
-        <Typography variant="caption" sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700 }}>
+      <Box
+        sx={{
+          position: 'absolute',
+          bottom: 16,
+          right: 16,
+          bgcolor: 'background.paper',
+          p: 1,
+          borderRadius: 1,
+          border: '1px solid',
+          borderColor: 'divider',
+          boxShadow: 1,
+        }}
+      >
+        <Typography
+          variant="caption"
+          sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700 }}
+        >
           <Box sx={{ w: 8, h: 8, bgcolor: 'primary.main', borderRadius: '50%' }} />
           {t('active_students')}
         </Typography>

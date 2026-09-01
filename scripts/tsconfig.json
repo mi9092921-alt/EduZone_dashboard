@@ -7,10 +7,7 @@
     "resolveJsonModule": true,
     "outDir": "../dist/scripts",
     // Point at the workspace that actually has @supabase/supabase-js installed
-    "typeRoots": [
-      "../apps/admin/node_modules/@types",
-      "../node_modules/@types"
-    ],
+    "typeRoots": ["../apps/admin/node_modules/@types", "../node_modules/@types"],
     "paths": {
       "@supabase/supabase-js": ["../apps/admin/node_modules/@supabase/supabase-js"]
     }

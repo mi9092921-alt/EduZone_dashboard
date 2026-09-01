@@ -36,8 +36,8 @@ const DrawerDemo = (args: React.ComponentProps<typeof Drawer>) => {
       <Drawer {...args} open={open} onClose={() => setOpen(false)}>
         <div className="p-6 space-y-4">
           <p className="text-sm text-muted-foreground">
-            This is the drawer content. It slides in over the page content and locks scrolling
-            on the body to prevent interactions outside the drawer.
+            This is the drawer content. It slides in over the page content and locks scrolling on
+            the body to prevent interactions outside the drawer.
           </p>
           <div className="h-40 bg-muted/50 rounded flex items-center justify-center border border-dashed border-border">
             Placeholder Content

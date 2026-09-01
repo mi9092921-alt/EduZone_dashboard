@@ -5,10 +5,7 @@ import type { UserLocationLog, CoordinatePoint } from '@/domain/types/analytics.
  * Service for fetching high-precision user location logs.
  */
 
-export async function getUserLocationLogs(
-  userId: string, 
-  limit = 20
-): Promise<UserLocationLog[]> {
+export async function getUserLocationLogs(userId: string, limit = 20): Promise<UserLocationLog[]> {
   const { supabase } = container;
 
   const { data, error } = await supabase

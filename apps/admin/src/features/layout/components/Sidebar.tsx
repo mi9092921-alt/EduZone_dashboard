@@ -46,15 +46,25 @@ function SidebarInnerContent({
       className="flex flex-col h-[100dvh] bg-popover border-e border-border/40 transition-[width] duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] overflow-hidden"
     >
       {/* BRANDING & CLOSE AREA */}
-      <div className={cn("h-16 flex items-center shrink-0 px-4", isCollapsed ? "justify-center" : "justify-between")}>
+      <div
+        className={cn(
+          'h-16 flex items-center shrink-0 px-4',
+          isCollapsed ? 'justify-center' : 'justify-between',
+        )}
+      >
         <div className="flex items-center gap-3 overflow-hidden">
-          <div className={cn("w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 text-primary ring-1 ring-primary/20 transition-all duration-300",
-            "hover:-translate-y-[2px] hover:shadow-lg hover:shadow-primary/20", // Glassmorphism & Depth
-          )}>
+          <div
+            className={cn(
+              'w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 text-primary ring-1 ring-primary/20 transition-all duration-300',
+              'hover:-translate-y-[2px] hover:shadow-lg hover:shadow-primary/20', // Glassmorphism & Depth
+            )}
+          >
             <AdminPanelSettings fontSize="small" />
           </div>
           {!isCollapsed && (
-            <span className="font-semibold tracking-tight text-foreground text-base whitespace-nowrap">EduZone</span>
+            <span className="font-semibold tracking-tight text-foreground text-base whitespace-nowrap">
+              EduZone
+            </span>
           )}
         </div>
 
@@ -93,12 +103,12 @@ function SidebarInnerContent({
               )}
             >
               {/* Animated Active Indicator */}
-              <div 
+              <div
                 className={cn(
-                  "absolute top-1/2 -translate-y-1/2 w-1 bg-primary rounded-full transition-all duration-300 pointer-events-none",
-                  isActive ? "h-1/2 opacity-100" : "h-0 opacity-0",
-                  isRtl ? "right-[2px]" : "left-[2px]"
-                )} 
+                  'absolute top-1/2 -translate-y-1/2 w-1 bg-primary rounded-full transition-all duration-300 pointer-events-none',
+                  isActive ? 'h-1/2 opacity-100' : 'h-0 opacity-0',
+                  isRtl ? 'right-[2px]' : 'left-[2px]',
+                )}
               />
 
               <Icon
@@ -108,42 +118,52 @@ function SidebarInnerContent({
                   isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground',
                 )}
               />
-              {!isCollapsed && (
-                <span className="text-sm truncate">{t(item.label)}</span>
-              )}
+              {!isCollapsed && <span className="text-sm truncate">{t(item.label)}</span>}
             </Link>
           );
 
           return isCollapsed ? (
-            <Tooltip 
-              key={item.id} 
-              title={t(item.label)} 
-              placement={isRtl ? "left" : "right"} 
-              arrow 
-              TransitionComponent={Zoom as React.JSXElementConstructor<TransitionProps & { children: React.ReactElement }>}
+            <Tooltip
+              key={item.id}
+              title={t(item.label)}
+              placement={isRtl ? 'left' : 'right'}
+              arrow
+              TransitionComponent={
+                Zoom as React.JSXElementConstructor<
+                  TransitionProps & { children: React.ReactElement }
+                >
+              }
             >
               <div>{buttonContent}</div>
             </Tooltip>
-          ) : buttonContent;
+          ) : (
+            buttonContent
+          );
         })}
       </nav>
 
       {/* FOOTER — User Profile / Role */}
       <div className="p-3 mt-auto shrink-0 mb-2 border-t border-border/40 backdrop-blur-[8px] bg-popover/50">
-        <div className={cn("flex items-center hover:bg-muted/40 transition-colors cursor-pointer border border-transparent hover:border-border/40 rounded-lg",
-           isCollapsed ? "justify-center p-2" : "justify-between p-2"
-        )}>
+        <div
+          className={cn(
+            'flex items-center hover:bg-muted/40 transition-colors cursor-pointer border border-transparent hover:border-border/40 rounded-lg',
+            isCollapsed ? 'justify-center p-2' : 'justify-between p-2',
+          )}
+        >
           {!isCollapsed && (
             <div className="flex-col flex overflow-hidden">
               <p className="text-sm font-medium text-foreground capitalize truncate">
                 {role.replaceAll('_', ' ')}
               </p>
-              <span className="text-xs text-muted-foreground truncate">
-                {t('access_level')}
-              </span>
+              <span className="text-xs text-muted-foreground truncate">{t('access_level')}</span>
             </div>
           )}
-          <div className={cn("w-2 h-2 rounded-full bg-emerald-500 ring-4 ring-emerald-500/20 shrink-0", isCollapsed && "w-3 h-3")} />
+          <div
+            className={cn(
+              'w-2 h-2 rounded-full bg-emerald-500 ring-4 ring-emerald-500/20 shrink-0',
+              isCollapsed && 'w-3 h-3',
+            )}
+          />
         </div>
       </div>
     </div>
@@ -165,7 +185,7 @@ export function Sidebar() {
   );
 
   const contentProps: SidebarContentProps = {
-    isMobile: !isDesktop, 
+    isMobile: !isDesktop,
     role,
     filteredNav,
     pathname,
@@ -179,12 +199,12 @@ export function Sidebar() {
       {isDesktop && (
         <aside
           className={cn(
-            "relative h-[100dvh] z-30 shrink-0 overflow-hidden bg-background border-e border-border/40",
-            "transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]",
-            sidebarOpen ? "w-[220px]" : "w-[80px]"
+            'relative h-[100dvh] z-30 shrink-0 overflow-hidden bg-background border-e border-border/40',
+            'transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]',
+            sidebarOpen ? 'w-[220px]' : 'w-[80px]',
           )}
         >
-          <div className="w-[220px] h-full"> 
+          <div className="w-[220px] h-full">
             <SidebarInnerContent {...contentProps} />
           </div>
         </aside>
@@ -212,8 +232,8 @@ export function Sidebar() {
                 exit={{ x: isRtl ? '100%' : '-100%' }}
                 transition={{ type: 'spring', stiffness: 350, damping: 30 }}
                 className={cn(
-                  "fixed top-0 bottom-0 z-50 w-[220px] shadow-2xl overflow-hidden bg-background",
-                  isRtl ? "right-0" : "left-0"
+                  'fixed top-0 bottom-0 z-50 w-[220px] shadow-2xl overflow-hidden bg-background',
+                  isRtl ? 'right-0' : 'left-0',
                 )}
               >
                 <div className="w-[220px] h-full absolute top-0 left-0">

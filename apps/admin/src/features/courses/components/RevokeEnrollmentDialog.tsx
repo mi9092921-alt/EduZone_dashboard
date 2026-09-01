@@ -2,8 +2,7 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Block } from '@mui/icons-material';
-import {
-} from '@mui/material';
+import {} from '@mui/material';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -12,13 +11,12 @@ import { useRevokeEnrollment } from '@/adapters/mutations/courses.mutations';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
-import { revokeEnrollmentSchema, type RevokeEnrollmentFormInput } from '@/domain/schemas/course.schema';
+import {
+  revokeEnrollmentSchema,
+  type RevokeEnrollmentFormInput,
+} from '@/domain/schemas/course.schema';
 import type { Enrollment } from '@/domain/types/course.types';
 import { getEnrollmentStudentName } from '@/domain/types/course.types';
-
-
-
-
 
 interface RevokeEnrollmentDialogProps {
   enrollment: Enrollment | null;
@@ -88,7 +86,10 @@ export function RevokeEnrollmentDialog({
       icon={<Block sx={{ fontSize: 22 }} />}
     >
       <div className="space-y-2 pt-2">
-        <Label htmlFor="revoke-reason" className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest ps-1">
+        <Label
+          htmlFor="revoke-reason"
+          className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest ps-1"
+        >
           {t('revocation_reason_label')}
         </Label>
         <Input

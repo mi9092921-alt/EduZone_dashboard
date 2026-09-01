@@ -35,7 +35,13 @@ const meta: Meta<typeof CourseInfoForm> = {
         http.get('*/rpc/get_users', () => {
           return HttpResponse.json({
             data: [
-              { id: 't1', email: 'sarah@example.com', first_name: 'Sarah', last_name: 'Drasner', primary_role: 'teacher' },
+              {
+                id: 't1',
+                email: 'sarah@example.com',
+                first_name: 'Sarah',
+                last_name: 'Drasner',
+                primary_role: 'teacher',
+              },
             ],
             count: 1,
             error: null,
@@ -77,9 +83,12 @@ export const SuccessfulSubmission: Story = {
     });
 
     await step('Verify success message', async () => {
-      await waitFor(() => {
-        expect(canvas.getByText(/Course updated successfully/i)).toBeInTheDocument();
-      }, { timeout: 5000 });
+      await waitFor(
+        () => {
+          expect(canvas.getByText(/Course updated successfully/i)).toBeInTheDocument();
+        },
+        { timeout: 5000 },
+      );
     });
   },
 };

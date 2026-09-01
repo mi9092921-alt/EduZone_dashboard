@@ -10,7 +10,7 @@ const TABLET_BREAKPOINT = 1024;
 
 export function useLayout() {
   const [windowWidth, setWindowWidth] = useState(
-    typeof window !== 'undefined' ? window.innerWidth : 1024
+    typeof window !== 'undefined' ? window.innerWidth : 1024,
   );
 
   useEffect(() => {

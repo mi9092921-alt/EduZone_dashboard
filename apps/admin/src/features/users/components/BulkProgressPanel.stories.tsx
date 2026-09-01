@@ -1,14 +1,14 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { BulkProgressPanel } from './BulkProgressPanel';
 
-// We mock the bulk.mutations and bulk.service via decorators or manual MSW 
+// We mock the bulk.mutations and bulk.service via decorators or manual MSW
 // Since BulkProgressPanel subscribes to real-time events, we shouldn't execute real hooks in pure UI.
 // But we can supply standard props if we abstracted the subscription out.
 // Wait, BulkProgressPanel internally calls `subscribeToBulkProgress`.
 // We will mock it using storybook decorators or MSW if it uses a network.
-// For the sake of the story, we can just test the UI component if we mock the modules, 
-// OR we can create a pure presentation component. 
-// Let's rely on MSW or module mocking if Vitest/Webpack allows, otherwise 
+// For the sake of the story, we can just test the UI component if we mock the modules,
+// OR we can create a pure presentation component.
+// Let's rely on MSW or module mocking if Vitest/Webpack allows, otherwise
 // we'll provide a wrapper demonstrating states.
 
 import * as bulkService from '@/infrastructure/repos/bulk.service';
@@ -18,9 +18,9 @@ const meta = {
   component: BulkProgressPanel,
   parameters: {
     layout: 'centered',
-    chromatic: { 
-      pauseAnimationAtEnd: true, 
-      disableSnapshot: false 
+    chromatic: {
+      pauseAnimationAtEnd: true,
+      disableSnapshot: false,
     },
   },
   decorators: [
@@ -31,8 +31,8 @@ const meta = {
           <Story />
         </div>
       );
-    }
-  ]
+    },
+  ],
 } satisfies Meta<typeof BulkProgressPanel>;
 
 export default meta;

@@ -48,7 +48,8 @@ export function useSessionCheck() {
           serverVersion !== clientVersion;
 
         const sessionInvalidated = !sessionResult.success && sessionResult.active === false;
-        const shouldInvalidate = error || !accessResult?.allowed || versionMismatch || sessionInvalidated;
+        const shouldInvalidate =
+          error || !accessResult?.allowed || versionMismatch || sessionInvalidated;
 
         // Only warn when there's an actual problem; use debug for healthy heartbeats
         const logData = {

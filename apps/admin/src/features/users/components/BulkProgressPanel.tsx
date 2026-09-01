@@ -1,13 +1,6 @@
 'use client';
 
-import {
-  CheckCircle,
-  Warning,
-  Cancel,
-  Download,
-  AccessTime,
-  Close,
-} from '@mui/icons-material';
+import { CheckCircle, Warning, Cancel, Download, AccessTime, Close } from '@mui/icons-material';
 import { LinearProgress } from '@mui/material';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -171,12 +164,8 @@ export function BulkProgressPanel({ jobId, action, onDone }: BulkProgressPanelPr
     <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden animate-in slide-in-from-bottom-2 duration-300">
       <div className="px-4 py-3 flex items-center justify-between border-b border-border bg-muted/30">
         <div className="flex items-center gap-2">
-          {isDone && failed === 0 && (
-            <CheckCircle className="text-emerald-500 text-base" />
-          )}
-          {isDone && failed > 0 && (
-            <Warning className="text-amber-500 text-base" />
-          )}
+          {isDone && failed === 0 && <CheckCircle className="text-emerald-500 text-base" />}
+          {isDone && failed > 0 && <Warning className="text-amber-500 text-base" />}
           {!isDone && (
             <div className="relative">
               <AccessTime className="text-primary text-base" />
@@ -185,9 +174,7 @@ export function BulkProgressPanel({ jobId, action, onDone }: BulkProgressPanelPr
               )}
             </div>
           )}
-          <h3 className="text-sm font-semibold text-foreground">
-            Bulk {action.replace('_', ' ')}
-          </h3>
+          <h3 className="text-sm font-semibold text-foreground">Bulk {action.replace('_', ' ')}</h3>
           <span
             className={cn(
               'text-[10px] font-bold uppercase px-2 py-0.5 rounded-md',
@@ -249,9 +236,7 @@ export function BulkProgressPanel({ jobId, action, onDone }: BulkProgressPanelPr
         {isDone && (
           <div className="flex items-center gap-3 flex-wrap">
             {status === 'done' && (
-              <span className="text-xs font-medium text-emerald-600">
-                ✓ {succeeded} succeeded
-              </span>
+              <span className="text-xs font-medium text-emerald-600">✓ {succeeded} succeeded</span>
             )}
             {status === 'failed' && (
               <span className="text-xs font-medium text-destructive">Job failed</span>
@@ -260,9 +245,7 @@ export function BulkProgressPanel({ jobId, action, onDone }: BulkProgressPanelPr
               <span className="text-xs font-medium text-muted-foreground">Job cancelled</span>
             )}
             {failed > 0 && (
-              <span className="text-xs font-medium text-destructive">
-                ✗ {failed} failed
-              </span>
+              <span className="text-xs font-medium text-destructive">✗ {failed} failed</span>
             )}
           </div>
         )}

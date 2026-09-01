@@ -82,9 +82,7 @@ export interface Enrollment extends BaseEnrollment {
 
 /** Computed student display name from joined enrollment fields */
 export function getEnrollmentStudentName(enrollment: Enrollment): string {
-  const full = [enrollment.user_first_name, enrollment.user_last_name]
-    .filter(Boolean)
-    .join(' ');
+  const full = [enrollment.user_first_name, enrollment.user_last_name].filter(Boolean).join(' ');
   return full || enrollment.user_email || 'Unknown';
 }
 
@@ -132,7 +130,10 @@ export interface CreateCourseInput {
   status?: CourseStatus;
 }
 
-export interface UpdateCourseInput extends Omit<Partial<CreateCourseInput>, 'description' | 'category' | 'slug' | 'thumbnail_url' | 'teacher_id'> {
+export interface UpdateCourseInput extends Omit<
+  Partial<CreateCourseInput>,
+  'description' | 'category' | 'slug' | 'thumbnail_url' | 'teacher_id'
+> {
   status?: CourseStatus;
   description?: string | null;
   category?: string | null;
