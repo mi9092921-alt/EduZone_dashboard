@@ -110,22 +110,15 @@ export async function GET(
     status: 200,
     headers: {
       "Content-Type": "text/html; charset=utf-8",
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, OPTIONS",
       "Cache-Control": "public, max-age=30, stale-while-revalidate=60",
       "X-Content-Type-Options": "nosniff",
     },
   });
 }
 
-/** CORS Preflight */
-export async function OPTIONS() {
-  return new NextResponse(null, {
-    status: 204,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, OPTIONS",
-      "Access-Control-Max-Age": "86400",
-    },
-  });
-}
+/** No CORS preflight is needed: nothing in this codebase calls this route via
+ *  cross-origin fetch/XHR (verified via repo-wide search), and the primary
+ *  consumer is a WebView/native image loader, which never enforces CORS in
+ *  the first place. OPTIONS is intentionally left unhandled -- Next.js
+ *  returns 405 for it, which is correct for a route with no real preflight need.
+ */

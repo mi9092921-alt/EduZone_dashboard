@@ -52,9 +52,16 @@ export async function GET(request: Request) {
       'process_update_enrollment_totals_jobs',
       { p_limit: 100 },
     );
-    results['enrollment_totals_jobs_processed'] = totalsErr
-      ? `Skipped: ${totalsErr.message}`
-      : enrollmentTotalsJobs;
+    // P1-SEC-003 FIX: don't put the raw RPC/Postgres error message in the
+    // response body (this is the one place in this route that did -- every
+    // other RPC error is thrown and caught below, which already logs
+    // server-side via console.error and returns a generic client response).
+    if (totalsErr) {
+      console.error('[CRON_ROUTINE_ENROLLMENT_TOTALS_ERROR]', totalsErr);
+      results['enrollment_totals_jobs_processed'] = 'Skipped: worker error';
+    } else {
+      results['enrollment_totals_jobs_processed'] = enrollmentTotalsJobs;
+    }
 
     // 4. Process Cache Purges from Job Queue
     // Generate a unique worker ID to maintain lease ownership and avoid race conditions
@@ -217,7 +224,10 @@ export async function GET(request: Request) {
       results['notification_fanout_jobs_processed'] = fanoutCount;
     } catch (fanoutErr: unknown) {
       console.error('[CRON_ROUTINE_FANOUT_ERROR]', fanoutErr);
-      results['notification_fanout_jobs_processed'] = `Worker error: ${getErrorMessage(fanoutErr)}`;
+      // P1-SEC-003 FIX: don't leak the raw error message in the response body
+      // (matches the generic 'Worker error' shape described above in the
+      // BUG-NOTIF-01 note as the pre-existing/intended behavior).
+      results['notification_fanout_jobs_processed'] = 'Worker error';
     }
 
     return NextResponse.json({

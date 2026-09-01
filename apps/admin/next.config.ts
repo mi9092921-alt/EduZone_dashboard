@@ -12,14 +12,17 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ['require-in-the-middle'],
 
   // ── YouTube Proxy Headers ─────────────────────────────────────────────────
+  // P1-SEC-004 FIX: dropped the wildcard Access-Control-Allow-Origin here.
+  // Nothing in this repo calls /api/video/:videoId* via cross-origin
+  // fetch/XHR (verified by search), and the real consumer is a WebView/
+  // iframe-src load, which CORS headers don't gate at all -- only
+  // script-initiated cross-origin reads are affected. X-Frame-Options stays,
+  // since embedding by a foreign origin was never the intent either.
   async headers() {
     return [
       {
         source: '/api/video/:videoId*',
-        headers: [
-          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
-          { key: 'Access-Control-Allow-Origin', value: '*' },
-        ],
+        headers: [{ key: 'X-Frame-Options', value: 'SAMEORIGIN' }],
       },
     ];
   },

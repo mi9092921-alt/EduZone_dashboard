@@ -75,10 +75,23 @@ interface UserFilterQuery {
   limit(count: number): PromiseLike<{ data: Record<string, unknown>[] | null; error: { message: string } | null }>;
 }
 
-function applyUserFilters(query: UserFilterQuery, f: Record<string, unknown>): UserFilterQuery {
+function applyUserFilters(
+  query: UserFilterQuery,
+  f: Record<string, unknown>,
+  restrictTenantId: string | undefined,
+): UserFilterQuery {
   if (f.user_ids && Array.isArray(f.user_ids) && f.user_ids.length > 0) {
     query = query.in('id', f.user_ids as string[]);
-    if (f.tenant_id) query = query.eq('tenant_id', f.tenant_id as string);
+    // P1-SEC-005 FIX: for non-super_admin callers, restrictTenantId is always
+    // the caller's own tenant and is enforced unconditionally -- it does not
+    // depend on (and overrides) whatever tenant_id the client sent. This is
+    // the query the service_role client actually runs, so this is the real
+    // tenant boundary; RLS does not apply to a service_role client.
+    if (restrictTenantId) {
+      query = query.eq('tenant_id', restrictTenantId);
+    } else if (f.tenant_id) {
+      query = query.eq('tenant_id', f.tenant_id as string);
+    }
     return query;
   }
 
@@ -89,7 +102,11 @@ function applyUserFilters(query: UserFilterQuery, f: Record<string, unknown>): U
   }
   if (f.primary_role) query = query.eq('primary_role', f.primary_role as string);
   if (f.account_status) query = query.eq('account_status', f.account_status as string);
-  if (f.tenant_id) query = query.eq('tenant_id', f.tenant_id as string);
+  if (restrictTenantId) {
+    query = query.eq('tenant_id', restrictTenantId);
+  } else if (f.tenant_id) {
+    query = query.eq('tenant_id', f.tenant_id as string);
+  }
   if (f.region_id) query = query.eq('region_id', f.region_id as string);
   return query;
 }
@@ -115,6 +132,7 @@ async function processInlineBulkJob(
   job: { id: string },
   body: BulkRequestBody,
   initiatorId: string,
+  restrictTenantId: string | undefined,
 ) {
   const { data: users, error } = await applyUserFilters(
     admin
@@ -122,6 +140,7 @@ async function processInlineBulkJob(
       .select('id, tenant_id, email, first_name, last_name, phone, primary_role, account_status, warning_count, login_count, token_version, created_at, last_login, last_seen_at, region_id')
       .is('deleted_at', null) as unknown as UserFilterQuery,
     body.filters,
+    restrictTenantId,
   ).limit(MAX_BULK_SIZE);
 
   if (error) throw error;
@@ -270,7 +289,11 @@ async function exportUsers(
   initiatorId: string,
 ) {
   const format = String(body.params?.export_format ?? 'json');
-  const tenantId = String(body.filters.tenant_id ?? users[0]?.tenant_id ?? 'default');
+  // P1-SEC-005 FIX: derive the storage path from the actual exported rows'
+  // tenant, not the client-supplied filter -- after the tenant-scoping fix
+  // above, `users` only ever contains one tenant's rows for non-super_admin
+  // callers, but the path shouldn't trust unvalidated client input either way.
+  const tenantId = String(users[0]?.tenant_id ?? body.filters.tenant_id ?? 'default');
   const ext = format === 'csv' ? 'csv' : 'json';
   const contentType = ext === 'csv' ? 'text/csv' : 'application/json';
   const fileContent = ext === 'csv' ? generateCsv(users) : JSON.stringify(users, null, 2);
@@ -398,6 +421,19 @@ export async function POST(request: NextRequest) {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
+    // P1-SEC-005 FIX: this route runs every query below through the
+    // service_role client, which bypasses RLS entirely -- so tenant scoping
+    // has to be enforced here, in application code, or it doesn't exist at
+    // all. Previously `filters.tenant_id` was client-supplied and optional,
+    // so a non-super_admin caller (e.g. a teacher, who has `users.read` and
+    // can therefore hit action:'export') could omit it or set it to another
+    // tenant's id and act on/export users outside their own tenant.
+    // super_admin is the only role allowed to choose/omit a tenant filter.
+    const isSuperAdmin = callerProfile.primary_role === 'super_admin';
+    const restrictTenantId: string | undefined = isSuperAdmin
+      ? undefined
+      : callerProfile.tenant_id;
+
     // ── Count matching users ──────────────────────────────────
     // v13: users_with_pii_access includes decrypted email for search;
     //      it inherits soft-delete exclusion from the underlying users_active join.
@@ -411,7 +447,11 @@ export async function POST(request: NextRequest) {
       // User explicitly selected individual users via checkboxes.
       // Bypass general search/filters to honor user intent, but retain tenant_id check.
       query = query.in('id', f.user_ids as string[]);
-      if (f.tenant_id) query = query.eq('tenant_id', f.tenant_id as string);
+      if (restrictTenantId) {
+        query = query.eq('tenant_id', restrictTenantId);
+      } else if (f.tenant_id) {
+        query = query.eq('tenant_id', f.tenant_id as string);
+      }
     } else {
       // User did not select checkboxes (e.g. bulk action on entire search results).
       // Apply full search and filters.
@@ -423,7 +463,11 @@ export async function POST(request: NextRequest) {
       }
       if (f.primary_role) query = query.eq('primary_role', f.primary_role as string);
       if (f.account_status) query = query.eq('account_status', f.account_status as string);
-      if (f.tenant_id) query = query.eq('tenant_id', f.tenant_id as string);
+      if (restrictTenantId) {
+        query = query.eq('tenant_id', restrictTenantId);
+      } else if (f.tenant_id) {
+        query = query.eq('tenant_id', f.tenant_id as string);
+      }
       if (f.region_id) query = query.eq('region_id', f.region_id as string);
     }
 
@@ -497,7 +541,7 @@ export async function POST(request: NextRequest) {
       // Don't block job submission if activity logging fails
     }
 
-    await processInlineBulkJob(admin, job, body, userData.user.id);
+    await processInlineBulkJob(admin, job, body, userData.user.id, restrictTenantId);
 
     // ── Return 202 Accepted ───────────────────────────────────
     return NextResponse.json(

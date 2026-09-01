@@ -68,25 +68,20 @@ export async function GET(req: NextRequest) {
       status: 200,
       headers: {
         "Content-Type": contentType,
-        "Access-Control-Allow-Origin": "*",
         "Cache-Control": "public, max-age=300, stale-while-revalidate=600",
         "X-Content-Type-Options": "nosniff",
       },
     });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return new NextResponse(`Asset proxy error: ${msg}`, { status: 502 });
+    // P1-SEC-004/006 FIX: don't return raw fetch/network error details (host,
+    // path, stack) to the caller. Log server-side, respond generically.
+    console.error("[PROXY_ASSET_ERROR]", err);
+    return new NextResponse("Asset proxy error", { status: 502 });
   }
 }
 
-/** CORS Preflight */
-export async function OPTIONS() {
-  return new NextResponse(null, {
-    status: 204,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, OPTIONS",
-      "Access-Control-Max-Age": "86400",
-    },
-  });
-}
+/** No CORS preflight is needed: nothing in this codebase calls this route via
+ *  cross-origin fetch/XHR (verified via repo-wide search), and the upstream
+ *  content is public YouTube/Google static assets with no user-specific data.
+ *  OPTIONS is intentionally left unhandled -- Next.js returns 405 for it.
+ */
