@@ -2004,6 +2004,16 @@ CREATE POLICY admin_only_all ON public.cache_invalidation_queue
 -- courses_select_merged calls has_course_access(id). Forcing either table
 -- strips the owner bypass that chain relies on and reopens 42P17 the first
 -- time has_course_access() is actually exercised via that OR branch.
+-- AUTH-BUG-01 FIX: 'user_progress' was also removed from this list (see the
+-- ALTER TABLE public.user_progress ENABLE ROW LEVEL SECURITY comment near
+-- the top of this file for the full explanation). public.update_lesson_progress()
+-- is SECURITY DEFINER and does its own INSERT ... ON CONFLICT DO UPDATE into
+-- this table as the table owner; user_progress_insert_merged /
+-- user_progress_update_merged are scoped TO authenticated only, so FORCE
+-- strips the owner bypass that write relies on and makes it fail 100% of
+-- the time (see VALIDATION.sql Check 37, reproduced against a live
+-- PostgreSQL 17 instance). Do not re-add it without first verifying
+-- update_lesson_progress() no longer needs the table-owner bypass.
 DO $$
 DECLARE
   _tables text[] := ARRAY[
@@ -2011,7 +2021,6 @@ DECLARE
     'sessions', 'devices',
     'roles', 'permissions', 'role_permissions',
     'settings_kv',
-    'user_progress',
     'notifications', 'user_notifications',
     'constants', 'user_validity_cache'
   ];
@@ -2061,6 +2070,14 @@ BEGIN
     WHERE n.nspname = 'public' AND c.relname = 'enrollments' AND c.relkind = 'r'
   ) THEN
     EXECUTE 'ALTER TABLE public.enrollments NO FORCE ROW LEVEL SECURITY';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public' AND c.relname = 'user_progress' AND c.relkind = 'r'
+  ) THEN
+    EXECUTE 'ALTER TABLE public.user_progress NO FORCE ROW LEVEL SECURITY';
   END IF;
 END;
 $$;

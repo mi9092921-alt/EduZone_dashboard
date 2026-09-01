@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   getActivityLogs,
   getActivityLogsForVerification,
+  getPrecedingLogEntryHash,
   getAuditChainState,
   flushActivityLogs,
   getQueuedActivities,
@@ -42,6 +43,7 @@ describe('audit.service', () => {
       range: vi.fn().mockReturnThis(),
       limit: vi.fn().mockReturnThis(),
       single: vi.fn().mockResolvedValue(resolvedValue),
+      maybeSingle: vi.fn().mockResolvedValue(resolvedValue),
       then: vi.fn().mockImplementation((cb) => cb(resolvedValue)),
     };
     return mockQuery;
@@ -84,6 +86,45 @@ describe('audit.service', () => {
     expect(res.last_seq).toBe(100);
     expect(mockFrom).toHaveBeenCalledWith('audit_chain_state');
     expect(q.eq).toHaveBeenCalledWith('id', 1);
+  });
+
+  describe('getPrecedingLogEntryHash', () => {
+    it('returns null for seq 1 without querying (no predecessor exists)', async () => {
+      const res = await getPrecedingLogEntryHash(1);
+      expect(res).toBeNull();
+      expect(mockFrom).not.toHaveBeenCalled();
+    });
+
+    it('returns null for seq <= 0 without querying', async () => {
+      const res = await getPrecedingLogEntryHash(0);
+      expect(res).toBeNull();
+      expect(mockFrom).not.toHaveBeenCalled();
+    });
+
+    it('fetches the entry_hash of seq - 1 independently', async () => {
+      const q = setupQuery({ data: { entry_hash: 'abc123' }, error: null });
+      mockFrom.mockReturnValue(q);
+
+      const res = await getPrecedingLogEntryHash(42);
+      expect(mockFrom).toHaveBeenCalledWith('activity_logs');
+      expect(q.eq).toHaveBeenCalledWith('seq', 41);
+      expect(res).toBe('abc123');
+    });
+
+    it('returns null when the predecessor row is not found', async () => {
+      const q = setupQuery({ data: null, error: null });
+      mockFrom.mockReturnValue(q);
+
+      const res = await getPrecedingLogEntryHash(42);
+      expect(res).toBeNull();
+    });
+
+    it('propagates query errors', async () => {
+      const q = setupQuery({ data: null, error: { message: 'RLS denied' } });
+      mockFrom.mockReturnValue(q);
+
+      await expect(getPrecedingLogEntryHash(42)).rejects.toBeTruthy();
+    });
   });
 
   it('flushActivityLogs handles lock contention', async () => {

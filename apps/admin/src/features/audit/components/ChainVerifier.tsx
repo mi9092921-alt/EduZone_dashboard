@@ -8,7 +8,7 @@ import { useState, useCallback } from 'react';
 import { useAuditChainState } from '@/adapters/queries/audit.queries';
 import { Button } from '@/components/ui/Button';
 import type { VerificationResult } from '@/domain/types/audit.types';
-import { getActivityLogsForVerification } from '@/infrastructure/repos/audit.service';
+import { getActivityLogsForVerification, getPrecedingLogEntryHash } from '@/infrastructure/repos/audit.service';
 import { verifyHashChain } from '@/lib/hash-chain';
 
 interface ChainVerifierProps {
@@ -43,8 +43,27 @@ export function ChainVerifier({ dateFrom, dateTo }: ChainVerifierProps) {
         return;
       }
 
-      // The genesis hash for the first log is its prev_hash
-      const genesisHash = logs[0]?.prev_hash ?? 'GENESIS_BLOCK';
+      // Trust anchor: independently fetch the entry_hash of the log
+      // immediately preceding this window (by seq), rather than trusting
+      // this window's own first row's prev_hash field — which is exactly
+      // the value an attacker tampering with that row would also control.
+      const firstSeq = logs[0]!.seq;
+      let genesisHash: string;
+      if (firstSeq <= 1) {
+        // Seq 1 has no predecessor; the server initializes prev_hash to a
+        // 64-character all-zero string for it (see 07_functions.sql).
+        genesisHash = '0'.repeat(64);
+      } else {
+        const precedingHash = await getPrecedingLogEntryHash(firstSeq);
+        if (!precedingHash) {
+          // seq > 1 but no predecessor row was found — a real gap/access
+          // issue, not genesis. Don't silently substitute a value here;
+          // that would let a broken or inaccessible predecessor pass as
+          // "verified" instead of surfacing the problem.
+          throw new Error(t('status_verification_failed'));
+        }
+        genesisHash = precedingHash;
+      }
 
       const verification = await verifyHashChain(logs, genesisHash, (pct) => setProgress(pct));
 
