@@ -93,7 +93,7 @@ export function LoginPage() {
         email: authData.user!.email || '',
         primary_role: accessResult.role,
         tenant_id: accessResult.tenant_id,
-        token_version: 0,
+        token_version: accessResult.token_version != null ? Number(accessResult.token_version) : 1,
         permissions: [],
       });
 

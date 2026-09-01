@@ -38,13 +38,15 @@ export function useSessionCheck() {
         // If token_version is absent from the JWT (hook not yet configured),
         // both values may be undefined/null — treat that as "no mismatch" to
         // avoid a forced sign-out loop while the hook is being wired up.
-        const serverVersion = accessResult?.token_version;
-        const clientVersion = user.token_version;
+        const serverVersion =
+          accessResult?.token_version != null ? Number(accessResult.token_version) : undefined;
+        const clientVersion =
+          user.token_version != null ? Number(user.token_version) : undefined;
         const versionMismatch =
           serverVersion !== undefined &&
-          serverVersion !== null &&
+          !isNaN(serverVersion) &&
           clientVersion !== undefined &&
-          clientVersion !== null &&
+          !isNaN(clientVersion) &&
           serverVersion !== clientVersion;
 
         const sessionInvalidated = !sessionResult.success && sessionResult.active === false;

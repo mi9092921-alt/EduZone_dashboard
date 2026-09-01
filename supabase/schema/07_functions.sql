@@ -6458,7 +6458,7 @@ DECLARE
   v_session jsonb := public._session_status();
   v_role text := v_session ->> 'role';
   v_tenant_id text := v_session ->> 'tenant_id';
-  v_token_version text := v_session ->> 'token_version';
+  v_token_version integer := (v_session ->> 'token_version')::integer;
   v_maintenance_excluded_roles text[] := ARRAY[]::text[];
   v_maintenance_excluded_users uuid[] := ARRAY[]::uuid[];
 BEGIN
