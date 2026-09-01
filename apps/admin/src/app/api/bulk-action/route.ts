@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 
+import { roleAllowsPermission } from '@/application/authorization/policy';
 import { createServerClient } from '@/infrastructure/supabase/server';
 
 /**
@@ -48,24 +49,6 @@ interface BulkRequestBody {
 
 function errorJson(code: string, message: string, status = 400, extra?: Record<string, unknown>) {
   return NextResponse.json({ code, message, error: message, ...extra }, { status });
-}
-
-function roleAllowsPermission(role: string | undefined, permission: string) {
-  if (role === 'admin') return permission !== 'tenants.manage';
-  if (role === 'teacher') {
-    return [
-      'courses.read',
-      'courses.write',
-      'courses.manage',
-      'users.read',
-      'warnings.write',
-      'reports.read',
-      'notifications.send',
-      'notifications.delete',
-    ].includes(permission);
-  }
-  if (role === 'student') return permission === 'courses.read' || permission === 'reports.read';
-  return false;
 }
 
 interface UserFilterQuery {
@@ -502,7 +485,10 @@ export async function POST(request: NextRequest) {
     const { count: estimatedCount, error: countErr } = await query;
 
     if (countErr) {
-      return errorJson('QUERY_ERROR', countErr.message, 400);
+      // P1-SEC-003 / P1-SEC-006: never forward raw DB error text to the client
+      // (internal schema/column details). Log full detail server-side only.
+      console.error('[bulk-action] count query failed:', countErr);
+      return errorJson('QUERY_ERROR', 'Failed to evaluate the given filters', 400);
     }
 
     const count = estimatedCount ?? 0;
@@ -551,7 +537,11 @@ export async function POST(request: NextRequest) {
           409,
         );
       }
-      return errorJson('QUEUE_ERROR', insertErr.message, 500);
+      // P1-SEC-003 / P1-SEC-006: same rationale as the count-query error above —
+      // the specific `.includes()` checks above still inspect the raw DB error
+      // server-side; only the generic fallback is returned to the client.
+      console.error('[bulk-action] enqueue failed:', insertErr);
+      return errorJson('QUEUE_ERROR', 'Failed to queue the bulk action', 500);
     }
 
     // ── Log the activity (non-critical) ──────────────────────

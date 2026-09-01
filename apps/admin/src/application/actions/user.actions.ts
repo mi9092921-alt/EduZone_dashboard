@@ -2,6 +2,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 
+import { roleAllowsPermission } from '@/application/authorization/policy';
 import { getErrorMessage } from '@/domain/errors';
 import { CreateUserInput, createUserSchema } from '@/domain/schemas/user.schema';
 import type { AccountAction } from '@/domain/types/user.types';
@@ -41,7 +42,7 @@ async function verifyCallerPermission(
   }
 
   const permissions = Array.isArray(permission) ? permission : [permission];
-  if (roleAllowsPermissions(profile?.primary_role as string | undefined, permissions)) {
+  if (roleAllowsPermission(profile?.primary_role as string | undefined, permissions)) {
     return { user: userData.user, error: null };
   }
 
@@ -70,33 +71,6 @@ async function verifyCallerPermission(
   return { user: userData.user, error: null };
 }
 
-function roleAllowsPermissions(role: string | undefined, permissions: string[]) {
-  if (role === 'admin') {
-    return permissions.some((permission) => permission !== 'tenants.manage');
-  }
-
-  if (role === 'teacher') {
-    const allowed = new Set([
-      'courses.read',
-      'courses.write',
-      'courses.manage',
-      'users.read',
-      'warnings.write',
-      'reports.read',
-      'notifications.send',
-      'notifications.delete',
-    ]);
-    return permissions.some((permission) => allowed.has(permission));
-  }
-
-  if (role === 'student') {
-    return permissions.some(
-      (permission) => permission === 'courses.read' || permission === 'reports.read',
-    );
-  }
-
-  return false;
-}
 
 /**
  * Creates a new user via Supabase Admin API natively.

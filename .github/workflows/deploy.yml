@@ -30,14 +30,14 @@ jobs:
         with:
           version: latest
 
-      - name: Deploy to Vercel
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-        run: npx vercel pull --yes --environment=production --token=$VERCEL_TOKEN && npx vercel build --prod --token=$VERCEL_TOKEN && npx vercel deploy --prebuilt --prod --token=$VERCEL_TOKEN
-
-      - name: Push DB Migrations
+      # Push DB schema before deploying app code that may depend on it. The
+      # app and DB share one Supabase project (see agent_prompt_eduzone_db.md):
+      # deploying the app first left a window where new code could call
+      # RPCs/columns the live schema didn't have yet. Schema changes here are
+      # applied directly to supabase/schema/ (no migrations, per project
+      # policy) and are expected to be backward-compatible with the
+      # previous app version during the rollout window.
+      - name: Push DB Schema
         env:
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
           SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
@@ -47,3 +47,10 @@ jobs:
         env:
           SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
         run: supabase functions deploy
+
+      - name: Deploy to Vercel
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: npx vercel pull --yes --environment=production --token=$VERCEL_TOKEN && npx vercel build --prod --token=$VERCEL_TOKEN && npx vercel deploy --prebuilt --prod --token=$VERCEL_TOKEN

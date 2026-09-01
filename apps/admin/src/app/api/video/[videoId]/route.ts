@@ -103,6 +103,15 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ vid
 </body>
 </html>`;
 
+  // P1-SEC-004: this page is loaded as a same-document iframe/navigation
+  // (`<iframe src="...">`), never read via cross-origin fetch/XHR, so a
+  // wildcard CORS grant serves no legitimate embedding purpose here — it
+  // only widened the response's readable-cross-origin surface. Dropped.
+  // NOTE: this route still has no authentication/authorization check on
+  // videoId — see PRODUCTION_READINESS_PLAN.md P1-SEC-004. No caller of
+  // this route was found in either EduZone_App or EduZone_dashboard via
+  // full-repo search, so adding an auth gate was left for manual
+  // confirmation of the real caller before changing that behavior.
   return new NextResponse(html, {
     status: 200,
     headers: {
@@ -112,10 +121,3 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ vid
     },
   });
 }
-
-/** No CORS preflight is needed: nothing in this codebase calls this route via
- *  cross-origin fetch/XHR (verified via repo-wide search), and the primary
- *  consumer is a WebView/native image loader, which never enforces CORS in
- *  the first place. OPTIONS is intentionally left unhandled -- Next.js
- *  returns 405 for it, which is correct for a route with no real preflight need.
- */

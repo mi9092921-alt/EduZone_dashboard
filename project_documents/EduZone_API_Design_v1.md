@@ -1,4 +1,4 @@
-﻿EduZone API Design Document v1.0 **| CONFIDENTIAL**
+EduZone API Design Document v1.0 **| CONFIDENTIAL**
 
 **EduZone**
 

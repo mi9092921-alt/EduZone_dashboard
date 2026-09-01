@@ -1,4 +1,4 @@
-﻿EduZone Admin & Management Dashboard — PRD v2.0 **| CONFIDENTIAL**
+EduZone Admin & Management Dashboard — PRD v2.0 **| CONFIDENTIAL**
 
 **EduZone**
 

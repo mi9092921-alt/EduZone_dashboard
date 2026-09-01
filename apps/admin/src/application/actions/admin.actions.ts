@@ -9,6 +9,7 @@ import type {
   UserNotification,
   TargetAudience,
 } from '@/adapters/queries/notifications.queries';
+import { roleAllowsPermission } from '@/application/authorization/policy';
 import type { CourseWithStats, MvCourseStats } from '@/domain/types/analytics.types';
 import type { ActivityLogQueueEntry } from '@/domain/types/audit.types';
 import type { CourseStats } from '@/domain/types/course.types';
@@ -61,7 +62,7 @@ async function requirePermission(permission: string | string[]) {
   }
 
   const permissions = Array.isArray(permission) ? permission : [permission];
-  if (roleAllowsPermissions(profile?.primary_role as string | undefined, permissions)) {
+  if (roleAllowsPermission(profile?.primary_role as string | undefined, permissions)) {
     return { userId: userData.user.id, tenantId: profile?.tenant_id as string | null };
   }
 
@@ -77,33 +78,6 @@ async function requirePermission(permission: string | string[]) {
   throw new Error(`Permission Denied: user lacks ${permissions.join(' or ')}`);
 }
 
-function roleAllowsPermissions(role: string | undefined, permissions: string[]) {
-  if (role === 'admin') {
-    return permissions.some((permission) => permission !== 'tenants.manage');
-  }
-
-  if (role === 'teacher') {
-    const allowed = new Set([
-      'courses.read',
-      'courses.write',
-      'courses.manage',
-      'users.read',
-      'warnings.write',
-      'reports.read',
-      'notifications.send',
-      'notifications.delete',
-    ]);
-    return permissions.some((permission) => allowed.has(permission));
-  }
-
-  if (role === 'student') {
-    return permissions.some(
-      (permission) => permission === 'courses.read' || permission === 'reports.read',
-    );
-  }
-
-  return false;
-}
 
 async function requireUser() {
   const supabase = await createServerClient();
