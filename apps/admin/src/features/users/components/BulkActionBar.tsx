@@ -17,7 +17,6 @@ import React, { useState } from 'react';
 
 import { useSubmitBulkAction } from '@/adapters/mutations/bulk.mutations';
 import { useToastStore } from '@/adapters/stores/toast.store';
-import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
@@ -64,7 +63,6 @@ export function BulkActionBar({
   const [pendingAction, setPendingAction] = useState<BulkAction | null>(null);
   const [estimatedCount, setEstimatedCount] = useState<number>(0);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [dryRunning, setDryRunning] = useState(false);
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -128,17 +126,15 @@ export function BulkActionBar({
         <div className="flex items-center gap-1 flex-wrap flex-1">
           {ACTIONS.map((action) => {
             const Icon = action.icon;
-            const label = t(action.labelKey as any);
+            const label = t(action.labelKey as 'bulk_action_lock' | 'bulk_action_unlock' | 'bulk_action_suspend' | 'bulk_action_ban' | 'bulk_action_warn' | 'bulk_action_terminate_sessions' | 'bulk_action_reset_devices' | 'bulk_action_export' | 'bulk_action_delete');
             return (
               <Tooltip key={action.id} title={label}>
                 <button
                   onClick={() => handleActionClick(action.id)}
-                  disabled={dryRunning}
                   className={cn(
                     'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all',
                     action.color,
                     action.bgColor,
-                    dryRunning && 'opacity-50 cursor-not-allowed',
                   )}
                 >
                   <Icon className="text-sm" />
@@ -172,14 +168,18 @@ export function BulkActionBar({
           open={showConfirm && !!pendingAction}
           onClose={handleCancel}
           onConfirm={handleConfirm}
-          title={t(`bulk_confirm_title_${pendingAction}` as any)}
+          title={t(`bulk_confirm_title_${pendingAction}` as 'bulk_confirm_title_lock' | 'bulk_confirm_title_unlock' | 'bulk_confirm_title_suspend' | 'bulk_confirm_title_ban' | 'bulk_confirm_title_warn' | 'bulk_confirm_title_terminate_sessions' | 'bulk_confirm_title_reset_devices' | 'bulk_confirm_title_export' | 'bulk_confirm_title_delete')}
           description={t('bulk_confirm_desc', { count: estimatedCount })}
-          confirmLabel={t(`bulk_confirm_btn_${pendingAction}` as any)}
+          confirmLabel={t(`bulk_confirm_btn_${pendingAction}` as 'bulk_confirm_btn_lock' | 'bulk_confirm_btn_unlock' | 'bulk_confirm_btn_suspend' | 'bulk_confirm_btn_ban' | 'bulk_confirm_btn_warn' | 'bulk_confirm_btn_terminate_sessions' | 'bulk_confirm_btn_reset_devices' | 'bulk_confirm_btn_export' | 'bulk_confirm_btn_delete')}
           confirmColor={pendingAction === 'ban' || pendingAction === 'delete' ? 'error' : 'warning'}
           isLoading={submitBulk.isPending}
           error={error}
-          icon={pendingAction ? ACTIONS.find(a => a.id === pendingAction)?.icon && 
-            React.createElement(ACTIONS.find(a => a.id === pendingAction)!.icon as any, { sx: { fontSize: 22 } }) : null}
+          icon={(() => {
+            const act = ACTIONS.find(a => a.id === pendingAction);
+            if (!act) return null;
+            const IconComp = act.icon;
+            return <IconComp sx={{ fontSize: 22 }} />;
+          })()}
         >
           {pendingAction !== 'export' && pendingAction !== 'unlock' && (
             <div className="space-y-2 pt-2">

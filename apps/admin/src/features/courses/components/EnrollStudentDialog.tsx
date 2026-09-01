@@ -53,7 +53,7 @@ export function EnrollStudentDialog({ courseId, open, onClose }: EnrollStudentDi
     reset,
     formState: { errors },
   } = useForm<EnrollStudentFormInput>({
-    resolver: zodResolver(enrollStudentSchema) as any,
+    resolver: zodResolver(enrollStudentSchema),
     defaultValues: {
       user_id: '',
       course_id: courseId,
@@ -120,31 +120,35 @@ export function EnrollStudentDialog({ courseId, open, onClose }: EnrollStudentDi
                   loading={isLoadingUsers}
                   onInputChange={(_, value) => setUserSearchText(value)}
                   onChange={(_, value) => field.onChange(value?.id || '')}
-                  renderInput={(params) => (
-                    <TextField
-                      {...(params as any)}
-                      label={t('select_student_label')}
-                      autoFocus
-                      error={!!errors.user_id}
-                      helperText={errors.user_id?.message}
-                      size="small"
-                      placeholder={t('student_search_placeholder')}
-                      InputProps={{
-                        ...params.InputProps,
-                        endAdornment: (
-                          <>
-                            {isLoadingUsers ? <CircularProgress color="inherit" size={20} /> : null}
-                            {params.InputProps.endAdornment}
-                          </>
-                        ),
-                      }}
-                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
-                    />
-                  )}
-                  renderOption={(props, option) => {
-                    const { key, ...optionProps } = props as any;
+                  renderInput={(params) => {
+                    const { InputLabelProps, InputProps, ...rest } = params;
                     return (
-                      <Box component="li" key={option.id} {...optionProps} sx={{ display: 'flex', gap: 1.5, py: 1 }}>
+                      <TextField
+                        {...rest}
+                        label={t('select_student_label')}
+                        autoFocus
+                        error={!!errors.user_id}
+                        helperText={errors.user_id?.message}
+                        size="small"
+                        placeholder={t('student_search_placeholder')}
+                        InputLabelProps={InputLabelProps as unknown as { shrink?: boolean; className?: string }}
+                        InputProps={{
+                          ...InputProps,
+                          endAdornment: (
+                            <>
+                              {isLoadingUsers ? <CircularProgress color="inherit" size={20} /> : null}
+                              {InputProps.endAdornment}
+                            </>
+                          ),
+                        }}
+                        sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                      />
+                    );
+                  }}
+                  renderOption={(props, option) => {
+                    const { key, ...optionProps } = props as React.HTMLAttributes<HTMLLIElement> & { key?: React.Key };
+                    return (
+                      <Box component="li" key={key ?? option.id} {...optionProps} sx={{ display: 'flex', gap: 1.5, py: 1 }}>
                         <Avatar src={option.avatar_url || ''} sx={{ width: 32, height: 32, fontSize: '0.75rem' }}>
                           {option.first_name?.[0]}{option.last_name?.[0]}
                         </Avatar>

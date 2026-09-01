@@ -1,3 +1,5 @@
+import { getServerEnv } from '@/lib/env';
+
 /**
  * YouTube Service
  * Handles fetching video metadata and duration from YouTube API.
@@ -55,7 +57,7 @@ export async function getYoutubeVideoDetails(
   const videoId = extractYoutubeId(urlOrId);
   if (!videoId) return null;
 
-  const apiKey = process.env.YOUTUBE_API_KEY;
+  const apiKey = getServerEnv().YOUTUBE_API_KEY;
   if (!apiKey) {
     console.warn('[YouTubeService] Missing YOUTUBE_API_KEY environment variable.');
     return null;

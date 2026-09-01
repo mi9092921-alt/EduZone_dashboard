@@ -6,8 +6,6 @@ import {
   LockOpen,
   WorkOutline,
   Info,
-  ChevronLeft,
-  ChevronRight,
 } from '@mui/icons-material';
 import { Tooltip } from '@mui/material';
 import { useTranslations } from 'next-intl';
@@ -33,7 +31,7 @@ const ALL_STATUSES: (JobStatus | 'all')[] = ['all', 'pending', 'processing', 'do
 export function JobsPage() {
   const t = useTranslations('jobs');
   const tCommon = useTranslations('common');
-  const [filters, setFilters] = useState<JobFilters>({});
+  const [filters] = useState<JobFilters>({});
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [activeTab, setActiveTab] = useState<JobStatus | 'all'>('all');
@@ -47,7 +45,6 @@ export function JobsPage() {
 
   const jobs = data?.data ?? [];
   const totalCount = data?.count ?? 0;
-  const totalPages = data?.totalPages ?? 1;
 
   const retryJob = useRetryJob();
   const cancelJob = useCancelJob();

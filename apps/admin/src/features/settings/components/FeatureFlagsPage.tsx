@@ -59,14 +59,12 @@ import {
 } from '@/adapters/mutations/settings.mutations';
 import { useFeatureFlags, useFeatureFlagDetail, useRoles } from '@/adapters/queries/settings.queries';
 import { useToastStore } from '@/adapters/stores/toast.store';
-import { Card, CardContent, StatsCard, StatsCardContent, StatsCardIcon } from '@/components/ui/Card';
-import type { FeatureFlag } from '@/domain/types/feature-flag.types';
+import type { CreateFeatureFlagInput, FeatureFlag } from '@/domain/types/feature-flag.types';
 
 export function FeatureFlagsPage() {
   const theme = useTheme();
   const t = useTranslations('settings');
   const tCommon = useTranslations('common');
-  const tVal = useTranslations('validation');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<FeatureFlag | null>(null);
@@ -351,6 +349,7 @@ export function FeatureFlagsPage() {
 function FlagOverridesPanel({ flagId }: { flagId: string }) {
   const theme = useTheme();
   const t = useTranslations('settings');
+  const tCommon = useTranslations('common');
   const { data: detail, isLoading } = useFeatureFlagDetail(flagId);
   const { data: roles } = useRoles();
   const addRoleMutation = useAddRoleOverride();
@@ -362,7 +361,6 @@ function FlagOverridesPanel({ flagId }: { flagId: string }) {
   const [addUserOpen, setAddUserOpen] = useState(false);
   const [selectedRoleId, setSelectedRoleId] = useState('');
   const [selectedIsExclude, setSelectedIsExclude] = useState(false);
-  const [userEmail, setUserEmail] = useState('');
   const [userId, setUserId] = useState('');
 
   if (isLoading) {
@@ -478,12 +476,13 @@ function FlagOverridesPanel({ flagId }: { flagId: string }) {
               )}
               onChange={(_, val) => setSelectedRoleId(val?.id ?? '')}
               renderInput={(params) => {
-                const { InputLabelProps, size, ...restParams } = params;
+                const { InputLabelProps, InputProps, size: _size, ...rest } = params;
                 return (
                   <TextField
-                    {...restParams}
-                    InputLabelProps={InputLabelProps as any}
+                    {...rest}
                     label={t('feature_flags.overrides.label_role')}
+                    InputLabelProps={InputLabelProps as unknown as { shrink?: boolean; className?: string }}
+                    InputProps={InputProps}
                   />
                 );
               }}
@@ -531,15 +530,15 @@ function FlagOverridesPanel({ flagId }: { flagId: string }) {
         fullWidth
         PaperProps={{ sx: { borderRadius: 3 } }}
       >
-        <DialogTitle sx={{ fontWeight: 700 }}>{t('feature_flags.overrides.dialog_user_title')}</DialogTitle>
-        <DialogContent>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+        <DialogTitle>{t('feature_flags.overrides.title_add_user')}</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
             <TextField
-              label={t('feature_flags.overrides.label_user_uuid')}
+              size="small"
+              label={t('feature_flags.overrides.label_user_id')}
               value={userId}
               onChange={(e) => setUserId(e.target.value)}
-              placeholder="_"
-              size="small"
+              placeholder="e.g. 123e4567-e89b-12d3-a456-426614174000"
             />
             <FormControl size="small">
               <InputLabel>{t('feature_flags.label_type')}</InputLabel>
@@ -548,30 +547,28 @@ function FlagOverridesPanel({ flagId }: { flagId: string }) {
                 onChange={(e) => setSelectedIsExclude(e.target.value === 'exclude')}
                 label={t('feature_flags.label_type')}
               >
-                <MenuItem value="include">{t('feature_flags.btn_include')}</MenuItem>
-                <MenuItem value="exclude">{t('feature_flags.btn_exclude')}</MenuItem>
+                <MenuItem value="include">{t('feature_flags.type_include')}</MenuItem>
+                <MenuItem value="exclude">{t('feature_flags.type_exclude')}</MenuItem>
               </Select>
             </FormControl>
           </Box>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setAddUserOpen(false)} sx={{ textTransform: 'none' }}>{t('btn_cancel')}</Button>
+        <DialogActions>
+          <Button onClick={() => setAddUserOpen(false)}>{tCommon('cancel')}</Button>
           <Button
             variant="contained"
             disabled={!userId || addUserMutation.isPending}
             onClick={async () => {
               await addUserMutation.mutateAsync({
-                flagId, userId, isExclude: selectedIsExclude,
+                flagId: flagId,
+                userId,
+                isExclude: selectedIsExclude,
               });
               setAddUserOpen(false);
               setUserId('');
             }}
-            sx={{
-              textTransform: 'none', fontWeight: 600, borderRadius: 2,
-              backgroundColor: 'primary.main', '&:hover': { backgroundColor: 'primary.dark' },
-            }}
           >
-            {t('feature_flags.btn_add')}
+            {tCommon('add')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -597,11 +594,12 @@ function CreateFlagDialog({ open, onClose, onSuccess }: CreateFlagDialogProps) {
   const [description, setDescription] = useState('');
   const [startsAt, setStartsAt] = useState('');
   const [endsAt, setEndsAt] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   const createMutation = useCreateFeatureFlag();
 
-  const handleCreate = async () => {
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!key.match(/^[a-z][a-z0-9_]*$/)) {
       setError(tVal('key_format'));
       return;
@@ -611,15 +609,15 @@ function CreateFlagDialog({ open, onClose, onSuccess }: CreateFlagDialogProps) {
       return;
     }
     try {
-      const input: any = {
+      const input: CreateFeatureFlagInput = {
         key,
         is_enabled: false,
         rollout_pct: 100,
+        ...(label ? { label } : {}),
+        ...(description ? { description } : {}),
+        ...(startsAt ? { starts_at: new Date(startsAt).toISOString() } : {}),
+        ...(endsAt ? { ends_at: new Date(endsAt).toISOString() } : {}),
       };
-      if (label) input.label = label;
-      if (description) input.description = description;
-      if (startsAt) input.starts_at = new Date(startsAt).toISOString();
-      if (endsAt) input.ends_at = new Date(endsAt).toISOString();
 
       await createMutation.mutateAsync(input);
       setKey('');

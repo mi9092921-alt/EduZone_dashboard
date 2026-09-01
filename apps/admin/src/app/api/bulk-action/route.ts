@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { roleAllowsPermission } from '@/application/authorization/policy';
 import { createServerClient } from '@/infrastructure/supabase/server';
+import { env, getServerEnv } from '@/lib/env';
 
 /**
  * Bulk-action API route — replaces the Supabase Edge Function.
@@ -423,8 +424,8 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Build admin client for privileged ops ─────────────────
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+    const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = getServerEnv().SUPABASE_SERVICE_ROLE_KEY;
 
     if (!supabaseUrl || !serviceKey) {
       return errorJson('SERVER_ERROR', 'Missing server configuration', 500);

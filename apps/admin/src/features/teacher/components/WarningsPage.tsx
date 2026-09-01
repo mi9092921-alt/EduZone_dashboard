@@ -43,7 +43,6 @@ import { useTeacherWarnings, useTeacherStudents } from '@/adapters/queries/teach
 import { useAuthUser } from '@/adapters/stores/auth.store';
 import { useToastStore } from '@/adapters/stores/toast.store';
 import {
-  CardContent,
   StatsCard,
   StatsCardContent,
   StatsCardIcon
@@ -124,7 +123,7 @@ export function WarningsPage() {
         setActionTaken('');
         setSeverity(2);
         showToast(t('status_success'), 'success');
-      } catch (err) {
+      } catch (_err) {
         showToast(t('status_error'), 'error');
       }
     },
@@ -289,7 +288,7 @@ export function WarningsPage() {
                         >
                           {btn.icon}
                           <Typography variant="caption" sx={{ fontWeight: 700, color: severity === btn.value ? btn.color : 'text.secondary', fontSize: '0.65rem' }}>
-                            {t(`severity_${btn.value}` as any)}
+                            {t(`severity_${btn.value}` as 'severity_1' | 'severity_2' | 'severity_3')}
                           </Typography>
                         </Box>
                       ))}
@@ -439,7 +438,7 @@ export function WarningsPage() {
                               label={
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
                                   <Box sx={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: sevColors.dot }} />
-                                  {t(`severity_${row.severity}` as any)}
+                                  {t(`severity_${row.severity}` as 'severity_1' | 'severity_2' | 'severity_3')}
                                 </Box>
                               }
                               sx={{

@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
 import { createServerClient } from '@/infrastructure/supabase/server';
+import { env, getServerEnv } from '@/lib/env';
 
 /**
  * POST /api/audit/cleanup-duplicate-seqs
@@ -42,8 +43,8 @@ export async function POST() {
     }
 
     // ── Admin client (service_role bypasses RLS; trigger allows duplicate deletes) ──
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+    const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = getServerEnv().SUPABASE_SERVICE_ROLE_KEY;
     if (!supabaseUrl || !serviceKey) {
       return NextResponse.json({ error: 'Missing server configuration' }, { status: 500 });
     }

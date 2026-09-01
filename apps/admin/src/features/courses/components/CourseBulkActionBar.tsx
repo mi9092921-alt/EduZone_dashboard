@@ -7,8 +7,6 @@ import React, { useState } from 'react';
 
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
-import { cn } from '@/lib/utils';
-
 export type CourseBulkAction =
   | 'publish'
   | 'draft'

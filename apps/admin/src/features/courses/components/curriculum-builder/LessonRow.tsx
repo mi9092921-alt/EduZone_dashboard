@@ -23,18 +23,36 @@ import {
 import { useTranslations } from 'next-intl';
 import { useState, useEffect } from 'react';
 
-import {
-  useUpdateLesson,
-  useDeleteLesson,
-} from '@/adapters/mutations/courses.mutations';
+import { useUpdateLesson, useDeleteLesson } from '@/adapters/mutations/courses.mutations';
 import { useToast } from '@/adapters/stores/toast.store';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import type { Lesson } from '@/domain/types/course.types';
+import { type Lesson } from '@/domain/types/course.types';
 
 // ── Helpers ─────────────────────────────────────────────
-// ── Helpers ─────────────────────────────────────────────
+function formatVideoUrl(provider: string, path: string): string {
+  if (!path) return '';
+  if (path.startsWith('http://') || path.startsWith('https://')) return path;
+  if (provider === 'youtube') return `https://www.youtube.com/watch?v=${path}`;
+  if (provider === 'vimeo') return `https://vimeo.com/${path}`;
+  return path;
+}
+
+function isValidVideoUrl(url: string): boolean {
+  if (!url.trim()) return false;
+  try { new URL(url); return true; } catch { return false; }
+}
+
+function hasVideoContent(content: Lesson['content']): boolean {
+  if (!content) return false;
+  if ('video_path' in content && typeof content.video_path === 'string') return !!content.video_path;
+  if (Array.isArray(content) && content.length > 0 && typeof content[0] === 'object' && content[0] !== null) {
+    return 'video_path' in (content[0] as Record<string, unknown>) && !!(content[0] as Record<string, unknown>).video_path;
+  }
+  return false;
+}
+
 function LessonIcon({ lesson }: { lesson: Lesson }) {
-  if (lesson.content?.video_path || (Array.isArray(lesson.content) && lesson.content[0]?.video_path)) {
+  if (hasVideoContent(lesson.content)) {
     return <OndemandVideo sx={{ fontSize: 20, color: 'primary.main' }} />;
   }
   return <Description sx={{ fontSize: 20, color: 'success.main' }} />;
@@ -51,8 +69,6 @@ function formatDuration(sec: number | null): string {
   }
   return `${mins}:${String(secs).padStart(2, '0')}`;
 }
-
-import { formatVideoUrl, isValidVideoUrl } from '@/domain/video.utils';
 
 // ══════════════════════════════════════════════════
 // LESSON ROW
@@ -128,13 +144,14 @@ export function LessonRow({
         },
       });
       setEditing(false);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[LessonRow handleSave] Error:', err);
-      setUrlError(err.message || 'An error occurred while saving the lesson.');
+      const msg = err instanceof Error ? err.message : 'An error occurred while saving the lesson.';
+      setUrlError(msg);
     }
   };
 
-  const handleTogglePreview = async (e?: any) => {
+  const handleTogglePreview = async (e?: React.MouseEvent) => {
     if (e?.stopPropagation) e.stopPropagation();
     const newValue = !localPreview;
     setLocalPreview(newValue); // Optimistic update
@@ -150,7 +167,7 @@ export function LessonRow({
     }
   };
 
-  const handleTogglePublish = async (e?: any) => {
+  const handleTogglePublish = async (e?: React.MouseEvent) => {
     if (e?.stopPropagation) e.stopPropagation();
     const newValue = !localPublished;
     setLocalPublished(newValue); // Optimistic update
@@ -236,7 +253,7 @@ export function LessonRow({
             <Switch
               size="small"
               checked={localPreview}
-              onChange={handleTogglePreview}
+              onChange={() => { void handleTogglePreview(); }}
             />
           </Stack>
           <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
@@ -300,8 +317,8 @@ export function LessonRow({
             width: 36,
             height: 36,
             borderRadius: 2,
-            backgroundColor: (lesson.content?.video_path || (Array.isArray(lesson.content) && (lesson.content as any)[0]?.video_path)) ? alpha(theme.palette.primary.main, 0.1) : alpha(theme.palette.success.main, 0.1),
-            color: (lesson.content?.video_path || (Array.isArray(lesson.content) && (lesson.content as any)[0]?.video_path)) ? 'primary.main' : 'success.main',
+            backgroundColor: hasVideoContent(lesson.content) ? alpha(theme.palette.primary.main, 0.1) : alpha(theme.palette.success.main, 0.1),
+            color: hasVideoContent(lesson.content) ? 'primary.main' : 'success.main',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -325,7 +342,7 @@ export function LessonRow({
             {index + 1}. {lesson.title}
           </Typography>
           <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 500 }}>
-            {(lesson.content?.video_path || (Array.isArray(lesson.content) && (lesson.content as any)[0]?.video_path)) ? t('lesson_type_video') : t('lesson_type_content')}
+            {hasVideoContent(lesson.content) ? t('lesson_type_video') : t('lesson_type_content')}
             {lesson.duration_sec ? ` • ${formatDuration(lesson.duration_sec)}` : ''}
             {localPreview && (
               <Box
@@ -357,7 +374,7 @@ export function LessonRow({
           <Switch
             size="small"
             checked={localPreview}
-            onChange={handleTogglePreview}
+            onChange={() => { void handleTogglePreview(); }}
             onClick={(e) => e.stopPropagation()}
             sx={{
               '& .MuiSwitch-switchBase.Mui-checked': { color: 'success.main' },
@@ -372,7 +389,7 @@ export function LessonRow({
           <Switch
             size="small"
             checked={localPublished}
-            onChange={handleTogglePublish}
+            onChange={() => { void handleTogglePublish(); }}
             onClick={(e) => e.stopPropagation()}
           />
         </Box>

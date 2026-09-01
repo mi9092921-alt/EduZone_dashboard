@@ -1,7 +1,6 @@
 'use client';
 
 import { Stream, Pause, PlayArrow, Circle, Close } from '@mui/icons-material';
-
 import { Tooltip } from '@mui/material';
 import { useTranslations } from 'next-intl';
 import { useState, useCallback } from 'react';

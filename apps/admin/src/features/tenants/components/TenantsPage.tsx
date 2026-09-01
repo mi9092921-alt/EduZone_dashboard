@@ -6,10 +6,7 @@ import {
   Edit,
   Delete,
   Block,
-  Refresh,
   Search,
-  KeyboardArrowLeft,
-  KeyboardArrowRight,
 } from '@mui/icons-material';
 import { useTranslations } from 'next-intl';
 import { useState, useCallback } from 'react';
@@ -71,10 +68,9 @@ export function TenantsPage() {
   const [newName, setNewName] = useState('');
   const [newPlan, setNewPlan] = useState<TenantPlan>('free');
 
-  const { data, isLoading, isFetching } = useTenants(filters, page, pageSize);
+  const { data, isLoading } = useTenants(filters, page, pageSize);
   const tenants = data?.data ?? [];
   const totalCount = data?.count ?? 0;
-  const totalPages = Math.ceil(totalCount / pageSize);
 
   const createMut = useCreateTenant();
   const suspendMut = useSuspendTenant();
@@ -111,44 +107,37 @@ export function TenantsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-        <div className="flex items-center gap-3">
-          <h1 className="text-title">{t('title')}</h1>
-          <div className="px-2 py-0.5 rounded-full bg-muted text-muted-foreground text-[11px] font-bold uppercase tracking-wider border border-border">
-            {totalCount.toLocaleString()} {tCommon('total')}
-          </div>
-          {isFetching && !isLoading && (
-            <div className="flex items-center gap-1.5 animate-pulse text-primary text-xs font-medium">
-              <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-              {tCommon('updating')}
-            </div>
-          )}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground tracking-tight">{t('title')}</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">{t('subtitle')}</p>
         </div>
-        <div className="flex items-center gap-3">
-          <Button onClick={() => setShowCreate(true)} className="gap-2">
-            <Add className="text-sm scale-90" />
-            {t('new_tenant')}
-          </Button>
-        </div>
+        <Button onClick={() => setShowCreate(true)} variant="primary" size="md">
+          <Add className="text-sm" />
+          {t('create_tenant_btn')}
+        </Button>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <Search className="absolute start-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm" />
+      {/* Filters Bar */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 p-4 rounded-2xl bg-card border border-border shadow-sm">
+        <div className="relative flex-1">
+          <Search className="absolute start-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground" />
           <input
             type="text"
+            placeholder={t('search_placeholder')}
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-            placeholder={t('search_placeholder')}
-            className="w-full h-9 ps-9 pe-3 rounded-xl border border-border bg-card text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            className="w-full ps-9 pe-4 py-2 text-sm bg-muted/50 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
           />
         </div>
         <select
           value={filters.plan ?? ''}
-          onChange={(e) => { setFilters((f) => ({ ...f, plan: (e.target.value || undefined) as TenantPlan | undefined })); setPage(1); }}
-          className="h-9 px-3 rounded-xl border border-border bg-card text-xs font-medium focus:outline-none focus:ring-1 focus:ring-ring"
+          onChange={(e) => {
+            setFilters((f) => ({ ...f, plan: (e.target.value as TenantPlan) || undefined }));
+            setPage(1);
+          }}
+          className="px-3 py-2 text-sm bg-muted/50 border border-border rounded-xl focus:outline-none text-foreground"
         >
           <option value="">{t('all_plans')}</option>
           <option value="free">{t('plan_free')}</option>
@@ -158,29 +147,36 @@ export function TenantsPage() {
         </select>
         <select
           value={filters.status ?? ''}
-          onChange={(e) => { setFilters((f) => ({ ...f, status: (e.target.value || undefined) as TenantStatus | undefined })); setPage(1); }}
-          className="h-9 px-3 rounded-xl border border-border bg-card text-xs font-medium focus:outline-none focus:ring-1 focus:ring-ring"
+          onChange={(e) => {
+            setFilters((f) => ({ ...f, status: (e.target.value as TenantStatus) || undefined }));
+            setPage(1);
+          }}
+          className="px-3 py-2 text-sm bg-muted/50 border border-border rounded-xl focus:outline-none text-foreground"
         >
           <option value="">{t('all_statuses')}</option>
           <option value="active">{t('status_active')}</option>
           <option value="suspended">{t('status_suspended')}</option>
+          <option value="deleted">{t('status_deleted')}</option>
         </select>
+        <Button onClick={handleSearch} variant="secondary" size="md">
+          {tCommon('search')}
+        </Button>
       </div>
 
-      {/* Table */}
+      {/* Tenants Table */}
       <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-start border-separate border-spacing-0 min-w-[900px]">
+          <table className="w-full text-start border-collapse">
             <thead>
-              <tr className="bg-muted/50 border-b border-border/60">
-                <th className="px-4 py-3 text-[11px] font-extrabold text-foreground/80 uppercase tracking-wider text-start">{t('header_tenant')}</th>
-                <th className="px-4 py-3 text-[11px] font-extrabold text-foreground/80 uppercase tracking-wider text-start">{t('header_plan')}</th>
-                <th className="px-4 py-3 text-[11px] font-extrabold text-foreground/80 uppercase tracking-wider text-start">{t('header_status')}</th>
-                <th className="px-4 py-3 text-[11px] font-extrabold text-foreground/80 uppercase tracking-wider text-start">{t('header_region')}</th>
-                <th className="px-4 py-3 text-[11px] font-extrabold text-foreground/80 uppercase tracking-wider text-start">{t('header_users')}</th>
-                <th className="px-4 py-3 text-[11px] font-extrabold text-foreground/80 uppercase tracking-wider text-start">{t('header_courses')}</th>
-                <th className="px-4 py-3 text-[11px] font-extrabold text-foreground/80 uppercase tracking-wider text-start">{t('header_storage')}</th>
-                <th className="px-4 py-3 text-[11px] font-extrabold text-foreground/80 uppercase tracking-wider text-end">{tCommon('activity_overview')}</th>
+              <tr className="border-b border-border/60 bg-muted/40">
+                <th className="px-4 py-3 text-[11px] font-extrabold text-foreground/80 uppercase text-start tracking-wider">{t('header_tenant')}</th>
+                <th className="px-4 py-3 text-[11px] font-extrabold text-foreground/80 uppercase text-start tracking-wider">{t('header_plan')}</th>
+                <th className="px-4 py-3 text-[11px] font-extrabold text-foreground/80 uppercase text-start tracking-wider">{t('header_status')}</th>
+                <th className="px-4 py-3 text-[11px] font-extrabold text-foreground/80 uppercase text-start tracking-wider">{t('header_region')}</th>
+                <th className="px-4 py-3 text-[11px] font-extrabold text-foreground/80 uppercase text-start tracking-wider">{t('header_users')}</th>
+                <th className="px-4 py-3 text-[11px] font-extrabold text-foreground/80 uppercase text-start tracking-wider">{t('header_courses')}</th>
+                <th className="px-4 py-3 text-[11px] font-extrabold text-foreground/80 uppercase text-start tracking-wider">{t('header_storage')}</th>
+                <th className="px-4 py-3 text-[11px] font-extrabold text-foreground/80 uppercase text-end tracking-wider">{tCommon('actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/40">
@@ -188,23 +184,25 @@ export function TenantsPage() {
                 Array.from({ length: 5 }).map((_, i) => (
                   <tr key={i} className="animate-pulse">
                     {Array.from({ length: 8 }).map((_, j) => (
-                      <td key={j} className="px-4 py-3"><div className="h-4 w-20 bg-muted rounded" /></td>
+                      <td key={j} className="px-4 py-3">
+                        <div className="h-4 bg-muted rounded" />
+                      </td>
                     ))}
                   </tr>
                 ))
               ) : tenants.length === 0 ? (
-                <tr><td colSpan={8} className="px-4 py-12 text-center text-muted-foreground text-sm">{t('no_tenants')}</td></tr>
+                <tr>
+                  <td colSpan={8} className="px-4 py-12 text-center text-muted-foreground text-sm">
+                    {t('no_tenants_found')}
+                  </td>
+                </tr>
               ) : (
                 tenants.map((t_item) => {
-                  const usage = t_item as Tenant & {
-                    current_users?: number | null;
-                    current_courses?: number | null;
-                    current_storage_bytes?: number | null;
-                  };
-                  const planKey = (t_item.plan in PLAN_CONFIG ? t_item.plan : 'free') as TenantPlan;
-                  const statusKey = (t_item.status in STATUS_CONFIG ? t_item.status : 'active') as TenantStatus;
-                  const plan = PLAN_CONFIG[planKey];
-                  const status = STATUS_CONFIG[statusKey];
+                  const planKey = (t_item.plan ?? 'free') as TenantPlan;
+                  const statusKey = (t_item.status ?? 'active') as TenantStatus;
+                  const plan = PLAN_CONFIG[planKey] ?? PLAN_CONFIG.free;
+                  const status = STATUS_CONFIG[statusKey] ?? STATUS_CONFIG.active;
+                  const usage = t_item as typeof t_item & { current_users?: number | null; current_courses?: number | null; current_storage_bytes?: number | null };
                   const currentUsers = Number(usage.current_users ?? 0);
                   const currentCourses = Number(usage.current_courses ?? 0);
                   const currentStorageBytes = Number(usage.current_storage_bytes ?? 0);
@@ -215,13 +213,13 @@ export function TenantsPage() {
                   return (
                     <tr
                       key={t_item.id}
-                      className="group hover:bg-muted/30 transition-colors cursor-pointer"
                       onClick={() => router.push(`/tenants/${t_item.id}`)}
+                      className="hover:bg-muted/30 transition-colors cursor-pointer group"
                     >
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-2.5">
-                          <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                            <Business className="text-sm text-primary" />
+                        <div className="flex items-center gap-3">
+                          <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-bold text-sm shrink-0">
+                            <Business className="text-base" />
                           </div>
                           <div>
                             <div className="text-sm font-bold text-foreground">{t_item.name}</div>
@@ -231,13 +229,13 @@ export function TenantsPage() {
                       </td>
                       <td className="px-4 py-3">
                         <span className={cn('px-2 py-0.5 rounded-md border text-[10px] font-extrabold uppercase', plan.bg, plan.text)}>
-                          {t(`plan_${planKey}` as any)}
+                          {t(`plan_${planKey}` as 'plan_free' | 'plan_starter' | 'plan_pro' | 'plan_enterprise')}
                         </span>
                       </td>
                       <td className="px-4 py-3">
                         <div className={cn('inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase border', status.bg, status.text)}>
                           <div className={cn('h-1.5 w-1.5 rounded-full', status.dot)} />
-                          {t(`status_${statusKey}` as any)}
+                          {t(`status_${statusKey}` as 'status_active' | 'status_suspended' | 'status_deleted')}
                         </div>
                       </td>
                       <td className="px-4 py-3 text-xs text-muted-foreground font-mono">{t_item.region_id}</td>

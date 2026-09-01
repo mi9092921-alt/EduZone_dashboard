@@ -70,7 +70,7 @@ export function ImportCourseDialog({ open, onClose }: ImportCourseDialogProps) {
   const [jsonText, setJsonText] = useState('');
   const [dragActive, setDragActive] = useState(false);
   const [validation, setValidation] = useState<ValidationResult | null>(null);
-  const [parsedData, setParsedData] = useState<any>(null);
+  const [parsedData, setParsedData] = useState<Record<string, unknown> | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [importStatus, setImportStatus] = useState('');
   const [showSchema, setShowSchema] = useState(false);
@@ -117,21 +117,21 @@ export function ImportCourseDialog({ open, onClose }: ImportCourseDialogProps) {
 
       let totalLessons = 0;
       if (data.sections && Array.isArray(data.sections)) {
-        data.sections.forEach((sec: any, sIdx: number) => {
+        data.sections.forEach((sec: Record<string, unknown>, sIdx: number) => {
           if (!sec.title) {
             errors.push(t('import_course.error_section_missing_title', { index: sIdx + 1 }));
           }
           if (sec.lessons) {
             if (!Array.isArray(sec.lessons)) {
-              errors.push(t('import_course.error_lessons_not_array', { title: sec.title || (sIdx + 1) }));
+              errors.push(t('import_course.error_lessons_not_array', { title: String(sec.title || (sIdx + 1)) }));
             } else {
               totalLessons += sec.lessons.length;
-              sec.lessons.forEach((les: any, lIdx: number) => {
+              sec.lessons.forEach((les: Record<string, unknown>, lIdx: number) => {
                 if (!les.title) {
-                  errors.push(t('import_course.error_lesson_missing_title', { index: lIdx + 1, title: sec.title || (sIdx + 1) }));
+                  errors.push(t('import_course.error_lesson_missing_title', { index: lIdx + 1, title: String(sec.title || (sIdx + 1)) }));
                 }
                 if (!les.video_url) {
-                  errors.push(t('import_course.error_lesson_missing_video_url', { index: lIdx + 1, title: sec.title || (sIdx + 1) }));
+                  errors.push(t('import_course.error_lesson_missing_video_url', { index: lIdx + 1, title: String(sec.title || (sIdx + 1)) }));
                 }
               });
             }
@@ -148,12 +148,12 @@ export function ImportCourseDialog({ open, onClose }: ImportCourseDialogProps) {
         isValid: true,
         errors: [],
         summary: {
-          title: data.course.title,
-          sectionsCount: data.sections?.length || 0,
+          title: String((data.course as Record<string, unknown>).title ?? ''),
+          sectionsCount: Array.isArray(data.sections) ? data.sections.length : 0,
           lessonsCount: totalLessons
         }
       };
-    } catch (e) {
+    } catch (_e) {
       return { isValid: false, errors: [t('import_course.error_invalid_json_format')] };
     }
   };
@@ -175,7 +175,7 @@ export function ImportCourseDialog({ open, onClose }: ImportCourseDialogProps) {
       setJsonText(text);
       const res = validateCourseJSON(text);
       setValidation(res);
-    } catch (err) {
+    } catch (_err) {
       setValidation({ isValid: false, errors: [t('import_course.error_cannot_read_file')] });
     }
   };
@@ -219,24 +219,26 @@ export function ImportCourseDialog({ open, onClose }: ImportCourseDialogProps) {
       setIsImporting(true);
       setImportStatus(t('import_course.status_creating_structure'));
 
+      const courseObj = (parsedData.course as Record<string, unknown>) ?? {};
+
       // 1. Create Course
       const newCourse = await createCourse.mutateAsync({
-        title: parsedData.course.title,
-        description: parsedData.course.description || '',
-        category: parsedData.course.category || '',
-        level: parsedData.course.level || 'beginner',
-        price: parsedData.course.price || 0,
-        thumbnail_url: parsedData.course.thumbnail_url || undefined,
-        status: parsedData.course.status || 'draft',
-        slug: parsedData.course.slug || undefined,
+        title: String(courseObj.title ?? ''),
+        description: String(courseObj.description ?? ''),
+        category: String(courseObj.category ?? ''),
+        level: (courseObj.level as 'beginner' | 'intermediate' | 'advanced') || 'beginner',
+        price: typeof courseObj.price === 'number' ? courseObj.price : 0,
+        status: (courseObj.status as 'draft' | 'published' | 'archived') || 'draft',
+        ...(typeof courseObj.thumbnail_url === 'string' ? { thumbnail_url: courseObj.thumbnail_url } : {}),
+        ...(typeof courseObj.slug === 'string' ? { slug: courseObj.slug } : {}),
       });
 
       // 2. Create Sections and Lessons
       if (parsedData.sections && Array.isArray(parsedData.sections)) {
         for (let sIdx = 0; sIdx < parsedData.sections.length; sIdx++) {
-          const sec = parsedData.sections[sIdx];
+          const sec = (parsedData.sections as Array<Record<string, unknown>>)[sIdx] ?? {};
           setImportStatus(t('import_course.status_inserting_section', {
-            title: sec.title || (sIdx + 1),
+            title: String(sec.title ?? (sIdx + 1)),
             current: sIdx + 1,
             total: parsedData.sections.length
           }));
@@ -244,18 +246,18 @@ export function ImportCourseDialog({ open, onClose }: ImportCourseDialogProps) {
           const newSec = await createSection.mutateAsync({
             courseId: newCourse.id,
             data: {
-              title: sec.title || `Section ${sIdx + 1}`,
-              order_index: sec.order_index ?? sec.order ?? sIdx,
+              title: String(sec.title ?? `Section ${sIdx + 1}`),
+              order_index: typeof sec.order_index === 'number' ? sec.order_index : typeof sec.order === 'number' ? sec.order : sIdx,
             }
           });
 
           if (sec.lessons && Array.isArray(sec.lessons)) {
-            const lessonsData = sec.lessons.map((les: any, lIdx: number) => ({
-              title: les.title || `Lesson ${lIdx + 1}`,
-              video_url: les.video_url || '',
-              order_index: les.order_index ?? les.order ?? lIdx,
-              duration_sec: les.duration_sec || les.duration || 0,
-              is_preview: les.is_preview ?? false,
+            const lessonsData = sec.lessons.map((les: Record<string, unknown>, lIdx: number) => ({
+              title: typeof les.title === 'string' ? les.title : `Lesson ${lIdx + 1}`,
+              video_url: typeof les.video_url === 'string' ? les.video_url : '',
+              order_index: typeof les.order_index === 'number' ? les.order_index : typeof les.order === 'number' ? les.order : lIdx,
+              duration_sec: typeof les.duration_sec === 'number' ? les.duration_sec : typeof les.duration === 'number' ? les.duration : 0,
+              is_preview: typeof les.is_preview === 'boolean' ? les.is_preview : false,
             }));
 
             await createLessons.mutateAsync({
@@ -276,9 +278,10 @@ export function ImportCourseDialog({ open, onClose }: ImportCourseDialogProps) {
         router.push(`/courses/${newCourse.id}`);
       }, 800);
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      showToast(err.message || t('import_course.toast_import_error'), 'error');
+      const msg = err instanceof Error ? err.message : t('import_course.toast_import_error');
+      showToast(msg, 'error');
       setImportStatus('');
       setIsImporting(false);
     }

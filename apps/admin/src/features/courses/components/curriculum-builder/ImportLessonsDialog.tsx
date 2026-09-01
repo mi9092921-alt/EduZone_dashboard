@@ -5,8 +5,6 @@ import {
   UploadFile,
   ContentPaste,
   CheckCircle,
-  ErrorOutline,
-  HelpOutline,
   ContentCopy,
   DeleteOutline,
   Visibility,
@@ -28,7 +26,6 @@ import {
   IconButton,
   Alert,
   Stack,
-  Switch,
   Collapse,
   Card,
   Divider,
@@ -126,9 +123,9 @@ export function ImportLessonsDialog({
       const parsed = JSON.parse(cleaned);
       const items = Array.isArray(parsed) ? parsed : [parsed];
 
-      const mapped = items.map((item: any, idx: number) => {
-        const title = item.title || (isRtl ? `درس جديد #${idx + 1}` : `New Lesson #${idx + 1}`);
-        const video_url = item.video_url || item.url || '';
+      const mapped = items.map((item: Record<string, unknown>, idx: number) => {
+        const title = (typeof item.title === 'string' ? item.title : '') || (isRtl ? `درس جديد #${idx + 1}` : `New Lesson #${idx + 1}`);
+        const video_url = (typeof item.video_url === 'string' ? item.video_url : typeof item.url === 'string' ? item.url : '');
         const order = typeof item.order_index === 'number'
           ? item.order_index
           : typeof item.order === 'number'
@@ -146,9 +143,10 @@ export function ImportLessonsDialog({
       });
 
       setLessonsPreview(mapped);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setLessonsPreview([]);
-      setJsonError(err.message || t('invalid_json_format'));
+      const msg = err instanceof Error ? err.message : t('invalid_json_format');
+      setJsonError(msg);
     }
   };
 
@@ -256,8 +254,9 @@ export function ImportLessonsDialog({
         'success'
       );
       onClose();
-    } catch (err: any) {
-      showToast(err.message || t('failed_to_import'), 'error');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : t('failed_to_import');
+      showToast(msg, 'error');
     }
   };
 

@@ -1,12 +1,22 @@
 'use client';
 
+import { AdminPanelSettings, Menu as MenuIcon } from '@mui/icons-material';
+import { Tooltip } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslations } from 'next-intl';
 import React, { useMemo } from 'react';
-import { AdminPanelSettings } from '@mui/icons-material';
-import { Zoom } from '@mui/material';
+
+import { useLayout } from '../hooks/useLayout';
+
+import type { PrimaryRole } from '@/adapters/stores/auth.store';
+import { useAuthUser } from '@/adapters/stores/auth.store';
+import { NAV_ITEMS } from '@/config/nav.config';
+import { usePathname, Link } from '@/i18n/routing';
+import { cn } from '@/lib/utils';
 
 const SIDEBAR_WIDTH = '220px';
 const COLLAPSED_WIDTH = '80px';
-const MOBILE_DRAWER_CLASS = 'w-[220px]';
 
 interface SidebarContentProps {
   isMobile: boolean;
@@ -16,10 +26,6 @@ interface SidebarContentProps {
   setSidebarOpen: (open: boolean) => void;
   isCollapsed?: boolean;
 }
-
-import { ChevronLeft, Menu as MenuIcon } from '@mui/icons-material';
-import { Tooltip } from '@mui/material';
-import { useTheme } from '@mui/material/styles';
 
 function SidebarInnerContent({
   isMobile,
@@ -113,7 +119,6 @@ function SidebarInnerContent({
               title={t(item.label)} 
               placement={isRtl ? "left" : "right"} 
               arrow 
-              TransitionComponent={Zoom as any}
             >
               <div>{buttonContent}</div>
             </Tooltip>
@@ -142,17 +147,6 @@ function SidebarInnerContent({
     </div>
   );
 }
-
-import { motion, AnimatePresence } from 'framer-motion';
-import { useTranslations } from 'next-intl';
-
-import { useLayout } from '../hooks/useLayout';
-
-import type { PrimaryRole } from '@/adapters/stores/auth.store';
-import { useAuthUser } from '@/adapters/stores/auth.store';
-import { NAV_ITEMS } from '@/config/nav.config';
-import { usePathname, Link } from '@/i18n/routing';
-import { cn } from '@/lib/utils';
 
 export function Sidebar() {
   const pathname = usePathname();

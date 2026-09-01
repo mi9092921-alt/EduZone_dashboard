@@ -25,8 +25,5 @@ export const container = {
 
   // ── Event bus ────────────────────────────────────────────────
   eventBus: new InMemoryEventBus() as IEventBus,
-
-  // ── Context (set after auth) ─────────────────────────────────
-  actorId: '' as string,
-  tenantId: '' as string,
 };
+

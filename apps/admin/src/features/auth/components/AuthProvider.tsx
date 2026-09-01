@@ -7,9 +7,9 @@ import { useEffect } from 'react';
 import { useSessionCheck } from '@/adapters/hooks/useSessionCheck';
 import { useAuthStore, useAuthUser, type PrimaryRole } from '@/adapters/stores/auth.store';
 import { recordCurrentSessionAction } from '@/application/actions/session.actions';
-import { container } from '@/container';
 import { useRouter, usePathname } from '@/i18n/routing';
 import { clearBrowserSessionId, getBrowserSessionId } from '@/infrastructure/auth/browserSession';
+import { createBrowserClient } from '@/infrastructure/supabase/client';
 
 /**
  * Authentication Provider
@@ -28,7 +28,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * Refined Hydration Logic
    */
   useEffect(() => {
-    const { supabase } = container;
+    const supabase = createBrowserClient();
     let isMounted = true;
 
     const hydrateAuth = async () => {
@@ -129,9 +129,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         if (isMounted) {
-          container.actorId = resolvedUser.id;
-          container.tenantId = resolvedUser.tenant_id;
-
           setUser({
             id: resolvedUser.id,
             email: session.user.email!,
@@ -175,8 +172,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, _session) => {
       if (event === 'SIGNED_OUT') {
-        container.actorId = '';
-        container.tenantId = '';
         clearBrowserSessionId();
         logout();
 

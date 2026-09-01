@@ -18,12 +18,10 @@ import {
   Laptop,
   Smartphone,
   Language,
-  Public,
   Security,
   Fingerprint,
   Work,
   History,
-  TaskAlt,
   School,
   ContentCopy,
 } from '@mui/icons-material';
@@ -37,7 +35,6 @@ import { formatDate, formatDistanceToNow } from './_utils';
 import {
   useUserDevices,
   useUserSessions,
-  useUserPermissions,
   useUserRoles,
 } from '@/adapters/queries/users.queries';
 import { Button } from '@/components/ui/Button';
@@ -46,6 +43,8 @@ import { Drawer } from '@/components/ui/Drawer';
 import { getUserDisplayName, getUserInitials } from '@/domain/types/user.types';
 import type { User, Device, Session } from '@/domain/types/user.types';
 import { cn } from '@/lib/utils';
+
+type TranslationFn = ReturnType<typeof useTranslations>;
 
 export function UserProfileDrawer({
   user,
@@ -121,32 +120,31 @@ export function UserProfileDrawer({
         type="button"
         onClick={onClose}
         aria-label={tCommon('close')}
-        className="absolute top-5 end-5 z-50 p-2.5 rounded-full bg-background/20 hover:bg-background/40 backdrop-blur-md text-foreground/60 hover:text-foreground transition-all duration-300 border border-white/10"
+        className="absolute top-4 end-4 z-50 p-2 rounded-xl bg-card/60 backdrop-blur-md border border-border/40 text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-all duration-300"
       >
-        <Close className="text-xl" />
+        <Close className="text-sm" />
       </button>
 
-      <div className="relative pt-7 pb-6 px-10 overflow-hidden shrink-0 border-b border-border/40">
-        <div className={cn("absolute inset-0 bg-gradient-to-br transition-all duration-1000", theme.gradient)} />
-        <div className={cn("absolute -top-32 -end-32 w-[500px] h-[500px] rounded-full blur-[120px] opacity-30 transition-all duration-1000 animate-pulse", theme.secondary)} />
-
-        <div className="relative flex flex-row items-center gap-6 z-10 text-start">
-          <div className="relative shrink-0">
-            <div className="absolute -inset-1.5 bg-gradient-to-tr from-primary/40 via-primary/0 to-transparent rounded-full blur-md opacity-40 transition duration-1000" />
-            <div className="relative p-0.5 rounded-full bg-gradient-to-br from-white/20 to-transparent border border-white/30 backdrop-blur-sm shadow-lg">
+      <div className={cn("relative p-6 pt-10 border-b border-border/40 overflow-hidden bg-gradient-to-b", theme.gradient)}>
+        <div className="flex items-center gap-5 relative z-10">
+          <div className="relative group">
+            <div className="w-16 h-16 rounded-3xl overflow-hidden ring-4 ring-background/50 shadow-2xl transition-transform duration-500 group-hover:scale-105 bg-gradient-to-tr from-indigo-500 via-primary to-purple-500 flex items-center justify-center text-white font-extrabold text-2xl tracking-wider">
               {user.avatar_url ? (
-                <Image src={user.avatar_url} alt={displayName} width={56} height={56} sizes="56px" className="w-14 h-14 rounded-full object-cover border-2 border-background" unoptimized />
+                <Image
+                  src={user.avatar_url}
+                  alt={displayName}
+                  width={64}
+                  height={64}
+                  className="w-full h-full object-cover"
+                />
               ) : (
-                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-indigo-500 via-primary to-primary flex items-center justify-center text-sm font-black text-white border-2 border-background">
-                  {initials}
-                </div>
+                initials
               )}
             </div>
-            <div className={cn("absolute bottom-0 end-0 w-4.5 h-4.5 rounded-full border-[3px] border-background flex items-center justify-center shadow-lg", theme.dot)}>
-              <div className="w-1 h-1 rounded-full bg-white animate-pulse" />
-            </div>
+            <span className={cn("absolute -bottom-1 -end-1 w-4 h-4 rounded-full ring-2 ring-background shadow-md", theme.dot)} />
           </div>
-          <div className="flex-1 space-y-2 min-w-0">
+
+          <div className="flex-1 min-w-0">
             <div className="flex flex-col">
               <h3 className="text-2xl font-black tracking-tight text-foreground capitalize truncate leading-none">
                 {displayName}
@@ -160,7 +158,7 @@ export function UserProfileDrawer({
 
             <div className="flex items-center gap-2.5 mt-2.5 flex-nowrap overflow-x-auto scrollbar-none">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-extrabold uppercase tracking-widest border transition-all duration-300 bg-primary/10 border-primary/20 text-primary">
-                {tUsers(`role_${user.primary_role}` as any)}
+                {tUsers(`role_${user.primary_role}` as 'role_super_admin' | 'role_admin' | 'role_teacher' | 'role_student')}
               </span>
               <span className={cn("inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-extrabold uppercase tracking-widest border transition-all duration-300 border-transparent", theme.dot + "/10", theme.text)}>
                 <div className={cn("w-1.5 h-1.5 rounded-full", theme.dot)} />
@@ -178,36 +176,33 @@ export function UserProfileDrawer({
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={cn(
-                "flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-[10px] sm:text-[11px] font-bold uppercase tracking-wider transition-all duration-500 whitespace-nowrap flex-1 justify-center relative group",
-                activeTab === tab.id ? "text-primary shadow-lg shadow-primary/5" : "text-muted-foreground/60 hover:text-foreground hover:bg-white/5 active:scale-95"
+                "flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap outline-none",
+                activeTab === tab.id
+                  ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-[1.02]"
+                  : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
               )}
             >
-              {activeTab === tab.id && <div className="absolute inset-0 bg-background rounded-xl border border-border shadow-sm -z-0" />}
-              <span className={cn("relative z-10 transition-all duration-300 flex items-center justify-center", activeTab === tab.id ? "scale-110 text-primary" : "opacity-40 group-hover:opacity-100")}>
-                {tab.icon}
-              </span>
-              <span className="relative z-10">{tab.label}</span>
+              {tab.icon}
+              <span>{tab.label}</span>
             </button>
           ))}
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto custom-scrollbar">
-        <div className="p-6 space-y-8 pb-32">
-          {activeTab === 0 && <OverviewTab user={user} t={t} locale={locale} />}
-          {activeTab === 1 && <ActivityTab user={user} t={t} />}
-          {activeTab === 2 && <EnrollmentsTab user={user} t={t} />}
-          {activeTab === 3 && (
-            <SecurityTab
-              user={user}
-              onTerminateSessions={onTerminateSessions}
-              onResetDevices={onResetDevices}
-              t={t}
-              locale={locale}
-            />
-          )}
-          {activeTab === 4 && <PermissionsTab user={user} t={t} locale={locale} />}
-        </div>
+      <div className="p-6">
+        {activeTab === 0 && <OverviewTab user={user} t={t} locale={locale} />}
+        {activeTab === 1 && <ActivityTab user={user} t={t} />}
+        {activeTab === 2 && <EnrollmentsTab user={user} t={t} />}
+        {activeTab === 3 && (
+          <SecurityTab
+            user={user}
+            onTerminateSessions={onTerminateSessions}
+            onResetDevices={onResetDevices}
+            t={t}
+            locale={locale}
+          />
+        )}
+        {activeTab === 4 && <PermissionsTab user={user} t={t} locale={locale} />}
       </div>
     </Drawer>
   );
@@ -251,32 +246,28 @@ CopyButton.displayName = 'CopyButton';
 
 function SectionTitle({ icon, title, subtitle }: { icon: React.ReactNode, title: string, subtitle?: string }) {
   return (
-    <div className="flex items-center gap-3 mb-4 group/title">
-      <div className="p-2.5 rounded-2xl bg-primary/5 text-primary border border-primary/10 shadow-inner group-hover/title:bg-primary/10 transition-colors duration-500 flex items-center justify-center text-xl">
+    <div className="flex items-center gap-3">
+      <div className="p-2 rounded-xl bg-primary/10 text-primary border border-primary/20">
         {icon}
       </div>
       <div>
-        <h3 className="text-sm font-bold text-foreground leading-none">{title}</h3>
-        {subtitle && <p className="text-[11px] text-muted-foreground font-medium mt-1">{subtitle}</p>}
+        <h4 className="text-sm font-bold text-foreground leading-none">{title}</h4>
+        {subtitle && <p className="text-[10px] text-muted-foreground font-medium mt-1">{subtitle}</p>}
       </div>
     </div>
   );
 }
 
-function StatCard({ icon, label, value, subValue }: { icon: React.ReactNode, label: string, value: string | number | null, subValue?: string | undefined }) {
+function StatCard({ icon, label, value, subValue }: { icon: React.ReactNode, label: string, value: React.ReactNode, subValue?: string | undefined }) {
   return (
     <StatsCard>
-      <StatsCardContent className="flex items-center gap-3">
-        <StatsCardIcon className="bg-primary/5 text-primary border-primary/10">
+      <StatsCardContent>
+        <StatsCardIcon>
           {icon}
         </StatsCardIcon>
-        <div className="relative z-10 flex flex-col items-start min-w-0">
-          <span className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground/60 group-hover:text-primary/60 transition-colors mb-0.5 truncate w-full">
-            {label}
-          </span>
-          <p className="text-sm font-bold text-foreground group-hover:text-primary transition-colors leading-tight truncate w-full">
-            {value ?? '—'}
-          </p>
+        <div className="flex-1 min-w-0">
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">{label}</p>
+          <p className="text-base font-extrabold text-foreground tracking-tight truncate mt-0.5">{value ?? '—'}</p>
           {subValue && <p className="text-[10px] text-muted-foreground font-medium mt-0.5 opacity-70 truncate w-full">{subValue}</p>}
         </div>
       </StatsCardContent>
@@ -284,7 +275,7 @@ function StatCard({ icon, label, value, subValue }: { icon: React.ReactNode, lab
   );
 }
 
-function OverviewTab({ user, t, locale }: { user: User, t: any, locale: string }) {
+function OverviewTab({ user, t, locale }: { user: User, t: TranslationFn, locale: string }) {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -332,7 +323,7 @@ function OverviewTab({ user, t, locale }: { user: User, t: any, locale: string }
   );
 }
 
-function ActivityTab({ user, t }: { user: User, t: any }) {
+function ActivityTab({ user, t }: { user: User, t: TranslationFn }) {
   return (
     <div className="h-[400px] flex flex-col items-center justify-center text-center space-y-6 animate-in zoom-in-95 duration-500">
       <History className="text-muted-foreground/30 text-5xl" />
@@ -345,7 +336,7 @@ function ActivityTab({ user, t }: { user: User, t: any }) {
   );
 }
 
-function EnrollmentsTab({ user, t }: { user: User, t: any }) {
+function EnrollmentsTab({ user, t }: { user: User, t: TranslationFn }) {
   return (
     <div className="h-[400px] flex flex-col items-center justify-center text-center space-y-6 animate-in zoom-in-95 duration-500">
       <School className="text-muted-foreground/30 text-5xl" />
@@ -357,7 +348,7 @@ function EnrollmentsTab({ user, t }: { user: User, t: any }) {
   );
 }
 
-function SecurityTab({ user, onTerminateSessions, onResetDevices, t, locale }: { user: User, onTerminateSessions: (u: User) => void, onResetDevices: (u: User) => void, t: any, locale: string }) {
+function SecurityTab({ user, onTerminateSessions, onResetDevices, t, locale }: { user: User, onTerminateSessions: (u: User) => void, onResetDevices: (u: User) => void, t: TranslationFn, locale: string }) {
   const { data: devices, isLoading: devLoading } = useUserDevices(user.id);
   const { data: sessions, isLoading: sesLoading } = useUserSessions(user.id);
 
@@ -385,7 +376,7 @@ function SecurityTab({ user, onTerminateSessions, onResetDevices, t, locale }: {
   );
 }
 
-function DeviceCard({ device, t, locale }: { device: Device, t: any, locale: string }) {
+function DeviceCard({ device, t, locale }: { device: Device, t: TranslationFn, locale: string }) {
   const Icon = device.platform === 'android' || device.platform === 'ios' ? Smartphone : Laptop;
   return (
     <div className="p-5 rounded-3xl bg-card/40 border border-border/50 flex items-center gap-5">
@@ -402,7 +393,7 @@ function DeviceCard({ device, t, locale }: { device: Device, t: any, locale: str
   );
 }
 
-function SessionCard({ session, t, locale }: { session: Session, t: any, locale: string }) {
+function SessionCard({ session, t, locale }: { session: Session, t: TranslationFn, locale: string }) {
   return (
     <div className="px-6 py-5 rounded-3xl bg-card/40 border border-border/50 flex items-center gap-5">
       <Language className="text-2xl text-muted-foreground" />
@@ -418,8 +409,7 @@ function SessionCard({ session, t, locale }: { session: Session, t: any, locale:
   );
 }
 
-function PermissionsTab({ user, t, locale }: { user: User, t: any, locale: string }) {
-  const { data: permissions } = useUserPermissions(user.id);
+function PermissionsTab({ user, t, locale }: { user: User, t: TranslationFn, locale: string }) {
   const { data: roles, isLoading } = useUserRoles(user.id);
   const tUsers = useTranslations('users');
 
@@ -432,7 +422,7 @@ function PermissionsTab({ user, t, locale }: { user: User, t: any, locale: strin
       user_id: user.id,
       role_id: 'primary',
       role_name: user.primary_role,
-      role_label: tUsers(`role_${user.primary_role}` as any),
+      role_label: tUsers(`role_${user.primary_role}` as 'role_super_admin' | 'role_admin' | 'role_teacher' | 'role_student'),
       granted_at: user.created_at,
     }];
   }, [roles, isLoading, user, tUsers]);

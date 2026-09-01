@@ -35,13 +35,7 @@ import {
   TextField,
   Switch,
   Collapse,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   Stack,
-  useTheme,
-  useMediaQuery,
 } from '@mui/material';
 import { useTranslations } from 'next-intl';
 import { useState, useEffect } from 'react';
@@ -53,7 +47,6 @@ import {
   useUpdateSection,
   useDeleteSection,
   useCreateLesson,
-  useCreateLessons,
   useReorderLessons,
 } from '@/adapters/mutations/courses.mutations';
 import { useToast } from '@/adapters/stores/toast.store';
@@ -73,8 +66,6 @@ export function SectionCard({
   courseId: string;
   index: number;
 }) {
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const t = useTranslations('common');
   const { showToast } = useToast();
 
@@ -95,7 +86,6 @@ export function SectionCard({
   const updateSection = useUpdateSection();
   const deleteSection = useDeleteSection();
   const createLesson = useCreateLesson();
-  const createLessonsBulk = useCreateLessons();
   const reorderLessons = useReorderLessons();
 
   const [importingJson, setImportingJson] = useState(false);
@@ -135,7 +125,7 @@ export function SectionCard({
     const newLessons = arrayMove(localLessons, oldIndex, newIndex);
     setLocalLessons(newLessons);
 
-    const updates = newLessons.map((l: any, idx: number) => ({ id: l.id, order_index: idx }));
+    const updates = newLessons.map((l: Lesson, idx: number) => ({ id: l.id, order_index: idx }));
     await reorderLessons.mutateAsync({ courseId, updates });
   };
 
@@ -144,7 +134,7 @@ export function SectionCard({
     setEditingTitle(false);
   };
 
-  const handleTogglePublish = async (e?: any) => {
+  const handleTogglePublish = async (e?: React.MouseEvent) => {
     if (e?.stopPropagation) e.stopPropagation();
     const newValue = !localPublished;
     setLocalPublished(newValue);
@@ -197,9 +187,10 @@ export function SectionCard({
       setNewLessonUrl('');
       setNewLessonIsPreview(false);
       setAddingLesson(false);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[handleAddLesson] Error:', err);
-      setUrlError(err.message || 'An error occurred while adding the lesson.');
+      const msg = err instanceof Error ? err.message : 'An error occurred while adding the lesson.';
+      setUrlError(msg);
     }
   };
 
@@ -311,7 +302,7 @@ export function SectionCard({
           <Switch
             size="small"
             checked={localPublished}
-            onChange={handleTogglePublish}
+            onChange={() => { void handleTogglePublish(); }}
             onClick={(e) => e.stopPropagation()}
             sx={{
               '& .MuiSwitch-switchBase.Mui-checked': { color: 'primary.main' },

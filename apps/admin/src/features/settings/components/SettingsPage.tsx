@@ -5,7 +5,6 @@ import {
   Save,
   Close,
   Lock,
-  LockOpen,
   Build,
   Refresh,
   ContentCopy,
@@ -45,12 +44,10 @@ import { MaintenanceWizard } from './MaintenanceWizard';
 import { useSetSetting } from '@/adapters/mutations/settings.mutations';
 import { useSettingsByCategory } from '@/adapters/queries/settings.queries';
 import { useToastStore } from '@/adapters/stores/toast.store';
-import { Card, CardContent, StatsCard, StatsCardContent, StatsCardIcon } from '@/components/ui/Card';
 import { parseRpcError } from '@/domain/errors';
-import type { SettingKv, SettingCategory } from '@/domain/types/settings.types';
+import type { SettingKv } from '@/domain/types/settings.types';
 
-
-const getCategoryTabs = (t: any) => [
+const getCategoryTabs = (t: (key: string) => string) => [
   { key: 'security', label: t('tabs.security'), icon: <Lock sx={{ fontSize: 18 }} /> },
   { key: 'maintenance', label: t('tabs.maintenance'), icon: <Build sx={{ fontSize: 18 }} /> },
   { key: 'limits', label: t('tabs.limits'), icon: <Refresh sx={{ fontSize: 18 }} /> },

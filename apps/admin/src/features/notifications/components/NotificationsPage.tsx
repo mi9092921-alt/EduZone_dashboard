@@ -6,6 +6,7 @@ import {
   Campaign as CampaignIcon,
   Close as CloseIcon,
   Delete as DeleteIcon,
+  EmojiEvents as PermissionIcon,
   Notifications as NotificationsIcon,
   People as PeopleIcon,
   Person as PersonIcon,
@@ -14,14 +15,11 @@ import {
   SupervisorAccount as SupervisorIcon,
 } from '@mui/icons-material';
 import {
-  Star as StarIcon,
-  EmojiEvents as PermissionIcon,
-} from '@mui/icons-material';
-import {
+  Autocomplete,
+  Avatar,
   Box,
   Button,
   Card as MuiCard,
-  CardContent as MuiCardContent,
   Chip,
   CircularProgress,
   Dialog,
@@ -34,45 +32,38 @@ import {
   Grid,
   IconButton,
   InputLabel,
+  LinearProgress,
   MenuItem,
-  Paper,
   Select,
   Stack,
-  TextField,
-  Tabs,
   Tab,
-  Tooltip,
-  Typography,
-} from '@mui/material';
-import {
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
-  LinearProgress,
-} from '@mui/material';
-import {
-  Autocomplete,
+  Tabs,
+  TextField,
   ToggleButton,
   ToggleButtonGroup,
-  Avatar,
+  Tooltip,
+  Typography,
 } from '@mui/material';
 import { useTranslations, useLocale } from 'next-intl';
-import { useState } from 'react';
-import { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 
-import { useSendNotification, useDeleteNotification, SendNotificationInput } from '@/adapters/mutations/notifications.mutations';
-import { useNotifications, Notification, TargetAudience } from '@/adapters/queries/notifications.queries';
+import { useSendNotification, useDeleteNotification, type SendNotificationInput } from '@/adapters/mutations/notifications.mutations';
+import { useNotifications, type TargetAudience } from '@/adapters/queries/notifications.queries';
 import { useAuthUser } from '@/adapters/stores/auth.store';
+import { useToastStore } from '@/adapters/stores/toast.store';
+import { StatsCard, StatsCardContent, StatsCardIcon } from '@/components/ui/Card';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { TablePagination } from '@/components/ui/TablePagination';
-import type { PrimaryRole } from '@/domain/types/user.types';
 import { PermissionGate } from '@/features/layout/components/PermissionGate';
 import { getAllPermissions, searchUsers } from '@/infrastructure/repos/users.service';
-
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -93,9 +84,6 @@ function getAllowedAudiences(role: string): TargetAudience[] {
       return [];
   }
 }
-
-import { useToastStore } from '@/adapters/stores/toast.store';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 function AudienceChip({
   audience,
@@ -150,7 +138,7 @@ function AudienceChip({
   return (
     <Chip
       icon={icons[audience] as React.ReactElement}
-      label={t(`audience_${audience}` as any)}
+      label={t(`audience_${audience}` as 'audience_all' | 'audience_teachers' | 'audience_students' | 'audience_custom')}
       color={colors[audience]}
       size="small"
       variant="outlined"
@@ -159,24 +147,15 @@ function AudienceChip({
   );
 }
 
-import {
-  Card,
-  CardContent,
-  StatsCard,
-  StatsCardContent,
-  StatsCardIcon
-} from '@/components/ui/Card';
-
 function StatCard({
   label,
   value,
   icon,
-  color,
 }: {
   label: string;
   value: number | string;
   icon: React.ReactNode;
-  color: string;
+  color?: string;
 }) {
   return (
     <StatsCard>
@@ -206,13 +185,31 @@ interface SendDialogProps {
   onSuccess: (msg: string) => void;
 }
 
+interface UserOption {
+  id: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  email?: string | null;
+}
+
+const sendNotificationSchema = z.object({
+  title: z.string().min(3),
+  body: z.string().min(10).max(500),
+  targeting_type: z.enum(['role', 'permission', 'users']).optional(),
+  target_audience: z.enum(['all', 'students', 'teachers', 'admins']).optional(),
+  target_permission: z.string().nullable().optional(),
+  target_user_ids: z.array(z.string()).nullable().optional(),
+});
+
+type SendNotificationFormData = z.infer<typeof sendNotificationSchema>;
+
 function SendNotificationDialog({ open, onClose, allowedAudiences, onSuccess }: SendDialogProps) {
   const t = useTranslations('notifications');
   const tCommon = useTranslations('common');
   const sendMutation = useSendNotification();
   const [permissions, setPermissions] = useState<string[]>([]);
   const [userQuery, setUserQuery] = useState('');
-  const [userOptions, setUserOptions] = useState<any[]>([]);
+  const [userOptions, setUserOptions] = useState<UserOption[]>([]);
 
   useEffect(() => {
     getAllPermissions().then(setPermissions);
@@ -220,38 +217,28 @@ function SendNotificationDialog({ open, onClose, allowedAudiences, onSuccess }: 
 
   useEffect(() => {
     if (userQuery.length > 1) {
-      searchUsers(userQuery).then(setUserOptions);
+      searchUsers(userQuery).then((res) => setUserOptions(res as unknown as UserOption[]));
     }
   }, [userQuery]);
-
-  const sendNotificationSchema = z.object({
-    title: z.string().min(3, t('error_title_min')).max(100),
-    body: z.string().min(10, t('error_body_min')).max(500),
-    targeting_type: z.enum(['role', 'permission', 'users']).optional(),
-    target_audience: z.enum(['all', 'students', 'teachers', 'admins']).optional(),
-    target_permission: z.string().nullable().optional(),
-    target_user_ids: z.array(z.string()).nullable().optional(),
-  });
 
   const {
     control,
     handleSubmit,
     reset,
     watch,
-    formState: { errors, isSubmitting },
-  } = useForm<any>({
+    formState: { errors },
+  } = useForm<SendNotificationFormData>({
     resolver: zodResolver(sendNotificationSchema),
     defaultValues: {
       title: '',
       body: '',
       targeting_type: 'role',
-      target_audience: allowedAudiences[0] ?? 'students',
+      target_audience: (allowedAudiences[0] ?? 'students') as 'all' | 'students' | 'teachers' | 'admins',
       target_permission: '',
       target_user_ids: [],
     },
   });
 
-  const bodyValue = watch('body') || '';
   const watchTargetType = watch('targeting_type');
 
   function handleClose() {
@@ -259,7 +246,7 @@ function SendNotificationDialog({ open, onClose, allowedAudiences, onSuccess }: 
     onClose();
   }
 
-  const onSubmit = async (data: any) => {
+  const onSubmit = async (data: SendNotificationFormData) => {
     try {
       const payload: SendNotificationInput = {
         title: data.title,
@@ -270,21 +257,18 @@ function SendNotificationDialog({ open, onClose, allowedAudiences, onSuccess }: 
       const defaultAudience = allowedAudiences.includes('students') ? 'students' : (allowedAudiences[0] || 'all');
 
       if (data.targeting_type === 'role') {
-        payload.target_audience = data.target_audience;
+        if (data.target_audience) payload.target_audience = data.target_audience;
       } else if (data.targeting_type === 'permission') {
         payload.target_permission = data.target_permission || null;
         payload.target_audience = defaultAudience;
       } else if (data.targeting_type === 'users') {
-        // Do NOT set target_audience when targeting specific users.
-        // The DB's send_notification function gates on audience value and will
-        // raise PERMISSION_DENIED if it sees an audience alongside user IDs.
         payload.target_user_ids = data.target_user_ids?.length ? data.target_user_ids : null;
       }
 
       await sendMutation.mutateAsync(payload);
       onSuccess(t('status_success'));
       handleClose();
-    } catch (err) {
+    } catch (_err) {
       // error handled by mutation
     }
   };
@@ -318,7 +302,7 @@ function SendNotificationDialog({ open, onClose, allowedAudiences, onSuccess }: 
             </Typography>
             <Controller
               name="targeting_type"
-              control={control as any}
+              control={control}
               defaultValue="role"
               render={({ field }) => (
                 <ToggleButtonGroup
@@ -397,18 +381,21 @@ function SendNotificationDialog({ open, onClose, allowedAudiences, onSuccess }: 
                   getOptionLabel={(option) => `${option.first_name} ${option.last_name}`}
                   onInputChange={(_, value) => setUserQuery(value)}
                   onChange={(_, value) => field.onChange(value.map(v => v.id))}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      label={t('label_users')}
-                      placeholder={t('placeholder_search_users')}
-                      error={!!errors.target_user_ids}
-                      helperText={(errors.target_user_ids?.message as string)}
-                      size="small"
-                      InputLabelProps={params.InputLabelProps as any}
-                      InputProps={{ ...params.InputProps, sx: { borderRadius: 2 } }}
-                    />
-                  )}
+                  renderInput={(params) => {
+                    const { InputLabelProps, InputProps, ...rest } = params;
+                    return (
+                      <TextField
+                        {...rest}
+                        label={t('label_users')}
+                        placeholder={t('placeholder_search_users')}
+                        error={!!errors.target_user_ids}
+                        helperText={(errors.target_user_ids?.message as string)}
+                        size="small"
+                        InputLabelProps={InputLabelProps as unknown as { shrink?: boolean; className?: string }}
+                        InputProps={{ ...InputProps, sx: { borderRadius: 2 } }}
+                      />
+                    );
+                  }}
                   renderTags={(tagValue, getTagProps) =>
                     tagValue.map((option, index) => (
                       <Chip
@@ -454,9 +441,10 @@ function SendNotificationDialog({ open, onClose, allowedAudiences, onSuccess }: 
                 placeholder={t('placeholder_body')}
                 fullWidth
                 multiline
-                rows={4}
+                rows={3}
+                size="small"
                 error={!!errors.body}
-                helperText={(errors.body?.message as string) ?? `${bodyValue.length}/500`}
+                helperText={(errors.body?.message as string) ?? `${(field.value || '').length}/500`}
                 InputProps={{ sx: { borderRadius: 2 } }}
               />
             )}
@@ -464,18 +452,20 @@ function SendNotificationDialog({ open, onClose, allowedAudiences, onSuccess }: 
         </Stack>
       </DialogContent>
 
-      <DialogActions sx={{ p: 3, pt: 0 }}>
-        <Button onClick={handleClose} variant="outlined" sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600, color: 'text.secondary', borderColor: 'divider' }}>
-          {t('btn_cancel')}
+      <Divider />
+
+      <DialogActions sx={{ p: 2.5, px: 3, bgcolor: 'background.default' }}>
+        <Button onClick={handleClose} variant="outlined" color="inherit" sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600 }}>
+          {tCommon('cancel')}
         </Button>
         <Button
           onClick={handleSubmit(onSubmit)}
           variant="contained"
-          disabled={isSubmitting || sendMutation.isPending}
-          sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, backgroundColor: 'primary.main', '&:hover': { backgroundColor: 'primary.dark' } }}
-          startIcon={sendMutation.isPending ? <CircularProgress size={16} color="inherit" /> : <SendIcon />}
+          disabled={sendMutation.isPending}
+          startIcon={sendMutation.isPending ? <CircularProgress size={16} color="inherit" /> : <SendIcon fontSize="small" />}
+          sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, px: 3, boxShadow: 2 }}
         >
-          {t('btn_send')}
+          {sendMutation.isPending ? t('status_sending') : t('btn_send')}
         </Button>
       </DialogActions>
     </Dialog>
@@ -501,7 +491,7 @@ function DeleteNotificationDialog({ open, notificationId, onClose, onSuccess }: 
       await deleteMutation.mutateAsync(notificationId);
       onSuccess(t('status_delete_success'));
       onClose();
-    } catch (err) {
+    } catch (_err) {
       // toast handled in mutation
     }
   };

@@ -9,7 +9,6 @@ import {
   GpsFixed,
   TravelExplore,
 } from '@mui/icons-material';
-
 import { useTranslations, useLocale } from 'next-intl';
 import React, { useState } from 'react';
 

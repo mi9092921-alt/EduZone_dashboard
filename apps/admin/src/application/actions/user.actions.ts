@@ -7,13 +7,14 @@ import { getErrorMessage } from '@/domain/errors';
 import { CreateUserInput, createUserSchema } from '@/domain/schemas/user.schema';
 import type { AccountAction } from '@/domain/types/user.types';
 import { createServerClient } from '@/infrastructure/supabase/server';
+import { env, getServerEnv } from '@/lib/env';
 
 // ── Helper: build a service-role admin client ────────────────────────────────
 function createAdminClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = getServerEnv().SUPABASE_SERVICE_ROLE_KEY;
   if (!supabaseUrl || !serviceKey) {
-    throw new Error('Supabase environment variables missing');
+    throw new Error('Supabase environment variables missing: SUPABASE_SERVICE_ROLE_KEY');
   }
   return createClient(supabaseUrl, serviceKey, {
     auth: { autoRefreshToken: false, persistSession: false },

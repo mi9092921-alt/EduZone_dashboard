@@ -12,21 +12,21 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select, SelectItem } from '@/components/ui/Select';
-import type { UserFilters, AccountStatus, PrimaryRole } from '@/domain/types/user.types';
+import type { UserFilters } from '@/domain/types/user.types';
 import { cn } from '@/lib/utils';
 
 
 interface UserFiltersBarProps {
   filters: UserFilters;
   onFiltersChange: (filters: UserFilters) => void;
-  totalCount: number;
+  totalCount?: number;
   onExport?: () => void;
 }
 
 export function UserFiltersBar({
   filters,
   onFiltersChange,
-  totalCount,
+  totalCount: _totalCount,
   onExport,
 }: UserFiltersBarProps) {
   const t = useTranslations('users');
@@ -72,12 +72,12 @@ export function UserFiltersBar({
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, []);
 
-  const updateFilter = (key: keyof UserFilters, value: any) => {
+  const updateFilter = <K extends keyof UserFilters>(key: K, value: UserFilters[K] | '') => {
     const next = { ...filters };
     if (value === '' || value === undefined) {
       delete next[key];
     } else {
-      (next as any)[key] = value;
+      next[key] = value as UserFilters[K];
     }
     onFiltersChange(next);
   };
@@ -121,7 +121,7 @@ export function UserFiltersBar({
             <Select
               className="h-10 text-xs font-medium"
               value={filters.primary_role ?? ''}
-              onValueChange={(val) => updateFilter('primary_role', val)}
+              onValueChange={(val) => updateFilter('primary_role', (val || undefined) as UserFilters['primary_role'])}
             >
               {ROLE_OPTIONS.map((opt) => (
                 <SelectItem key={opt.value} value={opt.value}>
@@ -135,7 +135,7 @@ export function UserFiltersBar({
             <Select
               className="h-10 text-xs font-medium"
               value={filters.account_status ?? ''}
-              onValueChange={(val) => updateFilter('account_status', val)}
+              onValueChange={(val) => updateFilter('account_status', (val || undefined) as UserFilters['account_status'])}
             >
               {STATUS_OPTIONS.map((opt) => (
                 <SelectItem key={opt.value} value={opt.value}>
