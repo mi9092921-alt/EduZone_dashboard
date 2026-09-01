@@ -1,7 +1,15 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { useTranslations } from 'next-intl';
+import {
+  Edit,
+  Save,
+  Close,
+  Lock,
+  LockOpen,
+  Build,
+  Refresh,
+  ContentCopy,
+} from '@mui/icons-material';
 import {
   Box,
   Typography,
@@ -25,26 +33,22 @@ import {
   useTheme,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
+import { useTranslations } from 'next-intl';
+import { useState, useCallback } from 'react';
+
+import { PermissionGate } from '../../layout/components/PermissionGate';
+
+import { AccessRulesManager } from './AccessRulesManager';
+import { AppLockControl } from './AppLockControl';
+import { MaintenanceWizard } from './MaintenanceWizard';
+
+import { useSetSetting } from '@/adapters/mutations/settings.mutations';
+import { useSettingsByCategory } from '@/adapters/queries/settings.queries';
 import { useToastStore } from '@/adapters/stores/toast.store';
 import { Card, CardContent, StatsCard, StatsCardContent, StatsCardIcon } from '@/components/ui/Card';
-import {
-  Edit,
-  Save,
-  Close,
-  Lock,
-  LockOpen,
-  Build,
-  Refresh,
-  ContentCopy,
-} from '@mui/icons-material';
-import { PermissionGate } from '../../layout/components/PermissionGate';
-import { useSettingsByCategory } from '@/adapters/queries/settings.queries';
-import { useSetSetting } from '@/adapters/mutations/settings.mutations';
 import { parseRpcError } from '@/domain/errors';
 import type { SettingKv, SettingCategory } from '@/domain/types/settings.types';
-import { MaintenanceWizard } from './MaintenanceWizard';
-import { AppLockControl } from './AppLockControl';
-import { AccessRulesManager } from './AccessRulesManager';
+
 
 const getCategoryTabs = (t: any) => [
   { key: 'security', label: t('tabs.security'), icon: <Lock sx={{ fontSize: 18 }} /> },
@@ -298,7 +302,7 @@ export function SettingsPage() {
                             {row.key}
                           </Typography>
                           <Tooltip title={t('tooltip_copy')}>
-                            <IconButton size="small" onClick={() => handleCopyKey(row.key)}>
+                            <IconButton size="small" onClick={() => handleCopyKey(row.key)} aria-label={t('tooltip_copy')}>
                               <ContentCopy sx={{ fontSize: 14, color: 'text.disabled' }} />
                             </IconButton>
                           </Tooltip>
@@ -360,6 +364,7 @@ export function SettingsPage() {
                                 size="small"
                                 onClick={() => handleSave(row)}
                                 disabled={setSettingMutation.isPending}
+                                aria-label={t('tooltip_save')}
                                 sx={{
                                   color: 'success.main',
                                   backgroundColor: alpha(theme.palette.success.main, 0.1),
@@ -373,6 +378,7 @@ export function SettingsPage() {
                               <IconButton
                                 size="small"
                                 onClick={handleCancel}
+                                aria-label={t('tooltip_cancel')}
                                 sx={{
                                   color: 'error.main',
                                   backgroundColor: alpha(theme.palette.error.main, 0.1),
@@ -388,6 +394,7 @@ export function SettingsPage() {
                             <IconButton
                               size="small"
                               onClick={() => handleEdit(row)}
+                              aria-label={t('tooltip_edit')}
                               sx={{
                                 color: 'primary.main',
                                 '&:hover': { backgroundColor: alpha(theme.palette.primary.main, 0.1) },

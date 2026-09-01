@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Close } from '@mui/icons-material';
 import {
   Dialog,
   DialogTitle,
@@ -16,14 +17,15 @@ import {
   Avatar,
   CircularProgress,
 } from '@mui/material';
-import { Close } from '@mui/icons-material';
+import { useTranslations } from 'next-intl';
+import { useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { enrollStudentSchema, type EnrollStudentFormInput } from '@/domain/schemas/course.schema';
+
 import { useEnrollStudent } from '@/adapters/mutations/courses.mutations';
 import { useUsers } from '@/adapters/queries/users.queries';
+import { enrollStudentSchema, type EnrollStudentFormInput } from '@/domain/schemas/course.schema';
 import { getUserDisplayName } from '@/domain/types/user.types';
-import { useTranslations } from 'next-intl';
+
 
 interface EnrollStudentDialogProps {
   courseId: string;
@@ -98,7 +100,7 @@ export function EnrollStudentDialog({ courseId, open, onClose }: EnrollStudentDi
         <Typography component="span" variant="h6" sx={{ fontWeight: 700, fontSize: '1.125rem' }}>
           {t('enroll_student_title')}
         </Typography>
-        <IconButton size="small" onClick={handleClose} sx={{ color: 'text.secondary' }}>
+        <IconButton size="small" onClick={handleClose} aria-label={t('close')} sx={{ color: 'text.secondary' }}>
           <Close fontSize="small" />
         </IconButton>
       </DialogTitle>

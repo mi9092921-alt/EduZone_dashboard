@@ -1,6 +1,5 @@
 'use client';
 
-import { useState, useCallback } from 'react';
 import {
   Add,
   Business,
@@ -12,18 +11,22 @@ import {
   KeyboardArrowLeft,
   KeyboardArrowRight,
 } from '@mui/icons-material';
-import { useTenants } from '@/adapters/queries/tenants.queries';
+import { useTranslations } from 'next-intl';
+import { useState, useCallback } from 'react';
+
 import {
   useCreateTenant,
   useSuspendTenant,
   useDeleteTenant,
 } from '@/adapters/mutations/tenants.mutations';
-import type { Tenant, TenantFilters, TenantPlan, TenantStatus, CreateTenantInput } from '@/domain/types/tenant.types';
-import { cn } from '@/lib/utils';
+import { useTenants } from '@/adapters/queries/tenants.queries';
 import { Button } from '@/components/ui/Button';
-import { useRouter } from '@/i18n/routing';
-import { useTranslations } from 'next-intl';
 import { TablePagination } from '@/components/ui/TablePagination';
+import type { Tenant, TenantFilters, TenantPlan, TenantStatus, CreateTenantInput } from '@/domain/types/tenant.types';
+import { useRouter } from '@/i18n/routing';
+import { cn } from '@/lib/utils';
+
+
 
 // ── Plan config ──────────────────────────────────────────────────
 const PLAN_CONFIG: Record<TenantPlan, { bg: string; text: string }> = {
@@ -250,25 +253,31 @@ export function TenantsPage() {
                       <td className="px-4 py-3 text-end" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
                           <button
+                            type="button"
                             onClick={() => router.push(`/tenants/${t_item.id}`)}
                             className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                             title={t('tooltip_edit')}
+                            aria-label={t('tooltip_edit')}
                           >
                             <Edit className="text-sm" />
                           </button>
                           {t_item.status === 'active' && (
                             <button
+                              type="button"
                               onClick={() => setSuspendTarget(t_item)}
                               className="p-1.5 rounded-lg hover:bg-amber-500/10 text-muted-foreground hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
                               title={t('tooltip_suspend')}
+                              aria-label={t('tooltip_suspend')}
                             >
                               <Block className="text-sm" />
                             </button>
                           )}
                           <button
+                            type="button"
                             onClick={() => setDeleteTarget(t_item)}
                             className="p-1.5 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-600 dark:hover:text-red-400 transition-colors"
                             title={t('tooltip_delete')}
+                            aria-label={t('tooltip_delete')}
                           >
                             <Delete className="text-sm" />
                           </button>

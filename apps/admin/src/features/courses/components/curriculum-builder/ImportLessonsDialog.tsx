@@ -1,6 +1,21 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import {
+  Close,
+  UploadFile,
+  ContentPaste,
+  CheckCircle,
+  ErrorOutline,
+  HelpOutline,
+  ContentCopy,
+  DeleteOutline,
+  Visibility,
+  VisibilityOff,
+  Code,
+  InfoOutlined,
+  ArrowDropDown,
+  ArrowDropUp,
+} from '@mui/icons-material';
 import {
   Dialog,
   DialogTitle,
@@ -24,25 +39,11 @@ import {
   Tabs,
   Tab,
 } from '@mui/material';
-import {
-  Close,
-  UploadFile,
-  ContentPaste,
-  CheckCircle,
-  ErrorOutline,
-  HelpOutline,
-  ContentCopy,
-  DeleteOutline,
-  Visibility,
-  VisibilityOff,
-  Code,
-  InfoOutlined,
-  ArrowDropDown,
-  ArrowDropUp,
-} from '@mui/icons-material';
 import { useTranslations, useLocale } from 'next-intl';
-import { useToast } from '@/adapters/stores/toast.store';
+import { useState, useRef, useEffect } from 'react';
+
 import { useCreateLessons } from '@/adapters/mutations/courses.mutations';
+import { useToast } from '@/adapters/stores/toast.store';
 import { isValidVideoUrl } from '@/domain/video.utils';
 
 interface ImportLessonsDialogProps {
@@ -309,7 +310,7 @@ export function ImportLessonsDialog({
               </Typography>
             </Box>
           </Stack>
-          <IconButton size="small" onClick={onClose} sx={{ color: 'text.secondary' }}>
+          <IconButton size="small" onClick={onClose} aria-label={t('close')} sx={{ color: 'text.secondary' }}>
             <Close />
           </IconButton>
         </Stack>
@@ -676,6 +677,7 @@ export function ImportLessonsDialog({
                         <Tooltip title={isRtl ? 'معاينة مجانية' : 'Free Preview'}>
                           <IconButton
                             onClick={() => handleUpdatePreviewLesson(item.id, { is_preview: !item.is_preview })}
+                            aria-label={isRtl ? 'معاينة مجانية' : 'Free Preview'}
                             color={item.is_preview ? 'primary' : 'default'}
                             size="small"
                           >
@@ -699,6 +701,7 @@ export function ImportLessonsDialog({
                         <Tooltip title={isRtl ? 'حذف من القائمة' : 'Remove from list'}>
                           <IconButton
                             onClick={() => handleRemovePreviewLesson(item.id)}
+                            aria-label={isRtl ? 'حذف من القائمة' : 'Remove from list'}
                             color="error"
                             size="small"
                           >

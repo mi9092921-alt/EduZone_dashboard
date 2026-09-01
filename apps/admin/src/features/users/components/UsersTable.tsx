@@ -1,17 +1,20 @@
 'use client';
 
-import Image from 'next/image';
-import { useState, memo, useMemo, useCallback } from 'react';
 import { ContentCopy, MoreHoriz } from '@mui/icons-material';
 import { Tooltip } from '@mui/material';
-import type { User, AccountAction } from '@/domain/types/user.types';
-import { getUserDisplayName, getUserInitials } from '@/domain/types/user.types';
-import { UserRowActions } from './UserRowActions';
+import Image from 'next/image';
+import { useTranslations, useLocale } from 'next-intl';
+import { useState, memo, useMemo, useCallback } from 'react';
+
 import { formatDistanceToNow } from './_utils';
-import { cn } from '@/lib/utils';
+import { UserRowActions } from './UserRowActions';
+
 import { Button } from '@/components/ui/Button';
 import { TablePagination } from '@/components/ui/TablePagination';
-import { useTranslations, useLocale } from 'next-intl';
+import type { User, AccountAction } from '@/domain/types/user.types';
+import { getUserDisplayName, getUserInitials } from '@/domain/types/user.types';
+import { cn } from '@/lib/utils';
+
 
 // ── Status config ────────────────────────────────────────────────
 const STATUS_CONFIG = {
@@ -48,9 +51,11 @@ const CopyButton = memo(({ value }: { value: string }) => {
       disableInteractive
     >
       <button
+        type="button"
         onClick={handleCopy}
+        aria-label={copied ? tAudit('copied_tooltip') : tAudit('copy_tooltip')}
         className={cn(
-          "p-1.5 rounded-md transition-faang active:scale-95 opacity-0 group-hover/contact:opacity-100",
+          "p-1.5 rounded-md transition-faang active:scale-95 opacity-0 group-hover/contact:opacity-100 focus-visible:opacity-100",
           copied
             ? "text-emerald-500 dark:text-emerald-400"
             : "text-muted-foreground hover:text-primary"
@@ -100,7 +105,7 @@ const UserRow = memo(({
       onClick={() => onViewProfile(user)}
       className="group hover:bg-muted/30 transition-all duration-200 cursor-pointer"
     >
-      <td className="px-5 py-4 sticky left-0 bg-card group-hover:bg-muted/30 z-10 border-b border-border/40" onClick={(e) => e.stopPropagation()}>
+      <td className="px-5 py-4 sticky start-0 bg-card group-hover:bg-muted/30 z-10 border-b border-border/40" onClick={(e) => e.stopPropagation()}>
         <input
           type="checkbox"
           className="h-4 w-4 rounded border-border text-primary focus:ring-primary transition-faang cursor-pointer"
@@ -148,7 +153,7 @@ const UserRow = memo(({
       <td className="px-4 py-4 text-sm text-muted-foreground whitespace-nowrap border-b border-border/40">
         {user.last_login ? formatDistanceToNow(user.last_login, locale) : t('temp_password_placeholder')}
       </td>
-      <td className="px-5 py-4 text-end sticky right-0 bg-card group-hover:bg-muted/30 z-10 border-b border-border/40 shadow-[-8px_0_12px_-6px_rgba(0,0,0,0.05)] overflow-visible" onClick={(e) => e.stopPropagation()}>
+      <td className="px-5 py-4 text-end sticky end-0 bg-card group-hover:bg-muted/30 z-10 border-b border-border/40 ltr:shadow-[-8px_0_12px_-6px_rgba(0,0,0,0.05)] rtl:shadow-[8px_0_12px_-6px_rgba(0,0,0,0.05)] overflow-visible" onClick={(e) => e.stopPropagation()}>
         <UserRowActions
           user={user}
           onViewProfile={onViewProfile}
@@ -226,7 +231,7 @@ export function UsersTable({
         <table className="w-full caption-bottom text-sm">
           <thead className="[&_tr]:border-b">
             <tr className="border-b border-border/40 transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
-              <th className="h-12 px-5 text-start align-middle font-medium text-muted-foreground w-[1%] sticky left-0 bg-background z-20 border-b border-border/40">
+              <th className="h-12 px-5 text-start align-middle font-medium text-muted-foreground w-[1%] sticky start-0 bg-background z-20 border-b border-border/40">
                 <input
                   type="checkbox"
                   className="h-4 w-4 rounded border-border text-primary focus:ring-primary transition-faang cursor-pointer"
@@ -249,7 +254,7 @@ export function UsersTable({
               <th className="h-12 px-4 text-start align-middle font-medium text-muted-foreground w-[15%] border-b border-border/40">
                 {t('table_header_last_login')}
               </th>
-              <th className="h-12 px-5 text-end align-middle font-medium text-muted-foreground w-[1%] sticky right-0 bg-background z-20 border-b border-border/40 shadow-[-8px_0_12px_-6px_rgba(0,0,0,0.05)]">
+              <th className="h-12 px-5 text-end align-middle font-medium text-muted-foreground w-[1%] sticky end-0 bg-background z-20 border-b border-border/40 ltr:shadow-[-8px_0_12px_-6px_rgba(0,0,0,0.05)] rtl:shadow-[8px_0_12px_-6px_rgba(0,0,0,0.05)]">
                 <MoreHoriz className="text-muted-foreground" />
               </th>
             </tr>

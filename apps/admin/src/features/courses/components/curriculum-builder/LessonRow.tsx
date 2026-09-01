@@ -1,6 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import {
+  Edit,
+  Delete,
+  DragIndicator,
+  OndemandVideo,
+  Description,
+} from '@mui/icons-material';
 import {
   Box,
   Typography,
@@ -12,23 +20,16 @@ import {
   useTheme,
   alpha,
 } from '@mui/material';
-import {
-  Edit,
-  Delete,
-  DragIndicator,
-  OndemandVideo,
-  Description,
-} from '@mui/icons-material';
-import type { Lesson } from '@/domain/types/course.types';
+import { useTranslations } from 'next-intl';
+import { useState, useEffect } from 'react';
+
 import {
   useUpdateLesson,
   useDeleteLesson,
 } from '@/adapters/mutations/courses.mutations';
-import { useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import { useTranslations } from 'next-intl';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useToast } from '@/adapters/stores/toast.store';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import type { Lesson } from '@/domain/types/course.types';
 
 // ── Helpers ─────────────────────────────────────────────
 // ── Helpers ─────────────────────────────────────────────
@@ -385,7 +386,7 @@ export function LessonRow({
             transition: 'opacity 150ms ease',
           }}
         >
-          <IconButton size="small" onClick={() => setEditing(true)} sx={{ color: 'text.disabled' }}>
+          <IconButton size="small" onClick={() => setEditing(true)} aria-label={t('edit')} sx={{ color: 'text.disabled' }}>
             <Edit sx={{ fontSize: 16 }} />
           </IconButton>
           <IconButton 
@@ -394,6 +395,7 @@ export function LessonRow({
               e.stopPropagation();
               handleDelete();
             }} 
+            aria-label={t('delete')}
             sx={{ color: 'text.disabled', '&:hover': { color: 'error.main' } }}
           >
             <Delete sx={{ fontSize: 16 }} />

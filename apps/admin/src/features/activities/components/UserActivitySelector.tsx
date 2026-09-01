@@ -1,13 +1,15 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
 import { Search, Person, Business, Close, Apartment } from '@mui/icons-material';
-import { useAuthUser } from '@/adapters/stores/auth.store';
-import { searchUsers } from '@/infrastructure/repos/users.service';
-import { useTenants } from '@/adapters/queries/tenants.queries';
-import { Select, SelectItem } from '@/components/ui/Select';
-import { cn } from '@/lib/utils';
 import { useTranslations } from 'next-intl';
+import React, { useState, useEffect, useRef } from 'react';
+
+import { useTenants } from '@/adapters/queries/tenants.queries';
+import { useAuthUser } from '@/adapters/stores/auth.store';
+import { Select, SelectItem } from '@/components/ui/Select';
+import { searchUsers } from '@/infrastructure/repos/users.service';
+import { cn } from '@/lib/utils';
+
 
 interface UserActivitySelectorProps {
   onSelect: (userId: string | null) => void;
@@ -17,6 +19,7 @@ interface UserActivitySelectorProps {
 
 export function UserActivitySelector({ onSelect, selectedUserId, userRole }: UserActivitySelectorProps) {
   const t = useTranslations('activities');
+  const tCommon = useTranslations('common');
   const authUser = useAuthUser();
   const isSuperAdmin = authUser?.primary_role === 'super_admin';
   
@@ -151,6 +154,7 @@ export function UserActivitySelector({ onSelect, selectedUserId, userRole }: Use
           <button 
             type="button"
             onClick={handleClear}
+            aria-label={tCommon('clear')}
             className="absolute end-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-muted text-muted-foreground transition-colors z-10"
           >
             <Close fontSize="small" />

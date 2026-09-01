@@ -1,15 +1,16 @@
 'use client';
 
-import { useState, useRef } from 'react';
-import { useCreateCourse, useCreateSection, useCreateLessons } from '@/adapters/mutations/courses.mutations';
-import { useRouter } from '@/i18n/routing';
-import { useToast } from '@/adapters/stores/toast.store';
+import { Upload, ContentCopy, CheckCircle, ErrorOutline, HelpOutline } from '@mui/icons-material';
 import { useTranslations, useLocale } from 'next-intl';
+import { useState, useRef } from 'react';
 
-import { Modal } from '@/components/ui/Modal';
+import { useCreateCourse, useCreateSection, useCreateLessons } from '@/adapters/mutations/courses.mutations';
+import { useToast } from '@/adapters/stores/toast.store';
 import { Button } from '@/components/ui/Button';
 import { Label } from '@/components/ui/Label';
-import { Upload, ContentCopy, CheckCircle, ErrorOutline, HelpOutline } from '@mui/icons-material';
+import { Modal } from '@/components/ui/Modal';
+import { useRouter } from '@/i18n/routing';
+
 
 interface ImportCourseDialogProps {
   open: boolean;
@@ -356,9 +357,9 @@ export function ImportCourseDialog({ open, onClose }: ImportCourseDialogProps) {
                     </p>
                   </div>
                 </div>
-                <div className={`border-t border-primary/10 pt-2 text-xs space-y-1 text-muted-foreground ${isRtl ? 'pr-8' : 'pl-8'}`}>
+                <div className="border-t border-primary/10 pt-2 text-xs space-y-1 text-muted-foreground ps-8">
                   <p className="font-bold text-foreground">{t('import_course.guidelines_title')}</p>
-                  <ul className="list-disc list-inside space-y-1 mt-1 pr-1">
+                  <ul className="list-disc list-inside space-y-1 mt-1 pe-1">
                     <li>{t('import_course.guideline_level')}</li>
                     <li>{t('import_course.guideline_duration')}</li>
                     <li>{t('import_course.guideline_video_url')}</li>
@@ -464,7 +465,7 @@ export function ImportCourseDialog({ open, onClose }: ImportCourseDialogProps) {
                   <ErrorOutline className="text-destructive mt-0.5 shrink-0" />
                   <div className="space-y-1 flex-1">
                     <h5 className="text-sm font-bold">{t('import_course.found_structural_errors')}</h5>
-                    <ul className="list-disc list-inside text-xs text-muted-foreground space-y-1 mt-1 pr-1 leading-relaxed">
+                    <ul className="list-disc list-inside text-xs text-muted-foreground space-y-1 mt-1 pe-1 leading-relaxed">
                       {validation.errors.map((err, idx) => (
                         <li key={idx} className="text-destructive font-medium">{err}</li>
                       ))}

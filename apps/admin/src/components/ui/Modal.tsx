@@ -1,6 +1,12 @@
-import * as React from "react"
-import { cn } from "@/lib/utils"
+'use client';
+
 import { Close } from "@mui/icons-material"
+import { useTranslations } from "next-intl"
+import * as React from "react"
+
+import { useFocusTrap } from "@/lib/useFocusTrap"
+import { cn } from "@/lib/utils"
+
 
 interface ModalProps {
   open: boolean
@@ -33,6 +39,11 @@ export function Modal({
   className,
   fullScreen = false,
 }: ModalProps) {
+  const t = useTranslations("common")
+  const titleId = React.useId()
+  const descriptionId = React.useId()
+  const panelRef = useFocusTrap<HTMLDivElement>(open, onClose)
+
   React.useEffect(() => {
     if (open) {
       document.body.style.overflow = "hidden"
@@ -49,8 +60,14 @@ export function Modal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-300">
       <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={title ? titleId : undefined}
+        aria-describedby={description ? descriptionId : undefined}
+        tabIndex={-1}
         className={cn(
-          "relative w-full bg-card border border-border shadow-2xl flex flex-col animate-in zoom-in-95 duration-200",
+          "relative w-full bg-card border border-border shadow-2xl flex flex-col animate-in zoom-in-95 duration-200 outline-none",
           fullScreen 
             ? "fixed inset-0 h-screen max-h-screen rounded-none border-none" 
             : "rounded-2xl max-h-[90vh] " + maxWidthClasses[maxWidth],
@@ -61,11 +78,13 @@ export function Modal({
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-border/50">
           <div className="space-y-1">
-            {title && <h3 className="text-lg font-bold tracking-tight text-foreground">{title}</h3>}
-            {description && <p className="text-sm text-muted-foreground font-medium">{description}</p>}
+            {title && <h3 id={titleId} className="text-lg font-bold tracking-tight text-foreground">{title}</h3>}
+            {description && <p id={descriptionId} className="text-sm text-muted-foreground font-medium">{description}</p>}
           </div>
           <button
+            type="button"
             onClick={onClose}
+            aria-label={t("close")}
             className="p-1 rounded-full text-muted-foreground hover:bg-muted transition-faang"
           >
             <Close className="h-5 w-5" />

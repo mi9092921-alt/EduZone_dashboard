@@ -1,8 +1,5 @@
 'use client';
 
-import Image from 'next/image';
-
-import React, { useState, useMemo, memo, useCallback } from 'react';
 import {
   Close,
   Email,
@@ -30,20 +27,24 @@ import {
   School,
   ContentCopy,
 } from '@mui/icons-material';
-import type { User, Device, Session } from '@/domain/types/user.types';
-import { getUserDisplayName, getUserInitials } from '@/domain/types/user.types';
+import { Tooltip } from '@mui/material'; // Using MUI Tooltip as requested/implied for pro-tips
+import Image from 'next/image';
+import { useTranslations, useLocale } from 'next-intl';
+import React, { useState, useMemo, memo, useCallback } from 'react';
+
+import { formatDate, formatDistanceToNow } from './_utils';
+
 import {
   useUserDevices,
   useUserSessions,
   useUserPermissions,
   useUserRoles,
 } from '@/adapters/queries/users.queries';
-import { useTranslations, useLocale } from 'next-intl';
-import { formatDate, formatDistanceToNow } from './_utils';
-import { Drawer } from '@/components/ui/Drawer';
 import { Button } from '@/components/ui/Button';
 import { StatsCard, StatsCardContent, StatsCardIcon } from '@/components/ui/Card';
-import { Tooltip } from '@mui/material'; // Using MUI Tooltip as requested/implied for pro-tips
+import { Drawer } from '@/components/ui/Drawer';
+import { getUserDisplayName, getUserInitials } from '@/domain/types/user.types';
+import type { User, Device, Session } from '@/domain/types/user.types';
 import { cn } from '@/lib/utils';
 
 export function UserProfileDrawer({
@@ -61,6 +62,7 @@ export function UserProfileDrawer({
 }) {
   const t = useTranslations('user_profile');
   const tUsers = useTranslations('users');
+  const tCommon = useTranslations('common');
   const locale = useLocale();
   const [activeTab, setActiveTab] = useState(0);
 
@@ -116,15 +118,17 @@ export function UserProfileDrawer({
       className="flex flex-col bg-background"
     >
       <button
+        type="button"
         onClick={onClose}
-        className="absolute top-5 right-5 z-50 p-2.5 rounded-full bg-background/20 hover:bg-background/40 backdrop-blur-md text-foreground/60 hover:text-foreground transition-all duration-300 border border-white/10"
+        aria-label={tCommon('close')}
+        className="absolute top-5 end-5 z-50 p-2.5 rounded-full bg-background/20 hover:bg-background/40 backdrop-blur-md text-foreground/60 hover:text-foreground transition-all duration-300 border border-white/10"
       >
         <Close className="text-xl" />
       </button>
 
       <div className="relative pt-7 pb-6 px-10 overflow-hidden shrink-0 border-b border-border/40">
         <div className={cn("absolute inset-0 bg-gradient-to-br transition-all duration-1000", theme.gradient)} />
-        <div className={cn("absolute -top-32 -right-32 w-[500px] h-[500px] rounded-full blur-[120px] opacity-30 transition-all duration-1000 animate-pulse", theme.secondary)} />
+        <div className={cn("absolute -top-32 -end-32 w-[500px] h-[500px] rounded-full blur-[120px] opacity-30 transition-all duration-1000 animate-pulse", theme.secondary)} />
 
         <div className="relative flex flex-row items-center gap-6 z-10 text-start">
           <div className="relative shrink-0">
@@ -138,11 +142,11 @@ export function UserProfileDrawer({
                 </div>
               )}
             </div>
-            <div className={cn("absolute bottom-0 right-0 w-4.5 h-4.5 rounded-full border-[3px] border-background flex items-center justify-center shadow-lg", theme.dot)}>
+            <div className={cn("absolute bottom-0 end-0 w-4.5 h-4.5 rounded-full border-[3px] border-background flex items-center justify-center shadow-lg", theme.dot)}>
               <div className="w-1 h-1 rounded-full bg-white animate-pulse" />
             </div>
           </div>
-          <div className="flex-1 space-y-2 min-w-0 pr-0">
+          <div className="flex-1 space-y-2 min-w-0">
             <div className="flex flex-col">
               <h3 className="text-2xl font-black tracking-tight text-foreground capitalize truncate leading-none">
                 {displayName}
@@ -228,15 +232,17 @@ const CopyButton = memo(({ value }: { value: string }) => {
       disableInteractive
     >
       <button
+        type="button"
         onClick={handleCopy}
+        aria-label={copied ? tCommon('copied') : tCommon('copy')}
         className={cn(
-          "w-3.5 h-3.5 flex items-center justify-center rounded-md transition-all duration-300 active:scale-95 opacity-0 group-hover/contact:opacity-100 bg-muted/40 hover:bg-muted ml-1",
+          "w-6 h-6 flex items-center justify-center rounded-md transition-all duration-300 active:scale-95 opacity-0 group-hover/contact:opacity-100 focus-visible:opacity-100 bg-muted/40 hover:bg-muted ms-1",
           copied
             ? "text-emerald-500 dark:text-emerald-400"
             : "text-muted-foreground hover:text-primary"
         )}
       >
-        <ContentCopy sx={{ fontSize: '15px' }} className="transition-opacity" />
+        <ContentCopy sx={{ fontSize: '14px' }} className="transition-opacity" />
       </button>
     </Tooltip>
   );
@@ -388,7 +394,7 @@ function DeviceCard({ device, t, locale }: { device: Device, t: any, locale: str
         <h4 className="text-base font-bold truncate">{device.device_name || 'Device'}</h4>
         <p className="text-[10px] text-muted-foreground uppercase">{device.platform} • {t('seen_at', { time: formatDistanceToNow(device.last_seen, locale) })}</p>
       </div>
-      <div className="text-right shrink-0">
+      <div className="text-end shrink-0">
         <p className="text-[10px] font-bold text-muted-foreground uppercase">{t('trust_score')}</p>
         <span className="text-xs font-mono font-bold">{device.trust_score}%</span>
       </div>
@@ -404,7 +410,7 @@ function SessionCard({ session, t, locale }: { session: Session, t: any, locale:
         <span className="font-mono text-sm font-bold">{session.ip_address}</span>
         <p className="text-[10px] text-muted-foreground uppercase">{t('started_at', { time: formatDistanceToNow(session.started_at, locale) })}</p>
       </div>
-      <div className="text-right">
+      <div className="text-end">
         <p className="text-[10px] font-bold text-muted-foreground uppercase">{t('risk_profile')}</p>
         <span className="text-xs font-bold">{session.risk_score}</span>
       </div>

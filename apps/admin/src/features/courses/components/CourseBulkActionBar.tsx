@@ -1,6 +1,5 @@
 'use client';
 
-import React, { useState } from 'react';
 import {
   Publish,
   Drafts,
@@ -11,10 +10,12 @@ import {
   MoreVert
 } from '@mui/icons-material';
 import { Tooltip, Menu, MenuItem, ListItemIcon, ListItemText } from '@mui/material';
-import { Button } from '@/components/ui/Button';
-import { cn } from '@/lib/utils';
 import { useTranslations } from 'next-intl';
+import React, { useState } from 'react';
+
+import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { cn } from '@/lib/utils';
 
 export type CourseBulkAction = 'publish' | 'draft' | 'archive' | 'delete' | 'export_json' | 'export_csv';
 
@@ -145,7 +146,9 @@ export function CourseBulkActionBar({
         </div>
 
         <button
+          type="button"
           onClick={onClear}
+          aria-label={t('clear')}
           className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
         >
           <Close className="text-base" />

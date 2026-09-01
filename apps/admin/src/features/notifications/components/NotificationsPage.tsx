@@ -1,6 +1,22 @@
 'use client';
 
-import { useState } from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import {
+  Add as AddIcon,
+  Campaign as CampaignIcon,
+  Close as CloseIcon,
+  Delete as DeleteIcon,
+  Notifications as NotificationsIcon,
+  People as PeopleIcon,
+  Person as PersonIcon,
+  School as SchoolIcon,
+  Send as SendIcon,
+  SupervisorAccount as SupervisorIcon,
+} from '@mui/icons-material';
+import {
+  Star as StarIcon,
+  EmojiEvents as PermissionIcon,
+} from '@mui/icons-material';
 import {
   Box,
   Button,
@@ -38,40 +54,25 @@ import {
   LinearProgress,
 } from '@mui/material';
 import {
-  Add as AddIcon,
-  Campaign as CampaignIcon,
-  Close as CloseIcon,
-  Delete as DeleteIcon,
-  Notifications as NotificationsIcon,
-  People as PeopleIcon,
-  Person as PersonIcon,
-  School as SchoolIcon,
-  Send as SendIcon,
-  SupervisorAccount as SupervisorIcon,
-} from '@mui/icons-material';
-import { useForm, Controller } from 'react-hook-form';
-import { z } from 'zod';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useTranslations, useLocale } from 'next-intl';
-
-import { useAuthUser } from '@/adapters/stores/auth.store';
-import { PermissionGate } from '@/features/layout/components/PermissionGate';
-import { useNotifications, Notification, TargetAudience } from '@/adapters/queries/notifications.queries';
-import { useSendNotification, useDeleteNotification, SendNotificationInput } from '@/adapters/mutations/notifications.mutations';
-import { TablePagination } from '@/components/ui/TablePagination';
-import type { PrimaryRole } from '@/domain/types/user.types';
-import { getAllPermissions, searchUsers } from '@/infrastructure/repos/users.service';
-import {
   Autocomplete,
   ToggleButton,
   ToggleButtonGroup,
   Avatar,
 } from '@mui/material';
-import {
-  Star as StarIcon,
-  EmojiEvents as PermissionIcon,
-} from '@mui/icons-material';
+import { useTranslations, useLocale } from 'next-intl';
+import { useState } from 'react';
 import { useEffect } from 'react';
+import { useForm, Controller } from 'react-hook-form';
+import { z } from 'zod';
+
+import { useSendNotification, useDeleteNotification, SendNotificationInput } from '@/adapters/mutations/notifications.mutations';
+import { useNotifications, Notification, TargetAudience } from '@/adapters/queries/notifications.queries';
+import { useAuthUser } from '@/adapters/stores/auth.store';
+import { TablePagination } from '@/components/ui/TablePagination';
+import type { PrimaryRole } from '@/domain/types/user.types';
+import { PermissionGate } from '@/features/layout/components/PermissionGate';
+import { getAllPermissions, searchUsers } from '@/infrastructure/repos/users.service';
+
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -207,6 +208,7 @@ interface SendDialogProps {
 
 function SendNotificationDialog({ open, onClose, allowedAudiences, onSuccess }: SendDialogProps) {
   const t = useTranslations('notifications');
+  const tCommon = useTranslations('common');
   const sendMutation = useSendNotification();
   const [permissions, setPermissions] = useState<string[]>([]);
   const [userQuery, setUserQuery] = useState('');
@@ -299,7 +301,7 @@ function SendNotificationDialog({ open, onClose, allowedAudiences, onSuccess }: 
               {t('dialog_send_title')}
             </Typography>
           </Stack>
-          <IconButton onClick={onClose} size="small" sx={{ color: 'text.secondary' }}>
+          <IconButton onClick={onClose} size="small" aria-label={tCommon('close')} sx={{ color: 'text.secondary' }}>
             <CloseIcon fontSize="small" />
           </IconButton>
         </Stack>
@@ -735,6 +737,7 @@ export default function NotificationsPage() {
                           <IconButton
                             size="small"
                             onClick={() => setDeleteId(row.id)}
+                            aria-label={t('btn_delete')}
                             sx={{ color: 'error.main', bgcolor: 'error.main' + '1A', borderRadius: 2, '&:hover': { bgcolor: 'error.main' + '2A' } }}
                           >
                             <DeleteIcon fontSize="small" />

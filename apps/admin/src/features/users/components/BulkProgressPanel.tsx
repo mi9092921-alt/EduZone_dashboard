@@ -1,7 +1,5 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import {
   CheckCircle,
   Warning,
@@ -11,11 +9,15 @@ import {
   Close,
 } from '@mui/icons-material';
 import { LinearProgress } from '@mui/material';
-import { Button } from '@/components/ui/Button';
-import { subscribeToBulkProgress, getBulkJobProgress } from '@/infrastructure/repos/bulk.service';
+import { useQueryClient } from '@tanstack/react-query';
+import { useTranslations } from 'next-intl';
+import { useState, useEffect, useRef, useCallback } from 'react';
+
 import { useCancelBulkJob } from '@/adapters/mutations/bulk.mutations';
 import { queryKeys } from '@/adapters/queries/keys';
+import { Button } from '@/components/ui/Button';
 import type { BulkAction, BulkProgress } from '@/domain/types/bulk.types';
+import { subscribeToBulkProgress, getBulkJobProgress } from '@/infrastructure/repos/bulk.service';
 import { cn } from '@/lib/utils';
 
 interface BulkProgressPanelProps {
@@ -28,6 +30,7 @@ const TERMINAL_STATUSES = new Set(['done', 'dead', 'failed']);
 const AUTO_DISMISS_MS = 3000;
 
 export function BulkProgressPanel({ jobId, action, onDone }: BulkProgressPanelProps) {
+  const tCommon = useTranslations('common');
   const queryClient = useQueryClient();
   const [progress, setProgress] = useState<BulkProgress | null>(null);
   const [status, setStatus] = useState<string>('pending');
@@ -210,6 +213,7 @@ export function BulkProgressPanel({ jobId, action, onDone }: BulkProgressPanelPr
             <button
               type="button"
               onClick={handleDismiss}
+              aria-label={tCommon('close')}
               className="p-1 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
             >
               <Close className="text-sm" />

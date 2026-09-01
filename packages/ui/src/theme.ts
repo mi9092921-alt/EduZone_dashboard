@@ -270,6 +270,18 @@ export const eduZoneTheme = createTheme({
   },
 });
 
+/**
+ * RTL variant of the light theme.
+ * MUI's own components (Menu/Popover positioning, Table cell padding, Dialog
+ * transitions, etc.) only mirror correctly when `direction: 'rtl'` is set on
+ * the theme — the `<html dir="rtl">` attribute alone only affects native CSS,
+ * not MUI's JS-driven layout. Pair this with the `stylis-plugin-rtl` stylis
+ * plugin in the emotion cache (see apps/admin ThemeProvider) so that `sx`/
+ * `styleOverrides` physical properties (margin-left, padding-right, etc.)
+ * are flipped too.
+ */
+export const eduZoneThemeRtl = createTheme(eduZoneTheme, { direction: 'rtl' });
+
 /** Dark theme variant */
 export const eduZoneDarkTheme = createTheme({
   ...eduZoneTheme,
@@ -418,4 +430,7 @@ export const eduZoneDarkTheme = createTheme({
     },
   },
 });
+
+/** RTL variant of the dark theme — see {@link eduZoneThemeRtl} for why this exists. */
+export const eduZoneDarkThemeRtl = createTheme(eduZoneDarkTheme, { direction: 'rtl' });
 

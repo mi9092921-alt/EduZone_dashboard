@@ -12,14 +12,15 @@ import {
   Warning,
   DeleteForever,
 } from '@mui/icons-material';
-import type { User, AccountAction } from '@/domain/types/user.types';
+import { useTranslations } from 'next-intl';
+
 import {
   Dropdown,
   DropdownItem,
   DropdownSeparator,
 } from '@/components/ui/Dropdown';
+import type { User, AccountAction } from '@/domain/types/user.types';
 
-import { useTranslations } from 'next-intl';
 
 interface UserRowActionsProps {
   user: User;
@@ -45,7 +46,7 @@ export function UserRowActions({
   return (
     <Dropdown
       trigger={
-        <button className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted border border-transparent hover:border-border/50 transition-all duration-200 active:scale-95">
+        <button type="button" aria-label={t('actions_user_options')} className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted border border-transparent hover:border-border/50 transition-all duration-200 active:scale-95">
           <MoreVert className="text-xl" />
         </button>
       }

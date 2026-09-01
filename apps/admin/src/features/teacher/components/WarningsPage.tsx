@@ -1,6 +1,15 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import {
+  ReportProblem,
+  CheckCircle,
+  Warning as WarningIcon,
+  Error as ErrorIcon,
+  Info,
+  Download,
+  FilterList,
+  TrendingDown,
+} from '@mui/icons-material';
 import {
   Box,
   Typography,
@@ -25,6 +34,13 @@ import {
   IconButton,
   useTheme,
 } from '@mui/material';
+import { alpha, type Theme } from '@mui/material/styles';
+import { useTranslations, useLocale } from 'next-intl';
+import { useState, useCallback } from 'react';
+
+import { useIssueWarning } from '@/adapters/mutations/warnings.mutations';
+import { useTeacherWarnings, useTeacherStudents } from '@/adapters/queries/teacher.queries';
+import { useAuthUser } from '@/adapters/stores/auth.store';
 import { useToastStore } from '@/adapters/stores/toast.store';
 import {
   CardContent,
@@ -33,22 +49,8 @@ import {
   StatsCardIcon
 } from '@/components/ui/Card';
 import { TablePagination } from '@/components/ui/TablePagination';
-import {
-  ReportProblem,
-  CheckCircle,
-  Warning as WarningIcon,
-  Error as ErrorIcon,
-  Info,
-  Download,
-  FilterList,
-  TrendingDown,
-} from '@mui/icons-material';
-import { useTeacherWarnings, useTeacherStudents } from '@/adapters/queries/teacher.queries';
-import { useIssueWarning } from '@/adapters/mutations/warnings.mutations';
-import { useAuthUser } from '@/adapters/stores/auth.store';
 import type { WarningSeverity, WarningFilters } from '@/domain/types/warning.types';
-import { useTranslations, useLocale } from 'next-intl';
-import { alpha, type Theme } from '@mui/material/styles';
+
 
 function getSeverityTokens(severity: WarningSeverity, theme: Theme) {
   switch (severity) {
@@ -351,6 +353,7 @@ export function WarningsPage() {
               <Box sx={{ display: 'flex', gap: 1 }}>
                 <IconButton
                   size="small"
+                  aria-label={tCommon('filter')}
                   sx={{
                     border: '1px solid',
                     borderColor: 'divider',
@@ -363,6 +366,7 @@ export function WarningsPage() {
                 </IconButton>
                 <IconButton
                   size="small"
+                  aria-label={tCommon('download')}
                   sx={{
                     border: '1px solid',
                     borderColor: 'divider',
@@ -496,7 +500,7 @@ export function WarningsPage() {
                 >
                   <TrendingDown sx={{ fontSize: 20 }} />
                 </StatsCardIcon>
-                <div className="flex flex-col min-w-0 flex-1 pr-6 sm:pr-0">
+                <div className="flex flex-col min-w-0 flex-1 pe-6 sm:pe-0">
                   <Typography variant="overline" sx={{ color: 'text.secondary', fontWeight: 700, mb: 0.5, textTransform: 'uppercase', fontSize: '0.625rem', lineHeight: 1.2 }} className="truncate">
                     {t('title_active_warnings')}
                   </Typography>
@@ -529,7 +533,7 @@ export function WarningsPage() {
                 >
                   <CheckCircle sx={{ fontSize: 20 }} />
                 </StatsCardIcon>
-                <div className="flex flex-col min-w-0 flex-1 pr-6 sm:pr-0">
+                <div className="flex flex-col min-w-0 flex-1 pe-6 sm:pe-0">
                   <Typography variant="overline" sx={{ color: 'text.secondary', fontWeight: 700, mb: 0.5, textTransform: 'uppercase', fontSize: '0.625rem', lineHeight: 1.2 }} className="truncate">
                     {t('title_resolved_warnings')}
                   </Typography>
@@ -562,7 +566,7 @@ export function WarningsPage() {
                 >
                   <ReportProblem sx={{ fontSize: 20 }} />
                 </StatsCardIcon>
-                <div className="flex flex-col min-w-0 flex-1 pr-6 sm:pr-0">
+                <div className="flex flex-col min-w-0 flex-1 pe-6 sm:pe-0">
                   <Typography variant="overline" sx={{ color: 'text.secondary', fontWeight: 700, mb: 0.5, textTransform: 'uppercase', fontSize: '0.625rem', lineHeight: 1.2 }} className="truncate">
                     {t('title_review_needed')}
                   </Typography>

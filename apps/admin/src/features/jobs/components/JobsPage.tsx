@@ -1,6 +1,5 @@
 'use client';
 
-import { useState, useCallback } from 'react';
 import {
   Replay,
   Cancel,
@@ -12,10 +11,12 @@ import {
 } from '@mui/icons-material';
 import { Tooltip } from '@mui/material';
 import { useTranslations } from 'next-intl';
-import { TablePagination } from '@/components/ui/TablePagination';
-import { Button } from '@/components/ui/Button';
-import { useJobs, useJobStatusCounts } from '@/adapters/queries/jobs.queries';
+import { useState, useCallback } from 'react';
+
 import { useRetryJob, useCancelJob, useReleaseStaleJobs } from '@/adapters/mutations/jobs.mutations';
+import { useJobs, useJobStatusCounts } from '@/adapters/queries/jobs.queries';
+import { Button } from '@/components/ui/Button';
+import { TablePagination } from '@/components/ui/TablePagination';
 import type { Job, JobFilters, JobStatus } from '@/domain/types/job.types';
 import { cn } from '@/lib/utils';
 
@@ -214,7 +215,9 @@ export function JobsPage() {
                         {(job.status === 'failed' || job.status === 'dead') && (
                           <Tooltip title={t('tooltip_retry')}>
                             <button
+                              type="button"
                               onClick={() => retryJob.mutate(job.id)}
+                              aria-label={t('tooltip_retry')}
                               className="p-1.5 rounded-lg hover:bg-primary/10 text-primary transition-colors"
                             >
                               <Replay className="text-sm" />
@@ -224,7 +227,9 @@ export function JobsPage() {
                         {(job.status === 'pending' || job.status === 'processing') && (
                           <Tooltip title={t('tooltip_cancel')}>
                             <button
+                              type="button"
                               onClick={() => cancelJob.mutate(job.id)}
+                              aria-label={t('tooltip_cancel')}
                               className="p-1.5 rounded-lg hover:bg-destructive/10 text-destructive transition-colors"
                             >
                               <Cancel className="text-sm" />
@@ -232,7 +237,7 @@ export function JobsPage() {
                           </Tooltip>
                         )}
                         <Tooltip title={t('tooltip_payload')}>
-                          <button className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
+                          <button type="button" aria-label={t('tooltip_payload')} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
                             <Info className="text-sm" />
                           </button>
                         </Tooltip>

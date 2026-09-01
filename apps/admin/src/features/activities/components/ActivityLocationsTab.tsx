@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
 import { Place, Language, Public, ContentCopy, Check, GpsFixed, TravelExplore } from '@mui/icons-material';
+import { useTranslations, useLocale } from 'next-intl';
+import React, { useState } from 'react';
+
 import { useActivityLogs } from '@/adapters/queries/audit.queries';
 import { useUserLocationLogs } from '@/adapters/queries/user_locations.queries';
-import { useTranslations, useLocale } from 'next-intl';
 import { cn } from '@/lib/utils';
 
 interface ActivityLocationsTabProps {
@@ -193,6 +194,7 @@ export function ActivityLocationsTab({ userId }: ActivityLocationsTabProps) {
 }
 
 function CopyButton({ value }: { value: string }) {
+  const tCommon = useTranslations('common');
   const [copied, setCopied] = useState(false);
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -203,7 +205,9 @@ function CopyButton({ value }: { value: string }) {
 
   return (
     <button
+      type="button"
       onClick={handleCopy}
+      aria-label={copied ? tCommon('copied') : tCommon('copy')}
       className={cn(
         "p-1 rounded-md transition-colors",
         copied ? "text-emerald-500" : "text-muted-foreground hover:bg-muted hover:text-foreground"

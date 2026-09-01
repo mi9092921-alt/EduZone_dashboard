@@ -1,7 +1,15 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
-import { useTranslations } from 'next-intl';
+import {
+  Flag,
+  Add,
+  ExpandMore,
+  ExpandLess,
+  Delete,
+  PersonAdd,
+  GroupAdd,
+  ContentCopy,
+} from '@mui/icons-material';
 import {
   Box,
   Typography,
@@ -34,19 +42,11 @@ import {
   useTheme,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import { Card, CardContent, StatsCard, StatsCardContent, StatsCardIcon } from '@/components/ui/Card';
-import {
-  Flag,
-  Add,
-  ExpandMore,
-  ExpandLess,
-  Delete,
-  PersonAdd,
-  GroupAdd,
-  ContentCopy,
-} from '@mui/icons-material';
+import { useTranslations } from 'next-intl';
+import React, { useState, useCallback } from 'react';
+
 import { PermissionGate } from '../../layout/components/PermissionGate';
-import { useFeatureFlags, useFeatureFlagDetail, useRoles } from '@/adapters/queries/settings.queries';
+
 import {
   useCreateFeatureFlag,
   useToggleFeatureFlag,
@@ -57,8 +57,10 @@ import {
   useAddUserOverride,
   useRemoveUserOverride,
 } from '@/adapters/mutations/settings.mutations';
-import type { FeatureFlag } from '@/domain/types/feature-flag.types';
+import { useFeatureFlags, useFeatureFlagDetail, useRoles } from '@/adapters/queries/settings.queries';
 import { useToastStore } from '@/adapters/stores/toast.store';
+import { Card, CardContent, StatsCard, StatsCardContent, StatsCardIcon } from '@/components/ui/Card';
+import type { FeatureFlag } from '@/domain/types/feature-flag.types';
 
 export function FeatureFlagsPage() {
   const theme = useTheme();
@@ -188,7 +190,7 @@ export function FeatureFlagsPage() {
                   <React.Fragment key={row.id}>
                     <TableRow hover sx={{ '& > *': { borderBottom: expandedId === row.id ? 'none' : undefined } }}>
                       <TableCell>
-                        <IconButton size="small" onClick={() => setExpandedId(expandedId === row.id ? null : row.id)}>
+                        <IconButton size="small" onClick={() => setExpandedId(expandedId === row.id ? null : row.id)} aria-label={expandedId === row.id ? tCommon('collapse') : tCommon('expand')}>
                           {expandedId === row.id ? <ExpandLess sx={{ fontSize: 18 }} /> : <ExpandMore sx={{ fontSize: 18 }} />}
                         </IconButton>
                       </TableCell>
@@ -198,7 +200,7 @@ export function FeatureFlagsPage() {
                             {row.key}
                           </Typography>
                           <Tooltip title={t('tooltip_copy')}>
-                            <IconButton size="small" onClick={() => handleCopyKey(row.key)}>
+                            <IconButton size="small" onClick={() => handleCopyKey(row.key)} aria-label={t('tooltip_copy')}>
                               <ContentCopy sx={{ fontSize: 14, color: 'text.disabled' }} />
                             </IconButton>
                           </Tooltip>
@@ -273,6 +275,7 @@ export function FeatureFlagsPage() {
                           <IconButton
                             size="small"
                             onClick={() => setDeleteTarget(row)}
+                            aria-label={t('btn_delete')}
                             sx={{ color: 'error.main', '&:hover': { backgroundColor: alpha(theme.palette.error.main, 0.1) } }}
                           >
                             <Delete sx={{ fontSize: 18 }} />

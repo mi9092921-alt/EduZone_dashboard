@@ -1,6 +1,5 @@
 'use client';
 
-import { useState, useCallback } from 'react';
 import {
   Search,
   ExpandMore,
@@ -12,11 +11,15 @@ import {
 } from '@mui/icons-material';
 import { Tooltip } from '@mui/material';
 import { useTranslations } from 'next-intl';
-import { useActivityLogs } from '@/adapters/queries/audit.queries';
+import { useState, useCallback } from 'react';
+
+
 import { ChainVerifier } from './ChainVerifier';
+
+import { useActivityLogs } from '@/adapters/queries/audit.queries';
+import { TablePagination } from '@/components/ui/TablePagination';
 import type { AuditFilters, ActivityLog, RiskLevel } from '@/domain/types/audit.types';
 import { cn } from '@/lib/utils';
-import { TablePagination } from '@/components/ui/TablePagination';
 
 const RISK_CHIPS: Record<RiskLevel, { bg: string; text: string }> = {
   low: { bg: 'bg-muted', text: 'text-muted-foreground' },
@@ -334,13 +337,15 @@ function CopyButton({ text }: { text: string }) {
   return (
     <Tooltip title={copied ? t('copied_tooltip') : t('copy_tooltip')}>
       <button
+        type="button"
         onClick={(e) => {
           e.stopPropagation();
           navigator.clipboard.writeText(text);
           setCopied(true);
           setTimeout(() => setCopied(false), 1500);
         }}
-        className="p-0.5 rounded hover:bg-muted transition-colors"
+        aria-label={copied ? t('copied_tooltip') : t('copy_tooltip')}
+        className="p-1 rounded hover:bg-muted transition-colors"
       >
         <ContentCopy className={cn('text-xs', copied ? 'text-emerald-500' : 'text-muted-foreground')} />
       </button>
@@ -430,11 +435,11 @@ function MultiSelect({
 
 // ── Chip ────────────────────────────────────────────────────
 function Chip({ label, onDelete }: { label: string; onDelete: () => void }) {
-  const t = useTranslations('audit');
+  const tCommon = useTranslations('common');
   return (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-muted text-xs font-medium text-foreground">
       {label}
-      <button onClick={onDelete} className="text-muted-foreground hover:text-foreground transition-colors">
+      <button type="button" onClick={onDelete} aria-label={`${tCommon('remove')}: ${label}`} className="text-muted-foreground hover:text-foreground transition-colors">
         ×
       </button>
     </span>

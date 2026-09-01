@@ -1,18 +1,7 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { Tooltip } from '@mui/material';
 import { AdminPanelSettings } from '@mui/icons-material';
-import { usePathname, Link } from '@/i18n/routing';
-
-import { useAuthUser } from '@/adapters/stores/auth.store';
-import { cn } from '@/lib/utils';
-import { useTranslations } from 'next-intl';
-
-import { NAV_ITEMS } from '@/config/nav.config';
-import type { PrimaryRole } from '@/adapters/stores/auth.store';
-
-import { useTheme } from '@mui/material/styles';
 import { Zoom } from '@mui/material';
 
 const SIDEBAR_WIDTH = '220px';
@@ -29,6 +18,8 @@ interface SidebarContentProps {
 }
 
 import { ChevronLeft, Menu as MenuIcon } from '@mui/icons-material';
+import { Tooltip } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 
 function SidebarInnerContent({
   isMobile,
@@ -153,7 +144,15 @@ function SidebarInnerContent({
 }
 
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslations } from 'next-intl';
+
 import { useLayout } from '../hooks/useLayout';
+
+import type { PrimaryRole } from '@/adapters/stores/auth.store';
+import { useAuthUser } from '@/adapters/stores/auth.store';
+import { NAV_ITEMS } from '@/config/nav.config';
+import { usePathname, Link } from '@/i18n/routing';
+import { cn } from '@/lib/utils';
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -216,12 +215,9 @@ export function Sidebar() {
                 animate={{ x: 0 }}
                 exit={{ x: isRtl ? '100%' : '-100%' }}
                 transition={{ type: 'spring', stiffness: 350, damping: 30 }}
-                className={cn(
-                  "fixed top-0 bottom-0 z-50 w-[220px] shadow-2xl overflow-hidden bg-background",
-                  isRtl ? "right-0" : "left-0"
-                )}
+                className="fixed top-0 bottom-0 start-0 z-50 w-[220px] shadow-2xl overflow-hidden bg-background"
               >
-                <div className="w-[220px] h-full absolute top-0 left-0">
+                <div className="w-[220px] h-full absolute top-0 start-0">
                   <SidebarInnerContent {...contentProps} isCollapsed={false} />
                 </div>
               </motion.aside>

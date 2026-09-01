@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import {
   Business,
   People,
@@ -11,14 +10,17 @@ import {
   Block,
   CheckCircle,
 } from '@mui/icons-material';
-import { useTenantDetail, useTenantAuditLogs } from '@/adapters/queries/tenants.queries';
-import { useUpdateTenant, useSuspendTenant } from '@/adapters/mutations/tenants.mutations';
-import type { TenantPlan, UpdateTenantInput } from '@/domain/types/tenant.types';
-import type { AuditFilters } from '@/domain/types/audit.types';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/Button';
-import { useRouter } from '@/i18n/routing';
 import { useTranslations } from 'next-intl';
+import { useState } from 'react';
+
+import { useUpdateTenant, useSuspendTenant } from '@/adapters/mutations/tenants.mutations';
+import { useTenantDetail, useTenantAuditLogs } from '@/adapters/queries/tenants.queries';
+import { Button } from '@/components/ui/Button';
+import type { AuditFilters } from '@/domain/types/audit.types';
+import type { TenantPlan, UpdateTenantInput } from '@/domain/types/tenant.types';
+import { useRouter } from '@/i18n/routing';
+import { cn } from '@/lib/utils';
+
 
 type Tab = 'overview' | 'users' | 'courses' | 'audit';
 
@@ -153,7 +155,7 @@ export function TenantDetailPage({ tenantId }: { tenantId: string }) {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <button onClick={() => router.push('/tenants')} className="p-2 rounded-xl hover:bg-muted transition-colors">
+        <button type="button" onClick={() => router.push('/tenants')} aria-label={tCommon('back')} className="p-2 rounded-xl hover:bg-muted transition-colors">
           <ArrowBack className="text-sm text-muted-foreground" />
         </button>
         <div className="flex-1">

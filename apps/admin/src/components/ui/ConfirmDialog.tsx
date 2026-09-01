@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode } from 'react';
+import { Close as CloseIcon } from '@mui/icons-material';
 import {
   Dialog,
   DialogTitle,
@@ -13,7 +13,8 @@ import {
   Box,
   IconButton
 } from '@mui/material';
-import { Close as CloseIcon } from '@mui/icons-material';
+import { useTranslations } from 'next-intl';
+import { ReactNode } from 'react';
 
 export interface ConfirmDialogProps {
   open: boolean;
@@ -46,6 +47,7 @@ export function ConfirmDialog({
   children,
   maxWidth = 'xs',
 }: ConfirmDialogProps) {
+  const tCommon = useTranslations('common');
   return (
     <Dialog 
       open={open} 
@@ -79,7 +81,7 @@ export function ConfirmDialog({
               {title}
             </Typography>
           </Stack>
-          <IconButton onClick={onClose} size="small" sx={{ color: 'text.secondary' }}>
+          <IconButton onClick={onClose} size="small" aria-label={tCommon('close')} sx={{ color: 'text.secondary' }}>
             <CloseIcon fontSize="small" />
           </IconButton>
         </Stack>

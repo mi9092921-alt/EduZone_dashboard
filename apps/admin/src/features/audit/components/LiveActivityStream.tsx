@@ -1,6 +1,5 @@
 'use client';
 
-import { useState, useCallback } from 'react';
 import {
   Stream,
   Pause,
@@ -10,6 +9,8 @@ import {
 } from '@mui/icons-material';
 import { Tooltip } from '@mui/material';
 import { useTranslations } from 'next-intl';
+import { useState, useCallback } from 'react';
+
 import { useQueuedActivities } from '@/adapters/queries/audit.queries';
 import type { ActivityLogQueueEntry, RiskLevel } from '@/domain/types/audit.types';
 import { cn } from '@/lib/utils';
@@ -37,6 +38,7 @@ interface LiveActivityStreamProps {
 
 export function LiveActivityStream({ open, onClose }: LiveActivityStreamProps) {
   const t = useTranslations('audit');
+  const tCommon = useTranslations('common');
   const [paused, setPaused] = useState(false);
 
   const { data: events } = useQueuedActivities(MAX_EVENTS + 50);
@@ -76,14 +78,18 @@ export function LiveActivityStream({ open, onClose }: LiveActivityStreamProps) {
         <div className="flex items-center gap-1">
           <Tooltip title={paused ? t('tooltip_resume') : t('tooltip_pause')}>
             <button
+              type="button"
               onClick={() => setPaused(!paused)}
+              aria-label={paused ? t('tooltip_resume') : t('tooltip_pause')}
               className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
             >
               {paused ? <PlayArrow className="text-base" /> : <Pause className="text-base" />}
             </button>
           </Tooltip>
           <button
+            type="button"
             onClick={onClose}
+            aria-label={tCommon('close')}
             className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
           >
             <Close className="text-base" />

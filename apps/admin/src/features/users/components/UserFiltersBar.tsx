@@ -6,14 +6,15 @@ import {
   Close,
   FilterList,
 } from '@mui/icons-material';
+import { useTranslations } from 'next-intl';
 import { useState, useCallback, useEffect, useRef } from 'react';
-import type { UserFilters, AccountStatus, PrimaryRole } from '@/domain/types/user.types';
+
+import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select, SelectItem } from '@/components/ui/Select';
-import { Button } from '@/components/ui/Button';
+import type { UserFilters, AccountStatus, PrimaryRole } from '@/domain/types/user.types';
 import { cn } from '@/lib/utils';
 
-import { useTranslations } from 'next-intl';
 
 interface UserFiltersBarProps {
   filters: UserFilters;
@@ -175,7 +176,7 @@ export function UserFiltersBar({
           {filters.primary_role && (
             <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-primary/10 border border-primary/20 text-primary text-[11px] font-bold">
               {t('primary_role_label')}: {ROLE_OPTIONS.find(o => o.value === filters.primary_role)?.label}
-              <button onClick={() => updateFilter('primary_role', '')} className="hover:text-primary/70 transition-faang">
+              <button type="button" onClick={() => updateFilter('primary_role', '')} aria-label={tCommon('clear_filter')} className="hover:text-primary/70 transition-faang">
                 <Close className="text-[14px]" />
               </button>
             </div>
@@ -183,7 +184,7 @@ export function UserFiltersBar({
           {filters.account_status && (
             <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 dark:text-indigo-400 text-[11px] font-bold">
               {t('actions_account_status')}: {STATUS_OPTIONS.find(o => o.value === filters.account_status)?.label}
-              <button onClick={() => updateFilter('account_status', '')} className="hover:text-indigo-600/70 transition-faang">
+              <button type="button" onClick={() => updateFilter('account_status', '')} aria-label={tCommon('clear_filter')} className="hover:text-indigo-600/70 transition-faang">
                 <Close className="text-[14px]" />
               </button>
             </div>

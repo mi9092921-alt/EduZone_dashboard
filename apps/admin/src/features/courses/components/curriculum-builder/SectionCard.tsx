@@ -1,39 +1,5 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import {
-  Box,
-  Typography,
-  Button,
-  IconButton,
-  TextField,
-  Switch,
-  Collapse,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Stack,
-  useTheme,
-  useMediaQuery,
-} from '@mui/material';
-import {
-  Add,
-  ExpandMore,
-  ExpandLess,
-  Edit,
-  Delete,
-  DragIndicator,
-  UploadFile,
-} from '@mui/icons-material';
-import type { Section, Lesson } from '@/domain/types/course.types';
-import {
-  useUpdateSection,
-  useDeleteSection,
-  useCreateLesson,
-  useCreateLessons,
-  useReorderLessons,
-} from '@/adapters/mutations/courses.mutations';
 import {
   DndContext,
   closestCenter,
@@ -52,12 +18,47 @@ import {
 } from '@dnd-kit/sortable';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import {
+  Add,
+  ExpandMore,
+  ExpandLess,
+  Edit,
+  Delete,
+  DragIndicator,
+  UploadFile,
+} from '@mui/icons-material';
+import {
+  Box,
+  Typography,
+  Button,
+  IconButton,
+  TextField,
+  Switch,
+  Collapse,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Stack,
+  useTheme,
+  useMediaQuery,
+} from '@mui/material';
 import { useTranslations } from 'next-intl';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { useToast } from '@/adapters/stores/toast.store';
-import { LessonRow } from './LessonRow';
-import { ImportLessonsDialog } from './ImportLessonsDialog';
+import { useState, useEffect } from 'react';
 
+import { ImportLessonsDialog } from './ImportLessonsDialog';
+import { LessonRow } from './LessonRow';
+
+import {
+  useUpdateSection,
+  useDeleteSection,
+  useCreateLesson,
+  useCreateLessons,
+  useReorderLessons,
+} from '@/adapters/mutations/courses.mutations';
+import { useToast } from '@/adapters/stores/toast.store';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import type { Section, Lesson } from '@/domain/types/course.types';
 import { isValidVideoUrl } from '@/domain/video.utils';
 
 // ══════════════════════════════════════════════════
@@ -332,6 +333,7 @@ export function SectionCard({
                 e.stopPropagation();
                 setEditingTitle(!editingTitle);
               }}
+              aria-label={t('edit')}
               sx={{ color: 'text.disabled' }}
             >
               <Edit sx={{ fontSize: 16 }} />
@@ -342,6 +344,7 @@ export function SectionCard({
                 e.stopPropagation();
                 handleDeleteSection();
               }}
+              aria-label={t('delete')}
               sx={{ color: 'text.disabled', '&:hover': { color: 'error.main' } }}
             >
               <Delete sx={{ fontSize: 16 }} />

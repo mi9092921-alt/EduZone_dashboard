@@ -93,7 +93,8 @@
   --accent: 210 40% 96.1%;
   --accent-foreground: 222.2 47.4% 11.2%;
 
-  --destructive: 0 84.2% 60.2%;
+  --destructive: 0 84.2% 47%;    /* Darkened from 60.2% — 60.2% only hit 3.6:1 against
+                                     white text, below the 4.5:1 WCAG AA text minimum */
   --destructive-foreground: 210 40% 98%;
 
   --border: 214.3 32% 82%;
@@ -144,12 +145,25 @@
   --accent: 217.2 32.6% 17.5%;
   --accent-foreground: 210 40% 98%;
 
-  --destructive: 0 84% 60%;      /* Brighter red for dark mode visibility */
+  --destructive: 0 84% 56%;      /* Best single-value compromise between two
+                                     conflicting uses: standalone text/icons need a
+                                     brighter red to read against this dark background
+                                     (was 60%, ~5:1), while white text ON a destructive
+                                     fill needs a darker red for 4.5:1 (was only 3.6:1
+                                     at 60%). 56% lands both near ~4:1 rather than
+                                     perfecting one at the other's expense. A real fix
+                                     is splitting this into two tokens (e.g. a separate
+                                     --destructive-solid for filled buttons/badges) —
+                                     left as a follow-up, not done here to avoid
+                                     touching every bg-destructive call site blind. */
   --destructive-foreground: 210 40% 98%;
 
   --border: 217.2 32.6% 22.5%;   /* Slightly lighter borders for better definition */
   --input: 217.2 32.6% 17.5%;
-  --ring: 224.3 76.3% 48%;
+  --ring: 224.3 76.3% 56%;       /* Brightened from 48% — 48% only hit ~2.9:1 against
+                                     surfaces, below the 3:1 WCAG non-text/focus-indicator
+                                     minimum, making the keyboard focus ring nearly
+                                     invisible on dark backgrounds */
 
   /* Subtle Refinement: Inner Glow for Dark Surfaces */
   --inner-glow: inset 0 1px 0 0 rgba(255, 255, 255, 0.05);

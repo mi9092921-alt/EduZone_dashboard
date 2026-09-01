@@ -1,7 +1,8 @@
-import { defineConfig } from 'vitest/config';
-import react from '@vitejs/plugin-react';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import react from '@vitejs/plugin-react';
+import { defineConfig } from 'vitest/config';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -25,12 +26,10 @@ export default defineConfig({
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     exclude: ['**/node_modules/**', '**/dist/**', '**/*.stories.*', '**/cypress/**'],
     pool: 'threads',
+    // Vitest 4 dropped `poolOptions.threads.singleThread`; `fileParallelism: false`
+    // is the current equivalent — it runs test files sequentially within the pool.
+    fileParallelism: false,
     testTimeout: 10000,
     hookTimeout: 10000,
-  },
-  poolOptions: {
-    threads: {
-      singleThread: true,
-    },
   },
 });

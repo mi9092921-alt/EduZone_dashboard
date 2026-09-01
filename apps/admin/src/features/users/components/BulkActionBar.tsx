@@ -1,6 +1,5 @@
 'use client';
 
-import React, { useState } from 'react';
 import {
   Lock,
   LockOpen,
@@ -13,16 +12,20 @@ import {
   DeleteForever,
 } from '@mui/icons-material';
 import { Tooltip } from '@mui/material';
+import { useTranslations } from 'next-intl';
+import React, { useState } from 'react';
+
+import { useSubmitBulkAction } from '@/adapters/mutations/bulk.mutations';
+import { useToastStore } from '@/adapters/stores/toast.store';
 import { Button } from '@/components/ui/Button';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
-import { useSubmitBulkAction } from '@/adapters/mutations/bulk.mutations';
 import type { BulkAction } from '@/domain/types/bulk.types';
 import type { UserFilters } from '@/domain/types/user.types';
 import { cn } from '@/lib/utils';
-import { useTranslations } from 'next-intl';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { useToastStore } from '@/adapters/stores/toast.store';
+
+
 
 interface BulkActionBarProps {
   selectedCount: number;
@@ -67,6 +70,7 @@ export function BulkActionBar({
 
   const submitBulk = useSubmitBulkAction();
   const t = useTranslations('users');
+  const tCommon = useTranslations('common');
   const { showToast } = useToastStore();
 
   const handleActionClick = (action: BulkAction) => {
@@ -146,7 +150,9 @@ export function BulkActionBar({
         </div>
 
         <button
+          type="button"
           onClick={onClear}
+          aria-label={tCommon('clear')}
           className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
         >
           <Close className="text-base" />

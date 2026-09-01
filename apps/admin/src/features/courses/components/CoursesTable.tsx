@@ -1,12 +1,15 @@
 'use client';
 
 import { School, ChevronLeft, ChevronRight, MoreHoriz } from '@mui/icons-material';
-import type { Course } from '@/domain/types/course.types';
+import { useTranslations } from 'next-intl';
+
 import { CourseRowActions } from './CourseRowActions';
-import { cn } from '@/lib/utils';
+
 import { Button } from '@/components/ui/Button';
 import { TablePagination } from '@/components/ui/TablePagination';
-import { useTranslations } from 'next-intl';
+import type { Course } from '@/domain/types/course.types';
+import { cn } from '@/lib/utils';
+
 
 // ── Status config ────────────────────────────────────────────────
 const STATUS_CONFIG = {
@@ -65,7 +68,7 @@ export function CoursesTable({
     { label: t('dashboard_lessons'), className: 'text-center w-24' },
     { label: t('price_header'), className: 'text-end w-24' },
     { label: t('teacher_date_header'), className: 'text-start w-52' },
-    { label: '', className: 'sticky end-0 z-20 bg-muted border-b border-border/60 text-end w-20 shadow-[-12px_0_12px_-10px_rgba(0,0,0,0.05)] overflow-visible' },
+    { label: '', className: 'sticky end-0 z-20 bg-muted border-b border-border/60 text-end w-20 ltr:shadow-[-12px_0_12px_-10px_rgba(0,0,0,0.05)] rtl:shadow-[12px_0_12px_-10px_rgba(0,0,0,0.05)] overflow-visible' },
   ];
 
   const allSelected = courses.length > 0 && courses.every(c => selectedIds.includes(c.id));
@@ -137,14 +140,14 @@ export function CoursesTable({
                   <td className="px-6 py-4"><div className="h-6 w-16 bg-muted rounded-full" /></td>
                   <td className="px-6 py-4"><div className="h-6 w-16 bg-muted rounded-full" /></td>
                   <td className="px-6 py-4"><div className="h-6 w-12 bg-muted rounded-full mx-auto" /></td>
-                  <td className="px-6 py-4"><div className="h-4 w-12 bg-muted rounded ml-auto text-end" /></td>
+                  <td className="px-6 py-4"><div className="h-4 w-12 bg-muted rounded ms-auto text-end" /></td>
                   <td className="px-6 py-4">
                     <div className="space-y-2">
                       <div className="h-4 w-32 bg-muted rounded" />
                       <div className="h-3 w-20 bg-muted rounded" />
                     </div>
                   </td>
-                  <td className="sticky end-0 px-6 py-4 bg-card"><div className="h-8 w-8 bg-muted rounded-xl ml-auto" /></td>
+                  <td className="sticky end-0 px-6 py-4 bg-card"><div className="h-8 w-8 bg-muted rounded-xl ms-auto" /></td>
                 </tr>
               ))
               : courses.map((course) => {
@@ -221,7 +224,7 @@ export function CoursesTable({
                         <span className="text-emerald-600 dark:text-emerald-400 font-extrabold text-[15px]">{t('free')}</span>
                       ) : (
                         <span className="text-foreground font-extrabold text-[15px]">
-                          <span className="text-[10px] text-muted-foreground mr-0.5 font-bold">$</span>
+                          <span className="text-[10px] text-muted-foreground me-0.5 font-bold">$</span>
                           {course.price}
                         </span>
                       )}
@@ -244,7 +247,7 @@ export function CoursesTable({
                     </td>
 
                     {/* Actions */}
-                    <td className="sticky end-0 z-10 px-6 py-5 bg-card group-hover:bg-card hover:!bg-muted/30 transition-colors border-b border-border/40 text-end shadow-[-12px_0_12px_-10px_rgba(0,0,0,0.05)] overflow-visible" onClick={(e) => e.stopPropagation()}>
+                    <td className="sticky end-0 z-10 px-6 py-5 bg-card group-hover:bg-card hover:!bg-muted/30 transition-colors border-b border-border/40 text-end ltr:shadow-[-12px_0_12px_-10px_rgba(0,0,0,0.05)] rtl:shadow-[12px_0_12px_-10px_rgba(0,0,0,0.05)] overflow-visible" onClick={(e) => e.stopPropagation()}>
                       <CourseRowActions
                         course={course}
                         onView={onViewCourse}
