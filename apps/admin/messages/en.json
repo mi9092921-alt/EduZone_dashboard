@@ -311,7 +311,22 @@
       "hide": "Hide ▲",
       "show": "Show ▼",
       "instructions_toggle_title": "Import Guidelines & File Structure"
-    }
+    },
+    "close": "Close",
+    "remove": "Remove",
+    "expand": "Expand",
+    "collapse": "Collapse",
+    "filter": "Filter",
+    "download": "Download",
+    "retry": "Retry",
+    "pause": "Pause",
+    "resume": "Resume",
+    "clear": "Clear",
+    "clear_filter": "Clear filter",
+    "view": "View",
+    "suspend": "Suspend",
+    "toggle_free_preview": "Toggle free preview",
+    "toggle_edit": "Toggle edit"
   },
   "warnings": {
     "page_title": "Student Warnings",

@@ -311,7 +311,22 @@
       "hide": "إخفاء ▲",
       "show": "إظهار ▼",
       "instructions_toggle_title": "إرشادات الاستيراد وهيكل الملف"
-    }
+    },
+    "close": "إغلاق",
+    "remove": "إزالة",
+    "expand": "توسيع",
+    "collapse": "طيّ",
+    "filter": "تصفية",
+    "download": "تنزيل",
+    "retry": "إعادة المحاولة",
+    "pause": "إيقاف مؤقت",
+    "resume": "استئناف",
+    "clear": "مسح",
+    "clear_filter": "مسح عامل التصفية",
+    "view": "عرض",
+    "suspend": "تعليق",
+    "toggle_free_preview": "تبديل المعاينة المجانية",
+    "toggle_edit": "تبديل التعديل"
   },
   "warnings": {
     "page_title": "تحذيرات الطلاب",

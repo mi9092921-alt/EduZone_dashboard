@@ -1,6 +1,8 @@
 import { Menu, MenuItem, Divider, MenuItemProps } from '@mui/material';
+import { useLocale } from 'next-intl';
 import * as React from 'react';
 
+import { getDir } from '@/lib/direction';
 import { cn } from '@/lib/utils';
 
 interface DropdownProps {
@@ -12,7 +14,10 @@ interface DropdownProps {
 
 export function Dropdown({ trigger, children, align = 'end', className }: DropdownProps) {
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+  const locale = useLocale();
+  const isRtl = getDir(locale) === 'rtl';
   const open = Boolean(anchorEl);
+
 
   const handleClick = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -20,6 +25,14 @@ export function Dropdown({ trigger, children, align = 'end', className }: Dropdo
   const handleClose = () => {
     setAnchorEl(null);
   };
+
+  // MUI's Menu/Popover positions itself using literal 'left'/'right' and does
+  // NOT read theme.direction to flip them — so the logical `align` prop has
+  // to be resolved to a physical side here, by hand, based on the current
+  // document direction. Without this, "end" always resolves to 'right' and
+  // the menu opens off the wrong (and on narrow RTL layouts, off-screen) side.
+  const physicalHorizontal: 'left' | 'right' =
+    isRtl ? (align === 'end' ? 'left' : 'right') : (align === 'end' ? 'right' : 'left')
 
   return (
     <>
@@ -33,11 +46,11 @@ export function Dropdown({ trigger, children, align = 'end', className }: Dropdo
         onClick={handleClose}
         anchorOrigin={{
           vertical: 'bottom',
-          horizontal: align === 'end' ? 'right' : 'left',
+          horizontal: physicalHorizontal,
         }}
         transformOrigin={{
           vertical: 'top',
-          horizontal: align === 'end' ? 'right' : 'left',
+          horizontal: physicalHorizontal,
         }}
         slotProps={{
           paper: {

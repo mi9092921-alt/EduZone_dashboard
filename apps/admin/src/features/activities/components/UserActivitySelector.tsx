@@ -10,6 +10,7 @@ import { Select, SelectItem } from '@/components/ui/Select';
 import { searchUsers, type UserSearchResult } from '@/infrastructure/repos/users.service';
 import { cn } from '@/lib/utils';
 
+
 interface UserActivitySelectorProps {
   onSelect: (userId: string | null) => void;
   selectedUserId: string | null;
@@ -22,6 +23,7 @@ export function UserActivitySelector({
   userRole,
 }: UserActivitySelectorProps) {
   const t = useTranslations('activities');
+  const tCommon = useTranslations('common');
   const authUser = useAuthUser();
   const isSuperAdmin = authUser?.primary_role === 'super_admin';
 
@@ -166,6 +168,7 @@ export function UserActivitySelector({
           <button
             type="button"
             onClick={handleClear}
+            aria-label={tCommon('clear')}
             className="absolute end-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-muted text-muted-foreground transition-colors z-10"
           >
             <Close fontSize="small" />

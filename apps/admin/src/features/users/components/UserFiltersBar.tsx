@@ -1,14 +1,20 @@
 'use client';
 
-import { Search, Download, Close, FilterList } from '@mui/icons-material';
+import {
+  Search,
+  Download,
+  Close,
+  FilterList,
+} from '@mui/icons-material';
 import { useTranslations } from 'next-intl';
 import { useState, useCallback, useEffect, useRef } from 'react';
 
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select, SelectItem } from '@/components/ui/Select';
-import type { UserFilters } from '@/domain/types/user.types';
+import type { UserFilters, AccountStatus, PrimaryRole } from '@/domain/types/user.types';
 import { cn } from '@/lib/utils';
+
 
 interface UserFiltersBarProps {
   filters: UserFilters;
@@ -20,7 +26,7 @@ interface UserFiltersBarProps {
 export function UserFiltersBar({
   filters,
   onFiltersChange,
-  totalCount: _totalCount,
+  totalCount,
   onExport,
 }: UserFiltersBarProps) {
   const t = useTranslations('users');
@@ -63,20 +69,15 @@ export function UserFiltersBar({
   );
 
   useEffect(() => {
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, []);
 
-  const updateFilter = <K extends keyof UserFilters>(
-    key: K,
-    value: UserFilters[K] | '' | undefined,
-  ) => {
+  const updateFilter = (key: keyof UserFilters, value: any) => {
     const next = { ...filters };
     if (value === '' || value === undefined) {
       delete next[key];
     } else {
-      next[key] = value;
+      (next as any)[key] = value;
     }
     onFiltersChange(next);
   };
@@ -86,7 +87,10 @@ export function UserFiltersBar({
     onFiltersChange({});
   };
 
-  const activeFilterCount = [filters.primary_role, filters.account_status].filter(Boolean).length;
+  const activeFilterCount = [
+    filters.primary_role,
+    filters.account_status,
+  ].filter(Boolean).length;
 
   return (
     <div className="flex flex-col gap-4 p-4 rounded-2xl bg-card border border-border shadow-sm mb-6 transition-faang">
@@ -112,16 +116,12 @@ export function UserFiltersBar({
           </Button>
         </div>
 
-        <div
-          className={cn('flex-wrap items-center gap-3', showFilters ? 'flex' : 'hidden lg:flex')}
-        >
+        <div className={cn("flex-wrap items-center gap-3", showFilters ? "flex" : "hidden lg:flex")}>
           <div className="w-full sm:w-[160px]">
             <Select
               className="h-10 text-xs font-medium"
               value={filters.primary_role ?? ''}
-              onValueChange={(val) =>
-                updateFilter('primary_role', val as UserFilters['primary_role'] | '')
-              }
+              onValueChange={(val) => updateFilter('primary_role', val)}
             >
               {ROLE_OPTIONS.map((opt) => (
                 <SelectItem key={opt.value} value={opt.value}>
@@ -135,9 +135,7 @@ export function UserFiltersBar({
             <Select
               className="h-10 text-xs font-medium"
               value={filters.account_status ?? ''}
-              onValueChange={(val) =>
-                updateFilter('account_status', val as UserFilters['account_status'] | '')
-              }
+              onValueChange={(val) => updateFilter('account_status', val)}
             >
               {STATUS_OPTIONS.map((opt) => (
                 <SelectItem key={opt.value} value={opt.value}>
@@ -148,9 +146,9 @@ export function UserFiltersBar({
           </div>
 
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
+            <Button 
+              variant="outline" 
+              size="sm" 
               className="h-10 gap-2 font-medium px-4"
               onClick={onExport}
             >
@@ -174,29 +172,19 @@ export function UserFiltersBar({
       {/* Active filters display (optional, if we want chips even with inline selects) */}
       {(filters.primary_role || filters.account_status) && (
         <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-border/50">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground me-1">
-            {tCommon('active_filters', { count: activeFilterCount })}:
-          </span>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground me-1">{tCommon('active_filters', { count: activeFilterCount })}:</span>
           {filters.primary_role && (
             <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-primary/10 border border-primary/20 text-primary text-[11px] font-bold">
-              {t('primary_role_label')}:{' '}
-              {ROLE_OPTIONS.find((o) => o.value === filters.primary_role)?.label}
-              <button
-                onClick={() => updateFilter('primary_role', '')}
-                className="hover:text-primary/70 transition-faang"
-              >
+              {t('primary_role_label')}: {ROLE_OPTIONS.find(o => o.value === filters.primary_role)?.label}
+              <button type="button" onClick={() => updateFilter('primary_role', '')} aria-label={tCommon('clear_filter')} className="hover:text-primary/70 transition-faang">
                 <Close className="text-[14px]" />
               </button>
             </div>
           )}
           {filters.account_status && (
             <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 dark:text-indigo-400 text-[11px] font-bold">
-              {t('actions_account_status')}:{' '}
-              {STATUS_OPTIONS.find((o) => o.value === filters.account_status)?.label}
-              <button
-                onClick={() => updateFilter('account_status', '')}
-                className="hover:text-indigo-600/70 transition-faang"
-              >
+              {t('actions_account_status')}: {STATUS_OPTIONS.find(o => o.value === filters.account_status)?.label}
+              <button type="button" onClick={() => updateFilter('account_status', '')} aria-label={tCommon('clear_filter')} className="hover:text-indigo-600/70 transition-faang">
                 <Close className="text-[14px]" />
               </button>
             </div>

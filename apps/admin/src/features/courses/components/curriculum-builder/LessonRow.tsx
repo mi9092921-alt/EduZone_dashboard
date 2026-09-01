@@ -2,7 +2,13 @@
 
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Edit, Delete, DragIndicator, OndemandVideo, Description } from '@mui/icons-material';
+import {
+  Edit,
+  Delete,
+  DragIndicator,
+  OndemandVideo,
+  Description,
+} from '@mui/icons-material';
 import {
   Box,
   Typography,
@@ -17,20 +23,18 @@ import {
 import { useTranslations } from 'next-intl';
 import { useState, useEffect } from 'react';
 
-import { useUpdateLesson, useDeleteLesson } from '@/adapters/mutations/courses.mutations';
+import {
+  useUpdateLesson,
+  useDeleteLesson,
+} from '@/adapters/mutations/courses.mutations';
 import { useToast } from '@/adapters/stores/toast.store';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { getErrorMessage } from '@/domain/errors';
 import type { Lesson } from '@/domain/types/course.types';
-import { formatVideoUrl, isValidVideoUrl } from '@/domain/video.utils';
 
 // ── Helpers ─────────────────────────────────────────────
 // ── Helpers ─────────────────────────────────────────────
 function LessonIcon({ lesson }: { lesson: Lesson }) {
-  if (
-    lesson.content?.video_path ||
-    (Array.isArray(lesson.content) && lesson.content[0]?.video_path)
-  ) {
+  if (lesson.content?.video_path || (Array.isArray(lesson.content) && lesson.content[0]?.video_path)) {
     return <OndemandVideo sx={{ fontSize: 20, color: 'primary.main' }} />;
   }
   return <Description sx={{ fontSize: 20, color: 'success.main' }} />;
@@ -41,12 +45,14 @@ function formatDuration(sec: number | null): string {
   const hrs = Math.floor(sec / 3600);
   const mins = Math.floor((sec % 3600) / 60);
   const secs = sec % 60;
-
+  
   if (hrs > 0) {
     return `${hrs}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   }
   return `${mins}:${String(secs).padStart(2, '0')}`;
 }
+
+import { formatVideoUrl, isValidVideoUrl } from '@/domain/video.utils';
 
 // ══════════════════════════════════════════════════
 // LESSON ROW
@@ -65,31 +71,32 @@ export function LessonRow({
   const { showToast } = useToast();
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(lesson.title);
-
+  
   // Optimistic UI state
   const [localPreview, setLocalPreview] = useState(lesson.is_preview);
   const [localPublished, setLocalPublished] = useState(lesson.is_published);
 
   // Sync with server state changes
-  useEffect(() => {
-    setLocalPreview(lesson.is_preview);
-  }, [lesson.is_preview]);
-  useEffect(() => {
-    setLocalPublished(lesson.is_published);
-  }, [lesson.is_published]);
-
+  useEffect(() => { setLocalPreview(lesson.is_preview); }, [lesson.is_preview]);
+  useEffect(() => { setLocalPublished(lesson.is_published); }, [lesson.is_published]);
+  
   const content = Array.isArray(lesson.content) ? lesson.content[0] : lesson.content;
   const initialProvider = content?.provider || 'youtube';
   const initialPath = content?.video_path || '';
   const [videoPath, setVideoPath] = useState(formatVideoUrl(initialProvider, initialPath));
-
+  
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const updateLesson = useUpdateLesson();
   const deleteLesson = useDeleteLesson();
 
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: lesson.id,
-  });
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: lesson.id });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -115,19 +122,19 @@ export function LessonRow({
       await updateLesson.mutateAsync({
         id: lesson.id,
         courseId,
-        data: {
-          title,
-          video_url: videoPath, // Mutator will handle the p_video_path update
+        data: { 
+          title, 
+          video_url: videoPath // Mutator will handle the p_video_path update
         },
       });
       setEditing(false);
-    } catch (err: unknown) {
+    } catch (err: any) {
       console.error('[LessonRow handleSave] Error:', err);
-      setUrlError(getErrorMessage(err) || 'An error occurred while saving the lesson.');
+      setUrlError(err.message || 'An error occurred while saving the lesson.');
     }
   };
 
-  const handleTogglePreview = async (e?: React.SyntheticEvent) => {
+  const handleTogglePreview = async (e?: any) => {
     if (e?.stopPropagation) e.stopPropagation();
     const newValue = !localPreview;
     setLocalPreview(newValue); // Optimistic update
@@ -143,7 +150,7 @@ export function LessonRow({
     }
   };
 
-  const handleTogglePublish = async (e?: React.SyntheticEvent) => {
+  const handleTogglePublish = async (e?: any) => {
     if (e?.stopPropagation) e.stopPropagation();
     const newValue = !localPublished;
     setLocalPublished(newValue); // Optimistic update
@@ -215,25 +222,25 @@ export function LessonRow({
             error={!!urlError}
             helperText={urlError}
             fullWidth
-            sx={{
-              '& .MuiOutlinedInput-root': {
+            sx={{ 
+              '& .MuiOutlinedInput-root': { 
                 borderRadius: 1.5,
-                backgroundColor: 'background.paper',
-              },
+                backgroundColor: 'background.paper'
+              } 
             }}
           />
           <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 1 }}>
             <Typography variant="caption" sx={{ color: 'text.secondary', flexGrow: 1 }}>
               {t('is_preview_label') || 'Free Preview'}
             </Typography>
-            <Switch size="small" checked={localPreview} onChange={handleTogglePreview} />
+            <Switch
+              size="small"
+              checked={localPreview}
+              onChange={handleTogglePreview}
+            />
           </Stack>
           <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-            <Button
-              size="small"
-              onClick={() => setEditing(false)}
-              sx={{ textTransform: 'none', fontSize: '0.8125rem' }}
-            >
+            <Button size="small" onClick={() => setEditing(false)} sx={{ textTransform: 'none', fontSize: '0.8125rem' }}>
               {t('cancel')}
             </Button>
             <Button
@@ -293,16 +300,8 @@ export function LessonRow({
             width: 36,
             height: 36,
             borderRadius: 2,
-            backgroundColor:
-              lesson.content?.video_path ||
-              (Array.isArray(lesson.content) && lesson.content[0]?.video_path)
-                ? alpha(theme.palette.primary.main, 0.1)
-                : alpha(theme.palette.success.main, 0.1),
-            color:
-              lesson.content?.video_path ||
-              (Array.isArray(lesson.content) && lesson.content[0]?.video_path)
-                ? 'primary.main'
-                : 'success.main',
+            backgroundColor: (lesson.content?.video_path || (Array.isArray(lesson.content) && (lesson.content as any)[0]?.video_path)) ? alpha(theme.palette.primary.main, 0.1) : alpha(theme.palette.success.main, 0.1),
+            color: (lesson.content?.video_path || (Array.isArray(lesson.content) && (lesson.content as any)[0]?.video_path)) ? 'primary.main' : 'success.main',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -326,10 +325,7 @@ export function LessonRow({
             {index + 1}. {lesson.title}
           </Typography>
           <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 500 }}>
-            {lesson.content?.video_path ||
-            (Array.isArray(lesson.content) && lesson.content[0]?.video_path)
-              ? t('lesson_type_video')
-              : t('lesson_type_content')}
+            {(lesson.content?.video_path || (Array.isArray(lesson.content) && (lesson.content as any)[0]?.video_path)) ? t('lesson_type_video') : t('lesson_type_content')}
             {lesson.duration_sec ? ` • ${formatDuration(lesson.duration_sec)}` : ''}
             {localPreview && (
               <Box
@@ -355,10 +351,7 @@ export function LessonRow({
       </Box>
       <Stack direction="row" alignItems="center" spacing={0.5}>
         <Box sx={{ mr: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <Typography
-            variant="caption"
-            sx={{ fontSize: '0.6rem', color: 'text.disabled', fontWeight: 700, mb: -0.5 }}
-          >
+          <Typography variant="caption" sx={{ fontSize: '0.6rem', color: 'text.disabled', fontWeight: 700, mb: -0.5 }}>
             {t('is_preview_label') || 'PREVIEW'}
           </Typography>
           <Switch
@@ -368,17 +361,12 @@ export function LessonRow({
             onClick={(e) => e.stopPropagation()}
             sx={{
               '& .MuiSwitch-switchBase.Mui-checked': { color: 'success.main' },
-              '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                backgroundColor: 'success.main',
-              },
+              '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: 'success.main' },
             }}
           />
         </Box>
         <Box sx={{ mr: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <Typography
-            variant="caption"
-            sx={{ fontSize: '0.6rem', color: 'text.disabled', fontWeight: 700, mb: -0.5 }}
-          >
+          <Typography variant="caption" sx={{ fontSize: '0.6rem', color: 'text.disabled', fontWeight: 700, mb: -0.5 }}>
             {t('is_published_label') || 'PUBLIC'}
           </Typography>
           <Switch
@@ -398,15 +386,16 @@ export function LessonRow({
             transition: 'opacity 150ms ease',
           }}
         >
-          <IconButton size="small" onClick={() => setEditing(true)} sx={{ color: 'text.disabled' }}>
+          <IconButton size="small" onClick={() => setEditing(true)} aria-label={t('edit')} sx={{ color: 'text.disabled' }}>
             <Edit sx={{ fontSize: 16 }} />
           </IconButton>
-          <IconButton
-            size="small"
+          <IconButton 
+            size="small" 
             onClick={(e) => {
               e.stopPropagation();
               handleDelete();
-            }}
+            }} 
+            aria-label={t('delete')}
             sx={{ color: 'text.disabled', '&:hover': { color: 'error.main' } }}
           >
             <Delete sx={{ fontSize: 16 }} />

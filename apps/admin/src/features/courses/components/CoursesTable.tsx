@@ -9,6 +9,7 @@ import { TablePagination } from '@/components/ui/TablePagination';
 import type { Course } from '@/domain/types/course.types';
 import { cn } from '@/lib/utils';
 
+
 // ── Status config ────────────────────────────────────────────────
 const STATUS_CONFIG = {
   published: {
@@ -80,7 +81,7 @@ export function CoursesTable({
     {
       label: '',
       className:
-        'sticky end-0 z-20 bg-muted border-b border-border/60 text-end w-20 shadow-[-12px_0_12px_-10px_rgba(0,0,0,0.05)] overflow-visible',
+        'sticky end-0 z-20 bg-muted border-b border-border/60 text-end w-20 ltr:shadow-[-12px_0_12px_-10px_rgba(0,0,0,0.05)] rtl:shadow-[12px_0_12px_-10px_rgba(0,0,0,0.05)] overflow-visible',
     },
   ];
 
@@ -165,7 +166,7 @@ export function CoursesTable({
                       <div className="h-6 w-12 bg-muted rounded-full mx-auto" />
                     </td>
                     <td className="px-6 py-4">
-                      <div className="h-4 w-12 bg-muted rounded ml-auto text-end" />
+                      <div className="h-4 w-12 bg-muted rounded ms-auto text-end" />
                     </td>
                     <td className="px-6 py-4">
                       <div className="space-y-2">
@@ -174,7 +175,7 @@ export function CoursesTable({
                       </div>
                     </td>
                     <td className="sticky end-0 px-6 py-4 bg-card">
-                      <div className="h-8 w-8 bg-muted rounded-xl ml-auto" />
+                      <div className="h-8 w-8 bg-muted rounded-xl ms-auto" />
                     </td>
                   </tr>
                 ))
@@ -276,7 +277,7 @@ export function CoursesTable({
                           </span>
                         ) : (
                           <span className="text-foreground font-extrabold text-[15px]">
-                            <span className="text-[10px] text-muted-foreground mr-0.5 font-bold">
+                            <span className="text-[10px] text-muted-foreground me-0.5 font-bold">
                               $
                             </span>
                             {course.price}
@@ -302,7 +303,7 @@ export function CoursesTable({
 
                       {/* Actions */}
                       <td
-                        className="sticky end-0 z-10 px-6 py-5 bg-card group-hover:bg-card hover:!bg-muted/30 transition-colors border-b border-border/40 text-end shadow-[-12px_0_12px_-10px_rgba(0,0,0,0.05)] overflow-visible"
+                        className="sticky end-0 z-10 px-6 py-5 bg-card group-hover:bg-card hover:!bg-muted/30 transition-colors border-b border-border/40 text-end ltr:shadow-[-12px_0_12px_-10px_rgba(0,0,0,0.05)] rtl:shadow-[12px_0_12px_-10px_rgba(0,0,0,0.05)] overflow-visible"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <CourseRowActions

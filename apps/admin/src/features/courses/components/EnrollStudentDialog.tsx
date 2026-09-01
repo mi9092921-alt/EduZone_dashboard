@@ -26,6 +26,7 @@ import { useUsers } from '@/adapters/queries/users.queries';
 import { enrollStudentSchema, type EnrollStudentFormInput } from '@/domain/schemas/course.schema';
 import { getUserDisplayName } from '@/domain/types/user.types';
 
+
 interface EnrollStudentDialogProps {
   courseId: string;
   open: boolean;
@@ -42,7 +43,7 @@ export function EnrollStudentDialog({ courseId, open, onClose }: EnrollStudentDi
   const { data: usersData, isLoading: isLoadingUsers } = useUsers(
     { primary_role: 'student', search: userSearchText },
     1,
-    50,
+    50
   );
   const students = usersData?.data || [];
 
@@ -52,7 +53,7 @@ export function EnrollStudentDialog({ courseId, open, onClose }: EnrollStudentDi
     reset,
     formState: { errors },
   } = useForm<EnrollStudentFormInput>({
-    resolver: zodResolver(enrollStudentSchema),
+    resolver: zodResolver(enrollStudentSchema) as any,
     defaultValues: {
       user_id: '',
       course_id: courseId,
@@ -95,13 +96,11 @@ export function EnrollStudentDialog({ courseId, open, onClose }: EnrollStudentDi
       fullWidth
       PaperProps={{ sx: { borderRadius: 3, boxShadow: '0 16px 48px rgba(0,0,0,0.15)' } }}
     >
-      <DialogTitle
-        sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 1 }}
-      >
+      <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 1 }}>
         <Typography component="span" variant="h6" sx={{ fontWeight: 700, fontSize: '1.125rem' }}>
           {t('enroll_student_title')}
         </Typography>
-        <IconButton size="small" onClick={handleClose} sx={{ color: 'text.secondary' }}>
+        <IconButton size="small" onClick={handleClose} aria-label={t('close')} sx={{ color: 'text.secondary' }}>
           <Close fontSize="small" />
         </IconButton>
       </DialogTitle>
@@ -109,11 +108,7 @@ export function EnrollStudentDialog({ courseId, open, onClose }: EnrollStudentDi
       <form onSubmit={handleSubmit(onSubmit)}>
         <DialogContent sx={{ pt: 1 }}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-            {error && (
-              <Alert severity="error" sx={{ borderRadius: 2 }}>
-                {error}
-              </Alert>
-            )}
+            {error && <Alert severity="error" sx={{ borderRadius: 2 }}>{error}</Alert>}
 
             <Controller
               name="user_id"
@@ -127,12 +122,7 @@ export function EnrollStudentDialog({ courseId, open, onClose }: EnrollStudentDi
                   onChange={(_, value) => field.onChange(value?.id || '')}
                   renderInput={(params) => (
                     <TextField
-                      {...params}
-                      InputLabelProps={
-                        (params.InputLabelProps ?? {}) as NonNullable<
-                          React.ComponentProps<typeof TextField>['InputLabelProps']
-                        >
-                      }
+                      {...(params as any)}
                       label={t('select_student_label')}
                       autoFocus
                       error={!!errors.user_id}
@@ -152,28 +142,15 @@ export function EnrollStudentDialog({ courseId, open, onClose }: EnrollStudentDi
                     />
                   )}
                   renderOption={(props, option) => {
-                    const { key: _key, ...optionProps } = props;
+                    const { key, ...optionProps } = props as any;
                     return (
-                      <Box
-                        component="li"
-                        key={option.id}
-                        {...optionProps}
-                        sx={{ display: 'flex', gap: 1.5, py: 1 }}
-                      >
-                        <Avatar
-                          src={option.avatar_url || ''}
-                          sx={{ width: 32, height: 32, fontSize: '0.75rem' }}
-                        >
-                          {option.first_name?.[0]}
-                          {option.last_name?.[0]}
+                      <Box component="li" key={option.id} {...optionProps} sx={{ display: 'flex', gap: 1.5, py: 1 }}>
+                        <Avatar src={option.avatar_url || ''} sx={{ width: 32, height: 32, fontSize: '0.75rem' }}>
+                          {option.first_name?.[0]}{option.last_name?.[0]}
                         </Avatar>
                         <Box>
-                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                            {getUserDisplayName(option)}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {option.email}
-                          </Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>{getUserDisplayName(option)}</Typography>
+                          <Typography variant="caption" color="text.secondary">{option.email}</Typography>
                         </Box>
                       </Box>
                     );
@@ -195,15 +172,15 @@ export function EnrollStudentDialog({ courseId, open, onClose }: EnrollStudentDi
         </DialogContent>
 
         <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          <Button
+        <Button
             onClick={handleClose}
             disabled={enrollMutation.isPending}
-            sx={{
-              textTransform: 'none',
-              fontWeight: 600,
-              color: 'text.secondary',
-              borderRadius: 2,
-              '&:hover': { bgcolor: 'action.hover' },
+            sx={{ 
+                textTransform: 'none', 
+                fontWeight: 600, 
+                color: 'text.secondary', 
+                borderRadius: 2,
+                '&:hover': { bgcolor: 'action.hover' }
             }}
           >
             {t('cancel')}

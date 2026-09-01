@@ -35,7 +35,13 @@ import {
   TextField,
   Switch,
   Collapse,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
   Stack,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material';
 import { useTranslations } from 'next-intl';
 import { useState, useEffect } from 'react';
@@ -47,11 +53,11 @@ import {
   useUpdateSection,
   useDeleteSection,
   useCreateLesson,
+  useCreateLessons,
   useReorderLessons,
 } from '@/adapters/mutations/courses.mutations';
 import { useToast } from '@/adapters/stores/toast.store';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { getErrorMessage } from '@/domain/errors';
 import type { Section, Lesson } from '@/domain/types/course.types';
 import { isValidVideoUrl } from '@/domain/video.utils';
 
@@ -67,6 +73,8 @@ export function SectionCard({
   courseId: string;
   index: number;
 }) {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const t = useTranslations('common');
   const { showToast } = useToast();
 
@@ -87,18 +95,22 @@ export function SectionCard({
   const updateSection = useUpdateSection();
   const deleteSection = useDeleteSection();
   const createLesson = useCreateLesson();
+  const createLessonsBulk = useCreateLessons();
   const reorderLessons = useReorderLessons();
 
   const [importingJson, setImportingJson] = useState(false);
 
   const [localLessons, setLocalLessons] = useState(section.lessons || []);
-  useEffect(() => {
-    setLocalLessons(section.lessons || []);
-  }, [section.lessons]);
+  useEffect(() => { setLocalLessons(section.lessons || []); }, [section.lessons]);
 
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: section.id,
-  });
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: section.id });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -110,7 +122,7 @@ export function SectionCard({
   const lessonSensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 15 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 300, tolerance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
   const handleLessonDragEnd = async (event: DragEndEvent) => {
@@ -123,7 +135,7 @@ export function SectionCard({
     const newLessons = arrayMove(localLessons, oldIndex, newIndex);
     setLocalLessons(newLessons);
 
-    const updates = newLessons.map((l: Lesson, idx: number) => ({ id: l.id, order_index: idx }));
+    const updates = newLessons.map((l: any, idx: number) => ({ id: l.id, order_index: idx }));
     await reorderLessons.mutateAsync({ courseId, updates });
   };
 
@@ -132,16 +144,12 @@ export function SectionCard({
     setEditingTitle(false);
   };
 
-  const handleTogglePublish = async (e?: React.SyntheticEvent) => {
+  const handleTogglePublish = async (e?: any) => {
     if (e?.stopPropagation) e.stopPropagation();
     const newValue = !localPublished;
     setLocalPublished(newValue);
     try {
-      await updateSection.mutateAsync({
-        id: section.id,
-        courseId,
-        data: { is_published: newValue },
-      });
+      await updateSection.mutateAsync({ id: section.id, courseId, data: { is_published: newValue } });
     } catch (err) {
       setLocalPublished(!newValue);
       console.error(err);
@@ -189,11 +197,13 @@ export function SectionCard({
       setNewLessonUrl('');
       setNewLessonIsPreview(false);
       setAddingLesson(false);
-    } catch (err: unknown) {
+    } catch (err: any) {
       console.error('[handleAddLesson] Error:', err);
-      setUrlError(getErrorMessage(err) || 'An error occurred while adding the lesson.');
+      setUrlError(err.message || 'An error occurred while adding the lesson.');
     }
   };
+
+
 
   return (
     <Box
@@ -240,18 +250,21 @@ export function SectionCard({
             <DragIndicator sx={{ fontSize: 18, color: 'text.disabled' }} />
           </Box>
           {editingTitle ? (
-            <Box sx={{ display: 'flex', gap: 1, flexGrow: 1 }} onClick={(e) => e.stopPropagation()}>
+            <Box
+              sx={{ display: 'flex', gap: 1, flexGrow: 1 }}
+              onClick={(e) => e.stopPropagation()}
+            >
               <TextField
                 size="small"
                 fullWidth
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
+                sx={{ 
+                  '& .MuiOutlinedInput-root': { 
                     borderRadius: 1.5,
                     backgroundColor: 'background.paper',
-                    '& fieldset': { borderColor: 'primary.main' },
-                  },
+                    '& fieldset': { borderColor: 'primary.main' }
+                  } 
                 }}
               />
               <Button
@@ -320,6 +333,7 @@ export function SectionCard({
                 e.stopPropagation();
                 setEditingTitle(!editingTitle);
               }}
+              aria-label={t('edit')}
               sx={{ color: 'text.disabled' }}
             >
               <Edit sx={{ fontSize: 16 }} />
@@ -330,6 +344,7 @@ export function SectionCard({
                 e.stopPropagation();
                 handleDeleteSection();
               }}
+              aria-label={t('delete')}
               sx={{ color: 'text.disabled', '&:hover': { color: 'error.main' } }}
             >
               <Delete sx={{ fontSize: 16 }} />
@@ -357,15 +372,8 @@ export function SectionCard({
 
       <Collapse in={expanded} timeout="auto" unmountOnExit>
         <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
-          <DndContext
-            sensors={lessonSensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleLessonDragEnd}
-          >
-            <SortableContext
-              items={localLessons.map((l: Lesson) => l.id)}
-              strategy={verticalListSortingStrategy}
-            >
+          <DndContext sensors={lessonSensors} collisionDetection={closestCenter} onDragEnd={handleLessonDragEnd}>
+            <SortableContext items={localLessons.map((l: Lesson) => l.id)} strategy={verticalListSortingStrategy}>
               {localLessons.map((lesson, i) => (
                 <LessonRow key={lesson.id} lesson={lesson} courseId={courseId} index={i} />
               ))}
@@ -423,10 +431,7 @@ export function SectionCard({
                 fullWidth
               />
               <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 1 }}>
-                <Typography
-                  variant="body2"
-                  sx={{ color: 'text.secondary', flexGrow: 1, fontWeight: 500 }}
-                >
+                <Typography variant="body2" sx={{ color: 'text.secondary', flexGrow: 1, fontWeight: 500 }}>
                   {t('is_preview_label') || 'Free Preview'}
                 </Typography>
                 <Switch

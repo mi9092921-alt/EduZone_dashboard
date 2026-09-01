@@ -1,6 +1,15 @@
 'use client';
 
-import { Edit, Save, Close, Lock, Build, Refresh, ContentCopy } from '@mui/icons-material';
+import {
+  Edit,
+  Save,
+  Close,
+  Lock,
+  LockOpen,
+  Build,
+  Refresh,
+  ContentCopy,
+} from '@mui/icons-material';
 import {
   Box,
   Typography,
@@ -36,10 +45,12 @@ import { MaintenanceWizard } from './MaintenanceWizard';
 import { useSetSetting } from '@/adapters/mutations/settings.mutations';
 import { useSettingsByCategory } from '@/adapters/queries/settings.queries';
 import { useToastStore } from '@/adapters/stores/toast.store';
+import { Card, CardContent, StatsCard, StatsCardContent, StatsCardIcon } from '@/components/ui/Card';
 import { parseRpcError } from '@/domain/errors';
-import type { SettingKv } from '@/domain/types/settings.types';
+import type { SettingKv, SettingCategory } from '@/domain/types/settings.types';
 
-const getCategoryTabs = (t: ReturnType<typeof useTranslations>) => [
+
+const getCategoryTabs = (t: any) => [
   { key: 'security', label: t('tabs.security'), icon: <Lock sx={{ fontSize: 18 }} /> },
   { key: 'maintenance', label: t('tabs.maintenance'), icon: <Build sx={{ fontSize: 18 }} /> },
   { key: 'limits', label: t('tabs.limits'), icon: <Refresh sx={{ fontSize: 18 }} /> },
@@ -79,31 +90,25 @@ export function SettingsPage() {
     setEditValue('');
   }, []);
 
-  const handleSave = useCallback(
-    async (setting: SettingKv) => {
-      try {
-        await setSettingMutation.mutateAsync({
-          key: setting.key,
-          value: editValue,
-          valueType: setting.value_type,
-        });
-        setEditingKey(null);
-        setEditValue('');
-        showToast(t('status_save_success'), 'success');
-      } catch (err: unknown) {
-        showToast(parseRpcError(err).message, 'error');
-      }
-    },
-    [editValue, setSettingMutation, showToast, t],
-  );
+  const handleSave = useCallback(async (setting: SettingKv) => {
+    try {
+      await setSettingMutation.mutateAsync({
+        key: setting.key,
+        value: editValue,
+        valueType: setting.value_type,
+      });
+      setEditingKey(null);
+      setEditValue('');
+      showToast(t('status_save_success'), 'success');
+    } catch (err: unknown) {
+      showToast(parseRpcError(err).message, 'error');
+    }
+  }, [editValue, setSettingMutation, showToast, t]);
 
-  const handleCopyKey = useCallback(
-    (key: string) => {
-      navigator.clipboard.writeText(key);
-      showToast(t('copy_success', { key }), 'success');
-    },
-    [showToast, t],
-  );
+  const handleCopyKey = useCallback((key: string) => {
+    navigator.clipboard.writeText(key);
+    showToast(t('copy_success', { key }), 'success');
+  }, [showToast, t]);
 
   const renderValueInput = (setting: SettingKv) => {
     if (editingKey !== setting.key) {
@@ -120,9 +125,7 @@ export function SettingsPage() {
           }}
         >
           {setting.value_type === 'boolean'
-            ? setting.value === 'true'
-              ? `✅ ${t('enabled')}`
-              : `❌ ${t('disabled')}`
+            ? (setting.value === 'true' ? `✅ ${t('enabled')}` : `❌ ${t('disabled')}`)
             : setting.value}
         </Typography>
       );
@@ -162,22 +165,8 @@ export function SettingsPage() {
           size="small"
           sx={{ width: 300, fontFamily: 'monospace', fontSize: '0.8rem' }}
           autoFocus
-          error={(() => {
-            try {
-              JSON.parse(editValue);
-              return false;
-            } catch {
-              return true;
-            }
-          })()}
-          helperText={(() => {
-            try {
-              JSON.parse(editValue);
-              return '';
-            } catch {
-              return t('error_invalid_json');
-            }
-          })()}
+          error={(() => { try { JSON.parse(editValue); return false; } catch { return true; } })()}
+          helperText={(() => { try { JSON.parse(editValue); return ''; } catch { return t('error_invalid_json'); } })()}
         />
       );
     }
@@ -202,24 +191,18 @@ export function SettingsPage() {
   }
 
   return (
-    <PermissionGate
-      roles={['admin', 'super_admin']}
-      fallback={
-        <Alert severity="error" sx={{ borderRadius: 3 }}>
-          {t('no_permission_error')}
-        </Alert>
-      }
-    >
+    <PermissionGate roles={['admin', 'super_admin']} fallback={
+      <Alert severity="error" sx={{ borderRadius: 3 }}>
+        {t('no_permission_error')}
+      </Alert>
+    }>
       <Box>
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">
             <h1 className="text-title">{t('page_title')}</h1>
             <div className="px-2 py-0.5 rounded-full bg-muted text-muted-foreground text-[11px] font-bold uppercase tracking-wider border border-border">
-              {Object.values(grouped ?? {})
-                .flat()
-                .length.toLocaleString()}{' '}
-              {tCommon('total')}
+              {Object.values(grouped ?? {}).flat().length.toLocaleString()} {tCommon('total')}
             </div>
             {isFetching && !isLoading && (
               <div className="flex items-center gap-1.5 animate-pulse text-primary text-xs font-medium">
@@ -275,84 +258,13 @@ export function SettingsPage() {
             <Table sx={{ minWidth: 1000 }}>
               <TableHead>
                 <TableRow sx={{ backgroundColor: 'action.hover' }}>
-                  <TableCell
-                    sx={{
-                      fontWeight: 800,
-                      textTransform: 'uppercase',
-                      fontSize: '0.75rem',
-                      color: 'text.secondary',
-                      py: 2,
-                    }}
-                  >
-                    {t('table_key')}
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      fontWeight: 800,
-                      textTransform: 'uppercase',
-                      fontSize: '0.75rem',
-                      color: 'text.secondary',
-                      py: 2,
-                    }}
-                  >
-                    {t('table_label')}
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      fontWeight: 800,
-                      textTransform: 'uppercase',
-                      fontSize: '0.75rem',
-                      color: 'text.secondary',
-                      py: 2,
-                    }}
-                  >
-                    {t('table_value')}
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      fontWeight: 800,
-                      textTransform: 'uppercase',
-                      fontSize: '0.75rem',
-                      color: 'text.secondary',
-                      py: 2,
-                    }}
-                  >
-                    {t('table_type')}
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      fontWeight: 800,
-                      textTransform: 'uppercase',
-                      fontSize: '0.75rem',
-                      color: 'text.secondary',
-                      py: 2,
-                    }}
-                  >
-                    {t('table_public')}
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      fontWeight: 800,
-                      textTransform: 'uppercase',
-                      fontSize: '0.75rem',
-                      color: 'text.secondary',
-                      py: 2,
-                    }}
-                  >
-                    {t('table_version')}
-                  </TableCell>
-                  <TableCell
-                    align="right"
-                    sx={{
-                      fontWeight: 800,
-                      textTransform: 'uppercase',
-                      fontSize: '0.75rem',
-                      color: 'text.secondary',
-                      py: 2,
-                    }}
-                  >
-                    {t('table_actions')}
-                  </TableCell>
+                  <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary', py: 2 }}>{t('table_key')}</TableCell>
+                  <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary', py: 2 }}>{t('table_label')}</TableCell>
+                  <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary', py: 2 }}>{t('table_value')}</TableCell>
+                  <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary', py: 2 }}>{t('table_type')}</TableCell>
+                  <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary', py: 2 }}>{t('table_public')}</TableCell>
+                  <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary', py: 2 }}>{t('table_version')}</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary', py: 2 }}>{t('table_actions')}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -379,7 +291,7 @@ export function SettingsPage() {
                           <Typography
                             sx={{
                               fontFamily: 'monospace',
-                              fontSize: '0.8rem',
+                               fontSize: '0.8rem',
                               color: 'text.primary',
                               backgroundColor: 'action.selected',
                               px: 1,
@@ -390,7 +302,7 @@ export function SettingsPage() {
                             {row.key}
                           </Typography>
                           <Tooltip title={t('tooltip_copy')}>
-                            <IconButton size="small" onClick={() => handleCopyKey(row.key)}>
+                            <IconButton size="small" onClick={() => handleCopyKey(row.key)} aria-label={t('tooltip_copy')}>
                               <ContentCopy sx={{ fontSize: 14, color: 'text.disabled' }} />
                             </IconButton>
                           </Tooltip>
@@ -398,41 +310,33 @@ export function SettingsPage() {
                       </TableCell>
                       <TableCell>
                         <Box>
-                          <Typography
-                            sx={{ fontSize: '0.875rem', color: 'text.primary', fontWeight: 500 }}
-                          >
+                          <Typography sx={{ fontSize: '0.875rem', color: 'text.primary', fontWeight: 500 }}>
                             {row.label || '—'}
                           </Typography>
                           {row.description && (
-                            <Typography
-                              sx={{ fontSize: '0.75rem', color: 'text.secondary', mt: 0.25 }}
-                            >
+                            <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary', mt: 0.25 }}>
                               {row.description}
                             </Typography>
                           )}
                         </Box>
                       </TableCell>
-                      <TableCell>{renderValueInput(row)}</TableCell>
                       <TableCell>
-                        <Chip
-                          label={row.value_type}
-                          size="small"
-                          sx={{
-                            height: 22,
-                            fontSize: '0.7rem',
-                            fontWeight: 700,
-                            fontFamily: 'monospace',
-                            backgroundColor: alpha(
-                              theme.palette[VALUE_TYPE_COLORS[row.value_type] || 'primary']?.main ||
-                                theme.palette.primary.main,
-                              0.1,
-                            ),
-                            color:
-                              theme.palette[VALUE_TYPE_COLORS[row.value_type] || 'primary']?.main ||
-                              'primary.main',
-                            border: `1px solid ${alpha(theme.palette[VALUE_TYPE_COLORS[row.value_type] || 'primary']?.main || theme.palette.primary.main, 0.2)}`,
-                          }}
-                        />
+                        {renderValueInput(row)}
+                      </TableCell>
+                      <TableCell>
+                          <Chip
+                            label={row.value_type}
+                            size="small"
+                            sx={{
+                              height: 22,
+                              fontSize: '0.7rem',
+                              fontWeight: 700,
+                              fontFamily: 'monospace',
+                              backgroundColor: alpha(theme.palette[VALUE_TYPE_COLORS[row.value_type] || 'primary']?.main || theme.palette.primary.main, 0.1),
+                              color: theme.palette[VALUE_TYPE_COLORS[row.value_type] || 'primary']?.main || 'primary.main',
+                              border: `1px solid ${alpha(theme.palette[VALUE_TYPE_COLORS[row.value_type] || 'primary']?.main || theme.palette.primary.main, 0.2)}`,
+                            }}
+                          />
                       </TableCell>
                       <TableCell>
                         <Chip
@@ -442,21 +346,13 @@ export function SettingsPage() {
                             height: 20,
                             fontSize: '0.65rem',
                             fontWeight: 600,
-                            backgroundColor: row.is_public
-                              ? alpha(theme.palette.success.main, 0.15)
-                              : alpha(theme.palette.error.main, 0.15),
-                            color: row.is_public ? 'success.main' : 'error.main',
-                          }}
+                             backgroundColor: row.is_public ? alpha(theme.palette.success.main, 0.15) : alpha(theme.palette.error.main, 0.15),
+                             color: row.is_public ? 'success.main' : 'error.main',
+                           }}
                         />
                       </TableCell>
                       <TableCell>
-                        <Typography
-                          sx={{
-                            fontSize: '0.8rem',
-                            color: 'text.secondary',
-                            fontFamily: 'monospace',
-                          }}
-                        >
+                        <Typography sx={{ fontSize: '0.8rem', color: 'text.secondary', fontFamily: 'monospace' }}>
                           v{row.version}
                         </Typography>
                       </TableCell>
@@ -468,12 +364,11 @@ export function SettingsPage() {
                                 size="small"
                                 onClick={() => handleSave(row)}
                                 disabled={setSettingMutation.isPending}
+                                aria-label={t('tooltip_save')}
                                 sx={{
                                   color: 'success.main',
                                   backgroundColor: alpha(theme.palette.success.main, 0.1),
-                                  '&:hover': {
-                                    backgroundColor: alpha(theme.palette.success.main, 0.2),
-                                  },
+                                  '&:hover': { backgroundColor: alpha(theme.palette.success.main, 0.2) },
                                 }}
                               >
                                 <Save sx={{ fontSize: 18 }} />
@@ -483,12 +378,11 @@ export function SettingsPage() {
                               <IconButton
                                 size="small"
                                 onClick={handleCancel}
+                                aria-label={t('tooltip_cancel')}
                                 sx={{
                                   color: 'error.main',
                                   backgroundColor: alpha(theme.palette.error.main, 0.1),
-                                  '&:hover': {
-                                    backgroundColor: alpha(theme.palette.error.main, 0.2),
-                                  },
+                                  '&:hover': { backgroundColor: alpha(theme.palette.error.main, 0.2) },
                                 }}
                               >
                                 <Close sx={{ fontSize: 18 }} />
@@ -500,17 +394,17 @@ export function SettingsPage() {
                             <IconButton
                               size="small"
                               onClick={() => handleEdit(row)}
+                              aria-label={t('tooltip_edit')}
                               sx={{
                                 color: 'primary.main',
-                                '&:hover': {
-                                  backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                                },
+                                '&:hover': { backgroundColor: alpha(theme.palette.primary.main, 0.1) },
                               }}
                             >
                               <Edit sx={{ fontSize: 18 }} />
                             </IconButton>
                           </Tooltip>
-                        )}
+                        )
+                        }
                       </TableCell>
                     </TableRow>
                   ))
@@ -521,11 +415,14 @@ export function SettingsPage() {
         </Paper>
 
         {/* Maintenance Wizard — only on Maintenance tab */}
-        {currentCategory === 'maintenance' &&
-          (grouped ? <MaintenanceWizard settings={grouped} /> : <MaintenanceWizard />)}
+        {currentCategory === 'maintenance' && (
+          grouped ? <MaintenanceWizard settings={grouped} /> : <MaintenanceWizard />
+        )}
 
         {/* Access Rules Manager — only on Security tab */}
-        {currentCategory === 'security' && <AccessRulesManager />}
+        {currentCategory === 'security' && (
+          <AccessRulesManager />
+        )}
       </Box>
     </PermissionGate>
   );

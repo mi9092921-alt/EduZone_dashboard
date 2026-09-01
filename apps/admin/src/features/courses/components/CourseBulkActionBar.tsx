@@ -7,6 +7,8 @@ import React, { useState } from 'react';
 
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
+import { cn } from '@/lib/utils';
+
 export type CourseBulkAction =
   | 'publish'
   | 'draft'
@@ -162,7 +164,9 @@ export function CourseBulkActionBar({
         </div>
 
         <button
+          type="button"
           onClick={onClear}
+          aria-label={t('clear')}
           className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
         >
           <Close className="text-base" />

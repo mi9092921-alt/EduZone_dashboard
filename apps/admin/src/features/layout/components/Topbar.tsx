@@ -1,7 +1,16 @@
 'use client';
 
-import { Menu as MenuIcon, Logout, Person, DarkMode } from '@mui/icons-material';
-import { Menu, MenuItem, Divider } from '@mui/material';
+import {
+  Menu as MenuIcon,
+  Logout,
+  Person,
+  DarkMode,
+} from '@mui/icons-material';
+import {
+  Menu,
+  MenuItem,
+  Divider,
+} from '@mui/material';
 import { useTranslations, useLocale } from 'next-intl';
 import { useTheme } from 'next-themes';
 import { useState, useMemo } from 'react';
@@ -27,8 +36,8 @@ export function Topbar() {
   const router = useRouter();
   const pathname = usePathname();
 
-  const activeItem = NAV_ITEMS.find(
-    (item) => pathname === item.path || (item.path !== '/' && pathname.startsWith(item.path + '/')),
+  const activeItem = NAV_ITEMS.find((item) =>
+    pathname === item.path || (item.path !== '/' && pathname.startsWith(item.path + '/'))
   );
   const pageTitle = activeItem ? t(activeItem.label) : t('dashboard');
 
@@ -64,18 +73,16 @@ export function Topbar() {
     <header
       className="sticky top-0 z-[var(--z-header)] w-full border-b border-border/40 bg-popover/80 backdrop-blur-md flex items-center justify-between min-w-0 shrink-0 h-16"
       style={{
-        paddingTop: 'env(safe-area-inset-top)',
+        paddingTop: 'env(safe-area-inset-top)'
       }}
     >
-      <div
-        className={cn(
-          'flex items-center h-full transition-all duration-300',
-          // When sidebar is closed, align normally (px-6).
-          // When open, align strictly with the "EduZone" text or Sidebar inner content (pl-6 or matching)
-          sidebarOpen ? 'pl-6 sm:pl-8' : 'pl-4 sm:pl-6',
-          'gap-3',
-        )}
-      >
+      <div className={cn(
+        "flex items-center h-full transition-all duration-300",
+        // When sidebar is closed, align normally (px-6).
+        // When open, align strictly with the "EduZone" text or Sidebar inner content (ps-6 or matching)
+        sidebarOpen ? "ps-6 sm:ps-8" : "ps-4 sm:ps-6",
+        "gap-3"
+      )}>
         {/* Hamburger toggle visible ONLY when sidebar is closed (ChatGPT style) */}
         {!sidebarOpen && (
           <button
@@ -128,7 +135,7 @@ export function Topbar() {
           slotProps={{
             paper: {
               className: cn(
-                'mt-3 min-w-[240px] rounded-xl border border-border/50 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150',
+                "mt-3 min-w-[240px] rounded-xl border border-border/50 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150",
               ),
               sx: {
                 boxShadow: 'none',
@@ -138,7 +145,7 @@ export function Topbar() {
                 color: 'hsl(var(--foreground))',
                 '& .MuiList-root': { padding: '6px' },
                 zIndex: 9999,
-              },
+              }
             },
           }}
         >
@@ -180,9 +187,7 @@ export function Topbar() {
           >
             <div className="flex items-center gap-3 w-full">
               <Logout fontSize="small" className="text-red-600 dark:text-red-400 shrink-0" />
-              <span className="text-sm font-medium text-red-600 dark:text-red-400">
-                {t('logout')}
-              </span>
+              <span className="text-sm font-medium text-red-600 dark:text-red-400">{t('logout')}</span>
             </div>
           </MenuItem>
         </Menu>

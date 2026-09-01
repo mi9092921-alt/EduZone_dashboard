@@ -26,11 +26,10 @@ export default defineConfig({
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     exclude: ['**/node_modules/**', '**/dist/**', '**/*.stories.*', '**/cypress/**'],
     pool: 'threads',
+    // Vitest 4 dropped `poolOptions.threads.singleThread`; `fileParallelism: false`
+    // is the current equivalent — it runs test files sequentially within the pool.
+    fileParallelism: false,
     testTimeout: 10000,
     hookTimeout: 10000,
-    // Vitest 4 removed poolOptions.threads.singleThread; fileParallelism: false
-    // is the current equivalent (forces a single worker), which is what keeps
-    // this unit-test process from spawning extra threads/workers.
-    fileParallelism: false,
   },
 });

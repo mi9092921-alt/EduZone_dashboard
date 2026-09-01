@@ -1,15 +1,19 @@
 'use client';
 
-import { Replay, Cancel, LockOpen, WorkOutline, Info } from '@mui/icons-material';
+import {
+  Replay,
+  Cancel,
+  LockOpen,
+  WorkOutline,
+  Info,
+  ChevronLeft,
+  ChevronRight,
+} from '@mui/icons-material';
 import { Tooltip } from '@mui/material';
 import { useTranslations } from 'next-intl';
 import { useState, useCallback } from 'react';
 
-import {
-  useRetryJob,
-  useCancelJob,
-  useReleaseStaleJobs,
-} from '@/adapters/mutations/jobs.mutations';
+import { useRetryJob, useCancelJob, useReleaseStaleJobs } from '@/adapters/mutations/jobs.mutations';
 import { useJobs, useJobStatusCounts } from '@/adapters/queries/jobs.queries';
 import { Button } from '@/components/ui/Button';
 import { TablePagination } from '@/components/ui/TablePagination';
@@ -24,19 +28,12 @@ const STATUS_CHIPS: Record<JobStatus, { bg: string; text: string }> = {
   dead: { bg: 'bg-muted', text: 'text-muted-foreground' },
 };
 
-const ALL_STATUSES: (JobStatus | 'all')[] = [
-  'all',
-  'pending',
-  'processing',
-  'done',
-  'failed',
-  'dead',
-];
+const ALL_STATUSES: (JobStatus | 'all')[] = ['all', 'pending', 'processing', 'done', 'failed', 'dead'];
 
 export function JobsPage() {
   const t = useTranslations('jobs');
   const tCommon = useTranslations('common');
-  const [filters, _setFilters] = useState<JobFilters>({});
+  const [filters, setFilters] = useState<JobFilters>({});
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [activeTab, setActiveTab] = useState<JobStatus | 'all'>('all');
@@ -50,6 +47,7 @@ export function JobsPage() {
 
   const jobs = data?.data ?? [];
   const totalCount = data?.count ?? 0;
+  const totalPages = data?.totalPages ?? 1;
 
   const retryJob = useRetryJob();
   const cancelJob = useCancelJob();
@@ -135,9 +133,7 @@ export function JobsPage() {
                 : 'text-muted-foreground hover:text-foreground',
             )}
           >
-            <span className="capitalize">
-              {status === 'all' ? t('label_all') : t(`status_${status}`)}
-            </span>
+            <span className="capitalize">{status === 'all' ? t('label_all') : t(`status_${status}`)}</span>
             <span
               className={cn(
                 'text-[10px] px-1.5 py-0.5 rounded-full font-semibold min-w-[20px] text-center',
@@ -166,51 +162,26 @@ export function JobsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/30">
-                <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">
-                  {t('header_job_type')}
-                </th>
-                <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">
-                  {t('header_status')}
-                </th>
-                <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">
-                  {t('header_priority')}
-                </th>
-                <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">
-                  {t('header_attempts')}
-                </th>
-                <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">
-                  {t('header_run_at')}
-                </th>
-                <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">
-                  {t('header_locked_by')}
-                </th>
-                <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">
-                  {t('header_error')}
-                </th>
-                <th className="text-end px-4 py-3 font-semibold text-muted-foreground text-xs">
-                  {t('header_actions')}
-                </th>
+                <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">{t('header_job_type')}</th>
+                <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">{t('header_status')}</th>
+                <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">{t('header_priority')}</th>
+                <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">{t('header_attempts')}</th>
+                <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">{t('header_run_at')}</th>
+                <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">{t('header_locked_by')}</th>
+                <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">{t('header_error')}</th>
+                <th className="text-end px-4 py-3 font-semibold text-muted-foreground text-xs">{t('header_actions')}</th>
               </tr>
             </thead>
             <tbody>
               {jobs.map((job: Job) => {
                 const statusStyle = STATUS_CHIPS[job.status] ?? STATUS_CHIPS.pending;
                 return (
-                  <tr
-                    key={job.id}
-                    className="border-b border-border/50 hover:bg-muted/20 transition-colors"
-                  >
+                  <tr key={job.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
                     <td className="px-4 py-2.5">
                       <span className="text-xs font-semibold text-foreground">{job.job_type}</span>
                     </td>
                     <td className="px-4 py-2.5">
-                      <span
-                        className={cn(
-                          'text-[10px] font-bold uppercase px-2 py-0.5 rounded-md',
-                          statusStyle.bg,
-                          statusStyle.text,
-                        )}
-                      >
+                      <span className={cn('text-[10px] font-bold uppercase px-2 py-0.5 rounded-md', statusStyle.bg, statusStyle.text)}>
                         {t(`status_${job.status}`)}
                       </span>
                     </td>
@@ -221,28 +192,18 @@ export function JobsPage() {
                       {job.attempts}/{job.max_attempts}
                     </td>
                     <td className="px-4 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
-                      {job.run_at
-                        ? new Date(job.run_at).toLocaleString(undefined, {
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            hour12: false,
-                          })
-                        : '—'}
+                      {job.run_at ? new Date(job.run_at).toLocaleString(undefined, {
+                        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
+                      }) : '—'}
                     </td>
                     <td className="px-4 py-2.5 text-xs font-mono text-muted-foreground">
-                      {job.locked_by_worker_id
-                        ? job.locked_by_worker_id.slice(0, 12) +
-                          (job.locked_by_worker_id.length > 12 ? '…' : '')
-                        : '—'}
+                      {job.locked_by_worker_id ? job.locked_by_worker_id.slice(0, 12) + (job.locked_by_worker_id.length > 12 ? '…' : '') : '—'}
                     </td>
                     <td className="px-4 py-2.5 max-w-[200px]">
                       {job.error_message ? (
                         <Tooltip title={job.error_message}>
                           <span className="text-xs text-destructive truncate block cursor-help">
-                            {job.error_message.slice(0, 50)}
-                            {job.error_message.length > 50 ? '…' : ''}
+                            {job.error_message.slice(0, 50)}{job.error_message.length > 50 ? '…' : ''}
                           </span>
                         </Tooltip>
                       ) : (
@@ -254,7 +215,9 @@ export function JobsPage() {
                         {(job.status === 'failed' || job.status === 'dead') && (
                           <Tooltip title={t('tooltip_retry')}>
                             <button
+                              type="button"
                               onClick={() => retryJob.mutate(job.id)}
+                              aria-label={t('tooltip_retry')}
                               className="p-1.5 rounded-lg hover:bg-primary/10 text-primary transition-colors"
                             >
                               <Replay className="text-sm" />
@@ -264,7 +227,9 @@ export function JobsPage() {
                         {(job.status === 'pending' || job.status === 'processing') && (
                           <Tooltip title={t('tooltip_cancel')}>
                             <button
+                              type="button"
                               onClick={() => cancelJob.mutate(job.id)}
+                              aria-label={t('tooltip_cancel')}
                               className="p-1.5 rounded-lg hover:bg-destructive/10 text-destructive transition-colors"
                             >
                               <Cancel className="text-sm" />
@@ -272,7 +237,7 @@ export function JobsPage() {
                           </Tooltip>
                         )}
                         <Tooltip title={t('tooltip_payload')}>
-                          <button className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
+                          <button type="button" aria-label={t('tooltip_payload')} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
                             <Info className="text-sm" />
                           </button>
                         </Tooltip>
@@ -324,9 +289,7 @@ function PriorityBadge({ priority }: { priority: number }) {
 
   return (
     <Tooltip title={t(`priority_${level}`)}>
-      <span
-        className={cn('text-[10px] font-bold px-2 py-0.5 rounded-md cursor-help', styles[level])}
-      >
+      <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-md cursor-help', styles[level])}>
         P{priority}
       </span>
     </Tooltip>

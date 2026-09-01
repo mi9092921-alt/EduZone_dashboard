@@ -5,6 +5,8 @@ import {
   UploadFile,
   ContentPaste,
   CheckCircle,
+  ErrorOutline,
+  HelpOutline,
   ContentCopy,
   DeleteOutline,
   Visibility,
@@ -26,6 +28,7 @@ import {
   IconButton,
   Alert,
   Stack,
+  Switch,
   Collapse,
   Card,
   Divider,
@@ -41,7 +44,6 @@ import { useState, useRef, useEffect } from 'react';
 
 import { useCreateLessons } from '@/adapters/mutations/courses.mutations';
 import { useToast } from '@/adapters/stores/toast.store';
-import { getErrorMessage } from '@/domain/errors';
 import { isValidVideoUrl } from '@/domain/video.utils';
 
 interface ImportLessonsDialogProps {
@@ -63,13 +65,13 @@ interface ParsedLesson {
 
 const TEMPLATE_JSON = [
   {
-    title: 'Introduction',
-    video_url: 'https://youtu.be/0Xx0Hh0Vv',
+    "title": "Introduction",
+    "video_url": "https://youtu.be/0Xx0Hh0Vv"
   },
   {
-    title: 'Core Fundamentals',
-    video_url: 'https://youtu.be/0Xx0Hh0Vv',
-  },
+    "title": "Core Fundamentals",
+    "video_url": "https://youtu.be/0Xx0Hh0Vv"
+  }
 ];
 
 export function ImportLessonsDialog({
@@ -124,26 +126,14 @@ export function ImportLessonsDialog({
       const parsed = JSON.parse(cleaned);
       const items = Array.isArray(parsed) ? parsed : [parsed];
 
-      interface RawImportedLesson {
-        title?: string;
-        video_url?: string;
-        url?: string;
-        order_index?: number;
-        order?: number;
-        duration_sec?: number;
-        duration?: number;
-        is_preview?: boolean;
-      }
-
-      const mapped = (items as RawImportedLesson[]).map((item, idx: number) => {
+      const mapped = items.map((item: any, idx: number) => {
         const title = item.title || (isRtl ? `درس جديد #${idx + 1}` : `New Lesson #${idx + 1}`);
         const video_url = item.video_url || item.url || '';
-        const order =
-          typeof item.order_index === 'number'
-            ? item.order_index
-            : typeof item.order === 'number'
-              ? item.order
-              : existingLessonsCount + idx;
+        const order = typeof item.order_index === 'number'
+          ? item.order_index
+          : typeof item.order === 'number'
+            ? item.order
+            : existingLessonsCount + idx;
 
         return {
           id: `lesson-temp-${Date.now()}-${idx}-${Math.random()}`,
@@ -156,9 +146,9 @@ export function ImportLessonsDialog({
       });
 
       setLessonsPreview(mapped);
-    } catch (err: unknown) {
+    } catch (err: any) {
       setLessonsPreview([]);
-      setJsonError(getErrorMessage(err) || t('invalid_json_format'));
+      setJsonError(err.message || t('invalid_json_format'));
     }
   };
 
@@ -181,9 +171,9 @@ export function ImportLessonsDialog({
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (e.type === 'dragenter' || e.type === 'dragover') {
+    if (e.type === "dragenter" || e.type === "dragover") {
       setDragActive(true);
-    } else if (e.type === 'dragleave') {
+    } else if (e.type === "dragleave") {
       setDragActive(false);
     }
   };
@@ -220,7 +210,7 @@ export function ImportLessonsDialog({
   // Edit fields inside live preview
   const handleUpdatePreviewLesson = (id: string, updates: Partial<ParsedLesson>) => {
     setLessonsPreview((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, ...updates } : item)),
+      prev.map((item) => (item.id === id ? { ...item, ...updates } : item))
     );
   };
 
@@ -239,7 +229,7 @@ export function ImportLessonsDialog({
         isRtl
           ? `الدرس "${invalidItem.title}" يحتوي على رابط فيديو غير صالح!`
           : `Lesson "${invalidItem.title}" has an invalid video URL!`,
-        'error',
+        'error'
       );
       return;
     }
@@ -250,7 +240,7 @@ export function ImportLessonsDialog({
         video_url: item.video_url,
         is_preview: item.is_preview,
         duration_sec: item.duration_sec,
-        order_index: item.order_index ?? existingLessonsCount + idx,
+        order_index: item.order_index ?? (existingLessonsCount + idx),
       }));
 
       await createLessonsBulk.mutateAsync({
@@ -263,11 +253,11 @@ export function ImportLessonsDialog({
         isRtl
           ? `تم استيراد ${lessonsPreview.length} دروس بنجاح!`
           : `Successfully imported ${lessonsPreview.length} lessons!`,
-        'success',
+        'success'
       );
       onClose();
-    } catch (err: unknown) {
-      showToast(getErrorMessage(err) || t('failed_to_import'), 'error');
+    } catch (err: any) {
+      showToast(err.message || t('failed_to_import'), 'error');
     }
   };
 
@@ -290,28 +280,24 @@ export function ImportLessonsDialog({
           borderRadius: isMobile ? 0 : 3,
           boxShadow: '0 24px 64px rgba(0,0,0,0.15)',
           backgroundColor: theme.palette.mode === 'dark' ? '#151521' : '#ffffff',
-          backgroundImage:
-            theme.palette.mode === 'dark'
-              ? 'linear-gradient(145deg, #1e1e2d 0%, #151521 100%)'
-              : 'linear-gradient(145deg, #ffffff 0%, #f7f9fc 100%)',
+          backgroundImage: theme.palette.mode === 'dark'
+            ? 'linear-gradient(145deg, #1e1e2d 0%, #151521 100%)'
+            : 'linear-gradient(145deg, #ffffff 0%, #f7f9fc 100%)',
         },
       }}
       slotProps={{
         backdrop: {
           sx: {
-            backgroundColor:
-              theme.palette.mode === 'dark'
-                ? 'rgba(10, 10, 15, 0.85)'
-                : 'rgba(255, 255, 255, 0.85)',
+            backgroundColor: theme.palette.mode === 'dark'
+              ? 'rgba(10, 10, 15, 0.85)'
+              : 'rgba(255, 255, 255, 0.85)',
             backdropFilter: 'blur(8px)',
-          },
-        },
+          }
+        }
       }}
     >
       {/* Title Header */}
-      <DialogTitle
-        sx={{ borderBottom: '1px solid', borderColor: 'divider', pb: 1.5, pt: 2.5, px: 3 }}
-      >
+      <DialogTitle sx={{ borderBottom: '1px solid', borderColor: 'divider', pb: 1.5, pt: 2.5, px: 3 }}>
         <Stack direction="row" alignItems="center" justifyContent="space-between">
           <Stack direction="row" alignItems="center" spacing={1.5}>
             <UploadFile sx={{ color: 'primary.main', fontSize: 28 }} />
@@ -320,13 +306,11 @@ export function ImportLessonsDialog({
                 {t('import_lessons_title')}
               </Typography>
               <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                {isRtl
-                  ? 'أضف دروساً متعددة فوراً إلى هذا القسم'
-                  : 'Add multiple lessons instantly to this section'}
+                {isRtl ? 'أضف دروساً متعددة فوراً إلى هذا القسم' : 'Add multiple lessons instantly to this section'}
               </Typography>
             </Box>
           </Stack>
-          <IconButton size="small" onClick={onClose} sx={{ color: 'text.secondary' }}>
+          <IconButton size="small" onClick={onClose} aria-label={t('close')} sx={{ color: 'text.secondary' }}>
             <Close />
           </IconButton>
         </Stack>
@@ -347,15 +331,7 @@ export function ImportLessonsDialog({
         }}
       >
         {/* Schema Instructions Collapsible Panel */}
-        <Box
-          sx={{
-            border: '1px solid',
-            borderColor: 'divider',
-            borderRadius: 2,
-            overflow: 'hidden',
-            flexShrink: 0,
-          }}
-        >
+        <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden', flexShrink: 0 }}>
           <Button
             fullWidth
             onClick={() => setShowSchema(!showSchema)}
@@ -401,69 +377,21 @@ export function ImportLessonsDialog({
                   : 'Please provide a JSON array containing the lessons. We support the following fields:'}
               </Typography>
 
-              <Box
-                sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}
-              >
-                <Box
-                  sx={{
-                    p: 2,
-                    borderRadius: 2,
-                    backgroundColor: 'action.hover',
-                    border: '1px solid',
-                    borderColor: 'divider',
-                  }}
-                >
-                  <Typography
-                    variant="subtitle2"
-                    sx={{
-                      fontWeight: 800,
-                      color: 'primary.main',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 0.5,
-                      mb: 0.5,
-                    }}
-                  >
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
+                <Box sx={{ p: 2, borderRadius: 2, backgroundColor: 'action.hover', border: '1px solid', borderColor: 'divider' }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 800, color: 'primary.main', display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
                     title <span style={{ color: 'red' }}>*</span>
                   </Typography>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ display: 'block', lineHeight: 1.4 }}
-                  >
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1.4 }}>
                     {isRtl ? 'عنوان الدرس (مطلوب)' : 'Lesson Title (Required)'}
                   </Typography>
                 </Box>
-                <Box
-                  sx={{
-                    p: 2,
-                    borderRadius: 2,
-                    backgroundColor: 'action.hover',
-                    border: '1px solid',
-                    borderColor: 'divider',
-                  }}
-                >
-                  <Typography
-                    variant="subtitle2"
-                    sx={{
-                      fontWeight: 800,
-                      color: 'primary.main',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 0.5,
-                      mb: 0.5,
-                    }}
-                  >
+                <Box sx={{ p: 2, borderRadius: 2, backgroundColor: 'action.hover', border: '1px solid', borderColor: 'divider' }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 800, color: 'primary.main', display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
                     video_url <span style={{ color: 'red' }}>*</span>
                   </Typography>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ display: 'block', lineHeight: 1.4 }}
-                  >
-                    {isRtl
-                      ? 'رابط الفيديو من يوتيوب أو فيميو (مطلوب)'
-                      : 'YouTube or Vimeo Video URL (Required)'}
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1.4 }}>
+                    {isRtl ? 'رابط الفيديو من يوتيوب أو فيميو (مطلوب)' : 'YouTube or Vimeo Video URL (Required)'}
                   </Typography>
                 </Box>
               </Box>
@@ -472,15 +400,7 @@ export function ImportLessonsDialog({
         </Box>
 
         {/* Supported Template Collapsible Panel */}
-        <Box
-          sx={{
-            border: '1px solid',
-            borderColor: 'divider',
-            borderRadius: 2,
-            overflow: 'hidden',
-            flexShrink: 0,
-          }}
-        >
+        <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden', flexShrink: 0 }}>
           <Button
             fullWidth
             onClick={() => setShowTemplate(!showTemplate)}
@@ -521,38 +441,17 @@ export function ImportLessonsDialog({
               }}
             >
               <Box sx={{ position: 'relative' }}>
-                <Stack
-                  direction="row"
-                  justifyContent="space-between"
-                  alignItems="center"
-                  sx={{ mb: 1 }}
-                >
-                  <Typography
-                    variant="caption"
-                    sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 0.5 }}
-                  >
-                    <Code sx={{ fontSize: 16 }} />{' '}
-                    {isRtl ? 'مثال على كود JSON:' : 'JSON Template Example:'}
+                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Code sx={{ fontSize: 16 }} /> {isRtl ? 'مثال على كود JSON:' : 'JSON Template Example:'}
                   </Typography>
                   <Button
                     size="small"
-                    startIcon={
-                      copied ? (
-                        <CheckCircle sx={{ fontSize: 16 }} />
-                      ) : (
-                        <ContentCopy sx={{ fontSize: 16 }} />
-                      )
-                    }
+                    startIcon={copied ? <CheckCircle sx={{ fontSize: 16 }} /> : <ContentCopy sx={{ fontSize: 16 }} />}
                     onClick={handleCopyTemplate}
                     sx={{ textTransform: 'none', fontWeight: 600 }}
                   >
-                    {copied
-                      ? isRtl
-                        ? 'تم النسخ!'
-                        : 'Copied!'
-                      : isRtl
-                        ? 'نسخ النموذج'
-                        : 'Copy Template'}
+                    {copied ? (isRtl ? 'تم النسخ!' : 'Copied!') : (isRtl ? 'نسخ النموذج' : 'Copy Template')}
                   </Button>
                 </Stack>
                 <Box
@@ -684,13 +583,7 @@ export function ImportLessonsDialog({
               icon={<CheckCircle fontSize="inherit" />}
               sx={{ borderRadius: 2, '& .MuiAlert-message': { width: '100%' } }}
             >
-              <Stack
-                direction="row"
-                flexWrap="wrap"
-                justifyContent="space-between"
-                alignItems="center"
-                gap={1.5}
-              >
+              <Stack direction="row" flexWrap="wrap" justifyContent="space-between" alignItems="center" gap={1.5}>
                 <Typography variant="body2" sx={{ fontWeight: 700 }}>
                   {isRtl
                     ? `تم تحليل ${lessonsPreview.length} دروس بنجاح! راجعها أدناه قبل الاستيراد.`
@@ -763,9 +656,7 @@ export function ImportLessonsDialog({
                           fullWidth
                           value={item.title}
                           label={isRtl ? 'عنوان الدرس' : 'Lesson Title'}
-                          onChange={(e) =>
-                            handleUpdatePreviewLesson(item.id, { title: e.target.value })
-                          }
+                          onChange={(e) => handleUpdatePreviewLesson(item.id, { title: e.target.value })}
                           sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1.5 } }}
                         />
                         <TextField
@@ -774,32 +665,19 @@ export function ImportLessonsDialog({
                           error={!isValid}
                           value={item.video_url}
                           label={isRtl ? 'رابط الفيديو' : 'Video URL'}
-                          onChange={(e) =>
-                            handleUpdatePreviewLesson(item.id, { video_url: e.target.value })
-                          }
-                          helperText={
-                            !isValid &&
-                            (isRtl
-                              ? 'رابط الفيديو غير صالح أو فارغ!'
-                              : 'Video URL is empty or invalid!')
-                          }
+                          onChange={(e) => handleUpdatePreviewLesson(item.id, { video_url: e.target.value })}
+                          helperText={!isValid && (isRtl ? 'رابط الفيديو غير صالح أو فارغ!' : 'Video URL is empty or invalid!')}
                           sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1.5 } }}
                         />
                       </Stack>
 
                       {/* Toggles & Delete Control */}
-                      <Stack
-                        direction="row"
-                        spacing={1.5}
-                        alignItems="center"
-                        sx={{ alignSelf: { xs: 'flex-end', sm: 'center' } }}
-                      >
+                      <Stack direction="row" spacing={1.5} alignItems="center" sx={{ alignSelf: { xs: 'flex-end', sm: 'center' } }}>
                         {/* Preview toggle indicator */}
                         <Tooltip title={isRtl ? 'معاينة مجانية' : 'Free Preview'}>
                           <IconButton
-                            onClick={() =>
-                              handleUpdatePreviewLesson(item.id, { is_preview: !item.is_preview })
-                            }
+                            onClick={() => handleUpdatePreviewLesson(item.id, { is_preview: !item.is_preview })}
+                            aria-label={isRtl ? 'معاينة مجانية' : 'Free Preview'}
                             color={item.is_preview ? 'primary' : 'default'}
                             size="small"
                           >
@@ -812,10 +690,7 @@ export function ImportLessonsDialog({
                           <Typography variant="caption" display="block" sx={{ fontWeight: 700 }}>
                             {formatDuration(item.duration_sec)}
                           </Typography>
-                          <Typography
-                            variant="caption"
-                            sx={{ color: 'text.secondary', fontSize: '0.65rem' }}
-                          >
+                          <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.65rem' }}>
                             {isRtl ? 'ثانية' : 'sec'}
                           </Typography>
                         </Box>
@@ -826,6 +701,7 @@ export function ImportLessonsDialog({
                         <Tooltip title={isRtl ? 'حذف من القائمة' : 'Remove from list'}>
                           <IconButton
                             onClick={() => handleRemovePreviewLesson(item.id)}
+                            aria-label={isRtl ? 'حذف من القائمة' : 'Remove from list'}
                             color="error"
                             size="small"
                           >
