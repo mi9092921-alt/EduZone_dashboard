@@ -3,8 +3,8 @@
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef } from 'react';
 
+import { recordCurrentSessionAction } from '@/adapters/actions/session.actions';
 import { useAuthStore } from '@/adapters/stores/auth.store';
-import { recordCurrentSessionAction } from '@/application/actions/session.actions';
 import { container } from '@/container';
 import { clearBrowserSessionId, getBrowserSessionId } from '@/infrastructure/auth/browserSession';
 

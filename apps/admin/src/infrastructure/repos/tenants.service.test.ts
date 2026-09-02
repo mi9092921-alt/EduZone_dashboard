@@ -24,7 +24,7 @@ vi.mock('@/container', () => ({
   },
 }));
 
-vi.mock('@/application/actions/tenants.actions', () => ({
+vi.mock('@/adapters/actions/tenants.actions', () => ({
   createTenantAction: vi.fn(),
   updateTenantAction: vi.fn(),
   suspendTenantAction: vi.fn(),
@@ -143,7 +143,7 @@ describe('tenants.service', () => {
   // ── createTenant ───────────────────────────────────────────
   describe('createTenant', () => {
     it('delegates to createTenantAction', async () => {
-      const { createTenantAction } = await import('@/application/actions/tenants.actions');
+      const { createTenantAction } = await import('@/adapters/actions/tenants.actions');
       const tenant = { id: 't-new', slug: 'new-school' };
       (createTenantAction as any).mockResolvedValue(tenant);
 
@@ -154,7 +154,7 @@ describe('tenants.service', () => {
     });
 
     it('propagates SLUG_TAKEN from the action', async () => {
-      const { createTenantAction } = await import('@/application/actions/tenants.actions');
+      const { createTenantAction } = await import('@/adapters/actions/tenants.actions');
       (createTenantAction as any).mockRejectedValue(new Error('SLUG_TAKEN'));
 
       await expect(createTenant({ slug: 'existing', name: 'Existing' } as any)).rejects.toThrow(
@@ -166,7 +166,7 @@ describe('tenants.service', () => {
   // ── updateTenant ───────────────────────────────────────────
   describe('updateTenant', () => {
     it('delegates to updateTenantAction', async () => {
-      const { updateTenantAction } = await import('@/application/actions/tenants.actions');
+      const { updateTenantAction } = await import('@/adapters/actions/tenants.actions');
       const tenant = { id: 't1', name: 'Updated' };
       (updateTenantAction as any).mockResolvedValue(tenant);
 
@@ -179,7 +179,7 @@ describe('tenants.service', () => {
   // ── suspendTenant ──────────────────────────────────────────
   describe('suspendTenant', () => {
     it('delegates to suspendTenantAction with id and reason', async () => {
-      const { suspendTenantAction } = await import('@/application/actions/tenants.actions');
+      const { suspendTenantAction } = await import('@/adapters/actions/tenants.actions');
       (suspendTenantAction as any).mockResolvedValue(undefined);
 
       await suspendTenant('t1', 'violation');
@@ -190,7 +190,7 @@ describe('tenants.service', () => {
   // ── deleteTenant ───────────────────────────────────────────
   describe('deleteTenant', () => {
     it('delegates to deleteTenantAction', async () => {
-      const { deleteTenantAction } = await import('@/application/actions/tenants.actions');
+      const { deleteTenantAction } = await import('@/adapters/actions/tenants.actions');
       (deleteTenantAction as any).mockResolvedValue(undefined);
 
       await deleteTenant('t1');

@@ -3,7 +3,7 @@ import {
   updateTenantAction,
   suspendTenantAction,
   deleteTenantAction,
-} from '@/application/actions/tenants.actions';
+} from '@/adapters/actions/tenants.actions';
 import { container } from '@/container';
 import type { ActivityLog, AuditFilters } from '@/domain/types/audit.types';
 import type {

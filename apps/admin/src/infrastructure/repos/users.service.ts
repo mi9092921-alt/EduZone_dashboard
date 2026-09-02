@@ -140,7 +140,7 @@ export async function issueWarning(
   severity: 1 | 2 | 3,
   action: string = 'none',
 ): Promise<string> {
-  const { issueWarningAction } = await import('@/application/actions/user.actions');
+  const { issueWarningAction } = await import('@/adapters/actions/user.actions');
   const result = await issueWarningAction(userId, reason, severity, action);
   if (!result.success) throw new Error(result.error);
   return result.warningId ?? '';

@@ -4,8 +4,8 @@ import { School, Lock, ErrorOutline as AlertCircle } from '@mui/icons-material';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 
+import { recordCurrentSessionAction } from '@/adapters/actions/session.actions';
 import { useAuthStore } from '@/adapters/stores/auth.store';
-import { recordCurrentSessionAction } from '@/application/actions/session.actions';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';

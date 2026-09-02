@@ -26,7 +26,7 @@ import {
   addUserOverrideAction,
   removeUserOverrideAction,
   getAllRolesAction,
-} from '@/application/actions/admin.actions';
+} from '@/adapters/actions/admin.actions';
 
 // feature-flags.service is a thin delegator to the admin server actions,
 // which run the privileged, service-role Supabase calls behind an
@@ -34,7 +34,7 @@ import {
 // delegation contract: correct action called with correct args, and the
 // result/error passed through unchanged. The query/mapping logic itself
 // lives in admin.actions.ts and is covered by admin.actions.test.ts.
-vi.mock('@/application/actions/admin.actions', () => ({
+vi.mock('@/adapters/actions/admin.actions', () => ({
   getAllFeatureFlagsAction: vi.fn(),
   getFeatureFlagByIdAction: vi.fn(),
   createFeatureFlagAction: vi.fn(),

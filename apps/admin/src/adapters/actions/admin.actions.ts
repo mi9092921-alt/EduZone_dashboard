@@ -2,7 +2,7 @@
 
 import type { AccessRule, PaginatedResult } from '@eduzone/types';
 
-import { requirePermission, requireUser } from '@/application/actions/boundary';
+import { requirePermission, requireUser } from '@/adapters/actions/boundary';
 import {
   GetMyNotificationsUseCase,
   GetUnreadNotificationCountUseCase,

@@ -1,6 +1,6 @@
 'use server';
 
-import { requireSuperAdmin } from '@/application/actions/boundary';
+import { requireSuperAdmin } from '@/adapters/actions/boundary';
 import {
   CreateTenantUseCase,
   DeleteTenantUseCase,

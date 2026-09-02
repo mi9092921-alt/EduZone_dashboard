@@ -18,7 +18,7 @@ import {
   markNotificationAsReadAction,
   markAllNotificationsAsReadAction,
   getUnreadNotificationCountAction,
-} from '@/application/actions/admin.actions';
+} from '@/adapters/actions/admin.actions';
 
 // notifications.service is a thin delegator to the admin server actions,
 // which run the privileged, service-role Supabase calls behind an
@@ -27,7 +27,7 @@ import {
 // delegation contract: correct action called with correct args, and the
 // result/error passed through unchanged. The query logic itself lives in
 // admin.actions.ts and is covered by admin.actions.test.ts.
-vi.mock('@/application/actions/admin.actions', () => ({
+vi.mock('@/adapters/actions/admin.actions', () => ({
   getNotificationsAction: vi.fn(),
   sendNotificationAction: vi.fn(),
   deleteNotificationAction: vi.fn(),

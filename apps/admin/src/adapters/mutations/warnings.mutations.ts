@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
+import { issueWarningAction } from '@/adapters/actions/user.actions';
 import { queryKeys } from '@/adapters/queries/keys';
-import { issueWarningAction } from '@/application/actions/user.actions';
 import type { IssueWarningInput } from '@/domain/types/warning.types';
 
 /**

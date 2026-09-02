@@ -1,9 +1,3 @@
-import type { SendNotificationInput } from '@/adapters/mutations/notifications.mutations';
-import type {
-  Notification,
-  UserNotification,
-  TargetAudience,
-} from '@/adapters/queries/notifications.queries';
 import {
   getNotificationsAction,
   sendNotificationAction,
@@ -12,7 +6,13 @@ import {
   markNotificationAsReadAction,
   markAllNotificationsAsReadAction,
   getUnreadNotificationCountAction,
-} from '@/application/actions/admin.actions';
+} from '@/adapters/actions/admin.actions';
+import type { SendNotificationInput } from '@/adapters/mutations/notifications.mutations';
+import type {
+  Notification,
+  UserNotification,
+  TargetAudience,
+} from '@/adapters/queries/notifications.queries';
 
 /**
  * Notifications service — the notifications domain.

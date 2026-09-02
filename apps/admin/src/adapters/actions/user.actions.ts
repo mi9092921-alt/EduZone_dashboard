@@ -1,6 +1,6 @@
 'use server';
 
-import { requirePermission } from '@/application/actions/boundary';
+import { requirePermission } from '@/adapters/actions/boundary';
 import {
   ControlUserAccountUseCase,
   IssueWarningUseCase,

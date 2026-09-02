@@ -4,9 +4,9 @@ import type { PermissionName } from '@eduzone/types';
 import { Box, CircularProgress } from '@mui/material';
 import { useEffect } from 'react';
 
+import { recordCurrentSessionAction } from '@/adapters/actions/session.actions';
 import { useSessionCheck } from '@/adapters/hooks/useSessionCheck';
 import { useAuthStore, useAuthUser, type PrimaryRole } from '@/adapters/stores/auth.store';
-import { recordCurrentSessionAction } from '@/application/actions/session.actions';
 import { useRouter, usePathname } from '@/i18n/routing';
 import { clearBrowserSessionId, getBrowserSessionId } from '@/infrastructure/auth/browserSession';
 import { createBrowserClient } from '@/infrastructure/supabase/client';

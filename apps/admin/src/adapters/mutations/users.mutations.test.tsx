@@ -13,7 +13,7 @@ vi.mock('@/infrastructure/repos/users.service', () => ({
 }));
 
 // Mock Server Actions (application layer)
-vi.mock('@/application/actions/user.actions', () => ({
+vi.mock('@/adapters/actions/user.actions', () => ({
   createUserAction: vi.fn(),
   deleteUserAction: vi.fn(),
   controlUserAccountAction: vi.fn(),
@@ -21,7 +21,7 @@ vi.mock('@/application/actions/user.actions', () => ({
   issueWarningAction: vi.fn(),
 }));
 
-import { controlUserAccountAction, issueWarningAction } from '@/application/actions/user.actions';
+import { controlUserAccountAction, issueWarningAction } from '@/adapters/actions/user.actions';
 
 // ── Wrapper factory ───────────────────────────────────────────────
 function createWrapper() {

@@ -1,4 +1,4 @@
-import { getYoutubeMetadataAction } from '@/application/actions/video.actions';
+import { getYoutubeMetadataAction } from '@/adapters/actions/video.actions';
 import { container } from '@/container';
 import type {
   Course,

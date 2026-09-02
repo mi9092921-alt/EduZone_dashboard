@@ -1,13 +1,13 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
-import { queryKeys } from '@/adapters/queries/keys';
 import {
   createUserAction,
   deleteUserAction,
   controlUserAccountAction,
   terminateUserSessionsAction,
   issueWarningAction,
-} from '@/application/actions/user.actions';
+} from '@/adapters/actions/user.actions';
+import { queryKeys } from '@/adapters/queries/keys';
 import type { CreateUserInput } from '@/domain/schemas/user.schema';
 import type { AccountAction } from '@/domain/types/user.types';
 import { resetUserDevices } from '@/infrastructure/repos/users.service';

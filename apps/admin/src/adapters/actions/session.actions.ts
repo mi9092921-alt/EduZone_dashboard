@@ -2,7 +2,7 @@
 
 import { headers } from 'next/headers';
 
-import { requireUser } from '@/application/actions/boundary';
+import { requireUser } from '@/adapters/actions/boundary';
 import { RecordCurrentSessionUseCase } from '@/application/use-cases/auth/record-current-session.use-case';
 import { makeSessionRepository } from '@/infrastructure/repos/session.repository';
 

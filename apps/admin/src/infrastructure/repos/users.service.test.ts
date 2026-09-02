@@ -30,7 +30,7 @@ vi.mock('@/container', () => ({
   },
 }));
 
-vi.mock('@/application/actions/user.actions', () => ({
+vi.mock('@/adapters/actions/user.actions', () => ({
   issueWarningAction: vi.fn(),
 }));
 
@@ -129,7 +129,7 @@ describe('users.service', () => {
   });
 
   it('issueWarning delegates to issueWarningAction', async () => {
-    const { issueWarningAction } = await import('@/application/actions/user.actions');
+    const { issueWarningAction } = await import('@/adapters/actions/user.actions');
     (issueWarningAction as any).mockResolvedValue({ success: true, warningId: 'w1' });
 
     const id = await issueWarning('u1', 'r', 1);
@@ -138,7 +138,7 @@ describe('users.service', () => {
   });
 
   it('issueWarning throws when the action reports failure', async () => {
-    const { issueWarningAction } = await import('@/application/actions/user.actions');
+    const { issueWarningAction } = await import('@/adapters/actions/user.actions');
     (issueWarningAction as any).mockResolvedValue({ success: false, error: 'PERMISSION_DENIED' });
 
     await expect(issueWarning('u1', 'r', 1)).rejects.toThrow('PERMISSION_DENIED');
