@@ -21,9 +21,13 @@ vi.mock('@/container', () => ({
   },
 }));
 
-vi.mock('@/application/actions/admin.actions', () => ({
-  getQueuedActivitiesAction: vi.fn(),
+const mockAdminFrom = vi.fn();
+vi.mock('@/infrastructure/supabase/admin', () => ({
+  createAdminClient: () => ({
+    from: mockAdminFrom,
+  }),
 }));
+
 
 describe('audit.service', () => {
   const mockFrom = container.supabase.from as any;
@@ -145,13 +149,15 @@ describe('audit.service', () => {
     expect(errorThrown).toBe(true);
   });
 
-  it('getQueuedActivities delegates to getQueuedActivitiesAction', async () => {
-    const { getQueuedActivitiesAction } = await import('@/application/actions/admin.actions');
+  it('getQueuedActivities queries activity_log_queue via admin client', async () => {
     const rows = [{ id: 'q1' }];
-    (getQueuedActivitiesAction as any).mockResolvedValue(rows);
+    const q = setupQuery({ data: rows, error: null });
+    mockAdminFrom.mockReturnValue(q);
 
     const res = await getQueuedActivities(50);
-    expect(getQueuedActivitiesAction).toHaveBeenCalledWith(50);
-    expect(res).toBe(rows);
+    expect(mockAdminFrom).toHaveBeenCalledWith('activity_log_queue');
+    expect(q.limit).toHaveBeenCalledWith(50);
+    expect(res).toEqual(rows);
   });
 });
+

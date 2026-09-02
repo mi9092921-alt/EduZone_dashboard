@@ -5,8 +5,10 @@ import type {
   MvDailyRevenue,
   DailyCount,
   CourseWithStats,
+  MvCourseStats,
   GeoPoint,
 } from '@/domain/types/analytics.types';
+import { createAdminClient } from '@/infrastructure/supabase/admin';
 
 /**
  * Analytics service — Supabase queries for materialized views
@@ -40,11 +42,32 @@ export async function getUserStats(tenantId?: string): Promise<UserStats> {
   return data as UserStats;
 }
 
-// ── Course stats from vw_course_stats ────────────────────────────
+// ── Course stats from vw_course_stats (admin read — bypasses RLS) ───────────
 export async function getCourseStats(tenantId?: string): Promise<CourseWithStats[]> {
   try {
-    const { getAnalyticsCourseStatsAction } = await import('@/application/actions/admin.actions');
-    return await getAnalyticsCourseStatsAction(tenantId);
+    const admin = createAdminClient();
+
+    let query = admin.from('vw_course_stats').select('*');
+    if (tenantId) query = query.eq('tenant_id', tenantId);
+
+    const { data, error } = await query.order('enrolled', { ascending: false }).limit(20);
+    if (error || !data) return [];
+
+    const courseIds = data.map((d: MvCourseStats) => d.course_id);
+    const { data: courses } = await admin
+      .from('courses')
+      .select('id, title')
+      .in('id', courseIds)
+      .is('deleted_at', null);
+
+    const titleMap = new Map(
+      (courses ?? []).map((c: { id: string; title: string }) => [c.id, c.title]),
+    );
+
+    return data.map((d: MvCourseStats) => ({
+      ...d,
+      title: titleMap.get(d.course_id) ?? 'Unknown',
+    }));
   } catch {
     return [];
   }

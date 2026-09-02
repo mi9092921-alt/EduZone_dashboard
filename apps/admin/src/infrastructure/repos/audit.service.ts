@@ -7,6 +7,7 @@ import type {
   AuditFilters,
 } from '@/domain/types/audit.types';
 import type { PaginatedResult } from '@/domain/types/user.types';
+import { createAdminClient } from '@/infrastructure/supabase/admin';
 
 /**
  * Audit service — Supabase queries for audit chain domain.
@@ -140,12 +141,16 @@ export async function flushActivityLogs(batchSize: number = 200): Promise<number
   return (data as number) ?? 0;
 }
 
-// ── Get queued (unflushed) activities ─────────────────────────────
-// activity_log_queue has REVOKE ALL for anon/authenticated + a deny-all RLS policy.
-// Direct browser-client queries always return 403 Forbidden.
-// We delegate to a 'use server' action that runs with the service-role key.
+// ── Get queued (unflushed) activities ───────────────────────────────────
+// activity_log_queue has REVOKE ALL for anon/authenticated + deny-all RLS.
+// Must use service_role admin client to bypass permission gate.
 export async function getQueuedActivities(limit: number = 200): Promise<ActivityLogQueueEntry[]> {
-  // Dynamic import avoids bundling 'use server' code in the client bundle
-  const { getQueuedActivitiesAction } = await import('@/application/actions/admin.actions');
-  return getQueuedActivitiesAction(limit);
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from('activity_log_queue')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []) as ActivityLogQueueEntry[];
 }

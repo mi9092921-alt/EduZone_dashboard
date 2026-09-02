@@ -19,6 +19,7 @@ import type {
   CoursePrerequisite,
 } from '@/domain/types/course.types';
 import { parseVideoUrl } from '@/domain/video.utils';
+import { createAdminClient } from '@/infrastructure/supabase/admin';
 
 /**
  * Courses service — all Supabase queries for the courses domain.
@@ -202,8 +203,12 @@ export async function updateCourse(id: string, data: UpdateCourseInput): Promise
 }
 
 export async function deleteCourse(id: string): Promise<void> {
-  const { deleteCourseAction } = await import('@/application/actions/admin.actions');
-  return deleteCourseAction(id);
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from('courses')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) throw error;
 }
 
 // ══════════════════════════════════════════════════
@@ -724,8 +729,14 @@ export async function revokeEnrollment(
 
 export async function getCourseStats(courseId: string): Promise<CourseStats | null> {
   try {
-    const { getCourseStatsAction } = await import('@/application/actions/admin.actions');
-    return await getCourseStatsAction(courseId);
+    const admin = createAdminClient();
+    const { data, error } = await admin
+      .from('vw_course_stats')
+      .select('*')
+      .eq('course_id', courseId)
+      .maybeSingle();
+    if (error) return null;
+    return (data as CourseStats) ?? null;
   } catch (err: unknown) {
     if (process.env.NODE_ENV === 'development') {
       console.debug('[getCourseStats] Stats not available:', err);
@@ -933,3 +944,5 @@ export async function getPrerequisiteOptions(
   if (error) throw error;
   return data || [];
 }
+
+

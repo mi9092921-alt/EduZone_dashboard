@@ -34,10 +34,13 @@ vi.mock('@/container', () => ({
   },
 }));
 
-vi.mock('@/application/actions/admin.actions', () => ({
-  deleteCourseAction: vi.fn(),
-  getCourseStatsAction: vi.fn(),
+const mockAdminFrom = vi.fn();
+vi.mock('@/infrastructure/supabase/admin', () => ({
+  createAdminClient: () => ({
+    from: mockAdminFrom,
+  }),
 }));
+
 
 describe('courses.service', () => {
   const mockFrom = container.supabase.from as any;
@@ -127,12 +130,17 @@ describe('courses.service', () => {
     expect(c.id).toBe('cnew');
   });
 
-  it('deleteCourse delegates to deleteCourseAction', async () => {
-    const { deleteCourseAction } = await import('@/application/actions/admin.actions');
-    (deleteCourseAction as any).mockResolvedValue(undefined);
+  it('deleteCourse updates deleted_at using admin client', async () => {
+    const q = setupQuery({ data: null, error: null });
+    mockAdminFrom.mockReturnValue(q);
     await deleteCourse('c1');
-    expect(deleteCourseAction).toHaveBeenCalledWith('c1');
+    expect(mockAdminFrom).toHaveBeenCalledWith('courses');
+    expect(q.update).toHaveBeenCalledWith(
+      expect.objectContaining({ deleted_at: expect.any(String) }),
+    );
+    expect(q.eq).toHaveBeenCalledWith('id', 'c1');
   });
+
 
   it('enrollStudent success and duplicate handling', async () => {
     // 1. Success case
@@ -243,14 +251,15 @@ describe('courses.service', () => {
   });
 
   it('getCourseStats handles success and catch block', async () => {
-    const { getCourseStatsAction } = await import('@/application/actions/admin.actions');
-
-    (getCourseStatsAction as any).mockResolvedValue({ course_id: 'c1' });
+    const qSuccess = setupQuery({ data: { course_id: 'c1' }, error: null });
+    mockAdminFrom.mockReturnValueOnce(qSuccess);
     const stats = await getCourseStats('c1');
     expect(stats!.course_id).toBe('c1');
 
-    (getCourseStatsAction as any).mockRejectedValue(new Error('fail'));
+    const qFail = setupQuery({ data: null, error: new Error('fail') });
+    mockAdminFrom.mockReturnValueOnce(qFail);
     const stats2 = await getCourseStats('c1');
     expect(stats2).toBeNull();
   });
 });
+

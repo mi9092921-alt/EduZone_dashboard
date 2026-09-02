@@ -19,9 +19,13 @@ vi.mock('@/container', () => ({
   },
 }));
 
-vi.mock('@/application/actions/admin.actions', () => ({
-  getAnalyticsCourseStatsAction: vi.fn(),
+const mockAdminFrom = vi.fn();
+vi.mock('@/infrastructure/supabase/admin', () => ({
+  createAdminClient: () => ({
+    from: mockAdminFrom,
+  }),
 }));
+
 
 describe('analytics.service', () => {
   const mockFrom = container.supabase.from as any;
@@ -64,22 +68,28 @@ describe('analytics.service', () => {
     expect(res.active_users).toBe(0);
   });
 
-  it('getCourseStats returns action data', async () => {
-    const { getAnalyticsCourseStatsAction } = await import('@/application/actions/admin.actions');
-    const stats = [{ course_id: 'c1', title: 'React', enrolled: 50 }];
-    (getAnalyticsCourseStatsAction as any).mockResolvedValue(stats);
+  it('getCourseStats returns mapped stats with course titles', async () => {
+    mockAdminFrom.mockImplementation((table: string) => {
+      if (table === 'vw_course_stats') {
+        return setupQuery({ data: [{ course_id: 'c1', enrolled: 50 }], error: null });
+      }
+      if (table === 'courses') {
+        return setupQuery({ data: [{ id: 'c1', title: 'React' }], error: null });
+      }
+      return setupQuery({ data: [], error: null });
+    });
 
-    const res = await getCourseStats();
-    expect(res).toEqual(stats);
+    const res = await getCourseStats('t1');
+    expect(res).toEqual([{ course_id: 'c1', enrolled: 50, title: 'React' }]);
   });
 
-  it('getCourseStats returns empty when the action throws', async () => {
-    const { getAnalyticsCourseStatsAction } = await import('@/application/actions/admin.actions');
-    (getAnalyticsCourseStatsAction as any).mockRejectedValue(new Error('unavailable'));
+  it('getCourseStats returns empty when the query throws', async () => {
+    mockAdminFrom.mockReturnValue(setupQuery({ data: null, error: new Error('unavailable') }));
 
     const res = await getCourseStats('t1');
     expect(res).toEqual([]);
   });
+
 
   it('getDailyActivity', async () => {
     // v13: getDailyActivity delegates to get_daily_activity RPC which returns { date, count }
