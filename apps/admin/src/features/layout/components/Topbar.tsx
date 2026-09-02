@@ -13,7 +13,7 @@ import {
 } from '@mui/material';
 import { useTranslations, useLocale } from 'next-intl';
 import { useTheme } from 'next-themes';
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 
 import { useLayout } from '../hooks/useLayout';
 
@@ -24,6 +24,7 @@ import { useAuthUser, useAuthStore } from '@/adapters/stores/auth.store';
 import { NAV_ITEMS } from '@/config/nav.config';
 import { useRouter, usePathname } from '@/i18n/routing';
 import { clearBrowserSessionId } from '@/infrastructure/auth/browserSession';
+import { logoutCurrentUser } from '@/infrastructure/repos/auth-rpc.service';
 import { createBrowserClient } from '@/infrastructure/supabase/client';
 import { cn } from '@/lib/utils';
 
@@ -47,12 +48,11 @@ export function Topbar() {
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const menuOpen = Boolean(anchorEl);
 
-  // Memoized — avoids re-instantiating the client on every logout press
-  const supabase = useMemo(() => createBrowserClient(), []);
-
   async function handleLogout() {
     setAnchorEl(null);
-    await supabase.rpc('logout_current_user');
+    // M11: RPC call lives in infrastructure/repos/auth-rpc.service.ts
+    await logoutCurrentUser();
+    const supabase = createBrowserClient();
     await supabase.auth.signOut();
     clearBrowserSessionId();
     logout();

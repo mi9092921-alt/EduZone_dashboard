@@ -7,6 +7,7 @@ import { recordCurrentSessionAction } from '@/adapters/actions/session.actions';
 import { useAuthStore } from '@/adapters/stores/auth.store';
 import { container } from '@/container';
 import { clearBrowserSessionId, getBrowserSessionId } from '@/infrastructure/auth/browserSession';
+import { checkDashboardAccess } from '@/infrastructure/repos/auth-rpc.service';
 
 /**
  * 1-minute security heartbeat.
@@ -28,7 +29,9 @@ export function useSessionCheck() {
 
     const checkSession = async () => {
       try {
-        const { data: accessResult, error } = await supabase.rpc('check_dashboard_access');
+        // M11: RPC call lives in infrastructure/repos/auth-rpc.service.ts
+        const access = await checkDashboardAccess();
+        const accessResult = access.ok ? access.access : undefined;
         const browserSessionId = getBrowserSessionId();
         const sessionResult = browserSessionId
           ? await recordCurrentSessionAction(browserSessionId)
@@ -51,11 +54,11 @@ export function useSessionCheck() {
 
         const sessionInvalidated = !sessionResult.success && sessionResult.active === false;
         const shouldInvalidate =
-          error || !accessResult?.allowed || versionMismatch || sessionInvalidated;
+          !access.ok || !accessResult?.allowed || versionMismatch || sessionInvalidated;
 
         // Only warn when there's an actual problem; use debug for healthy heartbeats
         const logData = {
-          error: error ?? null,
+          rpcError: access.ok ? null : access.error,
           allowed: accessResult?.allowed,
           serverVersion,
           clientVersion,

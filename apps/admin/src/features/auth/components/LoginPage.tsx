@@ -5,12 +5,13 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 
 import { recordCurrentSessionAction } from '@/adapters/actions/session.actions';
-import { useAuthStore } from '@/adapters/stores/auth.store';
+import { useAuthStore, type PrimaryRole } from '@/adapters/stores/auth.store';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import { getBrowserSessionId } from '@/infrastructure/auth/browserSession';
+import { checkDashboardAccess } from '@/infrastructure/repos/auth-rpc.service';
 import { createBrowserClient } from '@/infrastructure/supabase/client';
 
 export function LoginPage() {
@@ -54,12 +55,14 @@ export function LoginPage() {
         return;
       }
 
-      const { data: accessResult, error: accessError } =
-        await supabase.rpc('check_dashboard_access');
-      if (accessError) {
+      // M11: RPC call lives in infrastructure/repos/auth-rpc.service.ts
+      const access = await checkDashboardAccess();
+      if (!access.ok) {
         setError('Failed to verify account access. Please try again.');
         return;
       }
+
+      const accessResult = access.access;
 
       if (!accessResult?.allowed) {
         const reason = accessResult?.reason;
@@ -91,8 +94,8 @@ export function LoginPage() {
       setUser({
         id: authData.user!.id,
         email: authData.user!.email || '',
-        primary_role: accessResult.role,
-        tenant_id: accessResult.tenant_id,
+        primary_role: accessResult.role as PrimaryRole,
+        tenant_id: accessResult.tenant_id ?? '',
         token_version: accessResult.token_version != null ? Number(accessResult.token_version) : 1,
         permissions: [],
       });

@@ -189,9 +189,11 @@ describe('courses.service', () => {
     );
 
     mockRpc.mockResolvedValue({ error: null });
-    await reorderSections([{ id: 's1', order_index: 2 }]);
+    // M11: reorderSections now sends the real SQL signature (course_id + ordered ids).
+    await reorderSections('c1', ['s1']);
     expect(mockRpc).toHaveBeenCalledWith('reorder_course_sections', {
-      p_section_updates: [{ id: 's1', order_index: 2 }],
+      p_course_id: 'c1',
+      p_ordered_ids: ['s1'],
     });
   });
 

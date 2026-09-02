@@ -105,7 +105,10 @@ export function useReorderSections() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (vars: { courseId: string; updates: { id: string; order_index: number }[] }) =>
-      reorderSections(vars.updates),
+      reorderSections(
+        vars.courseId,
+        vars.updates.map((u) => u.id),
+      ),
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: queryKeys.courses.detail(vars.courseId) });
       qc.invalidateQueries({ queryKey: queryKeys.courses.sections(vars.courseId) });

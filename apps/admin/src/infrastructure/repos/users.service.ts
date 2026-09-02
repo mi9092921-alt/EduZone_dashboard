@@ -4,8 +4,6 @@ import type {
   User,
   UserFilters,
   PaginatedResult,
-  AccountAction,
-  ControlResult,
   Device,
   Session,
   Warning,
@@ -78,51 +76,12 @@ export async function getUserById(id: string): Promise<User> {
   return data as User;
 }
 
-/**
- * Control account (lock/unlock/suspend/ban) via secure RPC.
- * This ensures atomic updates, audit logging, and permission enforcement.
- * v13: RPC now returns jsonb { status, until } instead of void.
- */
-export async function controlUserAccount(
-  id: string,
-  action: AccountAction,
-  reason?: string,
-  suspendHours?: number,
-): Promise<ControlResult> {
-  const { supabase } = container;
-
-  const { data, error } = await supabase.rpc('control_user_account', {
-    p_user_id: id,
-    p_action: action,
-    p_reason: reason || null,
-    p_suspend_hours: suspendHours || null,
-  });
-
-  if (error) {
-    console.error(`Failed to execute ${action} on user ${id}:`, error);
-    throw error;
-  }
-
-  // v13: Parse jsonb response { status: string, until: string | null }
-  const result = data as { status?: string; until?: string } | null;
-  return {
-    success: true,
-    message: result?.status ? `Account status changed to: ${result.status}` : undefined,
-    auto_suspended: action === 'suspend' && !!result?.until,
-  };
-}
-
-// ── Terminate sessions ───────────────────────────────────────────
-export async function terminateUserSessions(userId: string, reason?: string): Promise<number> {
-  const { supabase } = container;
-  const { data, error } = await supabase.rpc('terminate_user_sessions', {
-    p_user_id: userId,
-    p_reason: reason || 'admin_terminated',
-  });
-
-  if (error) throw mapDbError(error, 'users.service.ts');
-  return (data as number | null) ?? 0;
-}
+// ── Control account / terminate sessions ─────────────────────────
+// M11: removed the dead browser-client paths for control_user_account and
+// terminate_user_sessions. Both RPCs are service-role EXECUTE (10_permissions.sql)
+// and their live call path is adapters/actions/user.actions.ts →
+// application/use-cases → infrastructure/repos/user-admin.repository.ts,
+// which uses the admin client behind the IUserAdminRepository port.
 
 // ── Reset devices ────────────────────────────────────────────────
 export async function resetUserDevices(userId: string): Promise<void> {

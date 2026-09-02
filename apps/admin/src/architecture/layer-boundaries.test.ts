@@ -3,6 +3,8 @@ import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { RPC_CATALOG, requiresAdminClient } from '@/infrastructure/rpc/rpc-catalog';
+
 /**
  * Architecture boundary tests (M8 — Repository / Port Boundary).
  *
@@ -194,6 +196,67 @@ describe('architecture: error boundary (M10)', () => {
         `getErrorMessage in ${toRelative(file)} passes raw .message through — ` +
           'use toClientMessage for client-facing results (it masks non-AppError shapes)',
       ).toBe(true);
+    }
+  });
+});
+
+/**
+ * M11 — RPC Boundary (Execution Plan §15).
+ *
+ * Postgres RPCs are privileged database entry points: each carries its own
+ * SECURITY DEFINER/INVOKER semantics, EXECUTE grants, and tenant/permission
+ * guards (see infrastructure/rpc/rpc-catalog.ts — the single source of truth).
+ *
+ * Rule: `.rpc(` call sites are allowed ONLY inside `infrastructure/` plus the
+ * documented exception below. UI components (features/), server-action
+ * boundaries (adapters/, app/) and use cases (application/) must go through
+ * a repository/service function so classification, error mapping and admin
+ * client usage are decided in one reviewed place — not sprinkled at will.
+ */
+describe('architecture: RPC boundary (M11)', () => {
+  /** Documented non-infrastructure call sites (each justified in the RPC catalog). */
+  const RPC_CALL_SITE_EXCEPTIONS = new Set([
+    // M5 centralized authorization: user_has_permission enforces
+    // p_user_id = auth.uid() server-side for non-service-role callers.
+    'application/authorization/authorization.service.ts',
+  ]);
+
+  const RPC_SCAN_DIRS = ['infrastructure', 'adapters', 'features', 'app', 'application'] as const;
+  const rpcFiles = RPC_SCAN_DIRS.flatMap((dir) => collectFiles(path.join(SRC_ROOT, dir))).filter(
+    (file) => !/\.test\.tsx?$/.test(file) && !/\.stories\.(ts|tsx)$/.test(file),
+  );
+
+  it('has RPC-boundary source files to scan', () => {
+    expect(rpcFiles.length).toBeGreaterThan(0);
+  });
+
+  it.each(rpcFiles.map((f) => [toRelative(f), f] as const))(
+    '%s calls .rpc() only inside infrastructure (or a documented exception)',
+    (rel, file) => {
+      const source = fs.readFileSync(file, 'utf8');
+      const isInfra = rel.startsWith('infrastructure/');
+      if (isInfra || RPC_CALL_SITE_EXCEPTIONS.has(rel)) return;
+
+      const rpcCallCount = (source.match(/\.rpc\s*(?:<[^>]*>)?\(/g) ?? []).length;
+      expect(
+        rpcCallCount,
+        `${rel} calls .rpc() directly — RPCs are catalogued privileged entry points ` +
+          '(infrastructure/rpc/rpc-catalog.ts). Move the call into an infrastructure ' +
+          'repository/service and depend on that instead.',
+      ).toBe(0);
+    },
+  );
+
+  it('every catalogued service-role RPC is owned by infrastructure', () => {
+    // Guard the catalog itself: each service-role RPC must be owned by an
+    // infrastructure module (call sites stay behind reviewed wrappers).
+    const serviceRole = RPC_CATALOG.filter((def) => requiresAdminClient(def));
+    expect(serviceRole.length).toBeGreaterThan(0);
+    for (const def of serviceRole) {
+      expect(
+        def.owner,
+        `service-role RPC ${def.name} must name an infrastructure owner (got: ${def.owner})`,
+      ).toMatch(/infrastructure/);
     }
   });
 });

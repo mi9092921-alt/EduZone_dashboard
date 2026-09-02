@@ -50,6 +50,65 @@ export async function getUserStats(tenantId?: string): Promise<UserStatsDto> {
   return data as UserStatsDto;
 }
 
+// ── System health from RPC (M11: moved from adapters/queries) ────
+export interface SystemHealthDto {
+  pending_jobs: number;
+  unflushed_activity: number;
+  active_tenants: number;
+  database_time: string;
+  timestamp: string;
+  processing_jobs?: number | undefined;
+  failed_jobs?: number | undefined;
+  partition_leaks?: number | undefined;
+}
+
+function emptySystemHealth(): SystemHealthDto {
+  const now = new Date().toISOString();
+  return {
+    pending_jobs: 0,
+    unflushed_activity: 0,
+    active_tenants: 0,
+    database_time: now,
+    timestamp: now,
+  };
+}
+
+/**
+ * get_system_health — privileged (is_admin_with_session_validation inside).
+ * Returns zeroed counters on RPC failure so dashboards degrade gracefully.
+ */
+export async function getSystemHealth(): Promise<SystemHealthDto> {
+  const { supabase } = container;
+
+  const { data, error } = await supabase.rpc('get_system_health');
+  if (error) {
+    // PostgrestError properties are non-enumerable — extract explicitly.
+    console.error('[analytics.service] get_system_health failed:', {
+      message: error.message,
+      code: error.code,
+    });
+    return emptySystemHealth();
+  }
+
+  // DB returns camelCase JSONB keys: { pendingJobs, unflushedActivity, activeTenants, databaseTime }
+  const raw = (data ?? {}) as Record<string, unknown>;
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+  const opt = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
+  return {
+    pending_jobs: num(raw['pendingJobs']),
+    unflushed_activity: num(raw['unflushedActivity']),
+    active_tenants: num(raw['activeTenants']),
+    database_time:
+      typeof raw['databaseTime'] === 'string'
+        ? raw['databaseTime']
+        : new Date().toISOString(),
+    timestamp: new Date().toISOString(),
+    processing_jobs: opt(raw['processingJobs']),
+    failed_jobs: opt(raw['failedJobs']),
+    partition_leaks: opt(raw['partitionLeaks']),
+  };
+}
+
 // ── Course stats from vw_course_stats (admin read — bypasses RLS) ───────────
 export async function getCourseStats(tenantId?: string): Promise<CourseWithStats[]> {
   try {

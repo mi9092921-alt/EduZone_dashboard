@@ -10,6 +10,12 @@ import {
   type BulkParamsInput,
 } from '@/domain/schemas/bulk-action.schema';
 import type { BulkAction } from '@/domain/types/bulk.types';
+import {
+  enqueueBulkJob,
+  logActivityAsync,
+  logUserHasPermissionSafe,
+  workerUpdateBulkJob,
+} from '@/infrastructure/repos/jobs-rpc.service';
 import { createAdminClient } from '@/infrastructure/supabase/admin';
 import { createServerClient } from '@/infrastructure/supabase/server';
 
@@ -51,14 +57,8 @@ async function updateBulkJob(
     releaseLock?: boolean;
   },
 ) {
-  const { error } = await admin.rpc('worker_update_bulk_job', {
-    p_id: jobId,
-    p_status: opts.status ?? null,
-    p_error_message: opts.errorMessage ?? null,
-    p_finished_at: opts.finishedAt ?? null,
-    p_release_lock: opts.releaseLock ?? false,
-  });
-  if (error) throw mapDbError(error, 'bulk-action');
+  // M11: RPC call delegated to infrastructure/repos/jobs-rpc.service.ts
+  await workerUpdateBulkJob(admin, jobId, opts);
 }
 
 async function processInlineBulkJob(
@@ -139,11 +139,12 @@ async function processInlineBulkJob(
     releaseLock: true,
   });
 
-  await admin.rpc('log_activity_async', {
-    p_user_id: initiatorId,
-    p_type: 'bulk_action_completed',
-    p_details: { job_id: job.id, action: body.action, ...result },
-    p_risk_level: failedIds.length > 0 ? 'medium' : 'low',
+  // M11: RPC call delegated to infrastructure/repos/jobs-rpc.service.ts
+  await logActivityAsync(admin, {
+    userId: initiatorId,
+    type: 'bulk_action_completed',
+    details: { job_id: job.id, action: body.action, ...result },
+    riskLevel: failedIds.length > 0 ? 'medium' : 'low',
   });
 }
 
@@ -304,11 +305,12 @@ async function exportUsers(
     releaseLock: true,
   });
 
-  await admin.rpc('log_activity_async', {
-    p_user_id: initiatorId,
-    p_type: 'bulk_export_completed',
-    p_details: { job_id: jobId, user_count: users.length, format: ext },
-    p_risk_level: 'low',
+  // M11: RPC call delegated to infrastructure/repos/jobs-rpc.service.ts
+  await logActivityAsync(admin, {
+    userId: initiatorId,
+    type: 'bulk_export_completed',
+    details: { job_id: jobId, user_count: users.length, format: ext },
+    riskLevel: 'low',
   });
 }
 
@@ -374,13 +376,15 @@ export async function POST(request: NextRequest) {
       callerProfile.primary_role !== 'super_admin' &&
       !roleAllowsPermission(callerProfile.primary_role, permission)
     ) {
-      const { data: hasPerm, error: permErr } = await supabase.rpc('user_has_permission', {
-        p_user_id: userData.user.id,
-        p_permission: permission,
-        p_tenant_id: callerProfile.tenant_id,
-      });
+      // M11: RPC call delegated to infrastructure/repos/jobs-rpc.service.ts
+      const hasPerm = await logUserHasPermissionSafe(
+        supabase,
+        userData.user.id,
+        permission,
+        callerProfile.tenant_id,
+      );
 
-      if (permErr || !hasPerm) {
+      if (!hasPerm) {
         return errorJson('FORBIDDEN', `Permission denied: requires ${permission}`, 403);
       }
     }
@@ -468,23 +472,22 @@ export async function POST(request: NextRequest) {
     // ── Insert job into queue ─────────────────────────────────
     const jobType = body.action === 'export' ? 'bulk_export' : `bulk_${body.action}`;
 
-    const { data: job, error: insertErr } = await admin.rpc('admin_enqueue_bulk_job', {
-      p_job_type: jobType,
-      p_payload: {
+    // M11: RPC call delegated to infrastructure/repos/jobs-rpc.service.ts
+    let job: { id: string; created_at: string };
+    try {
+      job = await enqueueBulkJob(admin, jobType, {
         action: body.action,
         filters: body.filters,
         params: body.params ?? {},
         initiator_id: userData.user.id,
         estimated_count: count,
-      },
-      p_initiator_id: userData.user.id,
-    });
-
-    if (insertErr) {
-      if (insertErr.message.includes('JOB_QUEUE_FULL')) {
+      }, userData.user.id);
+    } catch (err) {
+      const code = err instanceof Error && 'code' in err ? String((err as { code: unknown }).code) : '';
+      if (code === 'JOB_QUEUE_FULL') {
         return errorJson('JOB_QUEUE_FULL', 'Too many pending jobs. Please try again later.', 429);
       }
-      if (insertErr.message.includes('uq_job_dedupe')) {
+      if (code === 'DUPLICATE_JOB') {
         return errorJson(
           'DUPLICATE_JOB',
           'An identical bulk action is already processing. Please wait for it to finish.',
@@ -492,25 +495,25 @@ export async function POST(request: NextRequest) {
         );
       }
       // P1-SEC-003 / P1-SEC-006: same rationale as the count-query error above —
-      // the specific `.includes()` checks above still inspect the raw DB error
+      // the specific code checks above still inspect the raw DB error
       // server-side; only the generic fallback is returned to the client.
-      console.error('[bulk-action] enqueue failed:', insertErr);
+      console.error('[bulk-action] enqueue failed:', err);
       return errorJson('QUEUE_ERROR', 'Failed to queue the bulk action', 500);
     }
 
     // ── Log the activity (non-critical) ──────────────────────
     try {
-      await admin.rpc('log_activity_async', {
-        p_user_id: userData.user.id,
-        p_type: 'bulk_action_queued',
-        p_details: {
+      await logActivityAsync(admin, {
+        userId: userData.user.id,
+        type: 'bulk_action_queued',
+        details: {
           action: body.action,
           estimated_count: count,
           job_id: job.id,
           filters: body.filters,
         },
-        p_risk_level: 'medium',
-        p_tenant_id: callerProfile?.tenant_id ?? null,
+        riskLevel: 'medium',
+        tenantId: callerProfile?.tenant_id ?? null,
       });
     } catch {
       // Don't block job submission if activity logging fails

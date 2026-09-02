@@ -306,21 +306,26 @@ export async function deleteSection(id: string): Promise<void> {
 }
 
 export async function reorderSections(
-  updates: { id: string; order_index: number }[],
+  courseId: string,
+  orderedIds: string[],
 ): Promise<void> {
   const { supabase } = container;
 
-  // v13: Use RPC for atomic reordering
+  // v13: reorder_course_sections(course_id, ordered_ids) — atomic reordering.
+  // M11 fix: the call previously sent `p_section_updates` (a shape the SQL
+  // function never accepted), so every reorder silently failed and fell back
+  // to non-atomic per-row updates. Called with the real signature now.
   const { error } = await supabase.rpc('reorder_course_sections', {
-    p_section_updates: updates,
+    p_course_id: courseId,
+    p_ordered_ids: orderedIds,
   });
 
   if (error) {
     console.error('[reorderSections] RPC failed, falling back to batch updates:', error);
     // Fallback if RPC fails or is not yet available in the environment
     await Promise.all(
-      updates.map((u) =>
-        supabase.from('sections').update({ order_index: u.order_index }).eq('id', u.id),
+      orderedIds.map((id, order_index) =>
+        supabase.from('sections').update({ order_index }).eq('id', id),
       ),
     );
   }

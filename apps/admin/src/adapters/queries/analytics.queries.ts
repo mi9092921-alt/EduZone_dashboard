@@ -202,40 +202,15 @@ export interface SystemHealth {
 }
 
 /**
- * Fetches background job health and infrastructure alerts securely via RPC.
+ * Fetches background job health and infrastructure alerts via the
+ * analytics service (M11: RPC call sites live in infrastructure, not adapters).
  */
 export function useSystemHealth() {
   return useQuery({
     queryKey: [...queryKeys.analytics.dashboard, 'systemHealth'],
     queryFn: async (): Promise<SystemHealth> => {
-      const { supabase } = container;
-      const { data, error } = await supabase.rpc('get_system_health');
-
-      if (error) {
-        // PostgrestError properties are non-enumerable — extract explicitly
-        return {
-          pending_jobs: 0,
-          unflushed_activity: 0,
-          active_tenants: 0,
-          database_time: new Date().toISOString(),
-          timestamp: new Date().toISOString(),
-        };
-      }
-
-      // DB returns camelCase JSONB keys: { pendingJobs, unflushedActivity, activeTenants, databaseTime }
-      const raw = (data ?? {}) as Record<string, unknown>;
-      return {
-        pending_jobs: Number(raw['pendingJobs'] ?? 0),
-        unflushed_activity: Number(raw['unflushedActivity'] ?? 0),
-        active_tenants: Number(raw['activeTenants'] ?? 0),
-        database_time: String(raw['databaseTime'] ?? new Date().toISOString()),
-        timestamp: new Date().toISOString(),
-        processing_jobs:
-          raw['processingJobs'] !== undefined ? Number(raw['processingJobs']) : undefined,
-        failed_jobs: raw['failedJobs'] !== undefined ? Number(raw['failedJobs']) : undefined,
-        partition_leaks:
-          raw['partitionLeaks'] !== undefined ? Number(raw['partitionLeaks']) : undefined,
-      };
+      const { getSystemHealth } = await import('@/infrastructure/repos/analytics.service');
+      return getSystemHealth();
     },
     refetchInterval: 15000, // Refresh every 15s to monitor health
   });

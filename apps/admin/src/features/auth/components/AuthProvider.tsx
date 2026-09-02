@@ -9,6 +9,7 @@ import { useSessionCheck } from '@/adapters/hooks/useSessionCheck';
 import { useAuthStore, useAuthUser, type PrimaryRole } from '@/adapters/stores/auth.store';
 import { useRouter, usePathname } from '@/i18n/routing';
 import { clearBrowserSessionId, getBrowserSessionId } from '@/infrastructure/auth/browserSession';
+import { checkDashboardAccess } from '@/infrastructure/repos/auth-rpc.service';
 import { createBrowserClient } from '@/infrastructure/supabase/client';
 
 /**
@@ -52,18 +53,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // v13: Use the SECURITY DEFINER RPC to bypass RLS token_version validation.
         // Direct SELECT on users fails if JWT lacks token_version/tenant_id custom claims.
-        const { data: accessResult, error: accessError } =
-          await supabase.rpc('check_dashboard_access');
+        // M11: RPC call lives in infrastructure/repos/auth-rpc.service.ts.
+        const access = await checkDashboardAccess();
 
-        if (accessError) {
-          console.error('[AuthProvider] check_dashboard_access RPC failed:', {
-            message: accessError.message,
-            code: accessError.code,
-            details: accessError.details,
-            hint: accessError.hint,
-          });
-          throw accessError;
+        if (!access.ok) {
+          console.error('[AuthProvider] check_dashboard_access RPC failed:', access.error);
+          throw new Error(access.error);
         }
+
+        const accessResult = access.access;
 
         // RPC returned a valid response but access is denied
         if (!accessResult?.allowed) {

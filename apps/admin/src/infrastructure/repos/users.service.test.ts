@@ -4,8 +4,6 @@ import {
   bindDevice,
   getUsers,
   getUserById,
-  controlUserAccount,
-  terminateUserSessions,
   resetUserDevices,
   issueWarning,
   getDevices,
@@ -94,34 +92,11 @@ describe('users.service', () => {
     expect(res.id).toBe('u1');
   });
 
-  it('controlUserAccount handles all actions', async () => {
-    mockRpc.mockReturnValue(setupQuery({ error: null }));
-
-    await controlUserAccount('u1', 'lock', 'reason');
-    expect(mockRpc).toHaveBeenCalledWith('control_user_account', {
-      p_user_id: 'u1',
-      p_action: 'lock',
-      p_reason: 'reason',
-      p_suspend_hours: null,
-    });
-
-    await controlUserAccount('u1', 'suspend', 'reason', 24);
-    expect(mockRpc).toHaveBeenCalledWith('control_user_account', {
-      p_user_id: 'u1',
-      p_action: 'suspend',
-      p_reason: 'reason',
-      p_suspend_hours: 24,
-    });
-  });
-
-  it('terminateUserSessions and resetDevices', async () => {
+  it('resetUserDevices', async () => {
     mockRpc.mockReturnValue(setupQuery({ data: 1, error: null }));
-    await terminateUserSessions('u1');
-    expect(mockRpc).toHaveBeenCalledWith('terminate_user_sessions', {
-      p_user_id: 'u1',
-      p_reason: 'admin_terminated',
-    });
 
+    // M11: controlUserAccount/terminateUserSessions removed from users.service —
+    // their live path is user-admin.repository.ts (service-role admin client).
     await resetUserDevices('u1');
     expect(mockRpc).toHaveBeenCalledWith('reset_user_device', {
       p_user_id: 'u1',
