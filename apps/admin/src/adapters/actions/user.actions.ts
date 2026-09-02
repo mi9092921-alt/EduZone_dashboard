@@ -8,7 +8,7 @@ import {
 } from '@/application/use-cases/users/account-control.use-case';
 import { CreateUserUseCase } from '@/application/use-cases/users/create-user.use-case';
 import { DeleteUserUseCase } from '@/application/use-cases/users/delete-user.use-case';
-import { getErrorMessage } from '@/domain/errors';
+import { toClientMessage } from '@/domain/errors';
 import { CreateUserInput, createUserSchema } from '@/domain/schemas/user.schema';
 import type { AccountAction } from '@/domain/types/user.types';
 import { makeUserAdminRepository } from '@/infrastructure/repos/user-admin.repository';
@@ -39,7 +39,7 @@ export async function createUserAction(data: CreateUserInput) {
     return await new CreateUserUseCase(makeUserAdminRepository()).execute(ctx, parsed);
   } catch (error: unknown) {
     console.error('createUserAction error:', error);
-    return { success: false, error: getErrorMessage(error) };
+    return { success: false, error: toClientMessage(error) };
   }
 }
 
@@ -56,7 +56,7 @@ export async function deleteUserAction(userId: string) {
     return await new DeleteUserUseCase(makeUserAdminRepository()).execute(userId);
   } catch (error: unknown) {
     console.error('deleteUserAction error:', error);
-    return { success: false, error: getErrorMessage(error) };
+    return { success: false, error: toClientMessage(error) };
   }
 }
 
@@ -82,7 +82,7 @@ export async function controlUserAccountAction(
     );
   } catch (error: unknown) {
     console.error('controlUserAccountAction error:', error);
-    return { success: false, error: getErrorMessage(error) };
+    return { success: false, error: toClientMessage(error) };
   }
 }
 
@@ -104,7 +104,7 @@ export async function terminateUserSessionsAction(
     );
   } catch (error: unknown) {
     console.error('terminateUserSessionsAction error:', error);
-    return { success: false, error: getErrorMessage(error) };
+    return { success: false, error: toClientMessage(error) };
   }
 }
 
@@ -124,6 +124,6 @@ export async function issueWarningAction(
     );
   } catch (error: unknown) {
     console.error('issueWarningAction error:', error);
-    return { success: false, error: getErrorMessage(error) };
+    return { success: false, error: toClientMessage(error) };
   }
 }

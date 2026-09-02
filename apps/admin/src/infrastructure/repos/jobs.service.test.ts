@@ -54,7 +54,8 @@ describe('jobs.service', () => {
 
     it('propagates RPC errors', async () => {
       mockRpc.mockReturnValueOnce({ data: null, error: new Error('fail') });
-      await expect(getJobs({}, 1, 10)).rejects.toThrow('fail');
+      // M10: errors are mapped to InfrastructureError (raw text masked)
+      await expect(getJobs({}, 1, 10)).rejects.toBeInstanceOf(Error);
     });
   });
 
@@ -77,7 +78,8 @@ describe('jobs.service', () => {
 
     it('propagates errors', async () => {
       mockRpc.mockReturnValueOnce({ data: null, error: new Error('fail') });
-      await expect(retryJob('j1')).rejects.toThrow('fail');
+      // M10: errors are mapped to InfrastructureError (raw text masked)
+      await expect(retryJob('j1')).rejects.toBeInstanceOf(Error);
     });
   });
 
@@ -90,7 +92,8 @@ describe('jobs.service', () => {
 
     it('propagates errors', async () => {
       mockRpc.mockReturnValueOnce({ data: null, error: new Error('cancelled') });
-      await expect(cancelJob('j1')).rejects.toThrow('cancelled');
+      // M10: errors are mapped to InfrastructureError (raw text masked)
+      await expect(cancelJob('j1')).rejects.toBeInstanceOf(Error);
     });
   });
 
@@ -110,7 +113,8 @@ describe('jobs.service', () => {
 
     it('propagates RPC errors', async () => {
       mockRpcSingle.mockResolvedValueOnce({ data: null, error: new Error('RPC failed') });
-      await expect(releaseStaleJobs()).rejects.toThrow('RPC failed');
+      // M10: errors are mapped to InfrastructureError (raw text masked)
+      await expect(releaseStaleJobs()).rejects.toBeInstanceOf(Error);
     });
   });
 });

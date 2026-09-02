@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 
 import { roleAllowsPermission } from '@/application/authorization/policy';
+import { mapDbError } from '@/domain/errors';
 import {
   MAX_BULK_SIZE,
   bulkActionRequestSchema,
@@ -57,7 +58,7 @@ async function updateBulkJob(
     p_finished_at: opts.finishedAt ?? null,
     p_release_lock: opts.releaseLock ?? false,
   });
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'bulk-action');
 }
 
 async function processInlineBulkJob(
@@ -102,7 +103,7 @@ async function processInlineBulkJob(
 
   const { data: users, error } = await builder.limit(MAX_BULK_SIZE);
 
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'bulk-action');
 
   if (body.action === 'export') {
     await exportUsers(admin, job.id, users ?? [], body, initiatorId);
@@ -221,7 +222,7 @@ async function processInlineUserAction(
           updated_at: now,
         })
         .eq('id', user.id);
-      if (error) throw error;
+      if (error) throw mapDbError(error, 'bulk-action');
       break;
     }
     case 'terminate_sessions': {
@@ -230,7 +231,7 @@ async function processInlineUserAction(
         .update({ is_active: false, ended_at: now, end_reason: reason || 'bulk_terminated' })
         .eq('user_id', user.id)
         .eq('is_active', true);
-      if (error) throw error;
+      if (error) throw mapDbError(error, 'bulk-action');
       break;
     }
     case 'reset_devices': {
@@ -238,7 +239,7 @@ async function processInlineUserAction(
         .from('devices')
         .update({ is_active: false })
         .eq('user_id', user.id);
-      if (error) throw error;
+      if (error) throw mapDbError(error, 'bulk-action');
       break;
     }
     default:

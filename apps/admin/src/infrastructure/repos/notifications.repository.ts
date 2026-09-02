@@ -4,6 +4,7 @@ import type {
   INotificationAdminRepository,
   ResolveNotificationTargetsInput,
 } from '@/application/ports/INotificationAdminRepository';
+import { mapDbError } from '@/domain/errors';
 import type {
   NotificationListResult,
   SendNotificationInput,
@@ -68,7 +69,7 @@ export function makeNotificationAdminRepository(
         query = query.in('primary_role', ['admin', 'super_admin']);
 
       const { data, error } = await query;
-      if (error) throw error;
+      if (error) throw mapDbError(error, 'notifications.repository.ts');
       return (data ?? []).map((row) => row.id as string);
     },
 
@@ -161,7 +162,7 @@ export function makeNotificationAdminRepository(
       const { data, error, count } = await query
         .order('created_at', { ascending: false })
         .range(from, to);
-      if (error) throw error;
+      if (error) throw mapDbError(error, 'notifications.repository.ts');
 
       // Fetch total stats for stats cards (unpaginated counts) scoped to tenant
       let statsQuery = admin
@@ -201,7 +202,7 @@ export function makeNotificationAdminRepository(
       }
 
       const { error } = await query;
-      if (error) throw error;
+      if (error) throw mapDbError(error, 'notifications.repository.ts');
     },
 
     async listMine(
@@ -219,7 +220,7 @@ export function makeNotificationAdminRepository(
       if (unreadOnly) query = query.eq('is_read', false);
 
       const { data, error } = await query;
-      if (error) throw error;
+      if (error) throw mapDbError(error, 'notifications.repository.ts');
 
       return (data ?? []).map(
         (row: {
@@ -249,7 +250,7 @@ export function makeNotificationAdminRepository(
       if (unreadOnly) query = query.eq('is_read', false);
 
       const { count, error } = await query;
-      if (error) throw error;
+      if (error) throw mapDbError(error, 'notifications.repository.ts');
       return count ?? 0;
     },
 
@@ -259,7 +260,7 @@ export function makeNotificationAdminRepository(
         .update({ is_read: true })
         .eq('id', id)
         .eq('user_id', userId);
-      if (error) throw error;
+      if (error) throw mapDbError(error, 'notifications.repository.ts');
     },
 
     async markAllRead(userId: string): Promise<void> {
@@ -268,7 +269,7 @@ export function makeNotificationAdminRepository(
         .update({ is_read: true })
         .eq('user_id', userId)
         .eq('is_read', false);
-      if (error) throw error;
+      if (error) throw mapDbError(error, 'notifications.repository.ts');
     },
   };
 }

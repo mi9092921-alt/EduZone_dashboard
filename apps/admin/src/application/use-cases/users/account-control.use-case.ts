@@ -1,5 +1,5 @@
 import type { IUserAdminRepository } from '@/application/ports/IUserAdminRepository';
-import { getErrorMessage } from '@/domain/errors';
+import { toClientMessage } from '@/domain/errors';
 import type { AccountAction } from '@/domain/types/user.types';
 
 export interface ControlAccountResult {
@@ -56,7 +56,7 @@ export class ControlUserAccountUseCase {
       };
     } catch (rpcError) {
       console.error(`[controlUserAccountAction] ${action} on ${userId} failed:`, rpcError);
-      return { success: false, error: getErrorMessage(rpcError) };
+      return { success: false, error: toClientMessage(rpcError) };
     }
   }
 }
@@ -73,7 +73,7 @@ export class TerminateUserSessionsUseCase {
         `[terminateUserSessionsAction] terminate sessions for ${userId} failed:`,
         rpcError,
       );
-      return { success: false, error: getErrorMessage(rpcError) };
+      return { success: false, error: toClientMessage(rpcError) };
     }
   }
 }
@@ -97,7 +97,7 @@ export class IssueWarningUseCase {
       return { success: true, warningId };
     } catch (rpcError) {
       console.error(`[issueWarningAction] warning for ${userId} failed:`, rpcError);
-      return { success: false, error: getErrorMessage(rpcError) };
+      return { success: false, error: toClientMessage(rpcError) };
     }
   }
 }

@@ -9,8 +9,20 @@ import type {
   StepResult,
   UpsertProfileInput,
 } from '@/application/ports/IUserAdminRepository';
+import { InfrastructureError } from '@/domain/errors';
 import { createAdminClient } from '@/infrastructure/supabase/admin';
 import { createServerClient } from '@/infrastructure/supabase/server';
+
+/**
+ * M10: raw Supabase Auth / PostgREST error text must not flow to the UI
+ * (it can contain emails, constraint names, internal schema details).
+ * This helper logs the raw error server-side and produces a short,
+ * user-facing failure message keyed by a stable prefix the UI may match on.
+ */
+function toStepFailure(source: string, rawMessage: string): { ok: false; message: string } {
+  console.error(`[user-admin.repository] ${source} failed:`, rawMessage);
+  return { ok: false, message: `${source} failed` };
+}
 
 /**
  * Supabase implementation of IUserAdminRepository.
@@ -40,7 +52,7 @@ export function makeUserAdminRepository(
       });
 
       if (authCreateError) {
-        return { ok: false, message: authCreateError.message };
+        return toStepFailure('Auth user creation', authCreateError.message);
       }
 
       if (!authData?.user) {
@@ -62,7 +74,7 @@ export function makeUserAdminRepository(
       });
 
       if (error) {
-        return { ok: false, message: error.message };
+        return toStepFailure('Profile sync', error.message);
       }
       return { ok: true };
     },
@@ -93,7 +105,7 @@ export function makeUserAdminRepository(
       );
 
       if (error) {
-        return { ok: false, message: error.message };
+        return toStepFailure('Role sync', error.message);
       }
       return { ok: true };
     },
@@ -101,7 +113,12 @@ export function makeUserAdminRepository(
     async deleteAuthUser(userId: string): Promise<{ ok: true } | { ok: false; message: string }> {
       const { error } = await admin.auth.admin.deleteUser(userId);
       if (error) {
-        return { ok: false, message: error.message };
+        // "User not found" is an expected retry/idempotency path (the profile
+        // may already be gone) — keep that signal, mask everything else.
+        if (error.message.toLowerCase().includes('not found')) {
+          return { ok: false, message: 'User not found' };
+        }
+        return toStepFailure('Auth user deletion', error.message);
       }
       return { ok: true };
     },
@@ -123,7 +140,10 @@ export function makeUserAdminRepository(
         p_suspend_hours: input.suspendHours,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('[user-admin.repository] control_user_account failed:', error);
+        throw new InfrastructureError(undefined, `control_user_account: ${error.message}`);
+      }
       return data as { status?: string; until?: string } | null;
     },
 
@@ -133,7 +153,10 @@ export function makeUserAdminRepository(
         p_reason: reason,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('[user-admin.repository] terminate_user_sessions failed:', error);
+        throw new InfrastructureError(undefined, `terminate_user_sessions: ${error.message}`);
+      }
       return data as number | null;
     },
 
@@ -146,7 +169,12 @@ export function makeUserAdminRepository(
         p_note: input.note,
       });
 
-      if (error) throw error;
+      if (error) {
+        // issue_warning signals logic failures with authored codes
+        // (PERMISSION_DENIED, ...) — keep the code, mask only raw infra text.
+        console.error('[user-admin.repository] issue_warning failed:', error);
+        throw new InfrastructureError(error.message, `issue_warning: ${error.message}`);
+      }
       return data as string;
     },
   };

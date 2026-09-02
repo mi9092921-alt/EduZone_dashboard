@@ -1,4 +1,5 @@
 import type { INotificationAdminRepository } from '@/application/ports/INotificationAdminRepository';
+import { ValidationError } from '@/domain/errors';
 import type { RequestContext } from '@/domain/types/context.types';
 import type { SendNotificationInput } from '@/domain/types/notification.types';
 
@@ -19,7 +20,7 @@ export class SendNotificationUseCase {
 
   async execute(ctx: Readonly<RequestContext>, input: SendNotificationInput): Promise<string> {
     const tenantId = ctx.tenantId;
-    if (!tenantId) throw new Error('Tenant context is missing');
+    if (!tenantId) throw new ValidationError('Tenant context is missing');
 
     const targetUserIds = await this.notifications.resolveTargetUserIds(input, tenantId);
     const notificationId = await this.notifications.insertNotification(

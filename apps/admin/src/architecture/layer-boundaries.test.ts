@@ -143,3 +143,57 @@ describe('architecture: DTO / schema boundary (M9)', () => {
     },
   );
 });
+
+/**
+ * M10 — Error Architecture (Execution Plan §14).
+ *
+ * Two executable rules:
+ *
+ * 1. Raw error re-throws are banned at the infrastructure boundary.
+ *    `if (error) throw error;` forwards PostgREST/PG messages (constraint
+ *    names, schema details, hints) to whoever catches upstream. Errors
+ *    crossing the infrastructure boundary must be mapped to the domain
+ *    taxonomy (`domain/errors`) instead.
+ *
+ * 2. `getErrorMessage` must not be used for client-facing results.
+ *    It passes through ANY raw `.message` (including raw DB errors).
+ *    Client-facing boundaries use `toClientMessage`, which masks
+ *    non-AppError shapes.
+ */
+describe('architecture: error boundary (M10)', () => {
+  const RAW_RETHROW_RE = /\bif\s*\((?:\w*Err\w*|error|err)\)\s*(?:console\.[\w.]+\([^;]*\);\s*)?throw\s+(?:error|err|e)\s*;/;
+  const SCAN_DIRS = ['infrastructure', 'adapters', 'app', 'application'] as const;
+
+  const errorBoundaryFiles = SCAN_DIRS.flatMap((dir) =>
+    collectFiles(path.join(SRC_ROOT, dir)),
+  ).filter((file) => !/\.test\.ts$/.test(file));
+
+  it('has error-boundary source files to scan', () => {
+    expect(errorBoundaryFiles.length).toBeGreaterThan(0);
+  });
+
+  it.each(errorBoundaryFiles.map((f) => [toRelative(f), f] as const))(
+    '%s never re-throws a raw DB error (if (error) throw error)',
+    (_rel, file) => {
+      const source = fs.readFileSync(file, 'utf8');
+      const match = RAW_RETHROW_RE.exec(source);
+      expect(
+        match,
+        `raw re-throw in ${toRelative(file)} — map it to the error taxonomy ` +
+          '(InfrastructureError/ConflictError/NotFoundError/... from @/domain/errors) so raw DB details never reach clients',
+      ).toBeNull();
+    },
+  );
+
+  it('client-facing error mapping uses toClientMessage, not getErrorMessage', () => {
+    for (const file of errorBoundaryFiles) {
+      const source = fs.readFileSync(file, 'utf8');
+      if (!source.includes('getErrorMessage')) continue;
+      expect(
+        source.includes('toClientMessage') || /parseRpcError|hasPerm|\.test\./.test(source) === true,
+        `getErrorMessage in ${toRelative(file)} passes raw .message through — ` +
+          'use toClientMessage for client-facing results (it masks non-AppError shapes)',
+      ).toBe(true);
+    }
+  });
+});

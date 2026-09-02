@@ -30,6 +30,8 @@ export function createBrowserClient() {
     return client;
   } catch (err) {
     console.error('[SupabaseClient] Failed to create browser client:', err);
+    // Re-throw the original error: this is a client-construction failure,
+    // not a DB error carrying sensitive details.
     throw err;
   }
 }

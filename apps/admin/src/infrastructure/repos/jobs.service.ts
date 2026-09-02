@@ -1,3 +1,4 @@
+import { mapDbError } from '@/domain/errors';
 import type { Job, JobFilters, JobStatusCounts } from '@/domain/types/job.types';
 import type { PaginatedResult } from '@/domain/types/user.types';
 import { createAdminClient } from '@/infrastructure/supabase/admin';
@@ -40,7 +41,7 @@ export async function getJobs(
     p_job_type: filters.job_type || null,
     p_date_from: filters.dateFrom || null,
   });
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'jobs.service.ts');
 
   const results = (data ?? []) as AdminGetJobsRow[];
   const total = results.length > 0 ? Number(results[0]!.full_count) : 0;
@@ -79,7 +80,7 @@ export async function getJobs(
 export async function getJobStatusCounts(): Promise<JobStatusCounts> {
   const admin = createAdminClient();
   const { data, error } = await admin.rpc('admin_get_job_counts').single();
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'jobs.service.ts');
 
   // M9: validate the RPC payload with the JobStatusCounts shape instead of
   // blind-casting — a malformed row degrades to 0 counts, never lies.
@@ -97,18 +98,18 @@ export async function getJobStatusCounts(): Promise<JobStatusCounts> {
 export async function retryJob(id: string): Promise<void> {
   const admin = createAdminClient();
   const { error } = await admin.rpc('admin_retry_job', { p_id: id });
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'jobs.service.ts');
 }
 
 export async function cancelJob(id: string): Promise<void> {
   const admin = createAdminClient();
   const { error } = await admin.rpc('admin_cancel_job', { p_id: id });
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'jobs.service.ts');
 }
 
 export async function releaseStaleJobs(): Promise<number> {
   const admin = createAdminClient();
   const { data, error } = await admin.rpc('release_stale_job_locks').single();
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'jobs.service.ts');
   return (data as number) ?? 0;
 }

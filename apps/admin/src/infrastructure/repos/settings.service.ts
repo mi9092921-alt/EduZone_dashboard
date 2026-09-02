@@ -1,4 +1,6 @@
 import { container } from '@/container';
+import { mapDbError } from '@/domain/errors';
+import { InfrastructureError, NotFoundError, UnauthorizedError } from '@/domain/errors';
 import type {
   SettingKv,
   SettingsByCategory,
@@ -74,7 +76,7 @@ export async function getAllSettings(): Promise<SettingKv[]> {
     .order('category')
     .order('key');
 
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'settings.service.ts');
   return (data ?? []).map(mapDbRowToSetting);
 }
 
@@ -102,7 +104,7 @@ export async function getSetting(key: string): Promise<string | null> {
     .eq('key', key)
     .maybeSingle();
 
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'settings.service.ts');
   if (!data) return null;
   if (typeof data.value === 'object' && data.value !== null) {
     return JSON.stringify(data.value);
@@ -120,7 +122,7 @@ export async function setSetting(key: string, value: string, valueType?: string)
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error('ADMIN_ONLY');
+  if (!user) throw new UnauthorizedError('ADMIN_ONLY: sign-in required');
 
   let parsedValue: unknown = value;
   if (valueType === 'boolean') {
@@ -145,8 +147,8 @@ export async function setSetting(key: string, value: string, valueType?: string)
   const { error } = await supabase.from('settings_kv').update(updatePayload).eq('key', key);
 
   if (error) {
-    if (error.code === 'PGRST116') throw new Error('SETTING_NOT_FOUND');
-    throw error;
+    if (error.code === 'PGRST116') throw new NotFoundError('Setting');
+    throw new InfrastructureError(undefined, `setSetting(${key}): ${error.message}`);
   }
 }
 
@@ -158,7 +160,7 @@ export async function createSetting(
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error('ADMIN_ONLY');
+  if (!user) throw new UnauthorizedError('ADMIN_ONLY: sign-in required');
 
   let parsedValue: unknown = setting.value;
   const valueType = setting.value_type;
@@ -192,7 +194,7 @@ export async function createSetting(
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'settings.service.ts');
   return mapDbRowToSetting(data);
 }
 
@@ -200,7 +202,7 @@ export async function deleteSetting(key: string): Promise<void> {
   const { supabase } = container;
   const { error } = await supabase.from('settings_kv').delete().eq('key', key);
 
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'settings.service.ts');
 }
 
 // ══════════════════════════════════════════════════
@@ -249,7 +251,7 @@ export async function enableMaintenanceMode(params: MaintenanceModeParams): Prom
         { ...s, updated_by: user?.id, updated_at: new Date().toISOString() },
         { onConflict: 'key' },
       );
-    if (error) throw error;
+    if (error) throw mapDbError(error, 'settings.service.ts');
   }
 }
 
@@ -270,7 +272,7 @@ export async function disableMaintenanceMode(): Promise<void> {
     { onConflict: 'key' },
   );
 
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'settings.service.ts');
 }
 
 // ══════════════════════════════════════════════════
@@ -295,7 +297,7 @@ export async function lockApp(message: string): Promise<void> {
         { ...s, updated_by: user?.id, updated_at: new Date().toISOString() },
         { onConflict: 'key' },
       );
-    if (error) throw error;
+    if (error) throw mapDbError(error, 'settings.service.ts');
   }
 }
 
@@ -316,5 +318,5 @@ export async function unlockApp(): Promise<void> {
     { onConflict: 'key' },
   );
 
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'settings.service.ts');
 }

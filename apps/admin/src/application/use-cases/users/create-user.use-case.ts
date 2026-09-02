@@ -1,5 +1,5 @@
 import type { IUserAdminRepository } from '@/application/ports/IUserAdminRepository';
-import { getErrorMessage } from '@/domain/errors';
+import { toClientMessage } from '@/domain/errors';
 import type { CreateUserInput } from '@/domain/schemas/user.schema';
 import type { RequestContext } from '@/domain/types/context.types';
 
@@ -89,7 +89,7 @@ export class CreateUserUseCase {
       return { success: true, userId };
     } catch (error: unknown) {
       console.error('createUserAction error:', error);
-      return { success: false, error: getErrorMessage(error) };
+      return { success: false, error: toClientMessage(error) };
     }
   }
 }

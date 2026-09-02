@@ -23,6 +23,7 @@ import { useForm, Controller } from 'react-hook-form';
 
 import { useEnrollStudent } from '@/adapters/mutations/courses.mutations';
 import { useUsers } from '@/adapters/queries/users.queries';
+import { toClientMessage } from '@/domain/errors';
 import { enrollStudentSchema, type EnrollStudentFormInput } from '@/domain/schemas/course.schema';
 import { getUserDisplayName } from '@/domain/types/user.types';
 
@@ -75,8 +76,13 @@ export function EnrollStudentDialog({ courseId, open, onClose }: EnrollStudentDi
       reset();
       onClose();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : t('enroll_student_error');
-      setError(msg.includes('DUPLICATE') ? t('duplicate_enrollment_error') : msg);
+      // M10: conflicts arrive as ConflictError (AppError, code DUPLICATE).
+      const isConflict =
+        typeof err === 'object' &&
+        err !== null &&
+        'code' in err &&
+        (err as { code?: unknown }).code === 'DUPLICATE';
+      setError(isConflict ? t('duplicate_enrollment_error') : toClientMessage(err));
     }
   };
 

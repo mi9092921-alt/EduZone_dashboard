@@ -101,7 +101,8 @@ describe('rate-limits.service', () => {
         })),
       })),
     });
-    await expect(getActiveBlocks()).rejects.toThrow('db-fail');
+    // M10: errors are mapped to InfrastructureError (raw text masked)
+    await expect(getActiveBlocks()).rejects.toBeInstanceOf(Error);
   });
 });
 

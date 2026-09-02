@@ -69,7 +69,10 @@ export async function getYoutubeVideoDetails(
     );
 
     if (!response.ok) {
-      throw new Error(`YouTube API error: ${response.statusText}`);
+      // M10: the catch below logs the raw status; the thrown message stays
+      // generic (upstream statusText could echo internal proxy details).
+      console.error(`[YouTubeService] API responded ${response.status}: ${response.statusText}`);
+      throw new Error('YouTube metadata unavailable');
     }
 
     const data = await response.json();

@@ -1,5 +1,7 @@
 import { getYoutubeMetadataAction } from '@/adapters/actions/video.actions';
 import { container } from '@/container';
+import { mapDbError } from '@/domain/errors';
+import { ConflictError, InfrastructureError, UnauthorizedError } from '@/domain/errors';
 import type {
   Course,
   CourseDetail,
@@ -64,7 +66,7 @@ export async function getCourses(
   if (filters.tenant_id) query = query.eq('tenant_id', filters.tenant_id);
 
   const { data, error, count } = await query;
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'courses.service.ts');
 
   const total = count ?? 0;
   const courses = (data ?? []).map((row: Record<string, unknown>) => {
@@ -101,7 +103,7 @@ export async function getCourseById(id: string): Promise<CourseDetail | null> {
     .eq('id', id)
     .is('deleted_at', null)
     .maybeSingle(); // Use maybeSingle to avoid 406 if deleted
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'courses.service.ts');
   if (!course) return null;
 
   // Fetch sections with lessons and their secured content (v11 model)
@@ -140,7 +142,7 @@ export async function createCourse(data: CreateCourseInput): Promise<Course> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+  if (!user) throw new UnauthorizedError('Not authenticated');
 
   // Get tenant_id from the current user
   const { data: userData, error: userError } = await supabase
@@ -151,7 +153,10 @@ export async function createCourse(data: CreateCourseInput): Promise<Course> {
     .single();
 
   if (userError || !userData?.tenant_id) {
-    throw new Error('Could not determine tenant access. Please contact support.');
+    throw new InfrastructureError(
+      'Could not determine tenant access. Please contact support.',
+      `createCourse tenant lookup: ${userError?.message ?? 'missing tenant_id'}`,
+    );
   }
 
   // v13: is_free is a generated column, do not insert it.
@@ -170,7 +175,7 @@ export async function createCourse(data: CreateCourseInput): Promise<Course> {
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'courses.service.ts');
   return course as Course;
 }
 
@@ -198,7 +203,7 @@ export async function updateCourse(id: string, data: UpdateCourseInput): Promise
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'courses.service.ts');
   return course as Course;
 }
 
@@ -208,7 +213,7 @@ export async function deleteCourse(id: string): Promise<void> {
     .from('courses')
     .update({ deleted_at: new Date().toISOString() })
     .eq('id', id);
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'courses.service.ts');
 }
 
 // ══════════════════════════════════════════════════
@@ -224,7 +229,7 @@ export async function getCourseSections(courseId: string): Promise<Section[]> {
     .is('deleted_at', null)
     .order('order_index', { ascending: true });
 
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'courses.service.ts');
 
   return (data ?? []).map((sec: Record<string, unknown>) => ({
     ...sec,
@@ -270,7 +275,7 @@ export async function createSection(courseId: string, data: CreateSectionInput):
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'courses.service.ts');
   return section as Section;
 }
 
@@ -286,7 +291,7 @@ export async function updateSection(
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'courses.service.ts');
   return section as Section;
 }
 
@@ -297,7 +302,7 @@ export async function deleteSection(id: string): Promise<void> {
     .update({ deleted_at: new Date().toISOString() })
     .eq('id', id);
 
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'courses.service.ts');
 }
 
 export async function reorderSections(
@@ -337,7 +342,7 @@ export async function createLesson(sectionId: string, data: CreateLessonInput): 
 
   if (sectionErr || !sectionData?.tenant_id) {
     console.error('[createLesson] Tenant context missing:', sectionErr);
-    throw new Error(
+    throw new UnauthorizedError(
       'TENANT_CONTEXT_REQUIRED: تأكد من تسجيل الدخول بشكل صحيح وأن حسابك مرتبط بمؤسسة.',
     );
   }
@@ -377,7 +382,7 @@ export async function createLesson(sectionId: string, data: CreateLessonInput): 
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'courses.service.ts');
 
   // 2. Create Lesson Content (v13 security model)
   if (data.video_url) {
@@ -403,7 +408,10 @@ export async function createLesson(sectionId: string, data: CreateLessonInput): 
       });
       // Clean up the created lesson metadata to preserve database integrity
       await supabase.from('lessons').delete().eq('id', lesson.id);
-      throw new Error(`تعذر حفظ محتوى الفيديو: ${contentErr.message || 'خطأ في قواعد البيانات'}`);
+      throw new InfrastructureError(
+        'تعذر حفظ محتوى الفيديو. حاول مرة أخرى أو تواصل مع الدعم.',
+        `createLesson lesson_contents: ${contentErr.message}`,
+      );
     }
   }
 
@@ -427,7 +435,7 @@ export async function createLessons(
 
   if (sectionErr || !courseId || !tenantId) {
     console.error('[createLessons] Tenant context missing:', sectionErr);
-    throw new Error(
+    throw new UnauthorizedError(
       'TENANT_CONTEXT_REQUIRED: تأكد من تسجيل الدخول بشكل صحيح وأن حسابك مرتبط بمؤسسة.',
     );
   }
@@ -468,7 +476,7 @@ export async function createLessons(
     )
     .select();
 
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'courses.service.ts');
 
   // 3. Insert Lesson Contents (v13)
   const contents = lessons
@@ -497,8 +505,9 @@ export async function createLessons(
       // Clean up the created lessons metadata to preserve database integrity
       const lessonIds = lessons.map((l) => l.id);
       await supabase.from('lessons').delete().in('id', lessonIds);
-      throw new Error(
-        `تعذر حفظ محتويات الفيديو للدروس المستوردة: ${batchErr.message || 'خطأ في قواعد البيانات'}`,
+      throw new InfrastructureError(
+        'تعذر حفظ محتويات الفيديو للدروس المستوردة. حاول مرة أخرى أو تواصل مع الدعم.',
+        `createLessons lesson_contents batch: ${batchErr.message}`,
       );
     }
   }
@@ -538,7 +547,7 @@ export async function updateLesson(id: string, data: Partial<CreateLessonInput>)
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'courses.service.ts');
 
   // 2. Sync Lesson Content
   if (data.video_url !== undefined) {
@@ -557,7 +566,10 @@ export async function updateLesson(id: string, data: Partial<CreateLessonInput>)
 
     if (contentErr) {
       console.error('[updateLesson] Failed to sync lesson_contents:', contentErr);
-      throw new Error(`تعذر تحديث رابط الفيديو: ${contentErr.message || 'خطأ في قواعد البيانات'}`);
+      throw new InfrastructureError(
+        'تعذر تحديث رابط الفيديو. حاول مرة أخرى أو تواصل مع الدعم.',
+        `updateLesson lesson_contents: ${contentErr.message}`,
+      );
     }
   } else if (duration !== undefined) {
     // If only duration changed (rare but possible), update lesson_contents too
@@ -571,7 +583,10 @@ export async function updateLesson(id: string, data: Partial<CreateLessonInput>)
 
     if (durationErr) {
       console.error('[updateLesson] Failed to update lesson_contents duration:', durationErr);
-      throw new Error(`تعذر تحديث مدة الفيديو: ${durationErr.message || 'خطأ في قواعد البيانات'}`);
+      throw new InfrastructureError(
+        'تعذر تحديث مدة الفيديو. حاول مرة أخرى أو تواصل مع الدعم.',
+        `updateLesson duration: ${durationErr.message}`,
+      );
     }
   }
 
@@ -588,7 +603,7 @@ export async function deleteLesson(id: string): Promise<void> {
     })
     .eq('id', id);
 
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'courses.service.ts');
 }
 
 export async function reorderLessons(
@@ -625,7 +640,7 @@ export async function getCourseEnrollments(
     .order('enrolled_at', { ascending: false })
     .range(from, to);
 
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'courses.service.ts');
 
   const total = count ?? 0;
   const enrollments = (data ?? []).map((row: Record<string, unknown>) => {
@@ -659,7 +674,7 @@ export async function getAllCourseEnrollments(courseId: string): Promise<Enrollm
     .is('deleted_at', null)
     .order('enrolled_at', { ascending: false });
 
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'courses.service.ts');
 
   return (data ?? []).map((row: Record<string, unknown>) => {
     const user = row.users as Record<string, string> | null;
@@ -689,9 +704,9 @@ export async function enrollStudent(
 
   if (error) {
     if (error.message.includes('duplicate') || error.code === '23505') {
-      throw new Error('DUPLICATE: Student is already enrolled in this course');
+      throw new ConflictError('Student is already enrolled in this course');
     }
-    throw error;
+    throw new InfrastructureError(undefined, `enrollStudent: ${error.message}`);
   }
   return data as string;
 }
@@ -720,7 +735,7 @@ export async function revokeEnrollment(
     p_reason: reason,
   });
 
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'courses.service.ts');
 }
 
 // ══════════════════════════════════════════════════
@@ -793,7 +808,7 @@ export async function getVideoViewsByUser(
     .order('viewed_at', { ascending: false })
     .range(from, to);
 
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'courses.service.ts');
 
   const rows = (data ?? []) as Record<string, unknown>[];
   const courseIds = [
@@ -849,7 +864,7 @@ export async function getLearningObjectives(courseId: string): Promise<CourseLea
     .select('*')
     .eq('course_id', courseId)
     .order('order_index', { ascending: true });
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'courses.service.ts');
   return data || [];
 }
 
@@ -885,7 +900,7 @@ export async function getPrerequisites(courseId: string): Promise<CoursePrerequi
     .from('course_prerequisites')
     .select('*, prerequisite:courses!course_prerequisites_prereq_tenant_fkey(title, level)')
     .eq('course_id', courseId);
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'courses.service.ts');
   return (data || []).map(
     (row: {
       course_id: string;
@@ -941,7 +956,7 @@ export async function getPrerequisiteOptions(
     .neq('id', courseId)
     .is('deleted_at', null)
     .order('title', { ascending: true });
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'courses.service.ts');
   return data || [];
 }
 

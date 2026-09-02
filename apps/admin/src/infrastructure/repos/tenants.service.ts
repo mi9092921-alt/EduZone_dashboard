@@ -5,6 +5,7 @@ import {
   deleteTenantAction,
 } from '@/adapters/actions/tenants.actions';
 import { container } from '@/container';
+import { mapDbError } from '@/domain/errors';
 import type { ActivityLog, AuditFilters } from '@/domain/types/audit.types';
 import type {
   Tenant,
@@ -78,7 +79,7 @@ export async function getTenants(
   if (filters.region_id) query = query.eq('region_id', filters.region_id);
 
   const { data, count, error } = await query;
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'tenants.service.ts');
 
   const total = count ?? 0;
   const tenants = await withTenantUsage((data ?? []) as Tenant[]);
@@ -97,7 +98,7 @@ export async function getTenantById(id: string): Promise<Tenant> {
   const { supabase } = container;
   const { data, error } = await supabase.from('tenants').select('*').eq('id', id).single();
 
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'tenants.service.ts');
   const [tenant] = await withTenantUsage([data as Tenant]);
   return tenant as Tenant;
 }
@@ -154,7 +155,7 @@ export async function getTenantAuditLogs(
   if (filters.dateTo) query = query.lte('created_at', filters.dateTo);
 
   const { data, count, error } = await query;
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'tenants.service.ts');
 
   const total = count ?? 0;
   return {

@@ -71,12 +71,15 @@ describe('CreateTenantUseCase', () => {
     );
   });
 
-  it('throws the stable SLUG_TAKEN error before any insert', async () => {
+  it('throws a ConflictError with the stable SLUG_TAKEN signal before any insert', async () => {
     const repo = makeRepo({ slugExists: vi.fn().mockResolvedValue(true) });
 
     await expect(new CreateTenantUseCase(repo).execute(input)).rejects.toThrow(
-      'SLUG_TAKEN: A tenant with this slug already exists',
+      'A tenant with this slug already exists',
     );
+    await expect(new CreateTenantUseCase(repo).execute(input)).rejects.toMatchObject({
+      code: 'DUPLICATE',
+    });
     expect(repo.create).not.toHaveBeenCalled();
   });
 });

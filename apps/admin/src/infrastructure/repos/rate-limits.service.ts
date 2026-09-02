@@ -1,3 +1,4 @@
+import { mapDbError } from '@/domain/errors';
 import type {
   RateLimitRule,
   RateLimitWithEmail,
@@ -19,7 +20,7 @@ export async function getActiveBlocks(): Promise<RateLimitWithEmail[]> {
     .not('blocked_until', 'is', null)
     .gt('blocked_until', new Date().toISOString())
     .order('blocked_until', { ascending: false });
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'rate-limits.service.ts');
 
   // M9: map the joined row explicitly instead of `as unknown as` spreading
   // the whole row — only the whitelisted RateLimit fields cross the boundary.
@@ -41,7 +42,7 @@ export async function getActiveBlocks(): Promise<RateLimitWithEmail[]> {
 export async function getRateLimitRules(): Promise<RateLimitRule[]> {
   const admin = createAdminClient();
   const { data, error } = await admin.from('rate_limit_rules').select('*').order('action');
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'rate-limits.service.ts');
   return (data ?? []) as RateLimitRule[];
 }
 
@@ -52,14 +53,14 @@ export async function toggleRateLimitRule(action: string, isActive: boolean): Pr
     .from('rate_limit_rules')
     .update({ is_active: isActive })
     .eq('action', action);
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'rate-limits.service.ts');
 }
 
 // ── Clear a specific block ───────────────────────────────────────
 export async function clearBlock(id: string): Promise<void> {
   const admin = createAdminClient();
   const { error } = await admin.from('rate_limits').delete().eq('id', id);
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'rate-limits.service.ts');
 }
 
 // ── Top offenders (last 24h) ─────────────────────────────────────
@@ -73,7 +74,7 @@ export async function getTopOffenders(): Promise<TopOffender[]> {
     .gte('window_start', since)
     .order('hit_count', { ascending: false })
     .limit(100);
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'rate-limits.service.ts');
 
   const mapped = (data ?? []).map((row: Record<string, unknown>) => ({
     ...row,

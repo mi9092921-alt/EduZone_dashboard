@@ -1,4 +1,5 @@
 import { container } from '@/container';
+import { mapDbError } from '@/domain/errors';
 
 /**
  * Enrollment Service
@@ -28,7 +29,9 @@ export async function enrollInCourse(courseId: string): Promise<EnrollmentResult
 
   if (error) {
     console.error('Failed self-enrollment:', error);
-    return { success: false, error: error.message };
+    // M10: map to the taxonomy instead of forwarding raw RPC text.
+    const mapped = mapDbError(error, 'enroll_in_course');
+    return { success: false, error: mapped.message };
   }
 
   return { success: true, id: data as string };
@@ -57,7 +60,9 @@ export async function enrollStudent(
 
   if (error) {
     console.error('Failed admin enrollment:', error);
-    return { success: false, error: error.message };
+    // M10: map to the taxonomy instead of forwarding raw RPC text.
+    const mapped = mapDbError(error, 'enroll_student');
+    return { success: false, error: mapped.message };
   }
 
   return { success: true, id: data as string };

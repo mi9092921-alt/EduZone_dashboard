@@ -1,5 +1,5 @@
 import type { ISessionRepository } from '@/application/ports/ISessionRepository';
-import { getErrorMessage } from '@/domain/errors';
+import { toClientMessage } from '@/domain/errors';
 
 export interface RecordSessionResult {
   success: boolean;
@@ -46,7 +46,7 @@ export class RecordCurrentSessionUseCase {
     try {
       existing = await this.sessions.findSession(sessionId, userId);
     } catch (error) {
-      return { success: false, error: getErrorMessage(error) };
+      return { success: false, error: toClientMessage(error) };
     }
 
     if (existing) {
@@ -57,7 +57,7 @@ export class RecordCurrentSessionUseCase {
       try {
         await this.sessions.touchSession(sessionId, userId, now);
       } catch (error) {
-        return { success: false, error: getErrorMessage(error) };
+        return { success: false, error: toClientMessage(error) };
       }
 
       try {
@@ -80,13 +80,13 @@ export class RecordCurrentSessionUseCase {
         started_at: now,
       });
     } catch (error) {
-      return { success: false, error: getErrorMessage(error) };
+      return { success: false, error: toClientMessage(error) };
     }
 
     try {
       await this.sessions.recordLogin(userId, now, profile.login_count ?? 0);
     } catch (error) {
-      return { success: false, error: getErrorMessage(error) };
+      return { success: false, error: toClientMessage(error) };
     }
 
     return { success: true, active: true };

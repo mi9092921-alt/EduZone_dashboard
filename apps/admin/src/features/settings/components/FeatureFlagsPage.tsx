@@ -59,6 +59,7 @@ import {
 } from '@/adapters/mutations/settings.mutations';
 import { useFeatureFlags, useFeatureFlagDetail, useRoles } from '@/adapters/queries/settings.queries';
 import { useToastStore } from '@/adapters/stores/toast.store';
+import { toClientMessage } from '@/domain/errors';
 import type { CreateFeatureFlagInput, FeatureFlag } from '@/domain/types/feature-flag.types';
 
 export function FeatureFlagsPage() {
@@ -628,8 +629,13 @@ function CreateFlagDialog({ open, onClose, onSuccess }: CreateFlagDialogProps) {
       setError('');
       onSuccess();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'FAILED';
-      setError(msg === 'FLAG_KEY_EXISTS' ? tVal('key_exists') : msg);
+      // M10: conflicts arrive as ConflictError (AppError, code DUPLICATE).
+      const isConflict =
+        typeof err === 'object' &&
+        err !== null &&
+        'code' in err &&
+        (err as { code?: unknown }).code === 'DUPLICATE';
+      setError(isConflict ? tVal('key_exists') : toClientMessage(err));
     }
   };
 

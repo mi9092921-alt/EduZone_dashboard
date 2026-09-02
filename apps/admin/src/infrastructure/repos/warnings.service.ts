@@ -1,4 +1,5 @@
 import { container } from '@/container';
+import { mapDbError } from '@/domain/errors';
 import type {
   Warning,
   WarningFilters,
@@ -42,7 +43,7 @@ export async function getWarnings(
   if (filters.severity) query = query.eq('severity', filters.severity);
 
   const { data, error, count } = await query;
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'warnings.service.ts');
 
   const total = count ?? 0;
   const warnings = (data ?? []).map((row: Record<string, unknown>) => {
@@ -162,7 +163,7 @@ export async function getStudentProgress(
     .order('enrolled_at', { ascending: false })
     .range(from, to);
 
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'warnings.service.ts');
 
   const total = count ?? 0;
   // M9: map DB row → StudentProgress DTO here (typed), so the UI receives

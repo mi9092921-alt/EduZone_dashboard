@@ -2,6 +2,7 @@ import {
   authorizeCaller,
   authorizeSuperAdmin,
 } from '@/application/authorization/authorization.service';
+import { UnauthorizedError } from '@/domain/errors';
 import type { RequestContext } from '@/domain/types/context.types';
 import { createServerClient } from '@/infrastructure/supabase/server';
 
@@ -31,7 +32,7 @@ export async function requirePermission(
 export async function requireUser(): Promise<string> {
   const supabase = await createServerClient();
   const { data, error } = await supabase.auth.getUser();
-  if (error || !data?.user) throw new Error('Unauthorized');
+  if (error || !data?.user) throw new UnauthorizedError();
   return data.user.id;
 }
 

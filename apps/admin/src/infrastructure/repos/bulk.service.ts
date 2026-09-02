@@ -1,4 +1,5 @@
 import { container } from '@/container';
+import { mapDbError } from '@/domain/errors';
 import type {
   BulkAction,
   BulkDryRunResponse,
@@ -78,7 +79,7 @@ export async function submitBulkAction(
 export async function cancelBulkJob(jobId: string): Promise<void> {
   const { supabase } = container;
   const { error } = await supabase.rpc('admin_cancel_job', { p_id: jobId });
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'bulk.service.ts');
 }
 
 // ── Subscribe to job progress (Supabase Realtime) ────────────────

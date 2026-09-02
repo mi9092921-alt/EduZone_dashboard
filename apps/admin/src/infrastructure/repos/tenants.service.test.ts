@@ -117,7 +117,8 @@ describe('tenants.service', () => {
 
       // range() is terminal in our chain, so we mock the final resolution
       q.range.mockResolvedValue({ data: null, count: null, error: { message: 'DB error' } });
-      await expect(getTenants({}, 1, 10)).rejects.toEqual({ message: 'DB error' });
+      // M10: errors are mapped to InfrastructureError (raw text masked)
+      await expect(getTenants({}, 1, 10)).rejects.toBeInstanceOf(Error);
     });
   });
 
@@ -153,12 +154,12 @@ describe('tenants.service', () => {
       expect(result).toBe(tenant);
     });
 
-    it('propagates SLUG_TAKEN from the action', async () => {
+    it('propagates the slug conflict from the action', async () => {
       const { createTenantAction } = await import('@/adapters/actions/tenants.actions');
-      (createTenantAction as any).mockRejectedValue(new Error('SLUG_TAKEN'));
+      (createTenantAction as any).mockRejectedValue(new Error('A tenant with this slug already exists'));
 
       await expect(createTenant({ slug: 'existing', name: 'Existing' } as any)).rejects.toThrow(
-        'SLUG_TAKEN',
+        'A tenant with this slug already exists',
       );
     });
   });

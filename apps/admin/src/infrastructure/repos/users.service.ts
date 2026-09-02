@@ -1,4 +1,5 @@
 import { container } from '@/container';
+import { mapDbError } from '@/domain/errors';
 import type {
   User,
   UserFilters,
@@ -51,7 +52,7 @@ export async function getUsers(
   if (filters.last_login_to) query = query.lte('last_login', filters.last_login_to);
 
   const { data, error, count } = await query;
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'users.service.ts');
 
   const total = count ?? 0;
   return {
@@ -73,7 +74,7 @@ export async function getUserById(id: string): Promise<User> {
     .is('deleted_at', null)
     .single();
 
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'users.service.ts');
   return data as User;
 }
 
@@ -119,7 +120,7 @@ export async function terminateUserSessions(userId: string, reason?: string): Pr
     p_reason: reason || 'admin_terminated',
   });
 
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'users.service.ts');
   return (data as number | null) ?? 0;
 }
 
@@ -130,7 +131,7 @@ export async function resetUserDevices(userId: string): Promise<void> {
     p_user_id: userId,
   });
 
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'users.service.ts');
 }
 
 // ── Issue warning ────────────────────────────────────────────────
@@ -181,7 +182,7 @@ export async function getDevices(userId: string): Promise<Device[]> {
     .eq('is_active', true)
     .order('last_seen', { ascending: false });
 
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'users.service.ts');
   return (data ?? []) as Device[];
 }
 
@@ -197,7 +198,7 @@ export async function getSessions(userId: string): Promise<Session[]> {
     .order('started_at', { ascending: false })
     .limit(50);
 
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'users.service.ts');
   return (data ?? []) as Session[];
 }
 
@@ -211,7 +212,7 @@ export async function getWarnings(userId: string): Promise<Warning[]> {
     .order('created_at', { ascending: false })
     .limit(50);
 
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'users.service.ts');
   return (data ?? []) as Warning[];
 }
 
@@ -224,7 +225,7 @@ export async function getEffectivePermissions(userId: string): Promise<Permissio
     .eq('user_id', userId)
     .order('permission_name');
 
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'users.service.ts');
   return (data ?? []) as PermissionCacheEntry[];
 }
 
@@ -237,7 +238,7 @@ export async function getUserRoles(userId: string): Promise<UserRoleAssignment[]
     .eq('user_id', userId)
     .order('granted_at', { ascending: false });
 
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'users.service.ts');
 
   return (data ?? []).map((row: Record<string, unknown>) => ({
     // Spread all base row fields (user_id, role_id, granted_at, etc.)
@@ -315,7 +316,7 @@ export async function getAllPermissions(): Promise<string[]> {
   const { supabase } = container;
   const { data, error } = await supabase.from('permissions').select('name').order('name');
 
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'users.service.ts');
   return (data ?? []).map((p) => p.name);
 }
 
@@ -365,6 +366,6 @@ export async function searchUsers(
 
   const { data, error } = await q.limit(limit);
 
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'users.service.ts');
   return data ?? [];
 }

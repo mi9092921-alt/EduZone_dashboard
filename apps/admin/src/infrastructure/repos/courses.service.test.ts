@@ -158,7 +158,11 @@ describe('courses.service', () => {
       data: null,
       error: { message: 'duplicate key value', code: '23505' },
     });
-    await expect(enrollStudent('u1', 'c1', 'admin', '2025-01-01')).rejects.toThrow('DUPLICATE');
+    // M10: duplicate enrollment throws ConflictError (AppError, code DUPLICATE)
+    await expect(enrollStudent('u1', 'c1', 'admin', '2025-01-01')).rejects.toMatchObject({
+      code: 'DUPLICATE',
+      message: 'Student is already enrolled in this course',
+    });
   });
 
   it('getCourseSections, createSection, updateSection, deleteSection, reorderSections', async () => {

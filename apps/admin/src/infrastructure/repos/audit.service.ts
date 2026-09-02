@@ -1,4 +1,5 @@
 import { container } from '@/container';
+import { mapDbError } from '@/domain/errors';
 import { AppError } from '@/domain/errors/AppError';
 import type {
   ActivityLog,
@@ -51,7 +52,7 @@ export async function getActivityLogs(
   }
 
   const { data, error, count } = await query;
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'audit.service.ts');
 
   const total = count ?? 0;
   return {
@@ -78,7 +79,7 @@ export async function getActivityLogsForVerification(
     .order('created_at', { ascending: true })
     .limit(5000);
 
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'audit.service.ts');
   return (data ?? []) as ActivityLog[];
 }
 
@@ -108,7 +109,7 @@ export async function getPrecedingLogEntryHash(seq: number): Promise<string | nu
     .eq('seq', seq - 1)
     .maybeSingle();
 
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'audit.service.ts');
   return (data as { entry_hash: string } | null)?.entry_hash ?? null;
 }
 
@@ -121,7 +122,7 @@ export async function getAuditChainState(): Promise<AuditChainState> {
     .eq('id', 1)
     .single();
 
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'audit.service.ts');
   return data as AuditChainState;
 }
 
@@ -151,6 +152,6 @@ export async function getQueuedActivities(limit: number = 200): Promise<Activity
     .select('*')
     .order('created_at', { ascending: false })
     .limit(limit);
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'audit.service.ts');
   return (data ?? []) as ActivityLogQueueEntry[];
 }

@@ -51,7 +51,7 @@ describe('ControlUserAccountUseCase', () => {
     });
   });
 
-  it('returns success:false with the DB message when the RPC fails', async () => {
+  it('returns success:false with a masked, client-safe error when the RPC fails', async () => {
     const repo = makeRepo({
       controlAccount: vi.fn().mockRejectedValue({ message: 'PERMISSION_DENIED' }),
     });
@@ -59,7 +59,9 @@ describe('ControlUserAccountUseCase', () => {
 
     const result = await new ControlUserAccountUseCase(repo).execute('u1', 'ban', 'spam');
 
-    expect(result).toEqual({ success: false, error: 'PERMISSION_DENIED' });
+    // M10: raw RPC text stays in server logs; the client gets a generic message.
+    expect(result.success).toBe(false);
+    expect(result.error).not.toContain('PERMISSION_DENIED');
     expect(consoleSpy).toHaveBeenCalledWith(
       '[controlUserAccountAction] ban on u1 failed:',
       expect.anything(),
@@ -90,7 +92,7 @@ describe('TerminateUserSessionsUseCase', () => {
     expect(repo.terminateSessions).toHaveBeenCalledWith('u1', 'security incident');
   });
 
-  it('returns success:false when the RPC fails', async () => {
+  it('returns success:false with a masked error when the RPC fails', async () => {
     const repo = makeRepo({
       terminateSessions: vi.fn().mockRejectedValue({ message: 'rpc failed' }),
     });
@@ -98,7 +100,9 @@ describe('TerminateUserSessionsUseCase', () => {
 
     const result = await new TerminateUserSessionsUseCase(repo).execute('u1');
 
-    expect(result).toEqual({ success: false, error: 'rpc failed' });
+    // M10: raw RPC text must not reach the client-facing result.
+    expect(result.success).toBe(false);
+    expect(result.error).not.toContain('rpc failed');
     consoleSpy.mockRestore();
   });
 });
@@ -135,7 +139,7 @@ describe('IssueWarningUseCase', () => {
     });
   });
 
-  it('returns success:false when the RPC fails', async () => {
+  it('returns success:false with a masked error when the RPC fails', async () => {
     const repo = makeRepo({
       issueWarning: vi.fn().mockRejectedValue({ message: 'TOO_MANY_WARNINGS' }),
     });
@@ -143,7 +147,9 @@ describe('IssueWarningUseCase', () => {
 
     const result = await new IssueWarningUseCase(repo).execute('u1', 'Spamming', 1, 'none');
 
-    expect(result).toEqual({ success: false, error: 'TOO_MANY_WARNINGS' });
+    // M10: raw RPC text must not reach the client-facing result.
+    expect(result.success).toBe(false);
+    expect(result.error).not.toContain('TOO_MANY_WARNINGS');
     expect(consoleSpy).toHaveBeenCalledWith(
       '[issueWarningAction] warning for u1 failed:',
       expect.anything(),

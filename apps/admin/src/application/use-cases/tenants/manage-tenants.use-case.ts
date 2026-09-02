@@ -1,4 +1,5 @@
 import type { ITenantAdminRepository } from '@/application/ports/ITenantAdminRepository';
+import { ConflictError } from '@/domain/errors';
 import type { RequestContext } from '@/domain/types/context.types';
 import type { CreateTenantInput, Tenant, UpdateTenantInput } from '@/domain/types/tenant.types';
 
@@ -31,7 +32,7 @@ export class CreateTenantUseCase {
   async execute(input: CreateTenantInput): Promise<Tenant> {
     // Pre-check slug uniqueness
     if (await this.tenants.slugExists(input.slug)) {
-      throw new Error('SLUG_TAKEN: A tenant with this slug already exists');
+      throw new ConflictError('A tenant with this slug already exists', `SLUG_TAKEN: ${input.slug}`);
     }
 
     return this.tenants.create({

@@ -5,7 +5,9 @@ import type { RpcErrorCode } from './codes';
  * Contains a typed error code for programmatic handling.
  */
 export class AppError extends Error {
-  public readonly name = 'AppError' as const;
+  // M10: subclasses narrow `name` to their own literal; the base declares
+  // the widened type so the prototype chain stays instanceof-safe.
+  public readonly name: string = 'AppError';
 
   constructor(
     public readonly code: RpcErrorCode,

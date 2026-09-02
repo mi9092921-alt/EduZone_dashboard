@@ -1,5 +1,5 @@
 import type { IUserAdminRepository } from '@/application/ports/IUserAdminRepository';
-import { getErrorMessage } from '@/domain/errors';
+import { toClientMessage } from '@/domain/errors';
 
 export interface DeleteUserResult {
   success: boolean;
@@ -39,7 +39,7 @@ export class DeleteUserUseCase {
       return { success: true };
     } catch (error: unknown) {
       console.error('deleteUserAction error:', error);
-      return { success: false, error: getErrorMessage(error) };
+      return { success: false, error: toClientMessage(error) };
     }
   }
 }

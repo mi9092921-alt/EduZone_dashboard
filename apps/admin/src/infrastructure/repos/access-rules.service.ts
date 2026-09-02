@@ -1,6 +1,7 @@
 import type { AccessRule, PaginatedResult } from '@eduzone/types';
 
 import { container } from '@/container';
+import { mapDbError } from '@/domain/errors';
 import type { UpsertAccessRuleInput } from '@/domain/schemas/settings.schema';
 import { createAdminClient } from '@/infrastructure/supabase/admin';
 
@@ -57,7 +58,7 @@ export async function getAccessRulesAdmin(
   const { data, error, count } = await query
     .order('created_at', { ascending: false })
     .range(from, to);
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'access-rules.service.ts');
 
   const total = count ?? 0;
   return {
@@ -76,7 +77,7 @@ export async function upsertAccessRule(rule: UpsertAccessRuleInput): Promise<Acc
     .upsert({ ...rule, updated_at: new Date().toISOString() })
     .select('*')
     .single();
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'access-rules.service.ts');
   return data as AccessRule;
 }
 
@@ -88,21 +89,21 @@ export async function upsertAccessRuleAdmin(rule: UpsertAccessRuleInput): Promis
     .upsert({ ...rule, updated_at: new Date().toISOString() })
     .select('*')
     .single();
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'access-rules.service.ts');
   return data as AccessRule;
 }
 
 export async function deleteAccessRule(id: string): Promise<void> {
   const { supabase } = container;
   const { error } = await supabase.from('access_rules').delete().eq('id', id);
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'access-rules.service.ts');
 }
 
 /** Server-action variant — uses service_role to bypass RLS. */
 export async function deleteAccessRuleAdmin(id: string): Promise<void> {
   const admin = createAdminClient();
   const { error } = await admin.from('access_rules').delete().eq('id', id);
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'access-rules.service.ts');
 }
 
 export async function toggleAccessRule(id: string, isActive: boolean): Promise<void> {
@@ -111,12 +112,12 @@ export async function toggleAccessRule(id: string, isActive: boolean): Promise<v
     .from('access_rules')
     .update({ is_active: isActive })
     .eq('id', id);
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'access-rules.service.ts');
 }
 
 /** Server-action variant — uses service_role to bypass RLS. */
 export async function toggleAccessRuleAdmin(id: string, isActive: boolean): Promise<void> {
   const admin = createAdminClient();
   const { error } = await admin.from('access_rules').update({ is_active: isActive }).eq('id', id);
-  if (error) throw error;
+  if (error) throw mapDbError(error, 'access-rules.service.ts');
 }

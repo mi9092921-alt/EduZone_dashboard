@@ -109,14 +109,16 @@ describe('RecordCurrentSessionUseCase', () => {
     expect(repo.recordLogin).toHaveBeenCalledWith('user-1', expect.any(String), 5);
   });
 
-  it('returns the DB message when the session insert fails', async () => {
+  it('returns a masked error (never the raw DB message) when the session insert fails', async () => {
     const repo = makeRepo({
       createSession: vi.fn().mockRejectedValue({ message: 'duplicate key' }),
     });
 
     const result = await new RecordCurrentSessionUseCase(repo).execute(params);
 
-    expect(result).toEqual({ success: false, error: 'duplicate key' });
+    // M10: raw DB text must not reach the client-facing result
+    expect(result.success).toBe(false);
+    expect(result.error).not.toContain('duplicate key');
     expect(repo.recordLogin).not.toHaveBeenCalled();
   });
 

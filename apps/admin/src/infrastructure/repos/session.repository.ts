@@ -6,6 +6,7 @@ import type {
   SessionProfileRow,
   SessionRow,
 } from '@/application/ports/ISessionRepository';
+import { mapDbError } from '@/domain/errors';
 import { createAdminClient } from '@/infrastructure/supabase/admin';
 
 /**
@@ -46,7 +47,7 @@ export function makeSessionRepository(admin: SupabaseClient = createAdminClient(
         .update({ updated_at: at })
         .eq('id', sessionId)
         .eq('user_id', userId);
-      if (error) throw error;
+      if (error) throw mapDbError(error, 'session.repository.ts');
     },
 
     async bumpLastLogin(userId: string, at: string): Promise<void> {
@@ -65,7 +66,7 @@ export function makeSessionRepository(admin: SupabaseClient = createAdminClient(
         started_at: input.started_at,
         updated_at: input.started_at,
       });
-      if (error) throw error;
+      if (error) throw mapDbError(error, 'session.repository.ts');
     },
 
     async recordLogin(userId: string, at: string, previousLoginCount: number): Promise<void> {
@@ -73,7 +74,7 @@ export function makeSessionRepository(admin: SupabaseClient = createAdminClient(
         last_login: at,
         login_count: previousLoginCount + 1,
       }).eq('id', userId);
-      if (error) throw error;
+      if (error) throw mapDbError(error, 'session.repository.ts');
     },
   };
 }

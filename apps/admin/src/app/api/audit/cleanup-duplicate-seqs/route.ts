@@ -52,7 +52,10 @@ export async function POST() {
       .order('created_at', { ascending: true });
 
     if (fetchErr) {
-      return NextResponse.json({ error: fetchErr.message }, { status: 500 });
+      // M10: log raw DB error server-side, return a generic message — the
+      // PostgREST text can contain schema/column/function details.
+      console.error('[cleanup-duplicate-seqs] fetch failed:', fetchErr);
+      return NextResponse.json({ error: 'Failed to scan audit logs' }, { status: 500 });
     }
 
     // Group by seq
@@ -97,7 +100,12 @@ export async function POST() {
       const { error: delErr } = await admin.from('activity_logs').delete().in('id', batch);
 
       if (delErr) {
-        return NextResponse.json({ error: delErr.message, deleted }, { status: 500 });
+        // M10: same masking policy as the fetch error above.
+        console.error('[cleanup-duplicate-seqs] delete failed:', delErr);
+        return NextResponse.json(
+          { error: 'Failed to remove duplicate entries', deleted },
+          { status: 500 },
+        );
       }
       deleted += batch.length;
     }

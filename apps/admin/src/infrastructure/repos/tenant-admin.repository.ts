@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { ITenantAdminRepository, NewTenantRow } from '@/application/ports/ITenantAdminRepository';
+import { mapDbError } from '@/domain/errors';
 import type { Tenant, UpdateTenantInput } from '@/domain/types/tenant.types';
 import { createAdminClient } from '@/infrastructure/supabase/admin';
 
@@ -39,7 +40,7 @@ export function makeTenantAdminRepository(
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) throw mapDbError(error, 'tenant-admin.repository.ts');
       return data as Tenant;
     },
 
@@ -51,7 +52,7 @@ export function makeTenantAdminRepository(
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) throw mapDbError(error, 'tenant-admin.repository.ts');
       return data as Tenant;
     },
 
@@ -65,7 +66,7 @@ export function makeTenantAdminRepository(
         })
         .eq('id', id);
 
-      if (error) throw error;
+      if (error) throw mapDbError(error, 'tenant-admin.repository.ts');
     },
 
     async softDelete(id: string): Promise<void> {
@@ -79,7 +80,7 @@ export function makeTenantAdminRepository(
         })
         .eq('id', id);
 
-      if (error) throw error;
+      if (error) throw mapDbError(error, 'tenant-admin.repository.ts');
     },
 
     async logSuspension(input: {
