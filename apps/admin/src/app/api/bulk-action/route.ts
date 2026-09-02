@@ -1,9 +1,9 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 
 import { roleAllowsPermission } from '@/application/authorization/policy';
+import { createAdminClient } from '@/infrastructure/supabase/admin';
 import { createServerClient } from '@/infrastructure/supabase/server';
-import { env, getServerEnv } from '@/lib/env';
 
 /**
  * Bulk-action API route — replaces the Supabase Edge Function.
@@ -424,16 +424,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Build admin client for privileged ops ─────────────────
-    const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceKey = getServerEnv().SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!supabaseUrl || !serviceKey) {
-      return errorJson('SERVER_ERROR', 'Missing server configuration', 500);
-    }
-
-    const admin = createClient(supabaseUrl, serviceKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
+    const admin = createAdminClient();
 
     // P1-SEC-005 FIX: this route runs every query below through the
     // service_role client, which bypasses RLS entirely -- so tenant scoping

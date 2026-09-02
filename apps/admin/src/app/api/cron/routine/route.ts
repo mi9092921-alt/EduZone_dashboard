@@ -1,9 +1,9 @@
 import { timingSafeEqual } from 'node:crypto';
 
-import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
-import { env, getServerEnv } from '@/lib/env';
+import { createAdminClient } from '@/infrastructure/supabase/admin';
+import { getServerEnv } from '@/lib/env';
 
 function hasValidCronSecret(request: Request): boolean {
   const configuredSecret = getServerEnv().CRON_SECRET;
@@ -20,12 +20,7 @@ function hasValidCronSecret(request: Request): boolean {
 }
 
 function getSupabaseAdmin() {
-  const url = env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = getServerEnv().SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !serviceRoleKey) {
-    throw new Error('Cron worker is not configured: missing SUPABASE_SERVICE_ROLE_KEY');
-  }
-  return createClient(url, serviceRoleKey);
+  return createAdminClient();
 }
 
 export async function GET(request: Request) {

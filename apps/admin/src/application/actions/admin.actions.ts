@@ -1,7 +1,6 @@
 'use server';
 
 import type { AccessRule, PaginatedResult } from '@eduzone/types';
-import { createClient } from '@supabase/supabase-js';
 
 import type { SendNotificationInput } from '@/adapters/mutations/notifications.mutations';
 import type {
@@ -9,7 +8,7 @@ import type {
   UserNotification,
   TargetAudience,
 } from '@/adapters/queries/notifications.queries';
-import { roleAllowsPermission } from '@/application/authorization/policy';
+import { authorizeCaller } from '@/application/authorization/authorization.service';
 import type { CourseWithStats, MvCourseStats } from '@/domain/types/analytics.types';
 import type { ActivityLogQueueEntry } from '@/domain/types/audit.types';
 import type { CourseStats } from '@/domain/types/course.types';
@@ -31,52 +30,13 @@ import type {
   RateLimitWithEmail,
   TopOffender,
 } from '@/domain/types/rate-limit.types';
+import { createAdminClient } from '@/infrastructure/supabase/admin';
 import { createServerClient } from '@/infrastructure/supabase/server';
-import { env, getServerEnv } from '@/lib/env';
-
-function createAdminClient() {
-  const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = getServerEnv().SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceKey) {
-    throw new Error('Supabase server configuration is missing: SUPABASE_SERVICE_ROLE_KEY');
-  }
-
-  return createClient(supabaseUrl, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-}
 
 async function requirePermission(permission: string | string[]) {
   const supabase = await createServerClient();
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (userError || !userData?.user) throw new Error('Unauthorized');
-
-  const { data: profile } = await supabase
-    .from('users')
-    .select('primary_role, tenant_id')
-    .eq('id', userData.user.id)
-    .is('deleted_at', null)
-    .maybeSingle();
-
-  if (profile?.primary_role === 'super_admin') {
-    return { userId: userData.user.id, tenantId: profile.tenant_id as string | null };
-  }
-
-  const permissions = Array.isArray(permission) ? permission : [permission];
-  if (roleAllowsPermission(profile?.primary_role as string | undefined, permissions)) {
-    return { userId: userData.user.id, tenantId: profile?.tenant_id as string | null };
-  }
-
-  for (const p of permissions) {
-    const { data } = await supabase.rpc('user_has_permission', {
-      p_user_id: userData.user.id,
-      p_permission: p,
-      p_tenant_id: profile?.tenant_id ?? null,
-    });
-    if (data) return { userId: userData.user.id, tenantId: profile?.tenant_id as string | null };
-  }
-
-  throw new Error(`Permission Denied: user lacks ${permissions.join(' or ')}`);
+  const ctx = await authorizeCaller(supabase, permission);
+  return { userId: ctx.userId, tenantId: ctx.tenantId as string | null };
 }
 
 

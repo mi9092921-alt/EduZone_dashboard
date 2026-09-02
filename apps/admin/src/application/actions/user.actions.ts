@@ -1,75 +1,24 @@
 'use server';
 
-import { createClient } from '@supabase/supabase-js';
-
-import { roleAllowsPermission } from '@/application/authorization/policy';
+import { authorizeCaller } from '@/application/authorization/authorization.service';
 import { getErrorMessage } from '@/domain/errors';
 import { CreateUserInput, createUserSchema } from '@/domain/schemas/user.schema';
 import type { AccountAction } from '@/domain/types/user.types';
+import { createAdminClient } from '@/infrastructure/supabase/admin';
 import { createServerClient } from '@/infrastructure/supabase/server';
-import { env, getServerEnv } from '@/lib/env';
-
-// ── Helper: build a service-role admin client ────────────────────────────────
-function createAdminClient() {
-  const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = getServerEnv().SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceKey) {
-    throw new Error('Supabase environment variables missing: SUPABASE_SERVICE_ROLE_KEY');
-  }
-  return createClient(supabaseUrl, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-}
 
 // ── Helper: verify caller authentication and a required permission ────────────
 async function verifyCallerPermission(
   supabase: Awaited<ReturnType<typeof createServerClient>>,
   permission: string | string[],
 ) {
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (userError || !userData?.user) {
-    return { user: null, error: 'Unauthorized' as const };
+  try {
+    const ctx = await authorizeCaller(supabase, permission);
+    return { user: { id: ctx.userId }, error: null };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unauthorized';
+    return { user: null, error: message };
   }
-
-  const { data: profile } = await supabase
-    .from('users')
-    .select('primary_role, tenant_id')
-    .eq('id', userData.user.id)
-    .is('deleted_at', null)
-    .maybeSingle();
-
-  if (profile?.primary_role === 'super_admin') {
-    return { user: userData.user, error: null };
-  }
-
-  const permissions = Array.isArray(permission) ? permission : [permission];
-  if (roleAllowsPermission(profile?.primary_role as string | undefined, permissions)) {
-    return { user: userData.user, error: null };
-  }
-
-  let hasPerm = false;
-
-  for (const p of permissions) {
-    const { data } = await supabase.rpc('user_has_permission', {
-      p_user_id: userData.user.id,
-      p_permission: p,
-      p_tenant_id: profile?.tenant_id ?? null,
-    });
-
-    if (data) {
-      hasPerm = true;
-      break;
-    }
-  }
-
-  if (!hasPerm) {
-    return {
-      user: null,
-      error: `Permission Denied: user lacks ${permissions.join(' or ')}` as const,
-    };
-  }
-
-  return { user: userData.user, error: null };
 }
 
 

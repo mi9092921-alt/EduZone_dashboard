@@ -1,21 +1,9 @@
 'use server';
 
-import { createClient } from '@supabase/supabase-js';
 import { headers } from 'next/headers';
 
+import { createAdminClient } from '@/infrastructure/supabase/admin';
 import { createServerClient } from '@/infrastructure/supabase/server';
-import { env, getServerEnv } from '@/lib/env';
-
-function createAdminClient() {
-  const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = getServerEnv().SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceKey) {
-    throw new Error('Supabase environment variables missing: SUPABASE_SERVICE_ROLE_KEY');
-  }
-  return createClient(supabaseUrl, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-}
 
 function getClientIp(headerStore: Awaited<ReturnType<typeof headers>>) {
   const forwarded = headerStore.get('x-forwarded-for')?.split(',')[0]?.trim();

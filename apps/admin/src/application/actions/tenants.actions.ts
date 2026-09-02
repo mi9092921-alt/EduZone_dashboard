@@ -1,39 +1,14 @@
 'use server';
 
-import { createClient } from '@supabase/supabase-js';
-
+import { authorizeSuperAdmin } from '@/application/authorization/authorization.service';
 import type { Tenant, CreateTenantInput, UpdateTenantInput } from '@/domain/types/tenant.types';
+import { createAdminClient } from '@/infrastructure/supabase/admin';
 import { createServerClient } from '@/infrastructure/supabase/server';
-import { env, getServerEnv } from '@/lib/env';
-
-function createAdminClient() {
-  const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = getServerEnv().SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceKey) {
-    throw new Error('Supabase server configuration is missing: SUPABASE_SERVICE_ROLE_KEY');
-  }
-  return createClient(supabaseUrl, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-}
 
 async function requireSuperAdmin() {
   const supabase = await createServerClient();
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (userError || !userData?.user) throw new Error('Unauthorized');
-
-  const { data: profile } = await supabase
-    .from('users')
-    .select('primary_role, tenant_id')
-    .eq('id', userData.user.id)
-    .is('deleted_at', null)
-    .maybeSingle();
-
-  if (profile?.primary_role !== 'super_admin') {
-    throw new Error('Permission Denied: tenants management requires super_admin role');
-  }
-
-  return { userId: userData.user.id };
+  const ctx = await authorizeSuperAdmin(supabase);
+  return { userId: ctx.userId };
 }
 
 // ── Create tenant (admin client bypasses RLS) ───────────────────
