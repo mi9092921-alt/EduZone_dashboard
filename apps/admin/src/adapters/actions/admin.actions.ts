@@ -14,6 +14,7 @@ import {
   ListNotificationsUseCase,
 } from '@/application/use-cases/notifications/manage-notifications.use-case';
 import { SendNotificationUseCase } from '@/application/use-cases/notifications/send-notification.use-case';
+import type { UpsertAccessRuleInput } from '@/domain/schemas/settings.schema';
 import type { CourseWithStats } from '@/domain/types/analytics.types';
 import type { ActivityLogQueueEntry } from '@/domain/types/audit.types';
 import type { CourseStats } from '@/domain/types/course.types';
@@ -69,7 +70,9 @@ export async function getAccessRulesAction(
   return accessRulesService.getAccessRulesAdmin(tenantId, page, pageSize);
 }
 
-export async function upsertAccessRuleAction(rule: Partial<AccessRule>): Promise<AccessRule> {
+export async function upsertAccessRuleAction(
+  rule: UpsertAccessRuleInput,
+): Promise<AccessRule> {
   await requirePermission(['settings.manage', 'settings.write', 'tenants.manage']);
   return accessRulesService.upsertAccessRuleAdmin(rule);
 }

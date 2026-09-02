@@ -131,7 +131,7 @@ export function EnrollStudentDialog({ courseId, open, onClose }: EnrollStudentDi
                         helperText={errors.user_id?.message}
                         size="small"
                         placeholder={t('student_search_placeholder')}
-                        InputLabelProps={InputLabelProps as unknown as { shrink?: boolean; className?: string }}
+                        InputLabelProps={InputLabelProps as { shrink?: boolean; className?: string }}
                         InputProps={{
                           ...InputProps,
                           endAdornment: (

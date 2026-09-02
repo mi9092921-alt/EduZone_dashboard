@@ -1,6 +1,7 @@
 import type { AccessRule, PaginatedResult } from '@eduzone/types';
 
 import { container } from '@/container';
+import type { UpsertAccessRuleInput } from '@/domain/schemas/settings.schema';
 import { createAdminClient } from '@/infrastructure/supabase/admin';
 
 /**
@@ -68,7 +69,7 @@ export async function getAccessRulesAdmin(
   };
 }
 
-export async function upsertAccessRule(rule: Partial<AccessRule>): Promise<AccessRule> {
+export async function upsertAccessRule(rule: UpsertAccessRuleInput): Promise<AccessRule> {
   const { supabase } = container;
   const { data, error } = await supabase
     .from('access_rules')
@@ -80,7 +81,7 @@ export async function upsertAccessRule(rule: Partial<AccessRule>): Promise<Acces
 }
 
 /** Server-action variant — uses service_role to bypass RLS. */
-export async function upsertAccessRuleAdmin(rule: Partial<AccessRule>): Promise<AccessRule> {
+export async function upsertAccessRuleAdmin(rule: UpsertAccessRuleInput): Promise<AccessRule> {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from('access_rules')

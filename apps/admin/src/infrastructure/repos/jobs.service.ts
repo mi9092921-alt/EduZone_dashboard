@@ -80,7 +80,18 @@ export async function getJobStatusCounts(): Promise<JobStatusCounts> {
   const admin = createAdminClient();
   const { data, error } = await admin.rpc('admin_get_job_counts').single();
   if (error) throw error;
-  return data as unknown as JobStatusCounts;
+
+  // M9: validate the RPC payload with the JobStatusCounts shape instead of
+  // blind-casting — a malformed row degrades to 0 counts, never lies.
+  const raw = (data ?? {}) as Record<string, unknown>;
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+  return {
+    pending: num(raw.pending),
+    processing: num(raw.processing),
+    done: num(raw.done),
+    failed: num(raw.failed),
+    dead: num(raw.dead),
+  };
 }
 
 export async function retryJob(id: string): Promise<void> {

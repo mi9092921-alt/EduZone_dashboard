@@ -109,3 +109,37 @@ describe('architecture: application layer isolation', () => {
     }
   });
 });
+
+/**
+ * M9 — DTO / Schema Boundary (Execution Plan §13).
+ *
+ * The public boundary (server actions, route handlers, adapters) must not
+ * blind-cast DB/RPC payloads across layers with `as any` / `as unknown as`.
+ * Such casts silently widen what crosses the boundary and were the root of
+ * the findings fixed in M9 (F9-1..F9-7). Storybook stories (*.stories.*)
+ * are excluded: mock fixtures there are intentionally loose.
+ */
+describe('architecture: DTO / schema boundary (M9)', () => {
+  const BOUNDARY_DIRS = ['adapters', 'features', 'app'] as const;
+  const BLIND_CAST_RE = /\bas\s+unknown\s+as\b|\bas\s+any\b/;
+
+  const boundaryFiles = BOUNDARY_DIRS.flatMap((dir) =>
+    collectFiles(path.join(SRC_ROOT, dir)),
+  ).filter((file) => !/\.stories\.(ts|tsx)$/.test(file));
+
+  it('has boundary source files to scan', () => {
+    expect(boundaryFiles.length).toBeGreaterThan(0);
+  });
+
+  it.each(boundaryFiles.map((f) => [toRelative(f), f] as const))(
+    '%s uses no blind casts (as unknown as / as any)',
+    (_rel, file) => {
+      const source = fs.readFileSync(file, 'utf8');
+      const match = BLIND_CAST_RE.exec(source);
+      expect(
+        match,
+        `blind cast "${match?.[0] ?? ''}" in ${toRelative(file)} — map/validate the payload at the boundary instead (Zod schema or typed mapper)`,
+      ).toBeNull();
+    },
+  );
+});

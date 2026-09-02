@@ -1,3 +1,4 @@
+import type { PermissionName } from '@eduzone/types';
 import { renderHook } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 
@@ -11,53 +12,60 @@ vi.mock('@/adapters/stores/auth.store', () => ({
   useAuthStore: vi.fn(),
 }));
 
+// M9: typed mock handles instead of blind casts on the mocked hooks.
+const mockPermissions = vi.mocked(useAuthPermissions);
+const mockIsAdmin = vi.mocked(useIsAdmin);
+const mockAuthStore = vi.mocked(useAuthStore);
+
+const USER_READ: PermissionName = 'users.read';
+const USER_WRITE: PermissionName = 'users.write';
+
 describe('usePermission', () => {
   it('returns true if the user has the permission', () => {
-    (useAuthPermissions as any).mockReturnValue(['users_view', 'courses_edit']);
-    (useIsAdmin as any).mockReturnValue(false);
+    mockPermissions.mockReturnValue([USER_READ, USER_WRITE]);
+    mockIsAdmin.mockReturnValue(false);
 
-    const { result } = renderHook(() => usePermission('users_view' as any));
+    const { result } = renderHook(() => usePermission(USER_READ));
     expect(result.current.hasPermission).toBe(true);
   });
 
   it('returns false if the user lacks the permission', () => {
-    (useAuthPermissions as any).mockReturnValue(['courses_view']);
-    (useIsAdmin as any).mockReturnValue(false);
+    mockPermissions.mockReturnValue(['courses.read']);
+    mockIsAdmin.mockReturnValue(false);
 
-    const { result } = renderHook(() => usePermission('users_view' as any));
+    const { result } = renderHook(() => usePermission(USER_READ));
     expect(result.current.hasPermission).toBe(false);
   });
 
   it('returns true if the user is an admin (bypass)', () => {
-    (useAuthPermissions as any).mockReturnValue([]);
-    (useIsAdmin as any).mockReturnValue(true);
+    mockPermissions.mockReturnValue([]);
+    mockIsAdmin.mockReturnValue(true);
 
-    const { result } = renderHook(() => usePermission('any_perm' as any));
+    const { result } = renderHook(() => usePermission(USER_READ));
     expect(result.current.hasPermission).toBe(true);
   });
 });
 
 describe('useRole', () => {
   it('returns true if user role matches one of the allowed roles', () => {
-    (useAuthStore as any).mockImplementation((selector: any) =>
-      selector({ user: { primary_role: 'admin' } }),
-    );
+    mockAuthStore.mockImplementation(((selector: (state: unknown) => unknown) =>
+      selector({ user: { primary_role: 'admin' } })) as never);
 
     const { result } = renderHook(() => useRole(['admin', 'super_admin']));
     expect(result.current.hasRole).toBe(true);
   });
 
   it('returns false if user role does not match', () => {
-    (useAuthStore as any).mockImplementation((selector: any) =>
-      selector({ user: { primary_role: 'student' } }),
-    );
+    mockAuthStore.mockImplementation(((selector: (state: unknown) => unknown) =>
+      selector({ user: { primary_role: 'student' } })) as never);
 
     const { result } = renderHook(() => useRole(['admin', 'teacher']));
     expect(result.current.hasRole).toBe(false);
   });
 
   it('returns false if no user is authenticated', () => {
-    (useAuthStore as any).mockImplementation((selector: any) => selector({ user: null }));
+    mockAuthStore.mockImplementation(((selector: (state: unknown) => unknown) =>
+      selector({ user: null })) as never);
 
     const { result } = renderHook(() => useRole(['admin']));
     expect(result.current.hasRole).toBe(false);

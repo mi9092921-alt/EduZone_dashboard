@@ -135,7 +135,9 @@ export function TenantDetailPage({ tenantId }: { tenantId: string }) {
   const currentUsers = Number(usage.current_users ?? 0);
   const currentCourses = Number(usage.current_courses ?? 0);
   const currentStorageBytes = Number(usage.current_storage_bytes ?? 0);
-  const rawTenant = tenant as unknown as Record<string, unknown>;
+  // M9: read the optional/derived columns through a narrow typed record
+  // lookup instead of casting the whole tenant object.
+  const tenantRecord: Record<string, unknown> = { ...tenant };
   const tenantWithUsage = {
     ...tenant,
     plan: normalizeTenantPlan(tenant.plan),
@@ -144,8 +146,9 @@ export function TenantDetailPage({ tenantId }: { tenantId: string }) {
     current_storage_bytes: currentStorageBytes,
     // tenants table has no shard_id column (removed in v13 hardening).
     // Derive a stable display shard from region_id so the UI is never blank.
-    shard_id: Number(rawTenant.shard_id ?? rawTenant.shard_key ?? shardFromRegion(String(rawTenant.data_residency ?? tenant.region_id))),
-    data_residency: String(rawTenant.data_residency ?? tenant.region_id),
+    shard_id:
+      Number(tenantRecord.shard_id ?? tenantRecord.shard_key ?? shardFromRegion(String(tenantRecord.data_residency ?? tenant.region_id))),
+    data_residency: String(tenantRecord.data_residency ?? tenant.region_id),
   };
   const userPct = tenant.max_users > 0 ? (currentUsers / tenant.max_users) * 100 : 0;
   const coursePct = tenant.max_courses > 0 ? (currentCourses / tenant.max_courses) * 100 : 0;

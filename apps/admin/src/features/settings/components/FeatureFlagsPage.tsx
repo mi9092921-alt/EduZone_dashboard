@@ -481,7 +481,7 @@ function FlagOverridesPanel({ flagId }: { flagId: string }) {
                   <TextField
                     {...rest}
                     label={t('feature_flags.overrides.label_role')}
-                    InputLabelProps={InputLabelProps as unknown as { shrink?: boolean; className?: string }}
+                    InputLabelProps={InputLabelProps as { shrink?: boolean; className?: string }}
                     InputProps={InputProps}
                   />
                 );

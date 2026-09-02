@@ -3,6 +3,7 @@ import type {
   Warning,
   WarningFilters,
   TeacherStudent,
+  StudentProgress,
   PaginatedResult,
 } from '@/domain/types/warning.types';
 
@@ -144,7 +145,7 @@ export async function getStudentProgress(
   courseId: string,
   page: number,
   pageSize: number,
-): Promise<PaginatedResult<Record<string, unknown>>> {
+): Promise<PaginatedResult<StudentProgress>> {
   const { supabase } = container;
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
@@ -164,17 +165,19 @@ export async function getStudentProgress(
   if (error) throw error;
 
   const total = count ?? 0;
-  const students = (data ?? []).map((row: Record<string, unknown>) => {
-    const user = row.users as Record<string, string> | null;
+  // M9: map DB row → StudentProgress DTO here (typed), so the UI receives
+  // the domain type directly with no `as unknown as` cast downstream.
+  const students: StudentProgress[] = (data ?? []).map((row: Record<string, unknown>) => {
+    const user = row.users as Record<string, string | null> | null;
     return {
-      user_id: row.user_id,
+      user_id: String(row.user_id),
       first_name: user?.first_name ?? null,
       last_name: user?.last_name ?? null,
       // v13: use decrypted PII column
       email: user?.email ?? null,
       avatar_url: user?.avatar_url ?? null,
-      progress_pct: Number(row.progress_pct) ?? 0,
-      last_watched: row.last_watched_at,
+      progress_pct: Number(row.progress_pct ?? 0),
+      last_watched: (row.last_watched_at as string | null) ?? null,
       completed: row.status === 'completed',
     };
   });

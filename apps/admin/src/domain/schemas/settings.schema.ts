@@ -73,6 +73,22 @@ export const addFlagOverrideSchema = z.object({
   is_exclude: z.boolean().default(false),
 });
 
+// ── Access Rules (M9: upsert boundary — no mass-assignment) ────
+
+/**
+ * Whitelist of columns a client may set when upserting an access rule.
+ * Server-managed columns (`id`, `created_at`, `deleted_at`) are excluded so
+ * the caller can never overwrite audit/identity fields, and `tenant_id` is
+ * forced server-side from the authorized context by the caller.
+ */
+export const upsertAccessRuleSchema = z.object({
+  id: z.string().uuid().optional(),
+  tenant_id: z.string().uuid(),
+  rule_type: z.enum(['time_window', 'ip_whitelist', 'geo_location', 'device_type']),
+  rule_value: z.record(z.unknown()),
+  is_active: z.boolean(),
+});
+
 // Types based on the factory functions (using default t for inference)
 export type SetSettingInput = z.infer<ReturnType<typeof getSetSettingSchema>>;
 export type MaintenanceModeInput = z.infer<ReturnType<typeof getMaintenanceModeSchema>>;
@@ -80,3 +96,4 @@ export type AppLockInput = z.infer<ReturnType<typeof getAppLockSchema>>;
 export type CreateFeatureFlagInput = z.infer<ReturnType<typeof getCreateFeatureFlagSchema>>;
 export type UpdateFeatureFlagInput = z.infer<ReturnType<typeof getUpdateFeatureFlagSchema>>;
 export type AddFlagOverrideInput = z.infer<typeof addFlagOverrideSchema>;
+export type UpsertAccessRuleInput = z.infer<typeof upsertAccessRuleSchema>;

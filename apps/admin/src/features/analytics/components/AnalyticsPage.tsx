@@ -45,12 +45,14 @@ export function AnalyticsPage() {
 
   const [riskFilter, setRiskFilter] = useState<string | null>(null);
 
-  const handleExportCsv = (sectionName: string, data: Record<string, unknown>[]) => {
+  // M9: generic object export — callers pass their typed DTOs directly,
+  // no blind casts needed at the call sites.
+  const handleExportCsv = (sectionName: string, data: readonly object[]) => {
     if (!data || data.length === 0) return;
     const keys = Object.keys(data[0]!);
     const csv = [
       keys.join(','),
-      ...data.map((row) => keys.map((k) => JSON.stringify(row[k] ?? '')).join(',')),
+      ...data.map((row) => keys.map((k) => JSON.stringify((row as Record<string, unknown>)[k] ?? '')).join(',')),
     ].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -76,13 +78,9 @@ export function AnalyticsPage() {
       <section className="space-y-4">
         <SectionHeader
           title={ta('section_users')}
-          refreshedAt={
-            (userStats as unknown as Record<string, string> | null)?.refreshed_at ??
-            userStats?.last_updated
-          }
+          refreshedAt={userStats?.refreshed_at ?? userStats?.last_updated}
           onExport={() =>
-            userStats &&
-            handleExportCsv('user-metrics', [userStats as unknown as Record<string, unknown>])
+            userStats && handleExportCsv('user-metrics', [userStats])
           }
           locale={locale}
           ta={ta}
@@ -177,8 +175,7 @@ export function AnalyticsPage() {
           title={ta('section_courses')}
           refreshedAt={courseStats?.[0]?.refreshed_at}
           onExport={() =>
-            courseStats &&
-            handleExportCsv('course-metrics', courseStats as unknown as Record<string, unknown>[])
+            courseStats && handleExportCsv('course-metrics', courseStats)
           }
           locale={locale}
           ta={ta}
@@ -212,8 +209,7 @@ export function AnalyticsPage() {
         <SectionHeader
           title={ta('section_activity')}
           onExport={() =>
-            activity &&
-            handleExportCsv('activity-heatmap', activity as unknown as Record<string, unknown>[])
+            activity && handleExportCsv('activity-heatmap', activity)
           }
           locale={locale}
           ta={ta}
@@ -266,8 +262,7 @@ export function AnalyticsPage() {
         <SectionHeader
           title={ta('section_geo')}
           onExport={() =>
-            geoData &&
-            handleExportCsv('geographic', geoData as unknown as Record<string, unknown>[])
+            geoData && handleExportCsv('geographic', geoData)
           }
           locale={locale}
           ta={ta}

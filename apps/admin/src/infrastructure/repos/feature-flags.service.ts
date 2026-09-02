@@ -10,6 +10,7 @@ import type {
 import {
   mapDbRowToFeatureFlag,
   prepareFeatureFlagPayload,
+  type FeatureFlagDbRow,
 } from '@/domain/types/feature-flag.types';
 import { createAdminClient } from '@/infrastructure/supabase/admin';
 
@@ -26,7 +27,8 @@ export async function getAllFeatureFlags(): Promise<FeatureFlag[]> {
   const { supabase } = container;
   const { data, error } = await supabase.from('feature_flags').select('*').order('key');
   if (error) throw error;
-  return (data ?? []).map(mapDbRowToFeatureFlag);
+  // M9: mapper may return null only for a null row; list rows are never null.
+  return (data ?? []).flatMap((row) => mapDbRowToFeatureFlag(row as FeatureFlagDbRow) ?? []);
 }
 
 /** Server-action variant — uses service_role to bypass RLS. */
@@ -34,7 +36,7 @@ export async function getAllFeatureFlagsAdmin(): Promise<FeatureFlag[]> {
   const admin = createAdminClient();
   const { data, error } = await admin.from('feature_flags').select('*').order('key');
   if (error) throw error;
-  return (data ?? []).map(mapDbRowToFeatureFlag);
+  return (data ?? []).flatMap((row) => mapDbRowToFeatureFlag(row as FeatureFlagDbRow) ?? []);
 }
 
 export async function getFeatureFlagById(id: string): Promise<FeatureFlagDetail> {
@@ -62,10 +64,40 @@ export async function getFeatureFlagById(id: string): Promise<FeatureFlagDetail>
   const mappedRoles = mapRoleOverrides(roleOverrides ?? []);
   const mappedUsers = mapUserOverrides(userOverrides ?? []);
 
+  const mappedFlag = mapDbRowToFeatureFlag(flag as FeatureFlagDbRow);
+  if (!mappedFlag) throw new Error('FLAG_NOT_FOUND');
   return {
-    ...mapDbRowToFeatureFlag(flag),
+    ...mappedFlag,
     role_overrides: mappedRoles,
     user_overrides: mappedUsers,
+  };
+}
+
+/** Server-action variant — uses service_role to bypass RLS. */
+export async function getFeatureFlagByIdAdmin(id: string): Promise<FeatureFlagDetail> {
+  const admin = createAdminClient();
+
+  const { data: flag, error } = await admin.from('feature_flags').select('*').eq('id', id).single();
+  if (error) throw error;
+
+  const { data: roleOverrides, error: roleErr } = await admin
+    .from('feature_flag_roles')
+    .select('*, roles!feature_flag_roles_role_id_fkey(name, label)')
+    .eq('flag_id', id);
+  if (roleErr) throw roleErr;
+
+  const { data: userOverrides, error: userErr } = await admin
+    .from('feature_flag_users')
+    .select('*, users!feature_flag_users_user_id_fkey(email, first_name, last_name)')
+    .eq('flag_id', id);
+  if (userErr) throw userErr;
+
+  const mappedFlag = mapDbRowToFeatureFlag(flag as FeatureFlagDbRow);
+  if (!mappedFlag) throw new Error('FLAG_NOT_FOUND');
+  return {
+    ...mappedFlag,
+    role_overrides: mapRoleOverrides(roleOverrides ?? []),
+    user_overrides: mapUserOverrides(userOverrides ?? []),
   };
 }
 
@@ -100,32 +132,6 @@ function mapUserOverrides(userOverrides: Record<string, unknown>[]): FeatureFlag
   });
 }
 
-/** Server-action variant — uses service_role to bypass RLS. */
-export async function getFeatureFlagByIdAdmin(id: string): Promise<FeatureFlagDetail> {
-  const admin = createAdminClient();
-
-  const { data: flag, error } = await admin.from('feature_flags').select('*').eq('id', id).single();
-  if (error) throw error;
-
-  const { data: roleOverrides, error: roleErr } = await admin
-    .from('feature_flag_roles')
-    .select('*, roles!feature_flag_roles_role_id_fkey(name, label)')
-    .eq('flag_id', id);
-  if (roleErr) throw roleErr;
-
-  const { data: userOverrides, error: userErr } = await admin
-    .from('feature_flag_users')
-    .select('*, users!feature_flag_users_user_id_fkey(email, first_name, last_name)')
-    .eq('flag_id', id);
-  if (userErr) throw userErr;
-
-  return {
-    ...mapDbRowToFeatureFlag(flag),
-    role_overrides: mapRoleOverrides(roleOverrides ?? []),
-    user_overrides: mapUserOverrides(userOverrides ?? []),
-  };
-}
-
 // ══════════════════════════════════════════════════
 // WRITE
 // ══════════════════════════════════════════════════
@@ -138,7 +144,7 @@ export async function createFeatureFlag(input: CreateFeatureFlagInput): Promise<
     if (error.code === '23505') throw new Error('FLAG_KEY_EXISTS');
     throw error;
   }
-  return mapDbRowToFeatureFlag(data);
+  return mapDbRowToFeatureFlag(data as FeatureFlagDbRow)!;
 }
 
 /** Server-action variant — uses service_role to bypass RLS. */
@@ -150,7 +156,7 @@ export async function createFeatureFlagAdmin(input: CreateFeatureFlagInput): Pro
     if (error.code === '23505') throw new Error('FLAG_KEY_EXISTS');
     throw error;
   }
-  return mapDbRowToFeatureFlag(data);
+  return mapDbRowToFeatureFlag(data as FeatureFlagDbRow)!;
 }
 
 export async function updateFeatureFlag(
@@ -171,7 +177,7 @@ export async function updateFeatureFlag(
     .select()
     .single();
   if (error) throw error;
-  return mapDbRowToFeatureFlag(data);
+  return mapDbRowToFeatureFlag(data as FeatureFlagDbRow)!;
 }
 
 /** Server-action variant — uses service_role to bypass RLS. */
@@ -189,7 +195,7 @@ export async function updateFeatureFlagAdmin(
     .select()
     .single();
   if (error) throw error;
-  return mapDbRowToFeatureFlag(data);
+  return mapDbRowToFeatureFlag(data as FeatureFlagDbRow)!;
 }
 
 export async function deleteFeatureFlag(id: string): Promise<void> {

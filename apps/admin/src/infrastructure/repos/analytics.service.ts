@@ -16,8 +16,16 @@ import { createAdminClient } from '@/infrastructure/supabase/admin';
  * v13: Optimized to use RPCs for heavy aggregations.
  */
 
+/**
+ * M9 DTO: what `get_user_stats_summary` actually returns. The RPC adds a
+ * `refreshed_at` column that the shared `UserStats` type doesn't declare;
+ * declaring it here (instead of double-casting in the UI) keeps the
+ * DB→UI boundary typed without changing the shared package contract.
+ */
+export type UserStatsDto = UserStats & { refreshed_at?: string };
+
 // ── User stats from RPC ──────────────────────────────────────────
-export async function getUserStats(tenantId?: string): Promise<UserStats> {
+export async function getUserStats(tenantId?: string): Promise<UserStatsDto> {
   const { supabase } = container;
 
   const { data, error } = await supabase.rpc('get_user_stats_summary', {
@@ -39,7 +47,7 @@ export async function getUserStats(tenantId?: string): Promise<UserStats> {
     };
   }
 
-  return data as UserStats;
+  return data as UserStatsDto;
 }
 
 // ── Course stats from vw_course_stats (admin read — bypasses RLS) ───────────

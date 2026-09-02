@@ -67,7 +67,7 @@ export function StudentProgressPage() {
 
   useCourseById(courseId);
   const { data, isLoading, refetch } = useStudentProgress(courseId, page, pageSize);
-  const students = (data?.data ?? []) as unknown as StudentProgress[];
+  const students: StudentProgress[] = data?.data ?? [];
   const totalCount = data?.count ?? 0;
 
   const handleExportCSV = useCallback(() => {

@@ -2,6 +2,13 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 
 import { roleAllowsPermission } from '@/application/authorization/policy';
+import {
+  MAX_BULK_SIZE,
+  bulkActionRequestSchema,
+  type BulkActionRequest,
+  type BulkParamsInput,
+} from '@/domain/schemas/bulk-action.schema';
+import type { BulkAction } from '@/domain/types/bulk.types';
 import { createAdminClient } from '@/infrastructure/supabase/admin';
 import { createServerClient } from '@/infrastructure/supabase/server';
 
@@ -11,21 +18,11 @@ import { createServerClient } from '@/infrastructure/supabase/server';
  *
  * POST /api/bulk-action
  * Body: { action, filters, params?, dry_run }
+ *
+ * M9: the body is validated by `bulkActionRequestSchema` before it reaches
+ * any business logic — unknown keys are stripped and every field consumed
+ * below is fully typed (no more `Record<string, unknown>` re-casts).
  */
-
-const VALID_ACTIONS = [
-  'lock',
-  'unlock',
-  'suspend',
-  'ban',
-  'warn',
-  'terminate_sessions',
-  'reset_devices',
-  'export',
-  'delete',
-] as const;
-
-type BulkAction = (typeof VALID_ACTIONS)[number];
 
 const ACTION_PERMISSIONS: Record<BulkAction, string> = {
   lock: 'users.lock',
@@ -39,62 +36,8 @@ const ACTION_PERMISSIONS: Record<BulkAction, string> = {
   delete: 'users.write',
 };
 
-const MAX_BULK_SIZE = 500;
-
-interface BulkRequestBody {
-  action: BulkAction;
-  filters: Record<string, unknown>;
-  params?: Record<string, unknown>;
-  dry_run: boolean;
-}
-
 function errorJson(code: string, message: string, status = 400, extra?: Record<string, unknown>) {
   return NextResponse.json({ code, message, error: message, ...extra }, { status });
-}
-
-interface UserFilterQuery {
-  in(column: string, values: unknown[]): UserFilterQuery;
-  eq(column: string, value: unknown): UserFilterQuery;
-  or(filters: string): UserFilterQuery;
-  limit(
-    count: number,
-  ): PromiseLike<{ data: Record<string, unknown>[] | null; error: { message: string } | null }>;
-}
-
-function applyUserFilters(
-  query: UserFilterQuery,
-  f: Record<string, unknown>,
-  restrictTenantId: string | undefined,
-): UserFilterQuery {
-  if (f.user_ids && Array.isArray(f.user_ids) && f.user_ids.length > 0) {
-    query = query.in('id', f.user_ids as string[]);
-    // P1-SEC-005 FIX: for non-super_admin callers, restrictTenantId is always
-    // the caller's own tenant and is enforced unconditionally -- it does not
-    // depend on (and overrides) whatever tenant_id the client sent. This is
-    // the query the service_role client actually runs, so this is the real
-    // tenant boundary; RLS does not apply to a service_role client.
-    if (restrictTenantId) {
-      query = query.eq('tenant_id', restrictTenantId);
-    } else if (f.tenant_id) {
-      query = query.eq('tenant_id', f.tenant_id as string);
-    }
-    return query;
-  }
-
-  if (f.search) {
-    query = query.or(
-      `email.ilike.%${f.search}%,first_name.ilike.%${f.search}%,last_name.ilike.%${f.search}%`,
-    );
-  }
-  if (f.primary_role) query = query.eq('primary_role', f.primary_role as string);
-  if (f.account_status) query = query.eq('account_status', f.account_status as string);
-  if (restrictTenantId) {
-    query = query.eq('tenant_id', restrictTenantId);
-  } else if (f.tenant_id) {
-    query = query.eq('tenant_id', f.tenant_id as string);
-  }
-  if (f.region_id) query = query.eq('region_id', f.region_id as string);
-  return query;
 }
 
 async function updateBulkJob(
@@ -120,20 +63,44 @@ async function updateBulkJob(
 async function processInlineBulkJob(
   admin: SupabaseClient,
   job: { id: string },
-  body: BulkRequestBody,
+  body: BulkActionRequest,
   initiatorId: string,
   restrictTenantId: string | undefined,
 ) {
-  const { data: users, error } = await applyUserFilters(
-    admin
-      .from('users')
-      .select(
-        'id, tenant_id, email, first_name, last_name, phone, primary_role, account_status, warning_count, login_count, token_version, created_at, last_login, last_seen_at, region_id',
-      )
-      .is('deleted_at', null) as unknown as UserFilterQuery,
-    body.filters,
-    restrictTenantId,
-  ).limit(MAX_BULK_SIZE);
+  // M9: build the filtered user query inline (typed), reusing the same
+  // filter rules as the count query — no structural cast to a fake type.
+  let builder = admin
+    .from('users')
+    .select(
+      'id, tenant_id, email, first_name, last_name, phone, primary_role, account_status, warning_count, login_count, token_version, created_at, last_login, last_seen_at, region_id',
+    )
+    .is('deleted_at', null);
+
+  const f = body.filters;
+  if (f.user_ids && f.user_ids.length > 0) {
+    builder = builder.in('id', f.user_ids);
+    if (restrictTenantId) {
+      builder = builder.eq('tenant_id', restrictTenantId);
+    } else if (f.tenant_id) {
+      builder = builder.eq('tenant_id', f.tenant_id);
+    }
+  } else {
+    if (f.search) {
+      builder = builder.or(
+        `email.ilike.%${f.search}%,first_name.ilike.%${f.search}%,last_name.ilike.%${f.search}%`,
+      );
+    }
+    if (f.primary_role) builder = builder.eq('primary_role', f.primary_role);
+    if (f.account_status) builder = builder.eq('account_status', f.account_status);
+    if (restrictTenantId) {
+      builder = builder.eq('tenant_id', restrictTenantId);
+    } else if (f.tenant_id) {
+      builder = builder.eq('tenant_id', f.tenant_id);
+    }
+    if (f.region_id) builder = builder.eq('region_id', f.region_id);
+  }
+
+  const { data: users, error } = await builder.limit(MAX_BULK_SIZE);
 
   if (error) throw error;
 
@@ -183,11 +150,11 @@ async function processInlineUserAction(
   admin: SupabaseClient,
   action: BulkAction,
   user: Record<string, unknown>,
-  params: Record<string, unknown>,
+  params: BulkParamsInput,
   initiatorId: string,
 ) {
   const now = new Date().toISOString();
-  const reason = (params.reason as string | undefined)?.trim() || null;
+  const reason = params.reason?.trim() || null;
 
   switch (action) {
     case 'warn': {
@@ -238,7 +205,7 @@ async function processInlineUserAction(
             : action === 'suspend'
               ? 'suspended'
               : 'banned';
-      const suspendHours = Number(params.suspend_hours ?? 24);
+      const suspendHours = params.suspend_hours ?? 24;
       const { error } = await admin
         .from('users')
         .update({
@@ -283,10 +250,10 @@ async function exportUsers(
   admin: SupabaseClient,
   jobId: string,
   users: Record<string, unknown>[],
-  body: BulkRequestBody,
+  body: BulkActionRequest,
   initiatorId: string,
 ) {
-  const format = String(body.params?.export_format ?? 'json');
+  const format = body.params?.export_format ?? 'json';
   // P1-SEC-005 FIX: derive the storage path from the actual exported rows'
   // tenant, not the client-supplied filter -- after the tenant-scoping fix
   // above, `users` only ever contains one tenant's rows for non-super_admin
@@ -372,19 +339,13 @@ function generateCsv(users: Record<string, unknown>[]) {
 
 export async function POST(request: NextRequest) {
   try {
-    // ── Parse body ────────────────────────────────────────────
-    const body = (await request.json()) as BulkRequestBody;
-
-    if (!body.action || !VALID_ACTIONS.includes(body.action)) {
-      return errorJson(
-        'INVALID_ACTION',
-        `Invalid action. Must be one of: ${VALID_ACTIONS.join(', ')}`,
-      );
+    // ── Parse + validate body (M9: single typed boundary) ─────
+    const rawBody: unknown = await request.json().catch(() => null);
+    const parsedBody = bulkActionRequestSchema.safeParse(rawBody);
+    if (!parsedBody.success) {
+      return errorJson('INVALID_BODY', parsedBody.error.issues[0]?.message ?? 'Invalid body', 400);
     }
-
-    if (!body.filters || typeof body.filters !== 'object') {
-      return errorJson('INVALID_FILTERS', 'filters must be an object');
-    }
+    const body = parsedBody.data;
 
     // ── Authenticate caller ───────────────────────────────────
     const supabase = await createServerClient();
@@ -446,14 +407,14 @@ export async function POST(request: NextRequest) {
       .is('deleted_at', null);
 
     const f = body.filters;
-    if (f.user_ids && Array.isArray(f.user_ids) && f.user_ids.length > 0) {
+    if (f.user_ids && f.user_ids.length > 0) {
       // User explicitly selected individual users via checkboxes.
       // Bypass general search/filters to honor user intent, but retain tenant_id check.
-      query = query.in('id', f.user_ids as string[]);
+      query = query.in('id', f.user_ids);
       if (restrictTenantId) {
         query = query.eq('tenant_id', restrictTenantId);
       } else if (f.tenant_id) {
-        query = query.eq('tenant_id', f.tenant_id as string);
+        query = query.eq('tenant_id', f.tenant_id);
       }
     } else {
       // User did not select checkboxes (e.g. bulk action on entire search results).
@@ -464,14 +425,14 @@ export async function POST(request: NextRequest) {
           `email.ilike.%${f.search}%,first_name.ilike.%${f.search}%,last_name.ilike.%${f.search}%`,
         );
       }
-      if (f.primary_role) query = query.eq('primary_role', f.primary_role as string);
-      if (f.account_status) query = query.eq('account_status', f.account_status as string);
+      if (f.primary_role) query = query.eq('primary_role', f.primary_role);
+      if (f.account_status) query = query.eq('account_status', f.account_status);
       if (restrictTenantId) {
         query = query.eq('tenant_id', restrictTenantId);
       } else if (f.tenant_id) {
-        query = query.eq('tenant_id', f.tenant_id as string);
+        query = query.eq('tenant_id', f.tenant_id);
       }
-      if (f.region_id) query = query.eq('region_id', f.region_id as string);
+      if (f.region_id) query = query.eq('region_id', f.region_id);
     }
 
     const { count: estimatedCount, error: countErr } = await query;

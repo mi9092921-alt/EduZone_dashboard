@@ -91,10 +91,14 @@ export function AccessRulesManager({ tenantId }: { tenantId?: string }) {
   const handleSave = async () => {
     if (!editingRule?.rule_type || !editingRule?.rule_value) return;
     try {
+      // M9: only whitelisted columns cross the boundary (no created_at/deleted_at).
       await upsertAccessRule({
-        ...editingRule,
+        ...(editingRule.id ? { id: editingRule.id } : {}),
         tenant_id: tenantId || '00000000-0000-0000-0000-000000000000', // Global if no tenant
-      } as AccessRule);
+        rule_type: editingRule.rule_type,
+        rule_value: editingRule.rule_value,
+        is_active: editingRule.is_active ?? true,
+      });
       fetchRules();
       setIsDialogOpen(false);
       showToast('Rule saved successfully', 'success');

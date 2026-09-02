@@ -52,7 +52,7 @@ export interface UpdateFeatureFlagInput {
   metadata?: Record<string, unknown>;
 }
 
-interface FeatureFlagDbRow {
+export interface FeatureFlagDbRow {
   id: string;
   key: string;
   description?: string | null;
@@ -63,9 +63,11 @@ interface FeatureFlagDbRow {
   updated_at: string;
 }
 
-// Helper to map DB row to frontend FeatureFlag type
-export function mapDbRowToFeatureFlag(row: FeatureFlagDbRow | null): FeatureFlag {
-  if (!row) return row as unknown as FeatureFlag;
+// Helper to map DB row to frontend FeatureFlag type.
+// M9: a null row now returns null (typed), instead of the old
+// `null as unknown as FeatureFlag` cast that lied about the shape.
+export function mapDbRowToFeatureFlag(row: FeatureFlagDbRow | null): FeatureFlag | null {
+  if (!row) return null;
   const metadata = row.metadata || {};
 
   // Friendly default label from key

@@ -217,7 +217,18 @@ function SendNotificationDialog({ open, onClose, allowedAudiences, onSuccess }: 
 
   useEffect(() => {
     if (userQuery.length > 1) {
-      searchUsers(userQuery).then((res) => setUserOptions(res as unknown as UserOption[]));
+      // M9: project the search results onto the option shape the dialog needs,
+      // instead of blind-casting the wider UserSearchResult[].
+      searchUsers(userQuery).then((res) =>
+        setUserOptions(
+          res.map((u) => ({
+            id: u.id,
+            first_name: u.first_name,
+            last_name: u.last_name,
+            email: u.email,
+          })),
+        ),
+      );
     }
   }, [userQuery]);
 
@@ -391,7 +402,7 @@ function SendNotificationDialog({ open, onClose, allowedAudiences, onSuccess }: 
                         error={!!errors.target_user_ids}
                         helperText={(errors.target_user_ids?.message as string)}
                         size="small"
-                        InputLabelProps={InputLabelProps as unknown as { shrink?: boolean; className?: string }}
+                        InputLabelProps={InputLabelProps as { shrink?: boolean; className?: string }}
                         InputProps={{ ...InputProps, sx: { borderRadius: 2 } }}
                       />
                     );

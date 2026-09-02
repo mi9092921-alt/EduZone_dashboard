@@ -21,8 +21,18 @@ export async function getActiveBlocks(): Promise<RateLimitWithEmail[]> {
     .order('blocked_until', { ascending: false });
   if (error) throw error;
 
+  // M9: map the joined row explicitly instead of `as unknown as` spreading
+  // the whole row — only the whitelisted RateLimit fields cross the boundary.
   return (data ?? []).map((row: Record<string, unknown>) => ({
-    ...(row as unknown as RateLimitWithEmail),
+    id: row.id as string,
+    user_id: (row.user_id as string | null) ?? null,
+    ip_address: (row.ip_address as string | null) ?? null,
+    device_id: (row.device_id as string | null) ?? null,
+    tenant_id: row.tenant_id as string,
+    action: row.action as string,
+    window_start: row.window_start as string,
+    hit_count: Number(row.hit_count ?? 0),
+    blocked_until: (row.blocked_until as string | null) ?? null,
     user_email: (row.users as Record<string, string> | null)?.email ?? null,
   }));
 }
