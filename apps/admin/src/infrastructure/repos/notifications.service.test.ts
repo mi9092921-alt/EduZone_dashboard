@@ -1,151 +1,106 @@
-// @vitest-environment node
-//
-// notifications.service.ts is isomorphic (typeof window !== 'undefined' picks
-// the server-action branch); these tests target the container.supabase
-// branch, which requires no global `window` (jsdom, the default unit-test
-// environment, defines one).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-import { getNotifications, sendNotification, deleteNotification } from './notifications.service';
+import {
+  getNotifications,
+  sendNotification,
+  deleteNotification,
+  getMyNotifications,
+  markNotificationAsRead,
+  markAllNotificationsAsRead,
+  getUnreadNotificationCount,
+} from './notifications.service';
 
-import { container } from '@/container';
+import {
+  getNotificationsAction,
+  sendNotificationAction,
+  deleteNotificationAction,
+  getMyNotificationsAction,
+  markNotificationAsReadAction,
+  markAllNotificationsAsReadAction,
+  getUnreadNotificationCountAction,
+} from '@/application/actions/admin.actions';
 
-// Mock the container and supabase client
-vi.mock('@/container', () => ({
-  container: {
-    supabase: {
-      from: vi.fn(),
-      rpc: vi.fn(),
-    },
-  },
+// notifications.service is a thin delegator to the admin server actions,
+// which run the privileged, service-role Supabase calls behind an
+// auth/permission check and scope every per-user query/mutation to the
+// caller's own user_id (see admin.actions.ts). These tests verify the
+// delegation contract: correct action called with correct args, and the
+// result/error passed through unchanged. The query logic itself lives in
+// admin.actions.ts and is covered by admin.actions.test.ts.
+vi.mock('@/application/actions/admin.actions', () => ({
+  getNotificationsAction: vi.fn(),
+  sendNotificationAction: vi.fn(),
+  deleteNotificationAction: vi.fn(),
+  getMyNotificationsAction: vi.fn(),
+  markNotificationAsReadAction: vi.fn(),
+  markAllNotificationsAsReadAction: vi.fn(),
+  getUnreadNotificationCountAction: vi.fn(),
 }));
 
-/**
- * Supabase's real query builder is "thenable" — you can `await` it after any
- * number of chained filter/order calls, not just after a fixed final method.
- * This mock mirrors that so it doesn't need to hard-code an exact call
- * sequence (select -> is -> eq? -> order -> range).
- */
-function createThenableChain(result: unknown) {
-  const chain: any = {};
-  const methods = ['select', 'eq', 'is', 'order', 'range', 'limit', 'update'];
-  for (const method of methods) {
-    chain[method] = vi.fn(() => chain);
-  }
-  chain.then = (resolve: (v: unknown) => void) => resolve(result);
-  return chain;
-}
-
-describe('Notifications Service', () => {
-  const mockSupabase = container.supabase;
-
+describe('notifications.service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  describe('getNotifications', () => {
-    it('should fetch notifications with correct range and order', async () => {
-      const mockData = [{ id: '1', title: 'Test', target_audience: 'students' }];
-      let paginatedChain: any;
-      // First call: the paginated `notifications` query. Second call: the
-      // unpaginated stats query (getNotifications fetches both).
-      vi.mocked(mockSupabase.from)
-        .mockImplementationOnce(() => {
-          paginatedChain = createThenableChain({ data: mockData, error: null, count: 1 });
-          return paginatedChain;
-        })
-        .mockImplementationOnce(() => createThenableChain({ data: mockData, error: null }));
+  it('getNotifications delegates to getNotificationsAction with page/pageSize/audience', async () => {
+    const payload = { data: [{ id: '1' }], count: 1, stats: { all: 1, students: 1, teachers: 0, admins: 0 } };
+    (getNotificationsAction as any).mockResolvedValue(payload);
 
-      // Service uses 1-indexed pages: page=1 → from=0, to=9
-      const result = await getNotifications(1, 10);
-
-      expect(mockSupabase.from).toHaveBeenCalledWith('notifications');
-      expect(paginatedChain.select).toHaveBeenCalledWith('*', { count: 'exact' });
-      expect(paginatedChain.order).toHaveBeenCalledWith('created_at', { ascending: false });
-      expect(paginatedChain.range).toHaveBeenCalledWith(0, 9);
-      expect(result.data).toEqual(mockData);
-      expect(result.count).toBe(1);
-      expect(result.stats).toEqual({ all: 1, students: 1, teachers: 0, admins: 0 });
-    });
-
-    it('should throw error if supabase fails', async () => {
-      vi.mocked(mockSupabase.from).mockReturnValue(
-        createThenableChain({ data: null, error: { code: 'PGRST116', message: 'DB Error' } }),
-      );
-
-      await expect(getNotifications(1, 10)).rejects.toThrow('DB Error');
-    });
+    const result = await getNotifications(1, 10, 'students');
+    expect(getNotificationsAction).toHaveBeenCalledWith(1, 10, 'students');
+    expect(result).toBe(payload);
   });
 
-  describe('sendNotification', () => {
-    it('should call send_notification RPC with correct arguments', async () => {
-      vi.mocked(mockSupabase.rpc).mockResolvedValue({ data: 'new-id', error: null } as any);
+  it('getNotifications propagates errors from the action', async () => {
+    (getNotificationsAction as any).mockRejectedValue(new Error('DB Error'));
 
-      const input = {
-        title: 'Alert',
-        body: 'System update tomorrow',
-        target_audience: 'students' as const,
-      };
-
-      const result = await sendNotification(input);
-
-      expect(mockSupabase.rpc).toHaveBeenCalledWith('send_notification', {
-        p_title: 'Alert',
-        p_body: 'System update tomorrow',
-        p_target_audience: 'students',
-      });
-      expect(result).toBe('new-id');
-    });
-
-    it('should use target_user_ids and omit target_permission when both provided', async () => {
-      vi.mocked(mockSupabase.rpc).mockResolvedValue({ data: 'id-2', error: null } as any);
-
-      const input = {
-        title: 'Private',
-        body: 'Secret message',
-        target_permission: 'admin.super', // this should be ignored when target_user_ids is set
-        target_user_ids: ['u1', 'u2'],
-      };
-
-      await sendNotification(input);
-
-      // Service logic: when target_user_ids is present, omit p_target_audience & p_target_permission
-      // to avoid triggering the role-based permission gate in the DB function.
-      expect(mockSupabase.rpc).toHaveBeenCalledWith('send_notification', {
-        p_title: 'Private',
-        p_body: 'Secret message',
-        p_target_user_ids: ['u1', 'u2'],
-        // p_target_permission is intentionally absent
-      });
-    });
-
-    it('should throw error if RPC fails', async () => {
-      vi.mocked(mockSupabase.rpc).mockResolvedValue({
-        data: null,
-        error: { code: 'PGRST204', message: 'RPC Error' },
-      } as any);
-
-      await expect(sendNotification({ title: 'T', body: 'B' })).rejects.toThrow('RPC Error');
-    });
+    await expect(getNotifications(1, 10)).rejects.toThrow('DB Error');
   });
 
-  describe('deleteNotification', () => {
-    it('should call delete_notification RPC', async () => {
-      vi.mocked(mockSupabase.rpc).mockResolvedValue({ error: null } as any);
+  it('sendNotification delegates to sendNotificationAction with input', async () => {
+    const input = { title: 'Alert', body: 'System update tomorrow', target_audience: 'students' as const };
+    (sendNotificationAction as any).mockResolvedValue('new-id');
 
-      await deleteNotification('notif-123');
+    const result = await sendNotification(input);
+    expect(sendNotificationAction).toHaveBeenCalledWith(input);
+    expect(result).toBe('new-id');
+  });
 
-      expect(mockSupabase.rpc).toHaveBeenCalledWith('delete_notification', {
-        p_notification_id: 'notif-123',
-      });
-    });
+  it('deleteNotification delegates to deleteNotificationAction with id', async () => {
+    (deleteNotificationAction as any).mockResolvedValue(undefined);
 
-    it('should throw error if delete RPC fails', async () => {
-      vi.mocked(mockSupabase.rpc).mockResolvedValue({
-        error: { code: 'PGRST205', message: 'Delete Failed' },
-      } as any);
+    await deleteNotification('notif-123');
+    expect(deleteNotificationAction).toHaveBeenCalledWith('notif-123');
+  });
 
-      await expect(deleteNotification('id')).rejects.toThrow('Delete Failed');
-    });
+  it('getMyNotifications delegates to getMyNotificationsAction with limit/unreadOnly', async () => {
+    const payload = { data: [{ id: 'n1' }], unreadCount: 1 };
+    (getMyNotificationsAction as any).mockResolvedValue(payload);
+
+    const result = await getMyNotifications(20, true);
+    expect(getMyNotificationsAction).toHaveBeenCalledWith(20, true);
+    expect(result).toBe(payload);
+  });
+
+  it('markNotificationAsRead delegates to markNotificationAsReadAction with id', async () => {
+    (markNotificationAsReadAction as any).mockResolvedValue(undefined);
+
+    await markNotificationAsRead('n1');
+    expect(markNotificationAsReadAction).toHaveBeenCalledWith('n1');
+  });
+
+  it('markAllNotificationsAsRead delegates to markAllNotificationsAsReadAction', async () => {
+    (markAllNotificationsAsReadAction as any).mockResolvedValue(undefined);
+
+    await markAllNotificationsAsRead();
+    expect(markAllNotificationsAsReadAction).toHaveBeenCalledWith();
+  });
+
+  it('getUnreadNotificationCount delegates to getUnreadNotificationCountAction', async () => {
+    (getUnreadNotificationCountAction as any).mockResolvedValue(3);
+
+    const result = await getUnreadNotificationCount();
+    expect(getUnreadNotificationCountAction).toHaveBeenCalledWith();
+    expect(result).toBe(3);
   });
 });
