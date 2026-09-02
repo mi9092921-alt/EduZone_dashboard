@@ -1,45 +1,25 @@
+// ─── Types ─────────────────────────────────────────────────────────────────────
+// Single source of truth lives in the domain layer (application use cases and
+// ports must not depend on adapters). Re-exported here for feature components.
+
+export type {
+  Notification,
+  TargetAudience,
+  UserNotification,
+} from '@/domain/types/notification.types';
+
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 
 import { queryKeys } from './keys';
 
+import type { TargetAudience } from '@/domain/types/notification.types';
 import {
   getNotifications,
   getMyNotifications,
   getUnreadNotificationCount,
 } from '@/infrastructure/repos/notifications.service';
 import { createBrowserClient } from '@/infrastructure/supabase/client';
-
-// ─── Types ─────────────────────────────────────────────────────────────────────
-
-export type TargetAudience = 'all' | 'students' | 'teachers' | 'admins';
-
-/** Admin broadcast notification as stored in the `notifications` table */
-export interface Notification {
-  id: string;
-  tenant_id: string;
-  created_by: string | null;
-  title: string;
-  body: string;
-  target_audience: TargetAudience;
-  target_permission: string | null;
-  target_user_ids: string[] | null;
-  is_deleted: boolean;
-  created_at: string;
-}
-
-/** Per-user notification row as stored in `user_notifications` */
-export interface UserNotification {
-  id: string;
-  user_id: string;
-  notification_id: string;
-  title: string;
-  body: string;
-  type: 'account_action' | 'warning_issued' | 'course_update' | 'system_alert' | string;
-  link_to: string | null;
-  is_read: boolean;
-  created_at: string;
-}
 
 // ─── Admin Query Hooks ─────────────────────────────────────────────────────────
 

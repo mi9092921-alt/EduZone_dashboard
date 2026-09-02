@@ -1,26 +1,27 @@
 'use server';
 
-import { authorizeCaller } from '@/application/authorization/authorization.service';
+import { requirePermission } from '@/application/actions/boundary';
+import {
+  ControlUserAccountUseCase,
+  IssueWarningUseCase,
+  TerminateUserSessionsUseCase,
+} from '@/application/use-cases/users/account-control.use-case';
+import { CreateUserUseCase } from '@/application/use-cases/users/create-user.use-case';
+import { DeleteUserUseCase } from '@/application/use-cases/users/delete-user.use-case';
 import { getErrorMessage } from '@/domain/errors';
 import { CreateUserInput, createUserSchema } from '@/domain/schemas/user.schema';
 import type { AccountAction } from '@/domain/types/user.types';
-import { createAdminClient } from '@/infrastructure/supabase/admin';
-import { createServerClient } from '@/infrastructure/supabase/server';
+import { makeUserAdminRepository } from '@/infrastructure/repos/user-admin.repository';
 
-// ── Helper: verify caller authentication and a required permission ────────────
-async function verifyCallerPermission(
-  supabase: Awaited<ReturnType<typeof createServerClient>>,
-  permission: string | string[],
-) {
-  try {
-    const ctx = await authorizeCaller(supabase, permission);
-    return { user: { id: ctx.userId }, error: null };
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Unauthorized';
-    return { user: null, error: message };
-  }
-}
-
+/**
+ * Thin Server-Action boundary for the user-lifecycle domain.
+ *
+ * Contract per action: validate (zod) → authenticate/authorize (shared
+ * boundary gate) → execute use case → map response. All privileged DB
+ * access (auth admin API, profile/role sync, control/terminate RPCs)
+ * lives in infrastructure/repos/user-admin.repository.ts behind the
+ * IUserAdminRepository port; business rules live in the use cases.
+ */
 
 /**
  * Creates a new user via Supabase Admin API natively.
@@ -31,101 +32,11 @@ export async function createUserAction(data: CreateUserInput) {
     // 1. Validate input
     const parsed = createUserSchema.parse(data);
 
-    const supabase = await createServerClient();
+    // 2. Verify caller auth and permission (deny-by-default)
+    const ctx = await requirePermission('users.write');
 
-    // 2. Verify caller auth and permission
-    const { user, error: authError } = await verifyCallerPermission(supabase, 'users.write');
-    if (authError || !user) {
-      return { success: false, error: authError ?? 'Unauthorized' };
-    }
-
-    // 3. Fetch admin's tenant_id from the base table.
-    const { data: adminProfile, error: profileError } = await supabase
-      .from('users')
-      .select('tenant_id')
-      .eq('id', user.id)
-      .is('deleted_at', null)
-      .single();
-
-    if (profileError || !adminProfile) {
-      return { success: false, error: 'Could not determine admin tenant ID' };
-    }
-
-    // 4. Perform admin operations using service_role client
-    const supabaseAdmin = createAdminClient();
-
-    const { data: authData, error: authCreateError } = await supabaseAdmin.auth.admin.createUser({
-      email: parsed.email,
-      password: parsed.password || 'Temp1234!',
-      email_confirm: true,
-      user_metadata: {
-        first_name: parsed.first_name,
-        last_name: parsed.last_name,
-        phone: parsed.phone,
-      },
-    });
-
-    if (authCreateError) {
-      return { success: false, error: authCreateError.message };
-    }
-
-    if (!authData?.user) {
-      return { success: false, error: 'User creation failed silently' };
-    }
-
-    // 5. Sync profile in the main DB via upsert (admin client bypasses RLS)
-    const { error: updateError } = await supabaseAdmin.from('users').upsert({
-      id: authData.user.id,
-      email: parsed.email,
-      first_name: parsed.first_name,
-      last_name: parsed.last_name,
-      phone: parsed.phone,
-      primary_role: parsed.primary_role,
-      tenant_id: adminProfile.tenant_id,
-    });
-
-    if (updateError) {
-      await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-      return {
-        success: false,
-        error: 'User created but profile sync failed: ' + updateError.message,
-      };
-    }
-
-    const { data: role, error: roleLookupError } = await supabaseAdmin
-      .from('roles')
-      .select('id')
-      .eq('name', parsed.primary_role)
-      .maybeSingle();
-
-    if (roleLookupError || !role?.id) {
-      await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-      return {
-        success: false,
-        error: `User created but role sync failed: role ${parsed.primary_role} was not found`,
-      };
-    }
-
-    const { error: roleSyncError } = await supabaseAdmin.from('user_roles').upsert(
-      {
-        user_id: authData.user.id,
-        role_id: role.id,
-        tenant_id: adminProfile.tenant_id,
-        granted_by: user.id,
-        is_active: true,
-      },
-      { onConflict: 'user_id,role_id,tenant_id' },
-    );
-
-    if (roleSyncError) {
-      await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-      return {
-        success: false,
-        error: 'User created but role sync failed: ' + roleSyncError.message,
-      };
-    }
-
-    return { success: true, userId: authData.user.id };
+    // 3. Execute use case (tenant comes from the trusted caller context)
+    return await new CreateUserUseCase(makeUserAdminRepository()).execute(ctx, parsed);
   } catch (error: unknown) {
     console.error('createUserAction error:', error);
     return { success: false, error: getErrorMessage(error) };
@@ -138,34 +49,11 @@ export async function createUserAction(data: CreateUserInput) {
  */
 export async function deleteUserAction(userId: string) {
   try {
-    const supabase = await createServerClient();
-
     // Verify caller auth and permission
-    const { user, error: authError } = await verifyCallerPermission(supabase, 'users.write');
-    if (authError || !user) {
-      return { success: false, error: authError ?? 'Unauthorized' };
-    }
+    await requirePermission('users.write');
 
-    // Connect with Admin privileges
-    const supabaseAdmin = createAdminClient();
-
-    // Delete auth user (cascades to public.users if configured)
-    const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
-
-    // Fallback soft delete to hide from active views
-    await supabaseAdmin
-      .from('users')
-      .update({ deleted_at: new Date().toISOString(), account_status: 'banned' })
-      .eq('id', userId);
-
-    if (deleteError) {
-      // If user wasn't in auth for some reason, we soft deleted them in public anyway.
-      if (!deleteError.message.includes('not found')) {
-        return { success: false, error: deleteError.message };
-      }
-    }
-
-    return { success: true };
+    // Execute use case (auth deletion + soft-delete fallback policy)
+    return await new DeleteUserUseCase(makeUserAdminRepository()).execute(userId);
   } catch (error: unknown) {
     console.error('deleteUserAction error:', error);
     return { success: false, error: getErrorMessage(error) };
@@ -185,32 +73,13 @@ export async function controlUserAccountAction(
   suspendHours?: number,
 ): Promise<{ success: boolean; accountStatus?: string; until?: string; error?: string }> {
   try {
-    const supabase = await createServerClient();
-    const { user, error: authError } = await verifyCallerPermission(supabase, 'users.lock');
-    if (authError || !user) {
-      return { success: false, error: authError ?? 'Unauthorized' };
-    }
-
-    // Use service_role client — v13 RPC requires it
-    const supabaseAdmin = createAdminClient();
-    const { data, error } = await supabaseAdmin.rpc('control_user_account', {
-      p_user_id: userId,
-      p_action: action,
-      p_reason: reason ?? null,
-      p_suspend_hours: suspendHours ?? null,
-    });
-
-    if (error) {
-      console.error(`[controlUserAccountAction] ${action} on ${userId} failed:`, error);
-      return { success: false, error: getErrorMessage(error) };
-    }
-
-    const result = data as { status?: string; until?: string } | null;
-    return {
-      success: true,
-      ...(result?.status !== undefined && { accountStatus: result.status }),
-      ...(result?.until !== undefined && { until: result.until }),
-    };
+    await requirePermission('users.lock');
+    return await new ControlUserAccountUseCase(makeUserAdminRepository()).execute(
+      userId,
+      action,
+      reason,
+      suspendHours,
+    );
   } catch (error: unknown) {
     console.error('controlUserAccountAction error:', error);
     return { success: false, error: getErrorMessage(error) };
@@ -228,31 +97,11 @@ export async function terminateUserSessionsAction(
   reason?: string,
 ): Promise<{ success: boolean; count?: number; error?: string }> {
   try {
-    const supabase = await createServerClient();
-    const { user, error: authError } = await verifyCallerPermission(supabase, [
-      'sessions.manage',
-      'users.write',
-    ]);
-    if (authError || !user) {
-      return { success: false, error: authError ?? 'Unauthorized' };
-    }
-
-    // Use service_role client — v13 RPC requires it
-    const supabaseAdmin = createAdminClient();
-    const { data, error } = await supabaseAdmin.rpc('terminate_user_sessions', {
-      p_user_id: userId,
-      p_reason: reason ?? 'admin_terminated',
-    });
-
-    if (error) {
-      console.error(
-        `[terminateUserSessionsAction] terminate sessions for ${userId} failed:`,
-        error,
-      );
-      return { success: false, error: getErrorMessage(error) };
-    }
-
-    return { success: true, count: (data as number | null) ?? 0 };
+    await requirePermission(['sessions.manage', 'users.write']);
+    return await new TerminateUserSessionsUseCase(makeUserAdminRepository()).execute(
+      userId,
+      reason,
+    );
   } catch (error: unknown) {
     console.error('terminateUserSessionsAction error:', error);
     return { success: false, error: getErrorMessage(error) };
@@ -266,25 +115,13 @@ export async function issueWarningAction(
   action: string = 'none',
 ): Promise<{ success: boolean; warningId?: string; error?: string }> {
   try {
-    const supabase = await createServerClient();
-    const { user, error: authError } = await verifyCallerPermission(supabase, 'warnings.write');
-    if (authError || !user) {
-      return { success: false, error: authError ?? 'Unauthorized' };
-    }
-
-    const { data, error } = await supabase.rpc('issue_warning', {
-      p_user_id: userId,
-      p_reason: reason,
-      p_severity: severity,
-      p_note: action && action !== 'none' ? action : null,
-    });
-
-    if (error) {
-      console.error(`[issueWarningAction] warning for ${userId} failed:`, error);
-      return { success: false, error: getErrorMessage(error) };
-    }
-
-    return { success: true, warningId: data as string };
+    await requirePermission('warnings.write');
+    return await new IssueWarningUseCase(makeUserAdminRepository()).execute(
+      userId,
+      reason,
+      severity,
+      action,
+    );
   } catch (error: unknown) {
     console.error('issueWarningAction error:', error);
     return { success: false, error: getErrorMessage(error) };

@@ -1,110 +1,44 @@
 'use server';
 
-import { authorizeSuperAdmin } from '@/application/authorization/authorization.service';
+import { requireSuperAdmin } from '@/application/actions/boundary';
+import {
+  CreateTenantUseCase,
+  DeleteTenantUseCase,
+  SuspendTenantUseCase,
+  UpdateTenantUseCase,
+} from '@/application/use-cases/tenants/manage-tenants.use-case';
 import type { Tenant, CreateTenantInput, UpdateTenantInput } from '@/domain/types/tenant.types';
-import { createAdminClient } from '@/infrastructure/supabase/admin';
-import { createServerClient } from '@/infrastructure/supabase/server';
+import { makeTenantAdminRepository } from '@/infrastructure/repos/tenant-admin.repository';
 
-async function requireSuperAdmin() {
-  const supabase = await createServerClient();
-  const ctx = await authorizeSuperAdmin(supabase);
-  return { userId: ctx.userId };
-}
+/**
+ * Thin Server-Action boundary for tenant management (super-admin only).
+ *
+ * Contract: authenticate/authorize (super-admin gate) → execute use case.
+ * Business rules (slug uniqueness + platform defaults, suspension audit,
+ * soft delete) live in the use cases; the service-role tenant access is
+ * encapsulated in infrastructure/repos/tenant-admin.repository.ts.
+ */
 
 // ── Create tenant (admin client bypasses RLS) ───────────────────
 export async function createTenantAction(input: CreateTenantInput): Promise<Tenant> {
   await requireSuperAdmin();
-  const admin = createAdminClient();
-
-  // Pre-check slug uniqueness
-  const { count } = await admin
-    .from('tenants')
-    .select('id', { count: 'exact', head: true })
-    .eq('slug', input.slug)
-    .is('deleted_at', null);
-
-  if ((count ?? 0) > 0) {
-    throw new Error('SLUG_TAKEN: A tenant with this slug already exists');
-  }
-
-  const { data, error } = await admin
-    .from('tenants')
-    .insert({
-      slug: input.slug,
-      name: input.name,
-      plan: input.plan ?? 'free',
-      region_id: input.region_id ?? 'me-south-1',
-      max_users: input.max_users ?? 1000,
-      max_courses: input.max_courses ?? 50,
-      max_storage_bytes: input.max_storage_bytes ?? 10_737_418_240,
-      metadata: input.metadata ?? {},
-    })
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data as Tenant;
+  return new CreateTenantUseCase(makeTenantAdminRepository()).execute(input);
 }
 
 // ── Update tenant (admin client bypasses RLS) ───────────────────
 export async function updateTenantAction(id: string, input: UpdateTenantInput): Promise<Tenant> {
   await requireSuperAdmin();
-  const admin = createAdminClient();
-
-  const { data, error } = await admin
-    .from('tenants')
-    .update({ ...input, updated_at: new Date().toISOString() })
-    .eq('id', id)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data as Tenant;
+  return new UpdateTenantUseCase(makeTenantAdminRepository()).execute(id, input);
 }
 
 // ── Suspend tenant (admin client bypasses RLS) ──────────────────
 export async function suspendTenantAction(id: string, reason: string): Promise<void> {
-  const { userId } = await requireSuperAdmin();
-  const admin = createAdminClient();
-
-  const { error } = await admin
-    .from('tenants')
-    .update({
-      status: 'suspended',
-      metadata: { suspended_reason: reason, suspended_at: new Date().toISOString() },
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', id);
-
-  if (error) throw error;
-
-  // Log the suspension via activity_logs if available
-  try {
-    await admin.from('activity_logs').insert({
-      user_id: userId,
-      tenant_id: id,
-      activity_type: 'tenant_suspended',
-      details: { reason },
-      risk_level: 'high',
-    });
-  } catch {
-    // Non-fatal: continue even if audit log fails
-  }
+  const ctx = await requireSuperAdmin();
+  return new SuspendTenantUseCase(makeTenantAdminRepository()).execute(ctx, id, reason);
 }
 
 // ── Soft delete tenant (admin client bypasses RLS) ──────────────
 export async function deleteTenantAction(id: string): Promise<void> {
   await requireSuperAdmin();
-  const admin = createAdminClient();
-
-  const { error } = await admin
-    .from('tenants')
-    .update({
-      status: 'deleted',
-      deleted_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', id);
-
-  if (error) throw error;
+  return new DeleteTenantUseCase(makeTenantAdminRepository()).execute(id);
 }
