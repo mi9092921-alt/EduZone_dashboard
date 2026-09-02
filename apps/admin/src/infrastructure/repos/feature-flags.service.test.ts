@@ -2,150 +2,173 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import {
   getAllFeatureFlags,
-  getFeatureFlagById,
+  getAllFeatureFlagsAdmin,
   createFeatureFlag,
+  createFeatureFlagAdmin,
   updateFeatureFlag,
   deleteFeatureFlag,
   toggleFeatureFlag,
   addRoleOverride,
+  addRoleOverrideAdmin,
   removeRoleOverride,
   addUserOverride,
   removeUserOverride,
   getAllRoles,
 } from './feature-flags.service';
 
-import {
-  getAllFeatureFlagsAction,
-  getFeatureFlagByIdAction,
-  createFeatureFlagAction,
-  updateFeatureFlagAction,
-  deleteFeatureFlagAction,
-  toggleFeatureFlagAction,
-  addRoleOverrideAction,
-  removeRoleOverrideAction,
-  addUserOverrideAction,
-  removeUserOverrideAction,
-  getAllRolesAction,
-} from '@/adapters/actions/admin.actions';
+import { container } from '@/container';
+import { ConflictError } from '@/domain/errors';
 
-// feature-flags.service is a thin delegator to the admin server actions,
-// which run the privileged, service-role Supabase calls behind an
-// auth/permission check (see admin.actions.ts). These tests verify the
-// delegation contract: correct action called with correct args, and the
-// result/error passed through unchanged. The query/mapping logic itself
-// lives in admin.actions.ts and is covered by admin.actions.test.ts.
-vi.mock('@/adapters/actions/admin.actions', () => ({
-  getAllFeatureFlagsAction: vi.fn(),
-  getFeatureFlagByIdAction: vi.fn(),
-  createFeatureFlagAction: vi.fn(),
-  updateFeatureFlagAction: vi.fn(),
-  deleteFeatureFlagAction: vi.fn(),
-  toggleFeatureFlagAction: vi.fn(),
-  addRoleOverrideAction: vi.fn(),
-  removeRoleOverrideAction: vi.fn(),
-  addUserOverrideAction: vi.fn(),
-  removeUserOverrideAction: vi.fn(),
-  getAllRolesAction: vi.fn(),
+vi.mock('@/container', () => ({
+  container: {
+    supabase: {
+      from: vi.fn(),
+      auth: { getUser: vi.fn() },
+    },
+  },
 }));
 
+const mockAdminFrom = vi.fn();
+vi.mock('@/infrastructure/supabase/admin', () => ({
+  createAdminClient: () => ({
+    from: mockAdminFrom,
+  }),
+}));
+
+function chain(result: unknown) {
+  const q: any = {};
+  for (const m of ['select', 'eq', 'order', 'insert', 'upsert', 'delete', 'update', 'limit']) {
+    q[m] = vi.fn(() => q);
+  }
+  q.single = vi.fn().mockResolvedValue(result);
+  q.maybeSingle = vi.fn().mockResolvedValue(result);
+  q.then = (resolve: (v: unknown) => void) => resolve(result);
+  return q;
+}
+
 describe('feature-flags.service', () => {
+  const mockFrom = container.supabase.from as any;
+  const mockAuth = container.supabase.auth.getUser as any;
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('getAllFeatureFlags delegates to getAllFeatureFlagsAction', async () => {
-    const flags = [{ id: 'f1', key: 'dark_mode' }];
-    (getAllFeatureFlagsAction as any).mockResolvedValue(flags);
+  // ── Client-facing (RLS, container.supabase) variants ──────────────────────
 
+  it('getAllFeatureFlags queries via container.supabase (RLS-scoped)', async () => {
+    mockFrom.mockReturnValue(
+      chain({ data: [{ id: 'f1', key: 'dark_mode', is_enabled: true, metadata: {} }], error: null }),
+    );
     const result = await getAllFeatureFlags();
-    expect(getAllFeatureFlagsAction).toHaveBeenCalledWith();
-    expect(result).toBe(flags);
+    expect(mockFrom).toHaveBeenCalledWith('feature_flags');
+    expect(result).toHaveLength(1);
+    expect(result[0]!.id).toBe('f1');
   });
 
-  it('getFeatureFlagById delegates to getFeatureFlagByIdAction with id', async () => {
-    const flag = { id: 'f1', key: 'test_flag' };
-    (getFeatureFlagByIdAction as any).mockResolvedValue(flag);
-
-    const result = await getFeatureFlagById('f1');
-    expect(getFeatureFlagByIdAction).toHaveBeenCalledWith('f1');
-    expect(result).toBe(flag);
+  it('createFeatureFlag maps a unique-constraint violation (23505) to ConflictError', async () => {
+    mockFrom.mockReturnValue(chain({ data: null, error: { code: '23505', message: 'dup' } }));
+    await expect(createFeatureFlag({ key: 'existing' } as any)).rejects.toBeInstanceOf(ConflictError);
   });
 
-  it('createFeatureFlag delegates to createFeatureFlagAction with input', async () => {
-    const input = { key: 'new_feature', label: 'New Feature' } as any;
-    const created = { id: 'f-new', ...input };
-    (createFeatureFlagAction as any).mockResolvedValue(created);
-
-    const result = await createFeatureFlag(input);
-    expect(createFeatureFlagAction).toHaveBeenCalledWith(input);
-    expect(result).toBe(created);
+  it('updateFeatureFlag merges existing metadata before writing', async () => {
+    const q = chain({ data: { id: 'f1', key: 'dark_mode', is_enabled: true, metadata: {} }, error: null });
+    mockFrom.mockReturnValue(q);
+    await updateFeatureFlag('f1', { is_enabled: true });
+    expect(q.update).toHaveBeenCalled();
   });
 
-  it('createFeatureFlag propagates FLAG_KEY_EXISTS from the action', async () => {
-    (createFeatureFlagAction as any).mockRejectedValue(new Error('FLAG_KEY_EXISTS'));
+  it('deleteFeatureFlag deletes by id via container.supabase', async () => {
+    const q = chain({ error: null });
+    mockFrom.mockReturnValue(q);
+    await deleteFeatureFlag('f1');
+    expect(q.delete).toHaveBeenCalled();
+    expect(q.eq).toHaveBeenCalledWith('id', 'f1');
+  });
 
-    await expect(createFeatureFlag({ key: 'existing' } as any)).rejects.toThrow(
-      'FLAG_KEY_EXISTS',
+  it('toggleFeatureFlag updates is_enabled via container.supabase', async () => {
+    const q = chain({ error: null });
+    mockFrom.mockReturnValue(q);
+    await toggleFeatureFlag('f1', true);
+    expect(q.update).toHaveBeenCalledWith(
+      expect.objectContaining({ is_enabled: true }),
     );
   });
 
-  it('updateFeatureFlag delegates to updateFeatureFlagAction with id/input', async () => {
-    const updated = { id: 'f1', is_enabled: true };
-    (updateFeatureFlagAction as any).mockResolvedValue(updated);
-
-    const result = await updateFeatureFlag('f1', { is_enabled: true });
-    expect(updateFeatureFlagAction).toHaveBeenCalledWith('f1', { is_enabled: true });
-    expect(result).toBe(updated);
+  it('addRoleOverride resolves tenant from the caller session when no explicit tenant is cached', async () => {
+    mockAuth.mockResolvedValue({ data: { user: { id: 'u1' } } });
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'users') return chain({ data: { tenant_id: 't1' }, error: null });
+      return chain({ error: null });
+    });
+    await addRoleOverride('f1', 'r1');
+    expect(mockFrom).toHaveBeenCalledWith('users');
+    expect(mockFrom).toHaveBeenCalledWith('feature_flag_roles');
   });
 
-  it('deleteFeatureFlag delegates to deleteFeatureFlagAction with id', async () => {
-    (deleteFeatureFlagAction as any).mockResolvedValue(undefined);
-
-    await deleteFeatureFlag('f1');
-    expect(deleteFeatureFlagAction).toHaveBeenCalledWith('f1');
-  });
-
-  it('toggleFeatureFlag delegates to toggleFeatureFlagAction with id/enabled', async () => {
-    (toggleFeatureFlagAction as any).mockResolvedValue(undefined);
-
-    await toggleFeatureFlag('f1', true);
-    expect(toggleFeatureFlagAction).toHaveBeenCalledWith('f1', true);
-  });
-
-  it('addRoleOverride delegates to addRoleOverrideAction with flagId/roleId/isExclude', async () => {
-    (addRoleOverrideAction as any).mockResolvedValue(undefined);
-
-    await addRoleOverride('f1', 'r1', true);
-    expect(addRoleOverrideAction).toHaveBeenCalledWith('f1', 'r1', true);
-  });
-
-  it('removeRoleOverride delegates to removeRoleOverrideAction with flagId/roleId', async () => {
-    (removeRoleOverrideAction as any).mockResolvedValue(undefined);
-
+  it('removeRoleOverride deletes the matching flag/role pair via container.supabase', async () => {
+    const q = chain({ error: null });
+    mockFrom.mockReturnValue(q);
     await removeRoleOverride('f1', 'r1');
-    expect(removeRoleOverrideAction).toHaveBeenCalledWith('f1', 'r1');
+    expect(q.eq).toHaveBeenCalledWith('flag_id', 'f1');
+    expect(q.eq).toHaveBeenCalledWith('role_id', 'r1');
   });
 
-  it('addUserOverride delegates to addUserOverrideAction with flagId/userId/isExclude', async () => {
-    (addUserOverrideAction as any).mockResolvedValue(undefined);
-
-    await addUserOverride('f1', 'u1', false);
-    expect(addUserOverrideAction).toHaveBeenCalledWith('f1', 'u1', false);
+  it('addUserOverride resolves tenant from the target user first', async () => {
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'users') return chain({ data: { tenant_id: 'user-tenant' }, error: null });
+      return chain({ error: null });
+    });
+    await addUserOverride('f1', 'u1');
+    expect(mockFrom).toHaveBeenCalledWith('users');
+    expect(mockFrom).toHaveBeenCalledWith('feature_flag_users');
   });
 
-  it('removeUserOverride delegates to removeUserOverrideAction with flagId/userId', async () => {
-    (removeUserOverrideAction as any).mockResolvedValue(undefined);
-
+  it('removeUserOverride deletes the matching flag/user pair via container.supabase', async () => {
+    const q = chain({ error: null });
+    mockFrom.mockReturnValue(q);
     await removeUserOverride('f1', 'u1');
-    expect(removeUserOverrideAction).toHaveBeenCalledWith('f1', 'u1');
+    expect(q.eq).toHaveBeenCalledWith('flag_id', 'f1');
+    expect(q.eq).toHaveBeenCalledWith('user_id', 'u1');
   });
 
-  it('getAllRoles delegates to getAllRolesAction', async () => {
-    const roles = [{ id: 'r1', name: 'Administrator', key: 'admin' }];
-    (getAllRolesAction as any).mockResolvedValue(roles);
-
+  it('getAllRoles returns roles ordered by name via container.supabase', async () => {
+    const q = chain({ data: [{ id: 'r1', name: 'admin', label: 'Administrator' }], error: null });
+    mockFrom.mockReturnValue(q);
     const result = await getAllRoles();
-    expect(getAllRolesAction).toHaveBeenCalledWith();
-    expect(result).toBe(roles);
+    expect(q.order).toHaveBeenCalledWith('name');
+    expect(result).toEqual([{ id: 'r1', name: 'Administrator', key: 'admin' }]);
+  });
+
+  // ── Server-action (service-role, createAdminClient) variants ──────────────
+
+  it('getAllFeatureFlagsAdmin queries via createAdminClient (bypasses RLS)', async () => {
+    mockAdminFrom.mockReturnValue(
+      chain({ data: [{ id: 'f1', key: 'dark_mode', is_enabled: true, metadata: {} }], error: null }),
+    );
+    const result = await getAllFeatureFlagsAdmin();
+    expect(mockAdminFrom).toHaveBeenCalledWith('feature_flags');
+    // The RLS-scoped mock must never be hit by the Admin variant.
+    expect(mockFrom).not.toHaveBeenCalled();
+    expect(result).toHaveLength(1);
+  });
+
+  it('createFeatureFlagAdmin maps a unique-constraint violation (23505) to ConflictError', async () => {
+    mockAdminFrom.mockReturnValue(chain({ data: null, error: { code: '23505', message: 'dup' } }));
+    await expect(createFeatureFlagAdmin({ key: 'existing' } as any)).rejects.toBeInstanceOf(
+      ConflictError,
+    );
+  });
+
+  it('addRoleOverrideAdmin uses the passed-in tenantId directly (no extra lookup)', async () => {
+    const q = chain({ error: null });
+    mockAdminFrom.mockReturnValue(q);
+    await addRoleOverrideAdmin('f1', 'r1', 't1');
+    expect(mockAdminFrom).toHaveBeenCalledWith('feature_flag_roles');
+    expect(mockAdminFrom).toHaveBeenCalledTimes(1);
+    expect(q.upsert).toHaveBeenCalledWith(
+      { tenant_id: 't1', flag_id: 'f1', role_id: 'r1' },
+      { onConflict: 'tenant_id,flag_id,role_id' },
+    );
   });
 });
