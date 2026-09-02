@@ -9,10 +9,26 @@
 
 import { type NextRequest, NextResponse } from 'next/server';
 
+import { createServerClient } from '@/infrastructure/supabase/server';
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Route Handler
 // ─────────────────────────────────────────────────────────────────────────────
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ videoId: string }> }) {
+  // P1-SEC-004 FIX: this route previously had no authentication/authorization
+  // check at all -- any unauthenticated caller who obtained/guessed a
+  // videoId could load the anti-piracy wrapper page, defeating its purpose.
+  // A repo-wide search found no in-app caller of this route, so the minimum
+  // safe change is requiring a valid dashboard session (matching every other
+  // authenticated route in this app), without guessing at per-lesson
+  // ownership rules that would need the real caller to confirm.
+  const supabase = await createServerClient();
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+
+  if (userError || !userData?.user) {
+    return new NextResponse('Unauthorized', { status: 401 });
+  }
+
   const { videoId } = await params;
 
   // Validate videoId (alphanumeric + - _)
@@ -107,11 +123,10 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ vid
   // (`<iframe src="...">`), never read via cross-origin fetch/XHR, so a
   // wildcard CORS grant serves no legitimate embedding purpose here — it
   // only widened the response's readable-cross-origin surface. Dropped.
-  // NOTE: this route still has no authentication/authorization check on
-  // videoId — see PRODUCTION_READINESS_PLAN.md P1-SEC-004. No caller of
-  // this route was found in either EduZone_App or EduZone_dashboard via
-  // full-repo search, so adding an auth gate was left for manual
-  // confirmation of the real caller before changing that behavior.
+  // Authentication is now enforced above (session required); per-lesson
+  // ownership/enrollment checks are NOT implemented here, since no in-app
+  // caller was found to confirm what those checks should be -- flagged for
+  // manual confirmation if a caller is added later.
   return new NextResponse(html, {
     status: 200,
     headers: {

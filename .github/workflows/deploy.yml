@@ -30,6 +30,25 @@ jobs:
         with:
           version: latest
 
+      # Release gate: this workflow runs on every push to main and, unlike
+      # ci.yml, was not previously gated on typecheck/lint/test/build passing
+      # first -- a push straight to main (or a merge that bypassed required
+      # PR checks) could push a DB schema change and deploy broken code to
+      # production with no automated check in between. Mirror ci.yml's gates
+      # here so this workflow fails closed before touching the shared DB or
+      # production deployment.
+      - name: Typecheck
+        run: pnpm turbo typecheck
+
+      - name: Lint
+        run: pnpm turbo lint
+
+      - name: Test (Vitest)
+        run: pnpm turbo test
+
+      - name: Production build
+        run: pnpm turbo build
+
       # Push DB schema before deploying app code that may depend on it. The
       # app and DB share one Supabase project (see agent_prompt_eduzone_db.md):
       # deploying the app first left a window where new code could call

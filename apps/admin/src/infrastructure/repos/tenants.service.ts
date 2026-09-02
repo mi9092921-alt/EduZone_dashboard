@@ -14,6 +14,7 @@ import type {
   UpdateTenantInput,
   PaginatedResult,
 } from '@/domain/types/tenant.types';
+import { sanitizePostgrestSearchTerm } from '@/infrastructure/supabase/postgrest-filter';
 
 type TenantWithUsage = Tenant & {
   current_users: number;
@@ -72,7 +73,10 @@ export async function getTenants(
     .range(from, to);
 
   if (filters.search) {
-    query = query.or(`name.ilike.%${filters.search}%,slug.ilike.%${filters.search}%`);
+    // Sanitize before interpolating into the raw .or() filter string -- an
+    // unescaped ',' or '(' / ')' could inject additional filter conditions.
+    const safeSearch = sanitizePostgrestSearchTerm(filters.search);
+    query = query.or(`name.ilike.%${safeSearch}%,slug.ilike.%${safeSearch}%`);
   }
   if (filters.plan) query = query.eq('plan', filters.plan);
   if (filters.status) query = query.eq('status', filters.status);

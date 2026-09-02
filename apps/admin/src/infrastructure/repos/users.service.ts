@@ -11,6 +11,7 @@ import type {
   UserRoleAssignment,
   UserStats,
 } from '@/domain/types/user.types';
+import { sanitizePostgrestSearchTerm } from '@/infrastructure/supabase/postgrest-filter';
 
 /**
  * Users service — all Supabase queries for the users domain.
@@ -310,7 +311,11 @@ export async function searchUsers(
 
   // If query provided, apply search filters
   if (query.trim()) {
-    q = q.or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%,email.ilike.%${query}%`);
+    // Sanitize before interpolating into the raw .or() filter string --
+    // an unescaped ',' or '(' / ')' could inject additional filter
+    // conditions into the query PostgREST actually executes.
+    const safeQuery = sanitizePostgrestSearchTerm(query);
+    q = q.or(`first_name.ilike.%${safeQuery}%,last_name.ilike.%${safeQuery}%,email.ilike.%${safeQuery}%`);
   }
 
   // Filter by tenant if provided

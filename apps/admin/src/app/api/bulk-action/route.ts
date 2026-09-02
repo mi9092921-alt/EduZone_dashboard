@@ -17,6 +17,7 @@ import {
   workerUpdateBulkJob,
 } from '@/infrastructure/repos/jobs-rpc.service';
 import { createAdminClient } from '@/infrastructure/supabase/admin';
+import { sanitizePostgrestSearchTerm } from '@/infrastructure/supabase/postgrest-filter';
 import { createServerClient } from '@/infrastructure/supabase/server';
 
 /**
@@ -87,8 +88,13 @@ async function processInlineBulkJob(
     }
   } else {
     if (f.search) {
+      // P1-SEC-005 FIX (filter injection): sanitize before interpolating
+      // into the raw .or() filter string -- see postgrest-filter.ts. This
+      // runs on the service_role client (no RLS backstop), so an unescaped
+      // ',' or '(' / ')' in `search` could inject additional conditions.
+      const safeSearch = sanitizePostgrestSearchTerm(f.search);
       builder = builder.or(
-        `email.ilike.%${f.search}%,first_name.ilike.%${f.search}%,last_name.ilike.%${f.search}%`,
+        `email.ilike.%${safeSearch}%,first_name.ilike.%${safeSearch}%,last_name.ilike.%${safeSearch}%`,
       );
     }
     if (f.primary_role) builder = builder.eq('primary_role', f.primary_role);
@@ -426,8 +432,11 @@ export async function POST(request: NextRequest) {
       // Apply full search and filters.
       if (f.search) {
         // v13: search against decrypted PII column
+        // P1-SEC-005 FIX (filter injection): sanitize before interpolating
+        // into the raw .or() filter string -- see postgrest-filter.ts.
+        const safeSearch = sanitizePostgrestSearchTerm(f.search);
         query = query.or(
-          `email.ilike.%${f.search}%,first_name.ilike.%${f.search}%,last_name.ilike.%${f.search}%`,
+          `email.ilike.%${safeSearch}%,first_name.ilike.%${safeSearch}%,last_name.ilike.%${safeSearch}%`,
         );
       }
       if (f.primary_role) query = query.eq('primary_role', f.primary_role);
