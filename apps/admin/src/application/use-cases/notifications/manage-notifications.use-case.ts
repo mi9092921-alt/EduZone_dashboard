@@ -1,3 +1,4 @@
+import type { IAuditLogger } from '@/application/ports/IAuditLogger';
 import type { INotificationAdminRepository } from '@/application/ports/INotificationAdminRepository';
 import type { RequestContext } from '@/domain/types/context.types';
 import type {
@@ -13,6 +14,9 @@ import type {
  * Business rule (from the former fat action): the broadcast list and
  * deletes are scoped to the caller's tenant; a caller without tenant
  * context (legacy super_admin edge case) sees/ affects all tenants.
+ *
+ * M13 (§17): DeleteNotificationUseCase is the audit-event source for
+ * broadcast deletion (`notification_deleted`).
  */
 export class ListNotificationsUseCase {
   constructor(private readonly notifications: INotificationAdminRepository) {}
@@ -31,9 +35,17 @@ export class ListNotificationsUseCase {
 }
 
 export class DeleteNotificationUseCase {
-  constructor(private readonly notifications: INotificationAdminRepository) {}
+  constructor(
+    private readonly notifications: INotificationAdminRepository,
+    private readonly audit: IAuditLogger,
+  ) {}
 
   async execute(ctx: Readonly<RequestContext>, id: string): Promise<void> {
-    return this.notifications.softDelete(id, ctx.tenantId || null);
+    await this.notifications.softDelete(id, ctx.tenantId || null);
+    await this.audit.record(ctx, {
+      type: 'notification_deleted',
+      summary: 'Broadcast notification deleted',
+      riskLevel: 'medium',
+    });
   }
 }

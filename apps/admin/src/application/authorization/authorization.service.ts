@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { roleAllowsPermission } from '@/application/authorization/policy';
+import { createRequestId } from '@/application/ports/IAuditLogger';
 import { createRequestContext, type RequestContext } from '@/domain/types/context.types';
 import type { PrimaryRole } from '@/domain/types/user.types';
 
@@ -52,6 +53,10 @@ export async function authorizeCaller(
   const role = profile.primary_role as PrimaryRole;
   const callerTenantId = profile.tenant_id as string;
 
+  // M13: request-scoped correlation id — minted once per authorization and
+  // carried by every audit event / log entry emitted during this request.
+  const requestId = createRequestId();
+
   // 3. Super Admin Check
   if (options?.requireSuperAdmin) {
     if (role !== 'super_admin') {
@@ -63,6 +68,7 @@ export async function authorizeCaller(
       tenantId: callerTenantId,
       role,
       permissions: ['*'],
+      requestId,
     });
   }
 
@@ -72,6 +78,7 @@ export async function authorizeCaller(
       tenantId: callerTenantId,
       role,
       permissions: ['*'],
+      requestId,
     });
   }
 
@@ -90,6 +97,7 @@ export async function authorizeCaller(
       tenantId: callerTenantId,
       role,
       permissions,
+      requestId,
     });
   }
 
@@ -107,6 +115,7 @@ export async function authorizeCaller(
         tenantId: callerTenantId,
         role,
         permissions: [p],
+        requestId,
       });
     }
   }

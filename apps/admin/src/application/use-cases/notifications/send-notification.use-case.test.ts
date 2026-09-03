@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { SendNotificationUseCase } from './send-notification.use-case';
 
+import type { IAuditLogger } from '@/application/ports/IAuditLogger';
 import type {
   INotificationAdminRepository,
   ResolveNotificationTargetsInput,
@@ -32,18 +33,22 @@ const ctx = createRequestContext({
   tenantId: 'tenant-1',
   role: 'admin',
   permissions: ['notifications.send'],
+  requestId: 'req_test_notif',
 });
 
 describe('SendNotificationUseCase', () => {
+  let audit: IAuditLogger;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    audit = { record: vi.fn().mockResolvedValue(undefined) };
   });
 
   const input: SendNotificationInput = { title: 'Hello', body: 'World' };
 
   it('throws when the caller has no tenant context', async () => {
     const repo = makeRepo();
-    const useCase = new SendNotificationUseCase(repo);
+    const useCase = new SendNotificationUseCase(repo, audit);
     const noTenantCtx = createRequestContext({
       userId: 'admin-1',
       tenantId: '',
@@ -59,7 +64,7 @@ describe('SendNotificationUseCase', () => {
     const repo = makeRepo();
     (repo.resolveTargetUserIds as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
-    const result = await new SendNotificationUseCase(repo).execute(ctx, input);
+    const result = await new SendNotificationUseCase(repo, audit).execute(ctx, input);
 
     expect(result).toBe('notif-1');
     expect(repo.resolveTargetUserIds).toHaveBeenCalledWith(input, 'tenant-1');
@@ -72,7 +77,7 @@ describe('SendNotificationUseCase', () => {
     const repo = makeRepo();
     (repo.resolveTargetUserIds as ReturnType<typeof vi.fn>).mockResolvedValue(['u1', 'u2']);
 
-    await new SendNotificationUseCase(repo).execute(ctx, input);
+    await new SendNotificationUseCase(repo, audit).execute(ctx, input);
 
     expect(repo.attachNotificationTargets).toHaveBeenCalledWith('notif-1', ['u1', 'u2']);
     expect(repo.fanoutToUsers).toHaveBeenCalledWith('notif-1', 'tenant-1', ['u1', 'u2']);
@@ -85,7 +90,7 @@ describe('SendNotificationUseCase', () => {
     (repo.resolveTargetUserIds as ReturnType<typeof vi.fn>).mockResolvedValue(['u1']);
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    const result = await new SendNotificationUseCase(repo).execute(ctx, input);
+    const result = await new SendNotificationUseCase(repo, audit).execute(ctx, input);
 
     expect(result).toBe('notif-1');
     expect(repo.fanoutToUsers).toHaveBeenCalled();
@@ -104,7 +109,7 @@ describe('SendNotificationUseCase', () => {
     };
     (repo.resolveTargetUserIds as ReturnType<typeof vi.fn>).mockResolvedValue(['u9']);
 
-    await new SendNotificationUseCase(repo).execute(ctx, explicitInput);
+    await new SendNotificationUseCase(repo, audit).execute(ctx, explicitInput);
 
     expect(repo.resolveTargetUserIds).toHaveBeenCalledWith(explicitInput, 'tenant-1');
   });
@@ -115,7 +120,7 @@ describe('SendNotificationUseCase', () => {
     });
     (repo.resolveTargetUserIds as ReturnType<typeof vi.fn>).mockResolvedValue(['u1', 'u2']);
 
-    await expect(new SendNotificationUseCase(repo).execute(ctx, input)).rejects.toThrow(
+    await expect(new SendNotificationUseCase(repo, audit).execute(ctx, input)).rejects.toThrow(
       'fanout down',
     );
     // The orphan notification row is removed so the caller's retry starts clean.
@@ -131,7 +136,7 @@ describe('SendNotificationUseCase', () => {
     (repo.resolveTargetUserIds as ReturnType<typeof vi.fn>).mockResolvedValue(['u1']);
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    await expect(new SendNotificationUseCase(repo).execute(ctx, input)).rejects.toThrow(
+    await expect(new SendNotificationUseCase(repo, audit).execute(ctx, input)).rejects.toThrow(
       'targets down',
     );
     expect(repo.softDelete).toHaveBeenCalledWith('notif-1', 'tenant-1');
@@ -146,8 +151,52 @@ describe('SendNotificationUseCase', () => {
     const repo = makeRepo();
     (repo.resolveTargetUserIds as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
-    await new SendNotificationUseCase(repo).execute(ctx, input);
+    await new SendNotificationUseCase(repo, audit).execute(ctx, input);
 
     expect(repo.softDelete).not.toHaveBeenCalled();
+  });
+
+  it('M13: emits notification_sent with the recipient count and correlation ctx', async () => {
+    const repo = makeRepo();
+    (repo.resolveTargetUserIds as ReturnType<typeof vi.fn>).mockResolvedValue(['u1', 'u2']);
+
+    await new SendNotificationUseCase(repo, audit).execute(ctx, input);
+
+    expect(audit.record).toHaveBeenCalledWith(
+      ctx,
+      expect.objectContaining({
+        type: 'notification_sent',
+        details: expect.objectContaining({ recipient_count: 2, notification_id: 'notif-1' }),
+        riskLevel: 'medium',
+      }),
+    );
+  });
+
+  it('M13: emits notification_send_failed when the fanout is rolled back', async () => {
+    const repo = makeRepo({
+      fanoutToUsers: vi.fn().mockRejectedValue(new Error('fanout down')),
+    });
+    (repo.resolveTargetUserIds as ReturnType<typeof vi.fn>).mockResolvedValue(['u1']);
+
+    await expect(new SendNotificationUseCase(repo, audit).execute(ctx, input)).rejects.toThrow(
+      'fanout down',
+    );
+
+    expect(audit.record).toHaveBeenCalledWith(
+      ctx,
+      expect.objectContaining({ type: 'notification_send_failed', outcome: 'failure' }),
+    );
+  });
+
+  it('M13: never includes the notification body in the audit event', async () => {
+    const repo = makeRepo();
+    (repo.resolveTargetUserIds as ReturnType<typeof vi.fn>).mockResolvedValue(['u1']);
+
+    await new SendNotificationUseCase(repo, audit).execute(ctx, input);
+
+    const event = (audit.record as ReturnType<typeof vi.fn>).mock.calls.find(
+      (c) => (c[1] as { type: string }).type === 'notification_sent',
+    )?.[1] as { details?: Record<string, unknown>; summary?: string };
+    expect(JSON.stringify(event)).not.toContain('World');
   });
 });

@@ -82,19 +82,5 @@ export function makeTenantAdminRepository(
 
       if (error) throw mapDbError(error, 'tenant-admin.repository.ts');
     },
-
-    async logSuspension(input: {
-      userId: string;
-      tenantId: string;
-      reason: string;
-    }): Promise<void> {
-      await admin.from('activity_logs').insert({
-        user_id: input.userId,
-        tenant_id: input.tenantId,
-        activity_type: 'tenant_suspended',
-        details: { reason: input.reason },
-        risk_level: 'high',
-      });
-    },
   };
 }

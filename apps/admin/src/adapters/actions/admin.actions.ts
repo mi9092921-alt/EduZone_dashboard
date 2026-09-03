@@ -36,6 +36,7 @@ import type {
   RateLimitWithEmail,
   TopOffender,
 } from '@/domain/types/rate-limit.types';
+import { makeAuditLogger } from '@/infrastructure/observability/audit-logger.service';
 import * as accessRulesService from '@/infrastructure/repos/access-rules.service';
 import * as analyticsService from '@/infrastructure/repos/analytics.service';
 import * as auditService from '@/infrastructure/repos/audit.service';
@@ -73,20 +74,38 @@ export async function getAccessRulesAction(
 export async function upsertAccessRuleAction(
   rule: UpsertAccessRuleInput,
 ): Promise<AccessRule> {
-  await requirePermission(['settings.manage', 'settings.write', 'tenants.manage']);
-  return accessRulesService.upsertAccessRuleAdmin(rule);
+  const ctx = await requirePermission(['settings.manage', 'settings.write', 'tenants.manage']);
+  const saved = await accessRulesService.upsertAccessRuleAdmin(rule);
+  // M13: settings change is an audited operation (the boundary owns the ctx;
+  // the details never carry rule internals — just the target + tenant).
+  await makeAuditLogger().record(ctx, {
+    type: 'access_rule_upserted',
+    summary: 'Access rule created or updated',
+    riskLevel: 'medium',
+  });
+  return saved;
 }
 
 export async function deleteAccessRuleAction(id: string): Promise<void> {
   const ctx = await requirePermission(['settings.manage', 'settings.write', 'tenants.manage']);
   assertSameTenant(ctx, await accessRulesService.getAccessRuleTenantId(id));
-  return accessRulesService.deleteAccessRuleAdmin(id);
+  await accessRulesService.deleteAccessRuleAdmin(id);
+  await makeAuditLogger().record(ctx, {
+    type: 'access_rule_deleted',
+    summary: 'Access rule deleted',
+    riskLevel: 'medium',
+  });
 }
 
 export async function toggleAccessRuleAction(id: string, isActive: boolean): Promise<void> {
   const ctx = await requirePermission(['settings.manage', 'settings.write', 'tenants.manage']);
   assertSameTenant(ctx, await accessRulesService.getAccessRuleTenantId(id));
-  return accessRulesService.toggleAccessRuleAdmin(id, isActive);
+  await accessRulesService.toggleAccessRuleAdmin(id, isActive);
+  await makeAuditLogger().record(ctx, {
+    type: 'access_rule_toggled',
+    summary: `Access rule ${isActive ? 'enabled' : 'disabled'}`,
+    riskLevel: 'medium',
+  });
 }
 
 export async function getAllFeatureFlagsAction(): Promise<FeatureFlag[]> {
@@ -100,26 +119,50 @@ export async function getFeatureFlagByIdAction(id: string): Promise<FeatureFlagD
 }
 
 export async function createFeatureFlagAction(input: CreateFeatureFlagInput): Promise<FeatureFlag> {
-  await requirePermission('feature_flags.manage');
-  return featureFlagsService.createFeatureFlagAdmin(input);
+  const ctx = await requirePermission('feature_flags.manage');
+  const flag = await featureFlagsService.createFeatureFlagAdmin(input);
+  await makeAuditLogger().record(ctx, {
+    type: 'feature_flag_created',
+    summary: 'Feature flag created',
+    details: { key: flag.key },
+    riskLevel: 'medium',
+  });
+  return flag;
 }
 
 export async function updateFeatureFlagAction(
   id: string,
   input: UpdateFeatureFlagInput,
 ): Promise<FeatureFlag> {
-  await requirePermission('feature_flags.manage');
-  return featureFlagsService.updateFeatureFlagAdmin(id, input);
+  const ctx = await requirePermission('feature_flags.manage');
+  const flag = await featureFlagsService.updateFeatureFlagAdmin(id, input);
+  await makeAuditLogger().record(ctx, {
+    type: 'feature_flag_updated',
+    summary: 'Feature flag updated',
+    details: { key: flag.key },
+    riskLevel: 'medium',
+  });
+  return flag;
 }
 
 export async function deleteFeatureFlagAction(id: string): Promise<void> {
-  await requirePermission('feature_flags.manage');
-  return featureFlagsService.deleteFeatureFlagAdmin(id);
+  const ctx = await requirePermission('feature_flags.manage');
+  await featureFlagsService.deleteFeatureFlagAdmin(id);
+  await makeAuditLogger().record(ctx, {
+    type: 'feature_flag_deleted',
+    summary: 'Feature flag deleted',
+    riskLevel: 'medium',
+  });
 }
 
 export async function toggleFeatureFlagAction(id: string, enabled: boolean): Promise<void> {
-  await requirePermission('feature_flags.manage');
-  return featureFlagsService.toggleFeatureFlagAdmin(id, enabled);
+  const ctx = await requirePermission('feature_flags.manage');
+  await featureFlagsService.toggleFeatureFlagAdmin(id, enabled);
+  await makeAuditLogger().record(ctx, {
+    type: 'feature_flag_toggled',
+    summary: `Feature flag ${enabled ? 'enabled' : 'disabled'}`,
+    riskLevel: 'medium',
+  });
 }
 
 export async function addRoleOverrideAction(
@@ -199,7 +242,10 @@ export async function getNotificationsAction(
 
 export async function sendNotificationAction(input: SendNotificationInput): Promise<string> {
   const ctx = await requirePermission(['notifications.send', 'settings.write']);
-  return new SendNotificationUseCase(makeNotificationAdminRepository()).execute(ctx, input);
+  return new SendNotificationUseCase(makeNotificationAdminRepository(), makeAuditLogger()).execute(
+    ctx,
+    input,
+  );
 }
 
 export async function deleteNotificationAction(id: string): Promise<void> {
@@ -208,7 +254,10 @@ export async function deleteNotificationAction(id: string): Promise<void> {
     'notifications.send',
     'settings.write',
   ]);
-  return new DeleteNotificationUseCase(makeNotificationAdminRepository()).execute(ctx, id);
+  return new DeleteNotificationUseCase(makeNotificationAdminRepository(), makeAuditLogger()).execute(
+    ctx,
+    id,
+  );
 }
 
 export async function getMyNotificationsAction(
@@ -275,14 +324,24 @@ export async function getRateLimitRulesAction(): Promise<RateLimitRule[]> {
 }
 
 export async function toggleRateLimitRuleAction(action: string, isActive: boolean): Promise<void> {
-  await requirePermission('settings.write');
-  return rateLimitsService.toggleRateLimitRule(action, isActive);
+  const ctx = await requirePermission('settings.write');
+  await rateLimitsService.toggleRateLimitRule(action, isActive);
+  await makeAuditLogger().record(ctx, {
+    type: 'rate_limit_rule_toggled',
+    summary: `Rate limit rule ${isActive ? 'enabled' : 'disabled'}: ${action}`,
+    riskLevel: 'medium',
+  });
 }
 
 export async function clearRateLimitBlockAction(id: string): Promise<void> {
   const ctx = await requirePermission(['audit.read', 'settings.write']);
   assertSameTenant(ctx, await rateLimitsService.getRateLimitTenantId(id));
-  return rateLimitsService.clearBlock(id);
+  await rateLimitsService.clearBlock(id);
+  await makeAuditLogger().record(ctx, {
+    type: 'rate_limit_block_cleared',
+    summary: 'Rate limit block cleared',
+    riskLevel: 'medium',
+  });
 }
 
 export async function getTopOffendersAction(): Promise<TopOffender[]> {
@@ -303,5 +362,10 @@ export async function getCourseStatsAction(courseId: string): Promise<CourseStat
 export async function deleteCourseAction(id: string): Promise<void> {
   const ctx = await requirePermission(['courses.manage', 'courses.write']);
   assertSameTenant(ctx, await coursesService.getCourseTenantId(id));
-  return coursesService.deleteCourse(id);
+  await coursesService.deleteCourse(id);
+  await makeAuditLogger().record(ctx, {
+    type: 'course_deleted',
+    summary: 'Course deleted',
+    riskLevel: 'high',
+  });
 }

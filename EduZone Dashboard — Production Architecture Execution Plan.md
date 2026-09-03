@@ -1009,7 +1009,7 @@ partial failure
 
 ---
 
-# 17. P1 — Audit & Observability
+# 17. P1 — Audit & Observability ✅ DONE (M13 — 2026-09-03, see project_documents/milestone_reports/M13_audit_observability_report.md)
 
 المشروع لديه observability وaudit infrastructure بالفعل، لكن Production evidence غير مكتمل. 
 

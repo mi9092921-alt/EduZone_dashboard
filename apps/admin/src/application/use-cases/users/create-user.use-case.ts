@@ -1,3 +1,4 @@
+import type { IAuditLogger } from '@/application/ports/IAuditLogger';
 import type { IUserAdminRepository } from '@/application/ports/IUserAdminRepository';
 import { toClientMessage } from '@/domain/errors';
 import type { CreateUserInput } from '@/domain/schemas/user.schema';
@@ -22,9 +23,15 @@ export interface CreateUserResult {
  *  4. M16 (F16-5): a failed compensation is never silent — it is logged
  *     server-side and appended to the returned error so operators can
  *     find and delete the orphaned auth user.
+ *
+ * M13 (§17): emits `user_created` audit events (success/failure/compensation)
+ * with the requestId correlation id. Details never include the password.
  */
 export class CreateUserUseCase {
-  constructor(private readonly users: IUserAdminRepository) {}
+  constructor(
+    private readonly users: IUserAdminRepository,
+    private readonly audit: IAuditLogger,
+  ) {}
 
   async execute(ctx: Readonly<RequestContext>, input: CreateUserInput): Promise<CreateUserResult> {
     const failWithCompensation = async (
@@ -36,11 +43,27 @@ export class CreateUserUseCase {
         console.error(
           `[CREATE_USER_COMPENSATION_FAILED] orphaned auth user ${userId} could not be deleted: ${deleted.message}`,
         );
+        await this.audit.record(ctx, {
+          type: 'user_created',
+          summary: 'User creation rolled back, orphaned auth account remains',
+          details: { failure: message, compensation: 'auth_delete_failed' },
+          riskLevel: 'critical',
+          targetUserId: userId,
+          outcome: 'failure',
+        });
         return {
           success: false,
           error: `${message} (cleanup failed — orphaned auth account ${userId} needs manual removal)`,
         };
       }
+      await this.audit.record(ctx, {
+        type: 'user_created',
+        summary: 'User creation rolled back cleanly (compensation applied)',
+        details: { failure: message },
+        riskLevel: 'medium',
+        targetUserId: userId,
+        outcome: 'failure',
+      });
       return { success: false, error: message };
     };
 
@@ -59,6 +82,13 @@ export class CreateUserUseCase {
       });
 
       if (!created.ok) {
+        await this.audit.record(ctx, {
+          type: 'user_created',
+          summary: 'Auth user creation rejected',
+          details: { reason: created.message },
+          riskLevel: 'medium',
+          outcome: 'failure',
+        });
         return { success: false, error: created.message };
       }
       const userId = created.userId;
@@ -103,9 +133,23 @@ export class CreateUserUseCase {
         );
       }
 
+      await this.audit.record(ctx, {
+        type: 'user_created',
+        summary: 'User created and onboarded',
+        details: { role: input.primary_role },
+        riskLevel: 'medium',
+        targetUserId: userId,
+      });
+
       return { success: true, userId };
     } catch (error: unknown) {
       console.error('createUserAction error:', error);
+      await this.audit.record(ctx, {
+        type: 'user_created',
+        summary: 'User creation crashed unexpectedly',
+        riskLevel: 'high',
+        outcome: 'failure',
+      });
       return { success: false, error: toClientMessage(error) };
     }
   }

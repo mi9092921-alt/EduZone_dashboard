@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 
 import { roleAllowsPermission } from '@/application/authorization/policy';
+import { createRequestId } from '@/application/ports/IAuditLogger';
 import { mapDbError } from '@/domain/errors';
 import {
   MAX_BULK_SIZE,
@@ -69,6 +70,7 @@ async function processInlineBulkJob(
   body: BulkActionRequest,
   initiatorId: string,
   restrictTenantId: string | undefined,
+  requestId?: string,
 ) {
   // M9: build the filtered user query inline (typed), reusing the same
   // filter rules as the count query — no structural cast to a fake type.
@@ -150,7 +152,7 @@ async function processInlineBulkJob(
   await logActivityAsync(admin, {
     userId: initiatorId,
     type: 'bulk_action_completed',
-    details: { job_id: job.id, action: body.action, ...result },
+    details: { request_id: requestId ?? null, job_id: job.id, action: body.action, ...result },
     riskLevel: failedIds.length > 0 ? 'medium' : 'low',
   });
 }
@@ -508,11 +510,14 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Log the activity (non-critical) ──────────────────────
+    // M13: requestId correlates queued → completed audit entries for this job.
+    const requestId = createRequestId();
     try {
       await logActivityAsync(admin, {
         userId: userData.user.id,
         type: 'bulk_action_queued',
         details: {
+          request_id: requestId,
           action: body.action,
           estimated_count: count,
           job_id: job.id,
@@ -525,7 +530,7 @@ export async function POST(request: NextRequest) {
       // Don't block job submission if activity logging fails
     }
 
-    await processInlineBulkJob(admin, job, body, userData.user.id, restrictTenantId);
+    await processInlineBulkJob(admin, job, body, userData.user.id, restrictTenantId, requestId);
 
     // ── Return 202 Accepted ───────────────────────────────────
     return NextResponse.json(

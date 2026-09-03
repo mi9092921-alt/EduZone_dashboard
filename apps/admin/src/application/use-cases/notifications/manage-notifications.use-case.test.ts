@@ -5,6 +5,7 @@ import {
   ListNotificationsUseCase,
 } from './manage-notifications.use-case';
 
+import type { IAuditLogger } from '@/application/ports/IAuditLogger';
 import type { INotificationAdminRepository } from '@/application/ports/INotificationAdminRepository';
 import { createRequestContext } from '@/domain/types/context.types';
 
@@ -82,16 +83,23 @@ describe('ListNotificationsUseCase', () => {
 });
 
 describe('DeleteNotificationUseCase', () => {
+  let audit: IAuditLogger;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    audit = { record: vi.fn().mockResolvedValue(undefined) };
   });
 
-  it('soft-deletes scoped to the caller tenant', async () => {
+  it('soft-deletes scoped to the caller tenant and audits', async () => {
     const repo = makeRepo();
 
-    await new DeleteNotificationUseCase(repo).execute(adminCtx, 'notif-9');
+    await new DeleteNotificationUseCase(repo, audit).execute(adminCtx, 'notif-9');
 
     expect(repo.softDelete).toHaveBeenCalledWith('notif-9', 'tenant-1');
+    expect(audit.record).toHaveBeenCalledWith(
+      adminCtx,
+      expect.objectContaining({ type: 'notification_deleted', riskLevel: 'medium' }),
+    );
   });
 
   it('soft-deletes without tenant scope when tenant context is missing', async () => {
@@ -103,7 +111,7 @@ describe('DeleteNotificationUseCase', () => {
       permissions: ['*'],
     });
 
-    await new DeleteNotificationUseCase(repo).execute(noTenantCtx, 'notif-9');
+    await new DeleteNotificationUseCase(repo, audit).execute(noTenantCtx, 'notif-9');
 
     expect(repo.softDelete).toHaveBeenCalledWith('notif-9', null);
   });

@@ -11,6 +11,7 @@ import { DeleteUserUseCase } from '@/application/use-cases/users/delete-user.use
 import { toClientMessage } from '@/domain/errors';
 import { CreateUserInput, createUserSchema } from '@/domain/schemas/user.schema';
 import type { AccountAction } from '@/domain/types/user.types';
+import { makeAuditLogger } from '@/infrastructure/observability/audit-logger.service';
 import { makeUserAdminRepository } from '@/infrastructure/repos/user-admin.repository';
 import * as usersService from '@/infrastructure/repos/users.service';
 
@@ -37,7 +38,10 @@ export async function createUserAction(data: CreateUserInput) {
     const ctx = await requirePermission('users.write');
 
     // 3. Execute use case (tenant comes from the trusted caller context)
-    return await new CreateUserUseCase(makeUserAdminRepository()).execute(ctx, parsed);
+    return await new CreateUserUseCase(makeUserAdminRepository(), makeAuditLogger()).execute(
+      ctx,
+      parsed,
+    );
   } catch (error: unknown) {
     console.error('createUserAction error:', error);
     return { success: false, error: toClientMessage(error) };
@@ -60,7 +64,10 @@ export async function deleteUserAction(userId: string) {
     assertSameTenant(ctx, await usersService.getUserTenantId(userId));
 
     // Execute use case (auth deletion + soft-delete fallback policy)
-    return await new DeleteUserUseCase(makeUserAdminRepository()).execute(userId);
+    return await new DeleteUserUseCase(makeUserAdminRepository(), makeAuditLogger()).execute(
+      ctx,
+      userId,
+    );
   } catch (error: unknown) {
     console.error('deleteUserAction error:', error);
     return { success: false, error: toClientMessage(error) };
@@ -80,8 +87,9 @@ export async function controlUserAccountAction(
   suspendHours?: number,
 ): Promise<{ success: boolean; accountStatus?: string; until?: string; error?: string }> {
   try {
-    await requirePermission('users.lock');
-    return await new ControlUserAccountUseCase(makeUserAdminRepository()).execute(
+    const ctx = await requirePermission('users.lock');
+    return await new ControlUserAccountUseCase(makeUserAdminRepository(), makeAuditLogger()).execute(
+      ctx,
       userId,
       action,
       reason,
@@ -104,8 +112,9 @@ export async function terminateUserSessionsAction(
   reason?: string,
 ): Promise<{ success: boolean; count?: number; error?: string }> {
   try {
-    await requirePermission(['sessions.manage', 'users.write']);
-    return await new TerminateUserSessionsUseCase(makeUserAdminRepository()).execute(
+    const ctx = await requirePermission(['sessions.manage', 'users.write']);
+    return await new TerminateUserSessionsUseCase(makeUserAdminRepository(), makeAuditLogger()).execute(
+      ctx,
       userId,
       reason,
     );
@@ -122,8 +131,9 @@ export async function issueWarningAction(
   action: string = 'none',
 ): Promise<{ success: boolean; warningId?: string; error?: string }> {
   try {
-    await requirePermission('warnings.write');
-    return await new IssueWarningUseCase(makeUserAdminRepository()).execute(
+    const ctx = await requirePermission('warnings.write');
+    return await new IssueWarningUseCase(makeUserAdminRepository(), makeAuditLogger()).execute(
+      ctx,
       userId,
       reason,
       severity,

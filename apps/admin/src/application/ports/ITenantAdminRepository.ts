@@ -33,7 +33,4 @@ export interface ITenantAdminRepository {
 
   /** Soft-deletes the tenant (status = deleted + deleted_at). */
   softDelete(id: string): Promise<void>;
-
-  /** Best-effort audit entry for the suspension (activity_logs). */
-  logSuspension(input: { userId: string; tenantId: string; reason: string }): Promise<void>;
 }
