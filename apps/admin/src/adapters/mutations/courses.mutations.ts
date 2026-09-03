@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
+import { deleteCourseAction } from '@/adapters/actions/admin.actions';
 import { queryKeys } from '@/adapters/queries/keys';
 import { container } from '@/container';
 import type {
@@ -11,7 +12,6 @@ import type {
 import {
   createCourse,
   updateCourse,
-  deleteCourse,
   createSection,
   updateSection,
   deleteSection,
@@ -57,7 +57,16 @@ export function useUpdateCourse() {
 export function useDeleteCourse() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => deleteCourse(id),
+    // `deleteCourse` in the infra service uses the service-role client
+    // (bypasses RLS) and MUST NOT be called directly from the client —
+    // it has no permission or tenant check of its own. Always go through
+    // the `deleteCourseAction` server boundary, which enforces
+    // `courses.write`/`courses.manage` + same-tenant before deleting.
+    mutationFn: async (id: string) => {
+      const result = await deleteCourseAction(id);
+      if (!result.success) throw new Error(result.error);
+      return true;
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.courses.all });
     },

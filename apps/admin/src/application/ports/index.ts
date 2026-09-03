@@ -23,4 +23,5 @@ export type {
   CreateSessionInput,
 } from './ISessionRepository';
 export type { ITenantAdminRepository, NewTenantRow } from './ITenantAdminRepository';
+export type { ICourseAdminRepository } from './ICourseAdminRepository';
 

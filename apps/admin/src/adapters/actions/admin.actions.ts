@@ -3,6 +3,7 @@
 import type { AccessRule, PaginatedResult } from '@eduzone/types';
 
 import { assertSameTenant, requirePermission, requireUser } from '@/adapters/actions/boundary';
+import { DeleteCourseUseCase } from '@/application/use-cases/courses/delete-course.use-case';
 import {
   GetMyNotificationsUseCase,
   GetUnreadNotificationCountUseCase,
@@ -40,6 +41,7 @@ import { makeAuditLogger } from '@/infrastructure/observability/audit-logger.ser
 import * as accessRulesService from '@/infrastructure/repos/access-rules.service';
 import * as analyticsService from '@/infrastructure/repos/analytics.service';
 import * as auditService from '@/infrastructure/repos/audit.service';
+import { makeCourseAdminRepository } from '@/infrastructure/repos/course-admin.repository';
 import * as coursesService from '@/infrastructure/repos/courses.service';
 import * as featureFlagsService from '@/infrastructure/repos/feature-flags.service';
 import * as jobsService from '@/infrastructure/repos/jobs.service';
@@ -355,17 +357,22 @@ export async function getAnalyticsCourseStatsAction(tenantId?: string): Promise<
 }
 
 export async function getCourseStatsAction(courseId: string): Promise<CourseStats | null> {
-  await requirePermission(['reports.read', 'courses.read']);
+  const ctx = await requirePermission(['reports.read', 'courses.read']);
+  // getCourseStats reads via the service-role client (bypasses RLS), so —
+  // same as deleteCourseAction — tenant scoping must be enforced here.
+  // (Currently unused by any UI, but left unguarded it is a cross-tenant
+  // read landmine for the next caller that wires it up.)
+  assertSameTenant(ctx, await coursesService.getCourseTenantId(courseId));
   return coursesService.getCourseStats(courseId);
 }
 
-export async function deleteCourseAction(id: string): Promise<void> {
+export async function deleteCourseAction(
+  id: string,
+): Promise<{ success: boolean; error?: string }> {
   const ctx = await requirePermission(['courses.manage', 'courses.write']);
+  // IDOR/BOLA guard: deleteCourse goes through the service-role client
+  // (bypasses RLS), so tenant scoping MUST be enforced here at the
+  // boundary — same pattern as deleteUserAction / assertSameTenant.
   assertSameTenant(ctx, await coursesService.getCourseTenantId(id));
-  await coursesService.deleteCourse(id);
-  await makeAuditLogger().record(ctx, {
-    type: 'course_deleted',
-    summary: 'Course deleted',
-    riskLevel: 'high',
-  });
+  return new DeleteCourseUseCase(makeCourseAdminRepository(), makeAuditLogger()).execute(ctx, id);
 }
