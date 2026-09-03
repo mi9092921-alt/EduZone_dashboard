@@ -7,9 +7,12 @@ setup('authenticate', async ({ page }) => {
   await page.goto('/login');
 
   // Fill in credentials
-  // Note: Using seed data from Eduzone_schema_v9.sql
+  // Canonical QA seed account — supabase/schema/11_seed_reference.sql (v13):
+  // admin@eduzone-test.com / Admin@12345 (see supabase/AGENTS.md QA accounts
+  // table). The previous value ("Test1234!", referenced from a v9-era seed)
+  // no longer matches the canonical seed hash and would fail login.
   await page.getByLabel(/email/i).fill('admin@eduzone-test.com');
-  await page.getByLabel(/password/i).fill('Test1234!'); // Correct password from schema seed
+  await page.getByLabel(/password/i).fill('Admin@12345');
   await page.getByRole('button', { name: /login|sign in/i }).click();
 
   // Wait for redirect to dashboard or localized home with generous timeout

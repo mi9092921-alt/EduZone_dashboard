@@ -1,0 +1,89 @@
+name: E2E (Playwright)
+
+# Execution Plan §19 — CI/CD Production Gates: the E2E gate.
+#
+# DEFINED BUT DORMANT: the job runs only when the repository variable
+# E2E_ENABLED is set to "true" (Settings → Secrets and variables → Actions →
+# Variables). This follows the repo precedent of keeping gates meaningful
+# instead of permanently red (see the dependency-audit note in ci.yml): the
+# specs sign in with real credentials against a real Supabase (canonical QA
+# seed users from supabase/schema/11_seed_reference.sql), so this gate needs
+# a live local stack — a placeholder backend would fail every run.
+#
+# Activation checklist (M15 report — project_documents/milestone_reports/
+# M15_ci_cd_production_gates_report.md):
+#   1. Provision Docker-based local Supabase in CI (done below) and watch
+#      one monitored run end green (fix env gaps if any surface).
+#   2. Set repository variable E2E_ENABLED=true.
+#   3. Add "e2e" to the required status checks of main (Settings → Branches
+#      → Branch protection) so a failing E2E run blocks the merge, per §19.
+#
+# Schema policy: `supabase db reset` applies supabase/schema/*.sql through
+# schema_paths in supabase/config.toml — this READS the canonical schema and
+# changes nothing about the shared-DB contract (Execution Plan §20 stays
+# under repo coordination).
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    if: vars.E2E_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22.19.0
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start local Supabase (canonical schema + QA seed)
+        working-directory: supabase
+        run: |
+          supabase start
+          supabase db reset
+
+      - name: Export local Supabase URL and anon key
+        working-directory: supabase
+        run: supabase status -o env >> "$GITHUB_ENV"
+
+      - name: Export public env for the Next.js app
+        run: |
+          echo "NEXT_PUBLIC_SUPABASE_URL=$SUPABASE_URL" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY" >> "$GITHUB_ENV"
+
+      - name: Production build
+        run: pnpm --filter @eduzone/admin build
+
+      - name: Install Playwright browsers
+        run: pnpm --filter @eduzone/admin exec playwright install --with-deps chromium
+
+      - name: Run Playwright (chromium)
+        run: pnpm --filter @eduzone/admin exec playwright test --project=chromium
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/admin/playwright-report/
+          retention-days: 7

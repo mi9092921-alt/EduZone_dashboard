@@ -25,13 +25,32 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Validate direct pushes and merges to main with the same application
-      # quality gates used by the pull-request workflow.
-      - name: Typecheck
-        run: pnpm turbo typecheck
+      # Validate direct pushes and merges to main with the SAME gate chain
+      # used by the pull-request workflow (ci.yml — Execution Plan §19), so
+      # a push to main cannot bypass any production gate.
+      - name: Secret Scan (Gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Dependency Audit
+        # Scoped to production dependencies — same rationale as ci.yml:
+        # an unscoped audit walks devDependencies never shipped to
+        # production and would stay permanently red regardless of what
+        # this repo does.
+        run: pnpm audit --prod --audit-level=high
+
+      - name: Architecture Check
+        # Same gate as ci.yml: the vitest boundary guards in
+        # apps/admin/src/architecture (ESLint enforces the same rules in
+        # the Lint step below).
+        run: pnpm --filter @eduzone/admin exec vitest run --config vitest.unit.config.ts src/architecture
 
       - name: Lint
         run: pnpm turbo lint
+
+      - name: Typecheck
+        run: pnpm turbo typecheck
 
       - name: Test (Vitest)
         run: pnpm turbo test

@@ -1103,7 +1103,7 @@ routes ↛ business logic
 
 ---
 
-# 19. P1 — CI/CD Production Gates
+# 19. P1 — CI/CD Production Gates ✅ DONE (M15 — 2026-09-03, see project_documents/milestone_reports/M15_ci_cd_production_gates_report.md — Architecture Check صارت بوابة صريحة + parity على main؛ بوابة E2E مُعرَّفة وخاملة تنتظر `vars.E2E_ENABLED`، وRLS/Integration/Smoke متابَعة بفقرة §7 من التقرير)
 
 الـCI الحالي يقوم بـsecret scan وtypecheck وlint وVitest وbuild وDB lint، لكنه لا يثبت E2E أو integration/RLS/migration وغيرها. 
 

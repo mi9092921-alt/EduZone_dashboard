@@ -1,4 +1,20 @@
 name: CI
+
+# Execution Plan §19 — CI/CD Production Gates (PR chain, in order):
+#   Secret Scan → Dependency Audit → Architecture Check → Lint → Typecheck →
+#   Unit (coverage) → Production Build → Supabase DB Lint.
+#
+# E2E lives in e2e.yml (dormant until the disposable test backend is
+# provisioned — see that file). The security/RLS scripts under
+# scripts/security are not yet wired as gates: they rely on console.assert
+# (which does not fail the process) and need a seeded test backend — tracked
+# in project_documents/milestone_reports/M15_ci_cd_production_gates_report.md.
+#
+# Merge protection (Execution Plan §19): mark the "build_and_test" job as a
+# required status check for main (Settings → Branches → Branch protection) so
+# a failing gate blocks the merge. "build_and_test" is also mirrored on every
+# push to main by deploy.yml, so direct pushes cannot bypass the gates.
+
 on:
   pull_request:
     branches: [main]
@@ -45,11 +61,20 @@ jobs:
         # what is actually deployed.
         run: pnpm audit --prod --audit-level=high
 
-      - name: Typecheck
-        run: pnpm turbo typecheck
+      - name: Architecture Check
+        # Execution Plan §18/§19: the Clean Architecture boundary rules are
+        # the merge-blocking contract. ESLint enforces them in the Lint step
+        # below (no-restricted-imports blocks in apps/admin); this dedicated
+        # step makes the vitest guards in src/architecture an explicit, fast
+        # gate of their own so a boundary violation shows up as its own red
+        # check before the full unit suite runs.
+        run: pnpm --filter @eduzone/admin exec vitest run --config vitest.unit.config.ts src/architecture
 
       - name: Lint
         run: pnpm turbo lint
+
+      - name: Typecheck
+        run: pnpm turbo typecheck
 
       - name: Test (Vitest)
         run: pnpm turbo test -- --coverage
