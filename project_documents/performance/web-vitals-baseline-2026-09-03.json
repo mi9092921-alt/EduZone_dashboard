@@ -1,0 +1,53 @@
+{
+  "generatedAt": "2026-09-03T17:09:32.529Z",
+  "baseUrl": "http://localhost:3100",
+  "route": "/login",
+  "runs": 3,
+  "samples": [
+    {
+      "run": 1,
+      "finalUrl": "http://localhost:3100/en/login",
+      "status": 200,
+      "ttfb": 125.5,
+      "domContentLoaded": 3347.7999999523163,
+      "load": 3467.7999999523163,
+      "transferKb": 17.9,
+      "fcp": 3020,
+      "lcp": 3020,
+      "cls": 0.015
+    },
+    {
+      "run": 2,
+      "finalUrl": "http://localhost:3100/en/login",
+      "status": 200,
+      "ttfb": 40.89999985694885,
+      "domContentLoaded": 502.7999999523163,
+      "load": 742.2999999523163,
+      "transferKb": 17.9,
+      "fcp": 516,
+      "lcp": 516,
+      "cls": 0
+    },
+    {
+      "run": 3,
+      "finalUrl": "http://localhost:3100/en/login",
+      "status": 200,
+      "ttfb": 75.89999985694885,
+      "domContentLoaded": 511.69999980926514,
+      "load": 761.8999998569489,
+      "transferKb": 17.9,
+      "fcp": 524,
+      "lcp": 524,
+      "cls": 0
+    }
+  ],
+  "median": {
+    "ttfb": 75.9,
+    "fcp": 524,
+    "lcp": 524,
+    "cls": 0,
+    "domContentLoaded": 511.7,
+    "load": 761.9,
+    "transferKb": 17.9
+  }
+}

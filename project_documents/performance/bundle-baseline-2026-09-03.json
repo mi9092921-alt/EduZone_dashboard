@@ -1,0 +1,167 @@
+{
+  "generatedAt": "2026-09-03T17:07:02.923Z",
+  "method": "per-route unique client JS from .next/app-build-manifest.json + shared chunks counted once; build ran with the CI NEXT_PUBLIC_* placeholder values",
+  "routes": [
+    {
+      "route": "/[locale]/courses/page",
+      "files": 17,
+      "bytes": 1198994,
+      "kb": 1170.9
+    },
+    {
+      "route": "/[locale]/courses/[id]/analytics/page",
+      "files": 17,
+      "bytes": 1170083,
+      "kb": 1142.7
+    },
+    {
+      "route": "/[locale]/courses/[id]/students/page",
+      "files": 17,
+      "bytes": 1170083,
+      "kb": 1142.7
+    },
+    {
+      "route": "/[locale]/warnings/page",
+      "files": 17,
+      "bytes": 1170083,
+      "kb": 1142.7
+    },
+    {
+      "route": "/[locale]/courses/[id]/page",
+      "files": 17,
+      "bytes": 1170081,
+      "kb": 1142.7
+    },
+    {
+      "route": "/[locale]/flags/page",
+      "files": 13,
+      "bytes": 991604,
+      "kb": 968.4
+    },
+    {
+      "route": "/[locale]/settings/page",
+      "files": 13,
+      "bytes": 991604,
+      "kb": 968.4
+    },
+    {
+      "route": "/[locale]/users/page",
+      "files": 13,
+      "bytes": 980987,
+      "kb": 958
+    },
+    {
+      "route": "/[locale]/notifications/page",
+      "files": 13,
+      "bytes": 969454,
+      "kb": 946.7
+    },
+    {
+      "route": "/[locale]/activities/page",
+      "files": 10,
+      "bytes": 858511,
+      "kb": 838.4
+    },
+    {
+      "route": "/[locale]/audit/page",
+      "files": 9,
+      "bytes": 858190,
+      "kb": 838.1
+    },
+    {
+      "route": "/[locale]/tenants/[id]/page",
+      "files": 9,
+      "bytes": 843632,
+      "kb": 823.9
+    },
+    {
+      "route": "/[locale]/tenants/page",
+      "files": 9,
+      "bytes": 843632,
+      "kb": 823.9
+    },
+    {
+      "route": "/[locale]/jobs/page",
+      "files": 8,
+      "bytes": 819972,
+      "kb": 800.8
+    },
+    {
+      "route": "/[locale]/page",
+      "files": 8,
+      "bytes": 805898,
+      "kb": 787
+    },
+    {
+      "route": "/[locale]/analytics/page",
+      "files": 7,
+      "bytes": 794471,
+      "kb": 775.9
+    },
+    {
+      "route": "/[locale]/layout",
+      "files": 8,
+      "bytes": 665354,
+      "kb": 649.8
+    },
+    {
+      "route": "/[locale]/login/page",
+      "files": 4,
+      "bytes": 443059,
+      "kb": 432.7
+    },
+    {
+      "route": "/_not-found/page",
+      "files": 1,
+      "bytes": 3066,
+      "kb": 3
+    },
+    {
+      "route": "/global-error",
+      "files": 1,
+      "bytes": 1152,
+      "kb": 1.1
+    },
+    {
+      "route": "/api/audit/cleanup-duplicate-seqs/route",
+      "files": 1,
+      "bytes": 541,
+      "kb": 0.5
+    },
+    {
+      "route": "/api/bulk-action/route",
+      "files": 1,
+      "bytes": 541,
+      "kb": 0.5
+    },
+    {
+      "route": "/api/cron/routine/route",
+      "files": 1,
+      "bytes": 541,
+      "kb": 0.5
+    },
+    {
+      "route": "/api/proxy-asset/route",
+      "files": 1,
+      "bytes": 541,
+      "kb": 0.5
+    },
+    {
+      "route": "/api/video/[videoId]/route",
+      "files": 1,
+      "bytes": 541,
+      "kb": 0.5
+    }
+  ],
+  "shared": {
+    "files": 4,
+    "bytes": 587481,
+    "kb": 573.7
+  },
+  "totals": {
+    "routes": 25,
+    "heaviestRoute": "/[locale]/courses/page",
+    "staticAllBytes": 3006223,
+    "staticAllKb": 2935.8
+  }
+}

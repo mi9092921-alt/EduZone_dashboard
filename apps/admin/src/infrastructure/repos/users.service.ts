@@ -38,8 +38,13 @@ export async function getUsers(
 
   // Apply filters
   if (filters.search) {
+    // P1-SEC-005 pattern (see postgrest-filter.ts): a raw search term
+    // containing ',' / '(' / ')' can inject additional conditions into the
+    // .or() filter PostgREST actually executes. Same sanitization as
+    // bulk-action/route.ts, tenants.service.ts and searchUsers below.
+    const safeSearch = sanitizePostgrestSearchTerm(filters.search);
     query = query.or(
-      `email.ilike.%${filters.search}%,first_name.ilike.%${filters.search}%,last_name.ilike.%${filters.search}%`,
+      `email.ilike.%${safeSearch}%,first_name.ilike.%${safeSearch}%,last_name.ilike.%${safeSearch}%`,
     );
   }
   if (filters.primary_role) query = query.eq('primary_role', filters.primary_role);

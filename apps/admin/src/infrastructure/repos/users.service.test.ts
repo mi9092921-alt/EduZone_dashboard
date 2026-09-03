@@ -92,6 +92,26 @@ describe('users.service', () => {
     expect(q.gte).toHaveBeenCalledWith('warning_count', 2);
   });
 
+  it('getUsers sanitizes the search term before building the .or() filter (P1-SEC-005)', async () => {
+    const q = setupQuery({ data: [], count: 0, error: null });
+    mockFrom.mockReturnValue(q);
+
+    // A term that would inject an extra condition if interpolated raw.
+    await getUsers({ search: 'x,account_status.eq.banned' }, 1, 10);
+
+    // ',', '(' and ')' are replaced with spaces by
+    // sanitizePostgrestSearchTerm, so the injected condition is inert: the
+    // filter keeps exactly the three intended ilike clauses (raw
+    // interpolation would have produced 5 comma-separated conditions).
+    const filter = q.or.mock.calls[0]?.[0] as string;
+    expect(filter.split(',')).toHaveLength(3);
+    expect(filter).toBe(
+      'email.ilike.%x account_status.eq.banned%,' +
+        'first_name.ilike.%x account_status.eq.banned%,' +
+        'last_name.ilike.%x account_status.eq.banned%',
+    );
+  });
+
   it('getUserById returns a user', async () => {
     const q = setupQuery({ data: { id: 'u1' }, error: null });
     mockFrom.mockReturnValue(q);

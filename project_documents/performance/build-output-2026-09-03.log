@@ -1,0 +1,75 @@
+node.exe : [@sentry/nextjs] DEPRECATION WARNING: disableLogger is 
+deprecated and will be removed in a future version. Use 
+webpack.treeshake.removeDebugLogging instead.
+At C:\Users\Mosta\AppData\Roaming\npm\pnpm.ps1:24 char:5
++     & "node$exe"  "$basedir/node_modules/pnpm/bin/pnpm.cjs" 
+$args
++     
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([@sentry/nextjs...og 
+   ging instead.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+   Γû▓ Next.js 15.5.19
+   - Environments: .env.local
+   - Experiments (use with caution):
+     ┬╖ clientTraceMetadata
+     ┬╖ optimizePackageImports
+
+   Creating an optimized production build ...
+[@sentry/nextjs] DEPRECATION WARNING: It is recommended renaming 
+your `sentry.client.config.ts` file, or moving its content to 
+`instrumentation-client.ts`. When using Turbopack 
+`sentry.client.config.ts` will no longer work. Read more about 
+the `instrumentation-client.ts` file: https://nextjs.org/docs/app/
+api-reference/file-conventions/instrumentation-client
+ Γ£ô Compiled successfully in 55s
+   Linting and checking validity of types ...
+
+ ΓÜá The Next.js plugin was not detected in your ESLint 
+configuration. See https://nextjs.org/docs/app/api-reference/confi
+g/eslint#migrating-existing-config
+   Collecting page data ...
+   Generating static pages (0/7) ...
+   Generating static pages (1/7) 
+   Generating static pages (3/7) 
+   Generating static pages (5/7) 
+ Γ£ô Generating static pages (7/7)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                 Size  First Load JS
+Γöî Γùï /_not-found                          1.16 kB         181 kB
+Γö£ ╞Æ /[locale]                            10.8 kB         422 kB
+Γö£ ╞Æ /[locale]/activities                 8.43 kB         438 kB
+Γö£ ╞Æ /[locale]/analytics                  7.76 kB         419 kB
+Γö£ ╞Æ /[locale]/audit                      14.7 kB         436 kB
+Γö£ ╞Æ /[locale]/courses                    9.07 kB         539 kB
+Γö£ ╞Æ /[locale]/courses/[id]                 495 B         531 kB
+Γö£ ╞Æ /[locale]/courses/[id]/analytics       494 B         531 kB
+Γö£ ╞Æ /[locale]/courses/[id]/students        496 B         531 kB
+Γö£ ╞Æ /[locale]/flags                        481 B         477 kB
+Γö£ ╞Æ /[locale]/jobs                       5.64 kB         427 kB
+Γö£ ╞Æ /[locale]/login                       3.4 kB         306 kB
+Γö£ ╞Æ /[locale]/notifications              11.7 kB         474 kB
+Γö£ ╞Æ /[locale]/settings                     483 B         477 kB
+Γö£ ╞Æ /[locale]/tenants                      329 B         432 kB
+Γö£ ╞Æ /[locale]/tenants/[id]                 329 B         432 kB
+Γö£ ╞Æ /[locale]/users                      28.7 kB         476 kB
+Γö£ ╞Æ /[locale]/warnings                     495 B         531 kB
+Γö£ ╞Æ /api/audit/cleanup-duplicate-seqs      325 B         180 kB
+Γö£ ╞Æ /api/bulk-action                       323 B         180 kB
+Γö£ ╞Æ /api/cron/routine                      324 B         180 kB
+Γö£ ╞Æ /api/proxy-asset                       325 B         180 kB
+Γöö ╞Æ /api/video/[videoId]                   325 B         180 kB
++ First Load JS shared by all             180 kB
+  Γö£ chunks/2d27a773-057314b334946eaa.js  54.4 kB
+  Γö£ chunks/5736-19a721767d2db109.js       122 kB
+  Γöö other shared chunks (total)          2.96 kB
+
+
+╞Æ Middleware                              229 kB
+
+Γùï  (Static)   prerendered as static content
+╞Æ  (Dynamic)  server-rendered on demand
+
