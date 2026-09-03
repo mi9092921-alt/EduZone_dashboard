@@ -1,10 +1,10 @@
-name: Deploy
+name: Main Branch Checks
 on:
   push:
     branches: [main]
 
 jobs:
-  deploy:
+  checks:
     runs-on: ubuntu-latest
     environment: production
     steps:
@@ -25,18 +25,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
-        with:
-          version: latest
-
-      # Release gate: this workflow runs on every push to main and, unlike
-      # ci.yml, was not previously gated on typecheck/lint/test/build passing
-      # first -- a push straight to main (or a merge that bypassed required
-      # PR checks) could push a DB schema change and deploy broken code to
-      # production with no automated check in between. Mirror ci.yml's gates
-      # here so this workflow fails closed before touching the shared DB or
-      # production deployment.
+      # Validate direct pushes and merges to main with the same application
+      # quality gates used by the pull-request workflow.
       - name: Typecheck
         run: pnpm turbo typecheck
 
@@ -47,39 +37,13 @@ jobs:
         run: pnpm turbo test
 
       - name: Production build
-        # Pre-flight gate only -- the artifact actually deployed below is
-        # built separately by `vercel build --prod`, which pulls real env
-        # vars via `vercel pull`. These public (non-secret) values are still
+        # Build verification only. These public (non-secret) values are
         # required here to get past eager validation in
         # apps/admin/src/lib/env.ts (see ci.yml for details); falls back to
-        # a placeholder so this gate can't block a deploy on missing repo
-        # variables it doesn't actually need.
+        # a placeholder so this check remains deterministic when repository
+        # variables are not configured.
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL || 'https://ci-placeholder.supabase.co' }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'ci-placeholder-anon-key' }}
         run: pnpm turbo build
-
-      # Push DB schema before deploying app code that may depend on it. The
-      # app and DB share one Supabase project (see agent_prompt_eduzone_db.md):
-      # deploying the app first left a window where new code could call
-      # RPCs/columns the live schema didn't have yet. Schema changes here are
-      # applied directly to supabase/schema/ (no migrations, per project
-      # policy) and are expected to be backward-compatible with the
-      # previous app version during the rollout window.
-      - name: Push DB Schema
-        env:
-          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
-        run: supabase link --project-ref $SUPABASE_PROJECT_ID && supabase db push
-
-      - name: Deploy Edge Functions
-        env:
-          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
-        run: supabase functions deploy
-
-      - name: Deploy to Vercel
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-        run: npx vercel pull --yes --environment=production --token=$VERCEL_TOKEN && npx vercel build --prod --token=$VERCEL_TOKEN && npx vercel deploy --prebuilt --prod --token=$VERCEL_TOKEN
+# This workflow performs checks only; infrastructure and application releases are managed separately.

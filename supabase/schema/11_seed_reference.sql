@@ -1177,14 +1177,29 @@ ON CONFLICT (id) DO NOTHING;
 -- PHASE 18: Feature Flags (QA overrides — tenant-specific)
 -- ============================================================================
 
-INSERT INTO public.feature_flags (id, key, description, is_enabled, rollout_pct)
+INSERT INTO public.feature_flags (id, key, description, is_enabled, rollout_pct, metadata)
 VALUES
-  ('ffffffff-0000-0000-0000-000000000001', 'beta_dashboard',     'New dashboard UI',                  true,  100),
-  ('ffffffff-0000-0000-0000-000000000002', 'ai_recommendations', 'AI-powered course recommendations', false,  20),
-  ('ffffffff-0000-0000-0000-000000000003', 'advanced_analytics', 'Advanced analytics for teachers',   true,   50),
-  ('ffffffff-0000-0000-0000-000000000004', 'mobile_app',         'Mobile app features',               false,   0)
+  ('16fc9606-c481-4e29-b86c-86b9ad89a958', 'push_notifications', 'Push notification system',          true, 10000, '{}'::jsonb),
+  ('378750f7-5d66-48e7-a506-b1b41bc1a4dc', 'new_ui',             'New UI experience',                 false,     0, '{}'::jsonb),
+  ('621465e8-36dc-40d8-bb47-fc63fc483d7b', 'ai_tutor',            'AI tutoring assistant',             false,     0, '{}'::jsonb),
+  ('6d2c5b5d-b06e-4ad4-acb4-cf747c03779d', 'dark_mode',           'Dark mode toggle',                  true, 10000, '{}'::jsonb),
+  ('81a8ad40-2284-4011-8999-880badab1bf8', 'chat_enabled',        'In-app chat system',                false,     0, '{}'::jsonb),
+  ('84a6a1a8-b4c6-41ab-a990-c83682bc518c', 'beta_mode',           'Beta feature set',                  false,     0, '{}'::jsonb),
+  ('8a4b7e86-ca9f-4001-8f90-817723328b0c', 'screen_watermark',    'Dynamic watermark overlay',         false,     0, '{}'::jsonb),
+  ('909e2e88-4feb-4270-a944-b65ada0e0b9b', 'geo_restriction',     'Geographic access control',         false,     0, '{}'::jsonb),
+  ('ca2125ce-885f-4ad7-b5e9-5f41706cfd9a', 'player_proxy_api',   'Player Proxy API By Vercel',        false, 10000, '{"label": "Player Proxy API"}'::jsonb),
+  ('d54f36fa-bd44-405e-96d1-f730b9757964', 'hls_streaming',       'HLS encrypted streaming',          false,     0, '{}'::jsonb),
+  ('f284344c-cb1e-41ad-9333-142f4da2be71', 'live_sessions',       'Live class sessions',              false,     0, '{}'::jsonb),
+  ('ffffffff-0000-0000-0000-000000000001', 'beta_dashboard',      'New dashboard UI',                 true, 10000, '{}'::jsonb),
+  ('ffffffff-0000-0000-0000-000000000002', 'ai_recommendations',  'AI-powered course recommendations', false, 5500, '{}'::jsonb),
+  ('ffffffff-0000-0000-0000-000000000003', 'advanced_analytics',  'Advanced analytics for teachers',  true,  6000, '{}'::jsonb),
+  ('ffffffff-0000-0000-0000-000000000004', 'mobile_app',          'Mobile app features',              false,    0, '{}'::jsonb)
 
-ON CONFLICT (key) DO NOTHING;
+ON CONFLICT (key) DO UPDATE SET
+  description = EXCLUDED.description,
+  is_enabled = EXCLUDED.is_enabled,
+  rollout_pct = EXCLUDED.rollout_pct,
+  metadata = EXCLUDED.metadata;
 
 INSERT INTO public.tenant_feature_flags (tenant_id, flag_id, is_enabled)
 VALUES
