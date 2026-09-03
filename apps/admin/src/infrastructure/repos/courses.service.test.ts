@@ -5,6 +5,7 @@ import {
   getCourseById,
   createCourse,
   deleteCourse,
+  getCourseTenantId,
   getCourseSections,
   createSection,
   updateSection,
@@ -141,6 +142,27 @@ describe('courses.service', () => {
     expect(q.eq).toHaveBeenCalledWith('id', 'c1');
   });
 
+  describe('getCourseTenantId (cross-tenant IDOR guard support)', () => {
+    it('returns the owning tenant_id for an existing course', async () => {
+      mockAdminFrom.mockReturnValue(setupQuery({ data: { tenant_id: 't-1' }, error: null }));
+      const result = await getCourseTenantId('c1');
+      expect(mockAdminFrom).toHaveBeenCalledWith('courses');
+      expect(result).toBe('t-1');
+    });
+
+    it('returns null when the course does not exist', async () => {
+      mockAdminFrom.mockReturnValue(setupQuery({ data: null, error: null }));
+      const result = await getCourseTenantId('missing');
+      expect(result).toBeNull();
+    });
+
+    it('returns null on query error (fails closed)', async () => {
+      mockAdminFrom.mockReturnValue(setupQuery({ data: null, error: { message: 'db down' } }));
+      const result = await getCourseTenantId('c1');
+      expect(result).toBeNull();
+    });
+  });
+
 
   it('enrollStudent success and duplicate handling', async () => {
     // 1. Success case
@@ -268,4 +290,3 @@ describe('courses.service', () => {
     expect(stats2).toBeNull();
   });
 });
-

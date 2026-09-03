@@ -2,7 +2,7 @@
 
 import type { AccessRule, PaginatedResult } from '@eduzone/types';
 
-import { requirePermission, requireUser } from '@/adapters/actions/boundary';
+import { assertSameTenant, requirePermission, requireUser } from '@/adapters/actions/boundary';
 import {
   GetMyNotificationsUseCase,
   GetUnreadNotificationCountUseCase,
@@ -78,12 +78,14 @@ export async function upsertAccessRuleAction(
 }
 
 export async function deleteAccessRuleAction(id: string): Promise<void> {
-  await requirePermission(['settings.manage', 'settings.write', 'tenants.manage']);
+  const ctx = await requirePermission(['settings.manage', 'settings.write', 'tenants.manage']);
+  assertSameTenant(ctx, await accessRulesService.getAccessRuleTenantId(id));
   return accessRulesService.deleteAccessRuleAdmin(id);
 }
 
 export async function toggleAccessRuleAction(id: string, isActive: boolean): Promise<void> {
-  await requirePermission(['settings.manage', 'settings.write', 'tenants.manage']);
+  const ctx = await requirePermission(['settings.manage', 'settings.write', 'tenants.manage']);
+  assertSameTenant(ctx, await accessRulesService.getAccessRuleTenantId(id));
   return accessRulesService.toggleAccessRuleAdmin(id, isActive);
 }
 
@@ -278,7 +280,8 @@ export async function toggleRateLimitRuleAction(action: string, isActive: boolea
 }
 
 export async function clearRateLimitBlockAction(id: string): Promise<void> {
-  await requirePermission(['audit.read', 'settings.write']);
+  const ctx = await requirePermission(['audit.read', 'settings.write']);
+  assertSameTenant(ctx, await rateLimitsService.getRateLimitTenantId(id));
   return rateLimitsService.clearBlock(id);
 }
 
@@ -298,6 +301,7 @@ export async function getCourseStatsAction(courseId: string): Promise<CourseStat
 }
 
 export async function deleteCourseAction(id: string): Promise<void> {
-  await requirePermission(['courses.manage', 'courses.write']);
+  const ctx = await requirePermission(['courses.manage', 'courses.write']);
+  assertSameTenant(ctx, await coursesService.getCourseTenantId(id));
   return coursesService.deleteCourse(id);
 }

@@ -99,6 +99,24 @@ export async function deleteAccessRule(id: string): Promise<void> {
   if (error) throw mapDbError(error, 'access-rules.service.ts');
 }
 
+/**
+ * Looks up the owning tenant_id for an access rule via the service-role
+ * client. Used by the action boundary to assert the caller (unless
+ * super_admin) may only mutate access rules within their own tenant —
+ * access_rules.tenant_id is NOT NULL, every row belongs to exactly one
+ * tenant. Returns null when the rule does not exist.
+ */
+export async function getAccessRuleTenantId(id: string): Promise<string | null> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from('access_rules')
+    .select('tenant_id')
+    .eq('id', id)
+    .maybeSingle();
+  if (error || !data) return null;
+  return (data.tenant_id as string) ?? null;
+}
+
 /** Server-action variant — uses service_role to bypass RLS. */
 export async function deleteAccessRuleAdmin(id: string): Promise<void> {
   const admin = createAdminClient();

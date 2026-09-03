@@ -37,6 +37,7 @@ import {
   toggleRateLimitRule,
   clearBlock,
   getTopOffenders,
+  getRateLimitTenantId,
 } from './rate-limits.service';
 
 describe('rate-limits.service', () => {
@@ -104,6 +105,45 @@ describe('rate-limits.service', () => {
     // M10: errors are mapped to InfrastructureError (raw text masked)
     await expect(getActiveBlocks()).rejects.toBeInstanceOf(Error);
   });
+
+  describe('getRateLimitTenantId (cross-tenant IDOR guard support)', () => {
+    it('returns the owning tenant_id for an existing block', async () => {
+      mockFrom.mockImplementationOnce(() => ({
+        select: () => ({
+          eq: () => ({
+            maybeSingle: vi.fn().mockResolvedValue({ data: { tenant_id: 't-1' }, error: null }),
+          }),
+        }),
+      }));
+
+      const result = await getRateLimitTenantId('block-1');
+      expect(result).toBe('t-1');
+    });
+
+    it('returns null when the block does not exist', async () => {
+      mockFrom.mockImplementationOnce(() => ({
+        select: () => ({
+          eq: () => ({
+            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+          }),
+        }),
+      }));
+
+      const result = await getRateLimitTenantId('missing');
+      expect(result).toBeNull();
+    });
+
+    it('returns null on query error (fails closed)', async () => {
+      mockFrom.mockImplementationOnce(() => ({
+        select: () => ({
+          eq: () => ({
+            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: { message: 'db down' } }),
+          }),
+        }),
+      }));
+
+      const result = await getRateLimitTenantId('block-1');
+      expect(result).toBeNull();
+    });
+  });
 });
-
-

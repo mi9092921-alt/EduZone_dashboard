@@ -207,6 +207,24 @@ export async function updateCourse(id: string, data: UpdateCourseInput): Promise
   return course as Course;
 }
 
+/**
+ * Looks up the owning tenant_id for a course via the service-role client.
+ * Used by the action boundary to assert the caller (unless super_admin)
+ * may only mutate courses within their own tenant — courses.tenant_id is
+ * NOT NULL, every course belongs to exactly one tenant. Returns null when
+ * the course does not exist.
+ */
+export async function getCourseTenantId(id: string): Promise<string | null> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from('courses')
+    .select('tenant_id')
+    .eq('id', id)
+    .maybeSingle();
+  if (error || !data) return null;
+  return (data.tenant_id as string) ?? null;
+}
+
 export async function deleteCourse(id: string): Promise<void> {
   const admin = createAdminClient();
   const { error } = await admin
@@ -964,5 +982,3 @@ export async function getPrerequisiteOptions(
   if (error) throw mapDbError(error, 'courses.service.ts');
   return data || [];
 }
-
-
