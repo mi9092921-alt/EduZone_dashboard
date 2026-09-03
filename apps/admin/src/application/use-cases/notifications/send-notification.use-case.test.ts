@@ -108,4 +108,46 @@ describe('SendNotificationUseCase', () => {
 
     expect(repo.resolveTargetUserIds).toHaveBeenCalledWith(explicitInput, 'tenant-1');
   });
+
+  it('M16 (F16-4): compensates by soft-deleting the notification when the fanout fails', async () => {
+    const repo = makeRepo({
+      fanoutToUsers: vi.fn().mockRejectedValue(new Error('fanout down')),
+    });
+    (repo.resolveTargetUserIds as ReturnType<typeof vi.fn>).mockResolvedValue(['u1', 'u2']);
+
+    await expect(new SendNotificationUseCase(repo).execute(ctx, input)).rejects.toThrow(
+      'fanout down',
+    );
+    // The orphan notification row is removed so the caller's retry starts clean.
+    expect(repo.softDelete).toHaveBeenCalledWith('notif-1', 'tenant-1');
+    expect(repo.triggerInstantPush).not.toHaveBeenCalled();
+  });
+
+  it('M16 (F16-4): still throws the original fanout error when the compensation itself fails', async () => {
+    const repo = makeRepo({
+      attachNotificationTargets: vi.fn().mockRejectedValue(new Error('targets down')),
+      softDelete: vi.fn().mockRejectedValue(new Error('cleanup down')),
+    });
+    (repo.resolveTargetUserIds as ReturnType<typeof vi.fn>).mockResolvedValue(['u1']);
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(new SendNotificationUseCase(repo).execute(ctx, input)).rejects.toThrow(
+      'targets down',
+    );
+    expect(repo.softDelete).toHaveBeenCalledWith('notif-1', 'tenant-1');
+    expect(consoleSpy).toHaveBeenCalledWith(
+      '[SEND_NOTIFICATION_COMPENSATION_FAILED]',
+      expect.any(Error),
+    );
+    consoleSpy.mockRestore();
+  });
+
+  it('M16 (F16-4): does not compensate when no recipients resolved (nothing fanned out)', async () => {
+    const repo = makeRepo();
+    (repo.resolveTargetUserIds as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+
+    await new SendNotificationUseCase(repo).execute(ctx, input);
+
+    expect(repo.softDelete).not.toHaveBeenCalled();
+  });
 });

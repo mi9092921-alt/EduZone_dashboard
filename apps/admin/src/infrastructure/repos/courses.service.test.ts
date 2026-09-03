@@ -242,8 +242,13 @@ describe('courses.service', () => {
       expect.objectContaining({ deleted_at: expect.any(String) }),
     );
 
-    await reorderLessons([{ id: 'l1', order_index: 2 }]);
-    expect(q.update).toHaveBeenCalled();
+    await reorderLessons('s1', ['l1', 'l2', 'l3']);
+    // M16 (F16-2): atomic RPC reorder — no per-lesson table updates anymore
+    // (updateLesson/deleteLesson above still used the table path, as before).
+    expect(mockRpc).toHaveBeenCalledWith('reorder_section_lessons', {
+      p_section_id: 's1',
+      p_ordered_ids: ['l1', 'l2', 'l3'],
+    });
   });
 
   it('getCourseEnrollments and getAllCourseEnrollments', async () => {

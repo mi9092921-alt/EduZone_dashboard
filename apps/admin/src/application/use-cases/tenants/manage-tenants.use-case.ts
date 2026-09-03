@@ -30,21 +30,38 @@ export class CreateTenantUseCase {
   constructor(private readonly tenants: ITenantAdminRepository) {}
 
   async execute(input: CreateTenantInput): Promise<Tenant> {
-    // Pre-check slug uniqueness
+    // Pre-check slug uniqueness (fast, user-friendly path). This does NOT
+    // close the create-race by itself — the DB unique index
+    // uq_tenants_slug_active is the real guarantee; the 23505 fallthrough
+    // below maps that race into the same stable SLUG_TAKEN error.
     if (await this.tenants.slugExists(input.slug)) {
       throw new ConflictError('A tenant with this slug already exists', `SLUG_TAKEN: ${input.slug}`);
     }
 
-    return this.tenants.create({
-      slug: input.slug,
-      name: input.name,
-      plan: input.plan ?? CREATE_TENANT_DEFAULTS.plan,
-      region_id: input.region_id ?? CREATE_TENANT_DEFAULTS.region_id,
-      max_users: input.max_users ?? CREATE_TENANT_DEFAULTS.max_users,
-      max_courses: input.max_courses ?? CREATE_TENANT_DEFAULTS.max_courses,
-      max_storage_bytes: input.max_storage_bytes ?? CREATE_TENANT_DEFAULTS.max_storage_bytes,
-      metadata: input.metadata ?? {},
-    });
+    try {
+      return await this.tenants.create({
+        slug: input.slug,
+        name: input.name,
+        plan: input.plan ?? CREATE_TENANT_DEFAULTS.plan,
+        region_id: input.region_id ?? CREATE_TENANT_DEFAULTS.region_id,
+        max_users: input.max_users ?? CREATE_TENANT_DEFAULTS.max_users,
+        max_courses: input.max_courses ?? CREATE_TENANT_DEFAULTS.max_courses,
+        max_storage_bytes: input.max_storage_bytes ?? CREATE_TENANT_DEFAULTS.max_storage_bytes,
+        metadata: input.metadata ?? {},
+      });
+    } catch (error: unknown) {
+      // M16 (F16-3): two concurrent creates with the same slug — one insert
+      // wins, the loser hits uq_tenants_slug_active (23505). Re-check the
+      // slug so the caller always gets the stable SLUG_TAKEN conflict, never
+      // a raw DB error.
+      if (await this.tenants.slugExists(input.slug)) {
+        throw new ConflictError(
+          'A tenant with this slug already exists',
+          `SLUG_TAKEN (race): ${input.slug}`,
+        );
+      }
+      throw error;
+    }
   }
 }
 

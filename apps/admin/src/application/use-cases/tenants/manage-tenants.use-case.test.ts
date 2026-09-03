@@ -82,6 +82,34 @@ describe('CreateTenantUseCase', () => {
     });
     expect(repo.create).not.toHaveBeenCalled();
   });
+
+  it('M16 (F16-3): maps a slug race (insert fails, re-check finds the slug) to SLUG_TAKEN', async () => {
+    const slugExists = vi
+      .fn()
+      .mockResolvedValueOnce(false) // pre-check passes...
+      .mockResolvedValue(true); // ...concurrent create wins before the insert
+    const repo = makeRepo({
+      slugExists,
+      create: vi.fn().mockRejectedValue({ code: '23505', message: 'duplicate key' }),
+    });
+
+    await expect(new CreateTenantUseCase(repo).execute(input)).rejects.toMatchObject({
+      code: 'DUPLICATE',
+    });
+    expect(slugExists).toHaveBeenCalledTimes(2);
+    // The message is the stable, user-facing conflict text — never raw DB text.
+    await expect(new CreateTenantUseCase(repo).execute(input)).rejects.toThrow(
+      'A tenant with this slug already exists',
+    );
+  });
+
+  it('M16 (F16-3): rethrows unrelated create failures untouched', async () => {
+    const repo = makeRepo({
+      create: vi.fn().mockRejectedValue(new Error('db offline')),
+    });
+
+    await expect(new CreateTenantUseCase(repo).execute(input)).rejects.toThrow('db offline');
+  });
 });
 
 describe('UpdateTenantUseCase', () => {

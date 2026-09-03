@@ -105,6 +105,39 @@ describe('CreateUserUseCase', () => {
     expect(repo.deleteAuthUser).toHaveBeenCalledWith('new-user-1');
   });
 
+  it('M16 (F16-5): surfaces a failed compensation instead of silently dropping it', async () => {
+    const repo = makeRepo({
+      upsertProfile: vi.fn().mockResolvedValue({ ok: false, message: 'upsert broke' }),
+      deleteAuthUser: vi.fn().mockResolvedValue({ ok: false, message: 'auth api down' }),
+    });
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const result = await new CreateUserUseCase(repo).execute(ctx, input);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('profile sync failed');
+    expect(result.error).toContain('cleanup failed');
+    expect(result.error).toContain('new-user-1');
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[CREATE_USER_COMPENSATION_FAILED]'),
+    );
+    consoleSpy.mockRestore();
+  });
+
+  it('M16 (F16-5): treats an already-gone auth user during compensation as success (retry path)', async () => {
+    const repo = makeRepo({
+      upsertProfile: vi.fn().mockResolvedValue({ ok: false, message: 'upsert broke' }),
+      deleteAuthUser: vi.fn().mockResolvedValue({ ok: false, message: 'User not found' }),
+    });
+
+    const result = await new CreateUserUseCase(repo).execute(ctx, input);
+
+    expect(result).toEqual({
+      success: false,
+      error: 'User created but profile sync failed: upsert broke',
+    });
+  });
+
   it('fails without touching the repository when the caller has no tenant', async () => {
     const repo = makeRepo();
     const noTenantCtx = createRequestContext({

@@ -19,11 +19,31 @@ export interface CreateUserResult {
  *  3. Compensation: if profile sync or role sync fails after the auth
  *     user was created, the orphaned auth user is deleted (best-effort)
  *     so no half-created account remains.
+ *  4. M16 (F16-5): a failed compensation is never silent — it is logged
+ *     server-side and appended to the returned error so operators can
+ *     find and delete the orphaned auth user.
  */
 export class CreateUserUseCase {
   constructor(private readonly users: IUserAdminRepository) {}
 
   async execute(ctx: Readonly<RequestContext>, input: CreateUserInput): Promise<CreateUserResult> {
+    const failWithCompensation = async (
+      userId: string,
+      message: string,
+    ): Promise<CreateUserResult> => {
+      const deleted = await this.users.deleteAuthUser(userId);
+      if (!deleted.ok && !deleted.message.includes('not found')) {
+        console.error(
+          `[CREATE_USER_COMPENSATION_FAILED] orphaned auth user ${userId} could not be deleted: ${deleted.message}`,
+        );
+        return {
+          success: false,
+          error: `${message} (cleanup failed — orphaned auth account ${userId} needs manual removal)`,
+        };
+      }
+      return { success: false, error: message };
+    };
+
     try {
       const tenantId = ctx.tenantId;
       if (!tenantId) {
@@ -55,20 +75,18 @@ export class CreateUserUseCase {
       });
 
       if (!profileSync.ok) {
-        await this.users.deleteAuthUser(userId);
-        return {
-          success: false,
-          error: 'User created but profile sync failed: ' + profileSync.message,
-        };
+        return await failWithCompensation(
+          userId,
+          'User created but profile sync failed: ' + profileSync.message,
+        );
       }
 
       const roleId = await this.users.findRoleIdByName(input.primary_role);
       if (!roleId) {
-        await this.users.deleteAuthUser(userId);
-        return {
-          success: false,
-          error: `User created but role sync failed: role ${input.primary_role} was not found`,
-        };
+        return await failWithCompensation(
+          userId,
+          `User created but role sync failed: role ${input.primary_role} was not found`,
+        );
       }
 
       const roleSync = await this.users.assignRole({
@@ -79,11 +97,10 @@ export class CreateUserUseCase {
       });
 
       if (!roleSync.ok) {
-        await this.users.deleteAuthUser(userId);
-        return {
-          success: false,
-          error: 'User created but role sync failed: ' + roleSync.message,
-        };
+        return await failWithCompensation(
+          userId,
+          'User created but role sync failed: ' + roleSync.message,
+        );
       }
 
       return { success: true, userId };

@@ -168,8 +168,9 @@ export function useDeleteLesson() {
 export function useReorderLessons() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (vars: { courseId: string; updates: { id: string; order_index: number }[] }) =>
-      reorderLessons(vars.updates),
+    // M16 (F16-2): atomic section-wide reorder (RPC validates the full list).
+    mutationFn: (vars: { courseId: string; sectionId: string; orderedIds: string[] }) =>
+      reorderLessons(vars.sectionId, vars.orderedIds),
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: queryKeys.courses.detail(vars.courseId) });
       qc.invalidateQueries({ queryKey: queryKeys.courses.sections(vars.courseId) });

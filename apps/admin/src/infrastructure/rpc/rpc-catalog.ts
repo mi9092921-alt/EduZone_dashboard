@@ -164,6 +164,16 @@ export const RPC_CATALOG: readonly RpcDefinition[] = [
       'course teacher or an admin-with-session; tenant-pinned. M11 fixed the app-side ' +
       'parameter mismatch (was sending p_section_updates).',
   },
+  {
+    name: 'reorder_section_lessons',
+    classification: 'tenant-scoped',
+    owner: 'infrastructure/repos/courses.service.ts',
+    notes:
+      'SECURITY DEFINER. Signature (p_section_id uuid, p_ordered_ids uuid[]); allows the ' +
+      'course teacher or an admin-with-session; tenant-pinned. Validates that ordered_ids ' +
+      'exactly covers the section\'s non-deleted lessons, then applies order_index in one ' +
+      'UPDATE. M16 (F16-2): replaced the non-atomic per-lesson update loop.',
+  },
 
   // ── Analytics (privileged reads) ─────────────────────────────────
   {
@@ -238,6 +248,16 @@ export const RPC_CATALOG: readonly RpcDefinition[] = [
     classification: 'service-role',
     owner: 'infrastructure/repos/jobs-rpc.service.ts',
     notes: 'Function rejects anything but service_role.',
+  },
+  {
+    name: 'worker_issue_warning',
+    classification: 'service-role',
+    owner: 'infrastructure/repos/jobs-rpc.service.ts (workerIssueWarning)',
+    notes:
+      'SECURITY DEFINER. Function rejects non-service_role, re-verifies the initiator\'s ' +
+      'warnings.write permission and tenant, and atomically inserts the warning + ' +
+      'bumps warning_count (relative increment) in one SQL statement. M16 (F16-1): ' +
+      'replaces the bulk two-step insert+count path that lost concurrent increments.',
   },
 
   // ── Audit chain (privileged) ─────────────────────────────────────

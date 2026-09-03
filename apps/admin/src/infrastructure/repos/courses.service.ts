@@ -630,14 +630,25 @@ export async function deleteLesson(id: string): Promise<void> {
 }
 
 export async function reorderLessons(
-  updates: { id: string; order_index: number }[],
+  sectionId: string,
+  orderedIds: string[],
 ): Promise<void> {
   const { supabase } = container;
-  await Promise.all(
-    updates.map((u) =>
-      supabase.from('lessons').update({ order_index: u.order_index }).eq('id', u.id),
-    ),
-  );
+
+  // M16 (F16-2): atomic reorder via reorder_section_lessons (SECURITY DEFINER,
+  // tenant + teacher/admin gated server-side). The previous path fired one
+  // UPDATE per lesson — a crash or concurrent edit midway left the section
+  // with duplicate/interleaved order_index values, and the old silent
+  // fallback repeated the same non-atomic updates.
+  // The RPC validates that ordered_ids exactly covers the section's
+  // non-deleted lessons, so a stale client list fails loudly instead of
+  // half-applying.
+  const { error } = await supabase.rpc('reorder_section_lessons', {
+    p_section_id: sectionId,
+    p_ordered_ids: orderedIds,
+  });
+
+  if (error) throw mapDbError(error, 'courses.service.ts:reorderLessons');
 }
 
 // ══════════════════════════════════════════════════

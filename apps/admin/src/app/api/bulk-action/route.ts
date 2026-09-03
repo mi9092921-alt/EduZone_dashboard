@@ -14,6 +14,7 @@ import {
   enqueueBulkJob,
   logActivityAsync,
   logUserHasPermissionSafe,
+  workerIssueWarning,
   workerUpdateBulkJob,
 } from '@/infrastructure/repos/jobs-rpc.service';
 import { createAdminClient } from '@/infrastructure/supabase/admin';
@@ -166,23 +167,19 @@ async function processInlineUserAction(
 
   switch (action) {
     case 'warn': {
-      const { error: warningError } = await admin.from('warnings').insert({
-        user_id: user.id,
-        tenant_id: user.tenant_id,
-        issued_by: initiatorId,
+      // M16 (F16-1): the previous two-step path (insert warning → write back
+      // snapshotted warning_count + 1) was a read-modify-write that lost
+      // concurrent increments and left a half-applied state when the second
+      // step failed. worker_issue_warning (service-role RPC, SECURITY
+      // DEFINER) does insert + relative count bump atomically in SQL and
+      // re-verifies the initiator's warnings.write permission + tenant
+      // server-side.
+      await workerIssueWarning(admin, {
+        initiatorId,
+        userId: user.id as string,
         reason: reason || 'Bulk warning',
         severity: Math.max(1, Math.min(Number(params.severity ?? 1), 3)),
       });
-      if (warningError) throw warningError;
-
-      const { error: countError } = await admin
-        .from('users')
-        .update({
-          warning_count: Number(user.warning_count ?? 0) + 1,
-          updated_at: now,
-        })
-        .eq('id', user.id);
-      if (countError) throw countError;
       break;
     }
     case 'delete': {

@@ -61,6 +61,31 @@ export async function workerUpdateBulkJob(
   if (error) throw mapDbError(error, 'jobs-rpc.service.ts:worker_update_bulk_job');
 }
 
+/**
+ * M16 (F16-1): atomic bulk warning — inserts the warning row and bumps the
+ * target user's warning_count with a relative increment in one SQL statement.
+ * The function re-verifies the initiator's warnings.write permission and
+ * tenant server-side, so concurrent bulk runs can no longer lose increments
+ * (the previous read-modify-write path wrote back a snapshotted count).
+ */
+export async function workerIssueWarning(
+  admin: SupabaseClient,
+  input: {
+    initiatorId: string;
+    userId: string;
+    reason: string;
+    severity: number;
+  },
+): Promise<void> {
+  const { error } = await admin.rpc('worker_issue_warning', {
+    p_initiator_id: input.initiatorId,
+    p_user_id: input.userId,
+    p_reason: input.reason,
+    p_severity: input.severity,
+  });
+  if (error) throw mapDbError(error, 'jobs-rpc.service.ts:worker_issue_warning');
+}
+
 export async function logActivityAsync(
   admin: SupabaseClient,
   input: {

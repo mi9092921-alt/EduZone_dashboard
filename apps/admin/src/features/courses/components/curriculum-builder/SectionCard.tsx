@@ -125,8 +125,13 @@ export function SectionCard({
     const newLessons = arrayMove(localLessons, oldIndex, newIndex);
     setLocalLessons(newLessons);
 
-    const updates = newLessons.map((l: Lesson, idx: number) => ({ id: l.id, order_index: idx }));
-    await reorderLessons.mutateAsync({ courseId, updates });
+    // M16 (F16-2): atomic reorder — send the section id with the full
+    // ordered lesson list; the RPC validates and applies it in one statement.
+    await reorderLessons.mutateAsync({
+      courseId,
+      sectionId: section.id,
+      orderedIds: newLessons.map((l: Lesson) => l.id),
+    });
   };
 
   const handleSaveTitle = async () => {
