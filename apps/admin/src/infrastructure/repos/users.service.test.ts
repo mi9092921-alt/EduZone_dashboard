@@ -4,6 +4,7 @@ import {
   bindDevice,
   getUsers,
   getUserById,
+  getUserTenantId,
   resetUserDevices,
   issueWarning,
   getDevices,
@@ -30,6 +31,12 @@ vi.mock('@/container', () => ({
 
 vi.mock('@/adapters/actions/user.actions', () => ({
   issueWarningAction: vi.fn(),
+}));
+
+// Mock the admin (service_role) client used by getUserTenantId
+const mockAdminFrom: any = vi.fn();
+vi.mock('@/infrastructure/supabase/admin', () => ({
+  createAdminClient: () => ({ from: mockAdminFrom }),
 }));
 
 describe('users.service', () => {
@@ -191,6 +198,47 @@ describe('users.service', () => {
     await expect(bindDevice('dev', {}, 'ip')).rejects.toEqual({
       code: 'UNKNOWN',
       message: 'Something went wrong',
+    });
+  });
+
+  describe('getUserTenantId (cross-tenant IDOR guard support)', () => {
+    it('returns the owning tenant_id for an existing user', async () => {
+      mockAdminFrom.mockImplementationOnce(() => ({
+        select: () => ({
+          eq: () => ({
+            maybeSingle: vi.fn().mockResolvedValue({ data: { tenant_id: 't-1' }, error: null }),
+          }),
+        }),
+      }));
+
+      const result = await getUserTenantId('user-1');
+      expect(result).toBe('t-1');
+    });
+
+    it('returns null when the user does not exist', async () => {
+      mockAdminFrom.mockImplementationOnce(() => ({
+        select: () => ({
+          eq: () => ({
+            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+          }),
+        }),
+      }));
+
+      const result = await getUserTenantId('missing');
+      expect(result).toBeNull();
+    });
+
+    it('returns null on query error (fails closed)', async () => {
+      mockAdminFrom.mockImplementationOnce(() => ({
+        select: () => ({
+          eq: () => ({
+            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: { message: 'db down' } }),
+          }),
+        }),
+      }));
+
+      const result = await getUserTenantId('user-1');
+      expect(result).toBeNull();
     });
   });
 });

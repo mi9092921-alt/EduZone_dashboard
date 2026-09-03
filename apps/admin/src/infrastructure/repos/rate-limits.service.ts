@@ -56,6 +56,18 @@ export async function toggleRateLimitRule(action: string, isActive: boolean): Pr
   if (error) throw mapDbError(error, 'rate-limits.service.ts');
 }
 
+// ── Tenant lookup for a block (cross-tenant IDOR guard support) ──
+export async function getRateLimitTenantId(id: string): Promise<string | null> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from('rate_limits')
+    .select('tenant_id')
+    .eq('id', id)
+    .maybeSingle();
+  if (error || !data) return null;
+  return (data.tenant_id as string) ?? null;
+}
+
 // ── Clear a specific block ───────────────────────────────────────
 export async function clearBlock(id: string): Promise<void> {
   const admin = createAdminClient();

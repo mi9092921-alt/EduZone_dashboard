@@ -1,6 +1,6 @@
 'use server';
 
-import { requirePermission } from '@/adapters/actions/boundary';
+import { assertSameTenant, requirePermission } from '@/adapters/actions/boundary';
 import {
   ControlUserAccountUseCase,
   IssueWarningUseCase,
@@ -12,6 +12,7 @@ import { toClientMessage } from '@/domain/errors';
 import { CreateUserInput, createUserSchema } from '@/domain/schemas/user.schema';
 import type { AccountAction } from '@/domain/types/user.types';
 import { makeUserAdminRepository } from '@/infrastructure/repos/user-admin.repository';
+import * as usersService from '@/infrastructure/repos/users.service';
 
 /**
  * Thin Server-Action boundary for the user-lifecycle domain.
@@ -50,7 +51,13 @@ export async function createUserAction(data: CreateUserInput) {
 export async function deleteUserAction(userId: string) {
   try {
     // Verify caller auth and permission
-    await requirePermission('users.write');
+    const ctx = await requirePermission('users.write');
+
+    // IDOR/BOLA guard: block deleting a user outside the caller's tenant
+    // (super_admin exempt — see assertSameTenant). Deletion goes through the
+    // Admin Auth API directly (not an RLS/tenant-scoped RPC), so this check
+    // must happen here at the boundary.
+    assertSameTenant(ctx, await usersService.getUserTenantId(userId));
 
     // Execute use case (auth deletion + soft-delete fallback policy)
     return await new DeleteUserUseCase(makeUserAdminRepository()).execute(userId);

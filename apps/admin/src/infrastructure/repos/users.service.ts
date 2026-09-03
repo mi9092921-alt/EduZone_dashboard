@@ -11,6 +11,7 @@ import type {
   UserRoleAssignment,
   UserStats,
 } from '@/domain/types/user.types';
+import { createAdminClient } from '@/infrastructure/supabase/admin';
 import { sanitizePostgrestSearchTerm } from '@/infrastructure/supabase/postgrest-filter';
 
 /**
@@ -75,6 +76,18 @@ export async function getUserById(id: string): Promise<User> {
 
   if (error) throw mapDbError(error, 'users.service.ts');
   return data as User;
+}
+
+// ── Tenant lookup for a user (cross-tenant IDOR guard support) ───
+export async function getUserTenantId(userId: string): Promise<string | null> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from('users')
+    .select('tenant_id')
+    .eq('id', userId)
+    .maybeSingle();
+  if (error || !data) return null;
+  return (data.tenant_id as string) ?? null;
 }
 
 // ── Control account / terminate sessions ─────────────────────────
