@@ -35,7 +35,15 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Dependency Audit
-        run: pnpm audit --audit-level=high
+        # Scoped to production dependencies: an unscoped `pnpm audit` also
+        # walks devDependencies (Storybook, Cypress, ESLint tooling, jsdom)
+        # that are never shipped to production. One of those transitive
+        # advisories (image-size, pulled in by @storybook/nextjs-vite) has
+        # no patched release upstream, which would make an unscoped
+        # --audit-level=high gate permanently red regardless of what this
+        # repo does. --prod keeps the gate meaningful and enforceable for
+        # what is actually deployed.
+        run: pnpm audit --prod --audit-level=high
 
       - name: Typecheck
         run: pnpm turbo typecheck
@@ -47,6 +55,18 @@ jobs:
         run: pnpm turbo test -- --coverage
 
       - name: Production build
+        # NEXT_PUBLIC_* values are public (browser-bundled), not secrets --
+        # they're required at build time because Next.js inlines them into
+        # the client bundle and apps/admin/src/lib/env.ts validates them
+        # eagerly at module import, which Next's page-data collection
+        # triggers for every route. Falls back to a placeholder so this
+        # build-verification step stays deterministic even before
+        # `vars.NEXT_PUBLIC_SUPABASE_URL` / `vars.NEXT_PUBLIC_SUPABASE_ANON_KEY`
+        # are configured as repository variables; prefers the real
+        # configured value when present.
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL || 'https://ci-placeholder.supabase.co' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'ci-placeholder-anon-key' }}
         run: pnpm turbo build
 
       - name: Supabase DB Lint

@@ -47,3 +47,13 @@ storybook-static
 apps/admin/tsconfig.tsbuildinfo
 packages/types/tsconfig.tsbuildinfo
 packages/ui/tsconfig.tsbuildinfo
+
+# Playwright / dev-server run artifacts (contain local run output, stack
+# traces, and screenshots -- one committed error-context.md leaked a seeded
+# e2e test credential; these are regenerated on every run and must never be
+# tracked)
+apps/admin/playwright-report/
+apps/admin/test-results/
+apps/admin/next-dev-log.txt
+err.html
+apps/admin/err.html

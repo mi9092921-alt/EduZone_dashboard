@@ -47,6 +47,16 @@ jobs:
         run: pnpm turbo test
 
       - name: Production build
+        # Pre-flight gate only -- the artifact actually deployed below is
+        # built separately by `vercel build --prod`, which pulls real env
+        # vars via `vercel pull`. These public (non-secret) values are still
+        # required here to get past eager validation in
+        # apps/admin/src/lib/env.ts (see ci.yml for details); falls back to
+        # a placeholder so this gate can't block a deploy on missing repo
+        # variables it doesn't actually need.
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL || 'https://ci-placeholder.supabase.co' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'ci-placeholder-anon-key' }}
         run: pnpm turbo build
 
       # Push DB schema before deploying app code that may depend on it. The

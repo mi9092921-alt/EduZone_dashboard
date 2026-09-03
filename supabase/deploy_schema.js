@@ -35,12 +35,9 @@ async function main() {
   const client = new Client({
     connectionString: dbUrl,
     ssl: {
-      rejectUnauthorized:
-        process.env.SUPABASE_DB_REJECT_UNAUTHORIZED === 'true'
-          ? true
-          : process.env.SUPABASE_DB_CA_CERT
-            ? true
-            : false,
+      // Never disable TLS certificate verification for schema deployment.
+      // If a private CA is required, provide its PEM via SUPABASE_DB_CA_CERT.
+      rejectUnauthorized: true,
       ...(process.env.SUPABASE_DB_CA_CERT ? { ca: process.env.SUPABASE_DB_CA_CERT } : {}),
     },
   });
