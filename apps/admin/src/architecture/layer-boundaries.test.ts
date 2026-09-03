@@ -260,3 +260,58 @@ describe('architecture: RPC boundary (M11)', () => {
     }
   });
 });
+
+/**
+ * M14 — Architecture Enforcement (Execution Plan §18).
+ *
+ * ESLint (eslint.config.mjs) now fails `pnpm lint` — and therefore the CI
+ * *Lint* gate — for these rules. This vitest guard is a second, independent
+ * net: it runs in the *Test* gate so a misconfigured ESLint setup cannot
+ * silently reintroduce the security-critical violation.
+ *
+ * service_role containment: `createAdminClient()` (service-role client)
+ * bypasses every RLS policy in the database. Importing it anywhere outside
+ * `infrastructure/` — except the two documented privileged API routes
+ * (bulk-action, audit cleanup) — re-opens the M4 attack surface where any
+ * client-reachable module could act as the service role.
+ */
+describe('architecture: service-role containment (M14)', () => {
+  /** Documented importers of the service-role client outside infrastructure. */
+  const SERVICE_ROLE_ALLOWED_PREFIXES = [
+    'infrastructure/',
+    'app/api/bulk-action/',
+    'app/api/audit/cleanup-duplicate-seqs/',
+  ];
+
+  // Scan the whole src tree (not just the layers the other describes cover):
+  // a service-role import in lib/, config/, components/ or at the src root
+  // would be just as fatal.
+  const files = collectFiles(SRC_ROOT).filter(
+    (file) =>
+      !/\.test\.tsx?$/.test(file) &&
+      !/\.stories\.(ts|tsx)$/.test(file) &&
+      !SERVICE_ROLE_ALLOWED_PREFIXES.some((prefix) => toRelative(file).startsWith(prefix)),
+  );
+
+  it('has source files to scan', () => {
+    expect(files.length).toBeGreaterThan(0);
+  });
+
+  it.each(files.map((f) => [toRelative(f), f] as const))(
+    '%s never imports the service-role client',
+    (rel, file) => {
+      const source = fs.readFileSync(file, 'utf8');
+      // Matches the alias import and any relative path ending in
+      // supabase/admin, so the rule survives path-alias refactors.
+      const violation = source.match(/from\s+['"][^'"]*supabase\/admin['"]/);
+      expect(
+        violation,
+        `${rel} imports the service-role client (${violation?.[0] ?? ''}) — ` +
+          'createAdminClient() bypasses all RLS and is importable only from ' +
+          'src/infrastructure/** and the documented privileged API routes ' +
+          '(app/api/bulk-action, app/api/audit/cleanup-duplicate-seqs). Put the ' +
+          'operation behind an infrastructure repository/service instead.',
+      ).toBeNull();
+    },
+  );
+});

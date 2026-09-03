@@ -254,7 +254,7 @@ Key tables: `users`, `courses`, `sections`, `lessons`, `lesson_contents`, `enrol
 
 1. **Tenant context is mandatory** — All Supabase mutations must have valid `tenant_id` in JWT. The DB function `assert_tenant()` will reject requests without it.
 
-2. **Never import infrastructure from domain** — Clean Architecture dependency rule is strictly enforced. Domain knows nothing about Supabase.
+2. **Never import infrastructure from domain** — Clean Architecture dependency rules are enforced by ESLint (`no-restricted-imports` blocks in `apps/admin/eslint.config.mjs`): domain is framework/SDK-pure, application never imports another layer, `createAdminClient()` (service_role) is confined to `infrastructure/` + the two privileged API routes (bulk-action, audit cleanup), and routes/features never import `@supabase/*` directly. A violation fails `pnpm lint` (CI Lint gate) and the `src/architecture/layer-boundaries.test.ts` vitest guard.
 
 3. **Always use `queryKeys.*`** — Never hardcode React Query keys. Use the factory in `adapters/queries/keys.ts`.
 

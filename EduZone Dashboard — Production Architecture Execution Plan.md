@@ -1066,7 +1066,7 @@ operation
 
 ---
 
-# 18. P1 — Architecture Enforcement
+# 18. P1 — Architecture Enforcement ✅ DONE (M14 — 2026-09-03, see project_documents/milestone_reports/M14_architecture_enforcement_report.md)
 
 هذه مرحلة أساسية حتى لا يعود المشروع إلى حالته السابقة.
 
