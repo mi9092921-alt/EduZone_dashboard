@@ -3,10 +3,10 @@ import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from './keys';
 
 import {
-  getAllFeatureFlags,
-  getFeatureFlagById,
-  getAllRoles,
-} from '@/infrastructure/repos/feature-flags.service';
+  getAllFeatureFlagsAction,
+  getFeatureFlagByIdAction,
+  getAllRolesAction,
+} from '@/adapters/actions/admin.actions';
 import {
   getAllSettings,
   getSettingsByCategory,
@@ -48,7 +48,7 @@ export function useSetting(key: string) {
 export function useFeatureFlags() {
   return useQuery({
     queryKey: queryKeys.featureFlags.all,
-    queryFn: getAllFeatureFlags,
+    queryFn: getAllFeatureFlagsAction,
     staleTime: 30_000,
   });
 }
@@ -56,7 +56,7 @@ export function useFeatureFlags() {
 export function useFeatureFlagDetail(id: string | null) {
   return useQuery({
     queryKey: [...queryKeys.featureFlags.all, 'detail', id],
-    queryFn: () => getFeatureFlagById(id!),
+    queryFn: () => getFeatureFlagByIdAction(id!),
     enabled: !!id,
   });
 }
@@ -66,7 +66,7 @@ export function useFeatureFlagDetail(id: string | null) {
 export function useRoles() {
   return useQuery({
     queryKey: ['roles'],
-    queryFn: getAllRoles,
+    queryFn: getAllRolesAction,
     staleTime: 5 * 60_000,
   });
 }

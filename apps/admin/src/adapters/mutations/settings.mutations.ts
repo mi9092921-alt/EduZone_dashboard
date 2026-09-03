@@ -1,21 +1,21 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
+import {
+  createFeatureFlagAction,
+  updateFeatureFlagAction,
+  deleteFeatureFlagAction,
+  toggleFeatureFlagAction,
+  addRoleOverrideAction,
+  removeRoleOverrideAction,
+  addUserOverrideAction,
+  removeUserOverrideAction,
+} from '@/adapters/actions/admin.actions';
 import { queryKeys } from '@/adapters/queries/keys';
 import type {
   CreateFeatureFlagInput,
   UpdateFeatureFlagInput,
 } from '@/domain/types/feature-flag.types';
 import type { MaintenanceModeParams } from '@/domain/types/settings.types';
-import {
-  createFeatureFlag,
-  updateFeatureFlag,
-  deleteFeatureFlag,
-  toggleFeatureFlag,
-  addRoleOverride,
-  removeRoleOverride,
-  addUserOverride,
-  removeUserOverride,
-} from '@/infrastructure/repos/feature-flags.service';
 import {
   setSetting,
   createSetting,
@@ -112,7 +112,7 @@ export function useUnlockApp() {
 export function useCreateFeatureFlag() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: CreateFeatureFlagInput) => createFeatureFlag(input),
+    mutationFn: (input: CreateFeatureFlagInput) => createFeatureFlagAction(input),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.featureFlags.all });
     },
@@ -123,7 +123,7 @@ export function useUpdateFeatureFlag() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (vars: { id: string; input: UpdateFeatureFlagInput }) =>
-      updateFeatureFlag(vars.id, vars.input),
+      updateFeatureFlagAction(vars.id, vars.input),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.featureFlags.all });
     },
@@ -133,7 +133,7 @@ export function useUpdateFeatureFlag() {
 export function useDeleteFeatureFlag() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: deleteFeatureFlag,
+    mutationFn: deleteFeatureFlagAction,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.featureFlags.all });
     },
@@ -144,7 +144,7 @@ export function useToggleFeatureFlag() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (vars: { id: string; enabled: boolean }) =>
-      toggleFeatureFlag(vars.id, vars.enabled),
+      toggleFeatureFlagAction(vars.id, vars.enabled),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.featureFlags.all });
     },
@@ -155,7 +155,7 @@ export function useAddRoleOverride() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (vars: { flagId: string; roleId: string; isExclude?: boolean }) =>
-      addRoleOverride(vars.flagId, vars.roleId, vars.isExclude),
+      addRoleOverrideAction(vars.flagId, vars.roleId, vars.isExclude),
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: queryKeys.featureFlags.all });
       qc.invalidateQueries({ queryKey: [...queryKeys.featureFlags.all, 'detail', vars.flagId] });
@@ -167,7 +167,7 @@ export function useRemoveRoleOverride() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (vars: { flagId: string; roleId: string }) =>
-      removeRoleOverride(vars.flagId, vars.roleId),
+      removeRoleOverrideAction(vars.flagId, vars.roleId),
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: queryKeys.featureFlags.all });
       qc.invalidateQueries({ queryKey: [...queryKeys.featureFlags.all, 'detail', vars.flagId] });
@@ -179,7 +179,7 @@ export function useAddUserOverride() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (vars: { flagId: string; userId: string; isExclude?: boolean }) =>
-      addUserOverride(vars.flagId, vars.userId, vars.isExclude),
+      addUserOverrideAction(vars.flagId, vars.userId, vars.isExclude),
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: queryKeys.featureFlags.all });
       qc.invalidateQueries({ queryKey: [...queryKeys.featureFlags.all, 'detail', vars.flagId] });
@@ -191,7 +191,7 @@ export function useRemoveUserOverride() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (vars: { flagId: string; userId: string }) =>
-      removeUserOverride(vars.flagId, vars.userId),
+      removeUserOverrideAction(vars.flagId, vars.userId),
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: queryKeys.featureFlags.all });
       qc.invalidateQueries({ queryKey: [...queryKeys.featureFlags.all, 'detail', vars.flagId] });
