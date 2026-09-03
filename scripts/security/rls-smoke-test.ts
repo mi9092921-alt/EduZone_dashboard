@@ -37,8 +37,10 @@ async function testTeacherCannotReadUsers() {
     console.error('Error reading users:', error);
   }
 
-  console.assert(data?.length === 0, `❌ RLS BREACH: Teacher can see ${data?.length} other users!`);
-  if (data?.length === 0) {
+  if (data?.length !== 0) {
+    console.error(`❌ RLS BREACH: Teacher can see ${data?.length} other users!`);
+    process.exitCode = 1;
+  } else {
     console.log('✅ RLS OK: Teacher sees 0 users (own record excluded)');
   }
 }
@@ -53,11 +55,10 @@ async function testTeacherCannotReadSettings() {
     console.error('Error reading settings_kv:', error.message);
   }
 
-  console.assert(
-    data?.length === 0,
-    `❌ RLS BREACH: Teacher can see ${data?.length} private settings!`,
-  );
-  if (data?.length === 0) {
+  if (data?.length !== 0) {
+    console.error(`❌ RLS BREACH: Teacher can see ${data?.length} private settings!`);
+    process.exitCode = 1;
+  } else {
     console.log('✅ RLS OK: Teacher sees 0 private settings');
   }
 }
@@ -68,8 +69,10 @@ async function testTeacherCannotWriteSettings() {
     .update({ value: 'hacked' })
     .eq('key', 'app_locked');
 
-  console.assert(error !== null, '❌ RLS BREACH: Teacher was able to update settings!');
-  if (error !== null) {
+  if (error === null) {
+    console.error('❌ RLS BREACH: Teacher was able to update settings!');
+    process.exitCode = 1;
+  } else {
     console.log('✅ RLS OK: Teacher cannot write settings (error expected and received)');
   }
 }
@@ -79,8 +82,10 @@ async function testTeacherCannotInsertUserRoles() {
     .from('user_roles')
     .insert({ user_id: 'some_user_id', role_name: 'admin' });
 
-  console.assert(error !== null, '❌ RLS BREACH: Teacher was able to insert into user_roles!');
-  if (error !== null) {
+  if (error === null) {
+    console.error('❌ RLS BREACH: Teacher was able to insert into user_roles!');
+    process.exitCode = 1;
+  } else {
     console.log('✅ RLS OK: Teacher cannot insert cross-tenant user roles');
   }
 }
@@ -93,6 +98,10 @@ async function testTeacherCannotInsertUserRoles() {
     await testTeacherCannotReadSettings();
     await testTeacherCannotWriteSettings();
     await testTeacherCannotInsertUserRoles();
+    if (process.exitCode === 1) {
+      console.error('\n❌ Some RLS smoke tests failed.');
+      process.exit(1);
+    }
     console.log('\n🔒 All RLS smoke tests passed.');
     process.exit(0);
   } catch (err: any) {

@@ -3,10 +3,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   getTenants,
   getTenantById,
-  createTenant,
-  updateTenant,
-  suspendTenant,
-  deleteTenant,
   getTenantAuditLogs,
 } from './tenants.service';
 
@@ -22,13 +18,6 @@ vi.mock('@/container', () => ({
       },
     },
   },
-}));
-
-vi.mock('@/adapters/actions/tenants.actions', () => ({
-  createTenantAction: vi.fn(),
-  updateTenantAction: vi.fn(),
-  suspendTenantAction: vi.fn(),
-  deleteTenantAction: vi.fn(),
 }));
 
 describe('tenants.service', () => {
@@ -138,64 +127,6 @@ describe('tenants.service', () => {
       mockFrom.mockReturnValue(q);
 
       await expect(getTenantById('missing')).rejects.toBeDefined();
-    });
-  });
-
-  // ── createTenant ───────────────────────────────────────────
-  describe('createTenant', () => {
-    it('delegates to createTenantAction', async () => {
-      const { createTenantAction } = await import('@/adapters/actions/tenants.actions');
-      const tenant = { id: 't-new', slug: 'new-school' };
-      (createTenantAction as any).mockResolvedValue(tenant);
-
-      const input = { slug: 'new-school', name: 'New School' };
-      const result = await createTenant(input as any);
-      expect(createTenantAction).toHaveBeenCalledWith(input);
-      expect(result).toBe(tenant);
-    });
-
-    it('propagates the slug conflict from the action', async () => {
-      const { createTenantAction } = await import('@/adapters/actions/tenants.actions');
-      (createTenantAction as any).mockRejectedValue(new Error('A tenant with this slug already exists'));
-
-      await expect(createTenant({ slug: 'existing', name: 'Existing' } as any)).rejects.toThrow(
-        'A tenant with this slug already exists',
-      );
-    });
-  });
-
-  // ── updateTenant ───────────────────────────────────────────
-  describe('updateTenant', () => {
-    it('delegates to updateTenantAction', async () => {
-      const { updateTenantAction } = await import('@/adapters/actions/tenants.actions');
-      const tenant = { id: 't1', name: 'Updated' };
-      (updateTenantAction as any).mockResolvedValue(tenant);
-
-      const result = await updateTenant('t1', { name: 'Updated' });
-      expect(updateTenantAction).toHaveBeenCalledWith('t1', { name: 'Updated' });
-      expect(result).toBe(tenant);
-    });
-  });
-
-  // ── suspendTenant ──────────────────────────────────────────
-  describe('suspendTenant', () => {
-    it('delegates to suspendTenantAction with id and reason', async () => {
-      const { suspendTenantAction } = await import('@/adapters/actions/tenants.actions');
-      (suspendTenantAction as any).mockResolvedValue(undefined);
-
-      await suspendTenant('t1', 'violation');
-      expect(suspendTenantAction).toHaveBeenCalledWith('t1', 'violation');
-    });
-  });
-
-  // ── deleteTenant ───────────────────────────────────────────
-  describe('deleteTenant', () => {
-    it('delegates to deleteTenantAction', async () => {
-      const { deleteTenantAction } = await import('@/adapters/actions/tenants.actions');
-      (deleteTenantAction as any).mockResolvedValue(undefined);
-
-      await deleteTenant('t1');
-      expect(deleteTenantAction).toHaveBeenCalledWith('t1');
     });
   });
 

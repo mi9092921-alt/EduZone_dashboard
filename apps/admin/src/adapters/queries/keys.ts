@@ -102,4 +102,7 @@ export const queryKeys = {
       ['notifications', 'mine', limit, unreadOnly] as const,
     unreadCount: ['notifications', 'unreadCount'] as const,
   },
+  dashboard: {
+    securityAlerts: ['dashboard', 'security-alerts'] as const,
+  },
 } as const;

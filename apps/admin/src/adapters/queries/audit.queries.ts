@@ -7,6 +7,7 @@ import {
   getActivityLogs,
   getAuditChainState,
   getQueuedActivities,
+  getSecurityAlerts,
 } from '@/infrastructure/repos/audit.service';
 
 /**
@@ -34,5 +35,13 @@ export function useQueuedActivities(limit: number = 200) {
     queryKey: queryKeys.audit.queue,
     queryFn: () => getQueuedActivities(limit),
     refetchInterval: 5_000,
+  });
+}
+
+export function useSecurityAlerts(limit: number = 5) {
+  return useQuery({
+    queryKey: queryKeys.dashboard.securityAlerts,
+    queryFn: () => getSecurityAlerts(limit),
+    refetchInterval: 30_000,
   });
 }

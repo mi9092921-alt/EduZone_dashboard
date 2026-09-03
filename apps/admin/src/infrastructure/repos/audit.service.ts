@@ -155,3 +155,26 @@ export async function getQueuedActivities(limit: number = 200): Promise<Activity
   if (error) throw mapDbError(error, 'audit.service.ts');
   return (data ?? []) as ActivityLogQueueEntry[];
 }
+
+// ── Security alerts (high/critical events, dashboard panel) ─────
+export interface SecurityEvent {
+  id: string;
+  activity_type: string;
+  risk_level: 'low' | 'medium' | 'high' | 'critical';
+  details: unknown;
+  created_at: string;
+}
+
+export async function getSecurityAlerts(limit: number = 5): Promise<SecurityEvent[]> {
+  const { supabase } = container;
+  const { data, error } = await supabase
+    .from('activity_logs')
+    .select('id, activity_type, risk_level, details, created_at')
+    .in('risk_level', ['high', 'critical'])
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) throw mapDbError(error, 'audit.service.ts');
+  return (data ?? []) as SecurityEvent[];
+}
+

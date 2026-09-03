@@ -1,41 +1,16 @@
 'use client';
 
 import { Warning, Security, History, InfoOutlined, ReportProblem } from '@mui/icons-material';
-import { useQuery } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import { useTranslations } from 'next-intl';
 
+import { useSecurityAlerts } from '@/adapters/queries/audit.queries';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { container } from '@/container';
 import { cn } from '@/lib/utils';
-
-export interface SecurityEvent {
-  id: string;
-  activity_type: string;
-  risk_level: 'low' | 'medium' | 'high' | 'critical';
-  details: unknown;
-  created_at: string;
-}
 
 export function SecurityAlertPanel() {
   const t = useTranslations('common');
-  const { supabase } = container;
-
-  const { data: alerts, isLoading } = useQuery({
-    queryKey: ['dashboard', 'security-alerts'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('activity_logs')
-        .select('id, activity_type, risk_level, details, created_at')
-        .in('risk_level', ['high', 'critical'])
-        .order('created_at', { ascending: false })
-        .limit(5);
-
-      if (error) throw error;
-      return data as SecurityEvent[];
-    },
-    refetchInterval: 30000, // Real-time pulse every 30s
-  });
+  const { data: alerts, isLoading } = useSecurityAlerts(5);
 
   return (
     <Card className="border-red-500/20 bg-red-500/[0.02] dark:bg-red-500/[0.05]">
@@ -101,3 +76,4 @@ export function SecurityAlertPanel() {
     </Card>
   );
 }
+

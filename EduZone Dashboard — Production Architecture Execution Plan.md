@@ -1226,31 +1226,8 @@ bounded exports
 
 # 22. P2 — External Services
 
-أي integrations خارجية:
-
-```text
-FCM
-Google Drive
-YouTube
-Email
-Storage
-Payments
-Analytics
-```
-
-تُصمم خلف Ports عندما يكون ذلك مفيدًا فعلًا.
-
-الهدف:
-
-```text
-Use Case
- ↓
-Provider Port
- ↓
-Implementation
-```
-
-وليس ربط business logic مباشرة بالـSDK.
+أي integrations خارجية:  
+مرحلة محذوفة حاليا 
 
 ---
 

@@ -1,17 +1,9 @@
-import {
-  createTenantAction,
-  updateTenantAction,
-  suspendTenantAction,
-  deleteTenantAction,
-} from '@/adapters/actions/tenants.actions';
 import { container } from '@/container';
 import { mapDbError } from '@/domain/errors';
 import type { ActivityLog, AuditFilters } from '@/domain/types/audit.types';
 import type {
   Tenant,
   TenantFilters,
-  CreateTenantInput,
-  UpdateTenantInput,
   PaginatedResult,
 } from '@/domain/types/tenant.types';
 import { sanitizePostgrestSearchTerm } from '@/infrastructure/supabase/postgrest-filter';
@@ -105,30 +97,6 @@ export async function getTenantById(id: string): Promise<Tenant> {
   if (error) throw mapDbError(error, 'tenants.service.ts');
   const [tenant] = await withTenantUsage([data as Tenant]);
   return tenant as Tenant;
-}
-
-// ── Create tenant ───────────────────────────────────────────────
-export async function createTenant(input: CreateTenantInput): Promise<Tenant> {
-  // Always use the server action (service role) to bypass RLS
-  return createTenantAction(input);
-}
-
-// ── Update tenant ───────────────────────────────────────────────
-export async function updateTenant(id: string, input: UpdateTenantInput): Promise<Tenant> {
-  // Always use the server action (service role) to bypass RLS
-  return updateTenantAction(id, input);
-}
-
-// ── Suspend tenant ──────────────────────────────────────────────
-export async function suspendTenant(id: string, reason: string): Promise<void> {
-  // Always use the server action (service role) to bypass RLS
-  return suspendTenantAction(id, reason);
-}
-
-// ── Soft delete tenant ──────────────────────────────────────────
-export async function deleteTenant(id: string): Promise<void> {
-  // Always use the server action (service role) to bypass RLS
-  return deleteTenantAction(id);
 }
 
 // ── Tenant audit logs ───────────────────────────────────────────

@@ -1,4 +1,3 @@
-import { getYoutubeMetadataAction } from '@/adapters/actions/video.actions';
 import { container } from '@/container';
 import { mapDbError } from '@/domain/errors';
 import { ConflictError, InfrastructureError, UnauthorizedError } from '@/domain/errors';
@@ -22,6 +21,7 @@ import type {
 } from '@/domain/types/course.types';
 import { parseVideoUrl } from '@/domain/video.utils';
 import { createAdminClient } from '@/infrastructure/supabase/admin';
+import { getYoutubeVideoDetails } from '@/infrastructure/youtube.service';
 
 /**
  * Courses service — all Supabase queries for the courses domain.
@@ -379,10 +379,10 @@ export async function createLesson(sectionId: string, data: CreateLessonInput): 
     const parsed = parseVideoUrl(data.video_url);
     if (parsed.provider === 'youtube') {
       console.log('[createLesson] Fetching YouTube metadata for:', data.video_url);
-      const res = await getYoutubeMetadataAction(data.video_url);
-      console.log('[createLesson] Metadata result:', res);
-      if (res.success && res.data) {
-        duration = res.data.duration_sec;
+      const metadata = await getYoutubeVideoDetails(data.video_url);
+      console.log('[createLesson] Metadata result:', metadata);
+      if (metadata) {
+        duration = metadata.duration_sec;
       }
     }
   } else {
@@ -471,10 +471,10 @@ export async function createLessons(
         const parsed = parseVideoUrl(item.video_url);
         if (parsed.provider === 'youtube') {
           console.log('[createLessons] Fetching YouTube metadata for:', item.video_url);
-          const res = await getYoutubeMetadataAction(item.video_url);
-          console.log('[createLessons] Metadata result:', res);
-          if (res.success && res.data) {
-            duration = res.data.duration_sec;
+          const metadata = await getYoutubeVideoDetails(item.video_url);
+          console.log('[createLessons] Metadata result:', metadata);
+          if (metadata) {
+            duration = metadata.duration_sec;
           }
         }
       }
@@ -546,9 +546,9 @@ export async function updateLesson(id: string, data: Partial<CreateLessonInput>)
   if (data.video_url && !duration) {
     const parsed = parseVideoUrl(data.video_url);
     if (parsed.provider === 'youtube') {
-      const res = await getYoutubeMetadataAction(data.video_url);
-      if (res.success && res.data) {
-        duration = res.data.duration_sec;
+      const metadata = await getYoutubeVideoDetails(data.video_url);
+      if (metadata) {
+        duration = metadata.duration_sec;
       }
     }
   }
