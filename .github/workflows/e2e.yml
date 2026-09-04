@@ -73,9 +73,16 @@ jobs:
         # names here were always unset, so NEXT_PUBLIC_SUPABASE_URL and
         # NEXT_PUBLIC_SUPABASE_ANON_KEY resolved to empty strings and
         # failed the app's env schema validation during `next build`.
+        #
+        # `-o env` also wraps each value in literal double quotes
+        # (e.g. API_URL="http://127.0.0.1:54321"), and GITHUB_ENV does
+        # not strip them — so without stripping, NEXT_PUBLIC_SUPABASE_URL
+        # ends up as the literal string `"http://127.0.0.1:54321"`
+        # (quotes included), which fails the app's `.url()` schema check
+        # during `next build`. Strip the surrounding quotes here.
         run: |
-          echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL" >> "$GITHUB_ENV"
-          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_SUPABASE_URL=${API_URL//\"/}" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=${ANON_KEY//\"/}" >> "$GITHUB_ENV"
 
       - name: Production build
         run: pnpm --filter @eduzone/admin build
