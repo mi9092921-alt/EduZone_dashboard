@@ -69,7 +69,16 @@ test.describe('§23 UX & Accessibility Regression — Public & Auth Flows', () =
     await page.goto('/en/login');
 
     const emailInput = page.locator('input#email');
+    const passwordInput = page.locator('input#password');
     const submitBtn = page.locator('button[type="submit"]');
+
+    // The submit button is disabled while email/password are empty
+    // (LoginPage.tsx: disabled={isLoading || !email || !password}), and
+    // disabled elements are correctly excluded from the tab order and
+    // cannot receive focus -- fill both fields first so the button is
+    // enabled and actually focusable, matching real user behavior.
+    await emailInput.fill('admin@eduzone-test.com');
+    await passwordInput.fill('Password123');
 
     await emailInput.focus();
     await expect(emailInput).toBeFocused();

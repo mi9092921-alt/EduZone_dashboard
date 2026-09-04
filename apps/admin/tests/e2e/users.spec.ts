@@ -5,8 +5,9 @@ test.describe('User Management', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.goto('/users');
-    // Ensure table is loaded
-    await expect(page.getByRole('grid')).toBeVisible();
+    // Ensure table is loaded. UsersTable.tsx renders a plain semantic
+    // <table> (implicit role="table"), not an ARIA grid pattern.
+    await expect(page.getByRole('table')).toBeVisible();
   });
 
   test('displays user list with correct columns', async ({ page }) => {

@@ -223,7 +223,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           bgcolor: 'background.default',
         }}
       >
-        <CircularProgress color="primary" size={48} />
+        <CircularProgress color="primary" size={48} aria-label="Loading" />
       </Box>
     );
   }
