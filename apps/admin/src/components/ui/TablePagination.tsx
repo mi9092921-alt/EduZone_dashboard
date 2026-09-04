@@ -34,6 +34,7 @@ export function TablePagination({
           <Select
             value={pageSize.toString()}
             onValueChange={(val: string) => onPageSizeChange(Number(val))}
+            aria-label={t('rows_per_page')}
             className="bg-transparent border-none focus-visible:ring-0 shadow-none h-8 py-1 px-2 text-xs font-bold text-foreground cursor-pointer w-[70px] hover:bg-muted/50 rounded-lg"
           >
             {pageSizeOptions.map((size) => (
@@ -53,6 +54,7 @@ export function TablePagination({
         <Button
           variant="outline"
           size="sm"
+          aria-label={t('prev')}
           disabled={page <= 1}
           onClick={() => onPageChange(page - 1)}
           className="h-8 w-8 p-0"
@@ -87,6 +89,7 @@ export function TablePagination({
         <Button
           variant="outline"
           size="sm"
+          aria-label={t('next')}
           disabled={page >= totalPages}
           onClick={() => onPageChange(page + 1)}
           className="h-8 w-8 p-0"

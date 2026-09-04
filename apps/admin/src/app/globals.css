@@ -88,7 +88,12 @@
   --secondary-foreground: 222.2 47.4% 11.2%;
 
   --muted: 210 40% 96.1%;
-  --muted-foreground: 215.4 16.3% 46.9%;
+  /* 45% (was 46.9%) -- axe flagged text-muted-foreground on bg-muted at
+     4.34:1, just under the WCAG AA 4.5:1 minimum for small/bold text
+     (e.g. the "N total" badges). 45% clears it at ~4.64:1; visually
+     indistinguishable from the previous value. Dark mode is unaffected
+     (already tuned brighter, see below). */
+  --muted-foreground: 215.4 16.3% 45%;
 
   --accent: 210 40% 96.1%;
   --accent-foreground: 222.2 47.4% 11.2%;

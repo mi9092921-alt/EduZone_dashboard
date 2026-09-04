@@ -162,6 +162,7 @@ export function UserProfileDrawer({
               </span>
               <span className={cn("inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-extrabold uppercase tracking-widest border transition-all duration-300 border-transparent", theme.dot + "/10", theme.text)}>
                 <div className={cn("w-1.5 h-1.5 rounded-full", theme.dot)} />
+                <span className="sr-only">{tUsers('actions_account_status')}: </span>
                 {theme.label}
               </span>
             </div>

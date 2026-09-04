@@ -9,7 +9,11 @@ test.describe('Authentication & Session Heartbeat', () => {
       await page.goto('/login');
 
       await page.getByLabel(/email/i).fill('admin@eduzone-test.com');
-      await page.getByLabel(/password/i).fill('Password123');
+      // Canonical QA seed password (supabase/schema/11_seed_reference.sql,
+      // supabase/AGENTS.md QA accounts table) -- "Password123" was never
+      // a valid credential and always failed with "Invalid email or
+      // password", which is why this test never got past /login.
+      await page.getByLabel(/password/i).fill('Admin@12345');
       // The button's accessible name is "Sign In" (see
       // src/features/auth/components/LoginPage.tsx) -- "login" never
       // matched, which is why this click used to time out after 30s.
@@ -18,8 +22,11 @@ test.describe('Authentication & Session Heartbeat', () => {
       // Verify redirect
       await expect(page).toHaveURL(/.*activities/);
 
-      // Verify toast or profile presence
-      await expect(page.getByRole('button', { name: /profile|user/i })).toBeVisible();
+      // Verify the user menu is present. Its accessible name is the
+      // user's email (see aria-label on #user-menu-button in
+      // src/features/layout/components/Topbar.tsx), not "profile"/"user",
+      // so target the stable id instead of guessing at a name.
+      await expect(page.locator('#user-menu-button')).toBeVisible();
     });
   });
 
@@ -34,8 +41,8 @@ test.describe('Authentication & Session Heartbeat', () => {
     test('logs out successfully', async ({ page }) => {
       await page.goto('/activities');
 
-      // Click profile and logout
-      await page.getByRole('button', { name: /profile|user/i }).click();
+      // Click profile and logout (see note above on #user-menu-button)
+      await page.locator('#user-menu-button').click();
       await page.getByRole('menuitem', { name: /logout/i }).click();
 
       // Should redirect back to login

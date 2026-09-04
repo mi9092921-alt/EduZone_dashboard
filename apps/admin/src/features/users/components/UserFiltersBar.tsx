@@ -120,6 +120,7 @@ export function UserFiltersBar({
           <div className="w-full sm:w-[160px]">
             <Select
               className="h-10 text-xs font-medium"
+              aria-label={t('filter_role')}
               value={filters.primary_role ?? ''}
               onValueChange={(val) => updateFilter('primary_role', (val || undefined) as UserFilters['primary_role'])}
             >
@@ -134,6 +135,7 @@ export function UserFiltersBar({
           <div className="w-full sm:w-[160px]">
             <Select
               className="h-10 text-xs font-medium"
+              aria-label={t('filter_status')}
               value={filters.account_status ?? ''}
               onValueChange={(val) => updateFilter('account_status', (val || undefined) as UserFilters['account_status'])}
             >

@@ -385,6 +385,8 @@
     "bulk_actions": "إجراءات جماعية",
     "selected": "محدد",
     "clear_selection": "إلغاء التحديد",
+    "select_all_users": "تحديد جميع المستخدمين",
+    "select_user": "تحديد {name}",
     "apply_bulk_action": "تطبيق",
     "all_statuses": "جميع الحالات",
     "role_super_admin": "مدير أعلى",

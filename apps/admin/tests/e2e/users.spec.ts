@@ -27,8 +27,12 @@ test.describe('User Management', () => {
   });
 
   test('filtering users by role', async ({ page }) => {
-    // Open role filter
-    await page.getByLabel(/filter role/i).selectOption('student');
+    // Open role filter. This is a MUI Select rendered as
+    // role="combobox" (see UserFiltersBar.tsx), not a native <select>,
+    // so .selectOption() never applies here -- click to open the
+    // listbox, then click the option.
+    await page.getByRole('combobox', { name: /^role$/i }).click();
+    await page.getByRole('option', { name: /student/i }).click();
 
     // Verify results show only students
     const roles = page.getByRole('cell', { name: 'student' });

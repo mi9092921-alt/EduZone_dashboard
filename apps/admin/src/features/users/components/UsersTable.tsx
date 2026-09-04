@@ -107,6 +107,7 @@ const UserRow = memo(({
       <td className="px-5 py-4 sticky start-0 bg-card group-hover:bg-muted/30 z-10 border-b border-border/40" onClick={(e) => e.stopPropagation()}>
         <input
           type="checkbox"
+          aria-label={t('select_user', { name: displayName })}
           className="h-4 w-4 rounded border-border text-primary focus:ring-primary transition-faang cursor-pointer"
           checked={isSelected}
           onChange={() => onSelectToggle(user.id)}
@@ -227,6 +228,7 @@ export function UsersTable({
               <th className="h-12 px-5 text-start align-middle font-medium text-muted-foreground w-[1%] sticky start-0 bg-background z-20 border-b border-border/40">
                 <input
                   type="checkbox"
+                  aria-label={t('select_all_users')}
                   className="h-4 w-4 rounded border-border text-primary focus:ring-primary transition-faang cursor-pointer"
                   checked={allSelected}
                   onChange={(e) => onSelectAll(e.target.checked)}
