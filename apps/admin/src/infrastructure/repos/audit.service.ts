@@ -145,13 +145,21 @@ export async function flushActivityLogs(batchSize: number = 200): Promise<number
 // ── Get queued (unflushed) activities ───────────────────────────────────
 // activity_log_queue has REVOKE ALL for anon/authenticated + deny-all RLS.
 // Must use service_role admin client to bypass permission gate.
-export async function getQueuedActivities(limit: number = 200): Promise<ActivityLogQueueEntry[]> {
+//
+// IDOR guard: activity_log_queue.tenant_id is NOT NULL and rows carry
+// user_id/ip_address/details (not the "non-PII" data the old call site
+// assumed) — a service-role read here MUST be tenant-scoped by the
+// caller. `tenantId` should be the caller's own tenant, or omitted only
+// for super_admin — see getQueuedActivitiesAction.
+export async function getQueuedActivities(
+  limit: number = 200,
+  tenantId?: string,
+): Promise<ActivityLogQueueEntry[]> {
   const admin = createAdminClient();
-  const { data, error } = await admin
-    .from('activity_log_queue')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(limit);
+  let query = admin.from('activity_log_queue').select('*');
+  if (tenantId) query = query.eq('tenant_id', tenantId);
+
+  const { data, error } = await query.order('created_at', { ascending: false }).limit(limit);
   if (error) throw mapDbError(error, 'audit.service.ts');
   return (data ?? []) as ActivityLogQueueEntry[];
 }

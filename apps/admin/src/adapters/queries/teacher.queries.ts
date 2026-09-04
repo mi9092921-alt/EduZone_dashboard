@@ -61,9 +61,12 @@ export function useTeacherWarnings(filters: WarningFilters, page: number, pageSi
 export function useTeacherCourseStats(courseId: string | null) {
   return useQuery({
     queryKey: queryKeys.teacher.analytics(courseId!),
+    // M-CLIENT-ADMIN: getCourseStats() reads via the service-role client
+    // and must never be called from browser code (see courses.queries.ts
+    // useCourseStats for the same fix) — route through the server action.
     queryFn: async () => {
-      const { getCourseStats } = await import('@/infrastructure/repos/courses.service');
-      return getCourseStats(courseId!);
+      const { getCourseStatsAction } = await import('@/adapters/actions/admin.actions');
+      return getCourseStatsAction(courseId!);
     },
     enabled: !!courseId,
     staleTime: 60_000,

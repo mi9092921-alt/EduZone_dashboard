@@ -36,6 +36,30 @@ export async function requireUser(): Promise<string> {
   return data.user.id;
 }
 
+/**
+ * Authenticates the caller (no permission required) and resolves their
+ * own tenant_id — for boundaries that allow any authenticated user
+ * through but still MUST scope service-role reads/writes to that
+ * caller's own tenant (e.g. the audit-queue fallback path, which
+ * intentionally has no permission requirement but must never leak
+ * another tenant's rows).
+ */
+export async function requireUserContext(): Promise<{ userId: string; tenantId: string }> {
+  const supabase = await createServerClient();
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError || !userData?.user) throw new UnauthorizedError();
+
+  const { data: profile, error: profileError } = await supabase
+    .from('users')
+    .select('tenant_id')
+    .eq('id', userData.user.id)
+    .is('deleted_at', null)
+    .maybeSingle();
+  if (profileError || !profile?.tenant_id) throw new UnauthorizedError();
+
+  return { userId: userData.user.id, tenantId: profile.tenant_id as string };
+}
+
 /** Authenticates the caller and requires the super_admin role. */
 export async function requireSuperAdmin(): Promise<Readonly<RequestContext>> {
   const supabase = await createServerClient();

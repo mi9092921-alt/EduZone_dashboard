@@ -2,7 +2,12 @@
 
 import type { AccessRule, PaginatedResult } from '@eduzone/types';
 
-import { assertSameTenant, requirePermission, requireUser } from '@/adapters/actions/boundary';
+import {
+  assertSameTenant,
+  requirePermission,
+  requireUser,
+  requireUserContext,
+} from '@/adapters/actions/boundary';
 import { DeleteCourseUseCase } from '@/application/use-cases/courses/delete-course.use-case';
 import {
   GetMyNotificationsUseCase,
@@ -69,15 +74,33 @@ export async function getAccessRulesAction(
   page = 1,
   pageSize = 20,
 ): Promise<PaginatedResult<AccessRule>> {
-  await requirePermission(['settings.manage', 'settings.write', 'tenants.manage']);
-  return accessRulesService.getAccessRulesAdmin(tenantId, page, pageSize);
+  const ctx = await requirePermission(['settings.manage', 'settings.write', 'tenants.manage']);
+  // IDOR guard: getAccessRulesAdmin reads via the service-role client
+  // (bypasses RLS). `tenantId` was previously taken from the caller
+  // as-is — a non-super_admin caller could pass another tenant's id (or
+  // omit it) to read every tenant's access rules. Non-super_admin callers
+  // are pinned to their own tenant; only super_admin may choose/omit one.
+  const scopedTenantId = ctx.permissions.includes('*') ? tenantId : ctx.tenantId;
+  return accessRulesService.getAccessRulesAdmin(scopedTenantId, page, pageSize);
 }
 
 export async function upsertAccessRuleAction(
   rule: UpsertAccessRuleInput,
 ): Promise<AccessRule> {
   const ctx = await requirePermission(['settings.manage', 'settings.write', 'tenants.manage']);
-  const saved = await accessRulesService.upsertAccessRuleAdmin(rule);
+  // IDOR/BOLA guard: upsertAccessRuleAdmin writes via the service-role
+  // client (bypasses RLS). Without this guard a non-super_admin caller
+  // could create/overwrite an access rule (IP whitelist, time window,
+  // geo, device-type) in ANY tenant by setting `tenant_id` (insert) or
+  // `id` (update) to another tenant's values — same class of bug as
+  // deleteCourseAction / assertSameTenant.
+  if (rule.id) {
+    assertSameTenant(ctx, await accessRulesService.getAccessRuleTenantId(rule.id));
+  }
+  const scopedRule = ctx.permissions.includes('*')
+    ? rule
+    : { ...rule, tenant_id: ctx.tenantId };
+  const saved = await accessRulesService.upsertAccessRuleAdmin(scopedRule);
   // M13: settings change is an audited operation (the boundary owns the ctx;
   // the details never carry rule internals — just the target + tenant).
   await makeAuditLogger().record(ctx, {
@@ -303,21 +326,40 @@ export async function getUnreadNotificationCountAction(): Promise<number> {
 export async function getQueuedActivitiesAction(
   limit: number = 200,
 ): Promise<ActivityLogQueueEntry[]> {
+  // IDOR guard: getQueuedActivities reads via the service-role client
+  // (activity_log_queue has deny-all RLS). Rows carry tenant_id,
+  // user_id, ip_address and a free-form `details` payload — not the
+  // "non-PII" data the fallback path below assumed — so every caller,
+  // including the no-permission fallback, must be scoped to their own
+  // tenant. Only a caller holding audit.read AND super_admin sees
+  // across tenants.
+  let tenantId: string;
+  let isSuperAdmin = false;
   try {
     // Prefer callers with audit.read — super_admin gets a free pass via requirePermission
-    await requirePermission('audit.read');
+    const ctx = await requirePermission('audit.read');
+    tenantId = ctx.tenantId;
+    isSuperAdmin = ctx.permissions.includes('*');
   } catch {
-    // Fallback: any authenticated user may see queue entries (they are non-PII)
-    await requireUser();
+    // Fallback: any authenticated user may see queue entries for their
+    // OWN tenant (intentional low bar for this dashboard widget — but
+    // never cross-tenant).
+    const ctx = await requireUserContext();
+    tenantId = ctx.tenantId;
   }
 
-  return auditService.getQueuedActivities(limit);
+  return auditService.getQueuedActivities(limit, isSuperAdmin ? undefined : tenantId);
 }
 
 
 export async function getActiveBlocksAction(): Promise<RateLimitWithEmail[]> {
-  await requirePermission(['audit.read', 'settings.write']);
-  return rateLimitsService.getActiveBlocks();
+  const ctx = await requirePermission(['audit.read', 'settings.write']);
+  // IDOR guard: getActiveBlocks reads via the service-role client and
+  // rate_limits carries tenant_id + user email/IP — scope to the
+  // caller's own tenant; only super_admin sees across tenants.
+  return rateLimitsService.getActiveBlocks(
+    ctx.permissions.includes('*') ? undefined : ctx.tenantId,
+  );
 }
 
 export async function getRateLimitRulesAction(): Promise<RateLimitRule[]> {
@@ -347,13 +389,21 @@ export async function clearRateLimitBlockAction(id: string): Promise<void> {
 }
 
 export async function getTopOffendersAction(): Promise<TopOffender[]> {
-  await requirePermission(['audit.read', 'settings.write']);
-  return rateLimitsService.getTopOffenders();
+  const ctx = await requirePermission(['audit.read', 'settings.write']);
+  // IDOR guard — same as getActiveBlocksAction.
+  return rateLimitsService.getTopOffenders(
+    ctx.permissions.includes('*') ? undefined : ctx.tenantId,
+  );
 }
 
 export async function getAnalyticsCourseStatsAction(tenantId?: string): Promise<CourseWithStats[]> {
-  await requirePermission(['reports.read', 'courses.read', 'audit.read']);
-  return analyticsService.getCourseStats(tenantId);
+  const ctx = await requirePermission(['reports.read', 'courses.read', 'audit.read']);
+  // IDOR guard: getCourseStats reads via the service-role client. The
+  // `tenantId` argument was previously passed through unchecked — a
+  // non-super_admin caller could pass another tenant's id (or omit it)
+  // to see top-course/enrollment analytics across every tenant.
+  const scopedTenantId = ctx.permissions.includes('*') ? tenantId : ctx.tenantId;
+  return analyticsService.getCourseStats(scopedTenantId);
 }
 
 export async function getCourseStatsAction(courseId: string): Promise<CourseStats | null> {

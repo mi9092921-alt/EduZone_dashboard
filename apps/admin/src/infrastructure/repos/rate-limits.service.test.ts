@@ -62,6 +62,17 @@ describe('rate-limits.service', () => {
     expect(mockFrom).toHaveBeenCalledWith('rate_limits');
   });
 
+  it('getActiveBlocks — filters by tenant_id when provided (IDOR guard)', async () => {
+    const mockEq = vi.fn().mockReturnValue({ order: mockOrder });
+    const gtSpy = vi.fn(() => ({ eq: mockEq }));
+    mockNot.mockReturnValueOnce({ gt: gtSpy });
+
+    await getActiveBlocks('tenant-a');
+
+    expect(gtSpy).toHaveBeenCalled();
+    expect(mockEq).toHaveBeenCalledWith('tenant_id', 'tenant-a');
+  });
+
   it('getRateLimitRules — queries rate_limit_rules ordered by action', async () => {
     mockSelect.mockReturnValueOnce({ order: mockOrder });
     mockOrder.mockReturnValueOnce({ data: [{ action: 'login' }], error: null });
@@ -91,6 +102,15 @@ describe('rate-limits.service', () => {
   it('getTopOffenders — queries rate_limits with gte on window_start', async () => {
     await getTopOffenders();
     expect(mockFrom).toHaveBeenCalledWith('rate_limits');
+  });
+
+  it('getTopOffenders — filters by tenant_id when provided (IDOR guard)', async () => {
+    const mockEq = vi.fn().mockReturnValue({ order: mockOrder });
+    mockGte.mockReturnValueOnce({ eq: mockEq, order: mockOrder });
+
+    await getTopOffenders('tenant-a');
+
+    expect(mockEq).toHaveBeenCalledWith('tenant_id', 'tenant-a');
   });
 
   it('propagates DB errors from getActiveBlocks', async () => {

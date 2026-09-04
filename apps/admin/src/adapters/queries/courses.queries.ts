@@ -2,13 +2,13 @@ import { useQuery, keepPreviousData } from '@tanstack/react-query';
 
 import { queryKeys } from './keys';
 
+import { getCourseStatsAction } from '@/adapters/actions/admin.actions';
 import type { CourseFilters } from '@/domain/types/course.types';
 import {
   getCourses,
   getCourseById,
   getCourseSections,
   getCourseEnrollments,
-  getCourseStats,
   getCoursesOverviewStats,
   getVideoViewsByUser,
   getLearningObjectives,
@@ -56,7 +56,12 @@ export function useCourseEnrollments(courseId: string | null, page: number, page
 export function useCourseStats(courseId: string | null) {
   return useQuery({
     queryKey: queryKeys.courses.stats(courseId!),
-    queryFn: () => getCourseStats(courseId!),
+    // M-CLIENT-ADMIN: getCourseStats() reads via the service-role client
+    // (bypasses RLS) and MUST NOT be called from browser code — it throws
+    // at runtime ("Attempted to access server environment variables in
+    // the browser context"), which is exactly what was happening here.
+    // Route through the already-tenant-scoped server action instead.
+    queryFn: () => getCourseStatsAction(courseId!),
     enabled: !!courseId,
     staleTime: 60_000,
   });

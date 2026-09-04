@@ -2,11 +2,11 @@ import { useQuery } from '@tanstack/react-query';
 
 import { queryKeys } from './keys';
 
+import { getQueuedActivitiesAction } from '@/adapters/actions/admin.actions';
 import type { AuditFilters } from '@/domain/types/audit.types';
 import {
   getActivityLogs,
   getAuditChainState,
-  getQueuedActivities,
   getSecurityAlerts,
 } from '@/infrastructure/repos/audit.service';
 
@@ -33,7 +33,10 @@ export function useAuditChainState() {
 export function useQueuedActivities(limit: number = 200) {
   return useQuery({
     queryKey: queryKeys.audit.queue,
-    queryFn: () => getQueuedActivities(limit),
+    // M-CLIENT-ADMIN: getQueuedActivities() reads via the service-role
+    // client (bypasses RLS) and must never be called from browser code —
+    // route through the tenant-scoped server action instead.
+    queryFn: () => getQueuedActivitiesAction(limit),
     refetchInterval: 5_000,
   });
 }

@@ -3653,6 +3653,34 @@ BEGIN
 END;
 $$;
 
+-- ============================================================================
+-- IDOR FIX (P1-SEC-005 follow-up, audit pass on the 12 remaining
+-- service-role-only domains): admin_get_jobs / admin_get_job_counts /
+-- admin_retry_job / admin_cancel_job previously checked ONLY the caller's
+-- role (admin/super_admin) via is_admin_with_session_validation(), never
+-- tenant_id — unlike the sibling terminate_user_sessions/control_user_account
+-- functions elsewhere in this file, which already do
+-- "tenant_id = get_current_tenant_id() OR is_current_user_super_admin()".
+-- Verified with a real Postgres instance (helper functions + job_queue
+-- loaded verbatim from this file): a tenant-scoped 'admin' could list,
+-- retry, or cancel every OTHER tenant's background jobs (including their
+-- payloads, which can carry another tenant's user data).
+--
+-- Fix: tenant-scoped admins now only see/act on jobs where
+-- tenant_id = get_current_tenant_id() OR tenant_id IS NULL (platform-wide
+-- system/maintenance jobs stay visible/actionable by every admin — not
+-- "another tenant's data"). super_admin and the service_role worker
+-- remain unrestricted, matching every other admin RPC in this file.
+--
+-- DEPLOYMENT NOTE: admin_get_jobs now also returns `tenant_id` (it was
+-- silently never populated before, despite jobs.service.ts's TS row type
+-- already expecting it) — this changes the function's return row type, so
+-- on an EXISTING database `CREATE OR REPLACE` will fail with "cannot
+-- change return type of existing function". Run this first:
+--   DROP FUNCTION IF EXISTS public.admin_get_jobs(int, int, text, text, timestamptz);
+-- before re-running this file. Not needed on a fresh bootstrap.
+-- ============================================================================
+
 CREATE OR REPLACE FUNCTION public.admin_get_jobs(
   p_page      int DEFAULT 1,
   p_page_size int DEFAULT 10,
@@ -3662,6 +3690,7 @@ CREATE OR REPLACE FUNCTION public.admin_get_jobs(
 )
 RETURNS TABLE (
   id              uuid,
+  tenant_id       uuid,
   job_type        text,
   payload         jsonb,
   status          text,
@@ -3684,10 +3713,15 @@ SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_offset int;
+  v_is_unrestricted boolean;
+  v_tenant_id uuid;
 BEGIN
   IF auth.role() <> 'service_role' AND NOT public.is_admin_with_session_validation() THEN
     RAISE EXCEPTION 'PERMISSION_DENIED';
   END IF;
+
+  v_is_unrestricted := (auth.role() = 'service_role') OR public.is_current_user_super_admin();
+  v_tenant_id := public.get_current_tenant_id();
 
   v_offset := (p_page - 1) * p_page_size;
 
@@ -3697,12 +3731,17 @@ BEGIN
     WHERE (p_status    IS NULL OR internal.job_queue.status   = p_status)
       AND (p_job_type  IS NULL OR internal.job_queue.job_type = p_job_type)
       AND (p_date_from IS NULL OR internal.job_queue.created_at >= p_date_from)
+      AND (
+        v_is_unrestricted
+        OR internal.job_queue.tenant_id IS NULL
+        OR internal.job_queue.tenant_id = v_tenant_id
+      )
   ),
   total_count AS (
     SELECT count(*) AS cnt FROM filtered_jobs
   )
   SELECT
-    fj.id, fj.job_type, fj.payload, fj.status, fj.priority,
+    fj.id, fj.tenant_id, fj.job_type, fj.payload, fj.status, fj.priority,
     fj.attempts, fj.max_attempts, fj.run_at, 
     fj.locked_by_worker_id::text AS locked_by,
     fj.locked_at, fj.lock_expires_at, fj.started_at,
@@ -3723,19 +3762,29 @@ LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
+DECLARE
+  v_is_unrestricted boolean;
+  v_tenant_id uuid;
 BEGIN
   IF auth.role() <> 'service_role' AND NOT public.is_admin_with_session_validation() THEN
     RAISE EXCEPTION 'PERMISSION_DENIED';
   END IF;
 
+  -- IDOR guard (added): same tenant scoping as admin_get_jobs, so the
+  -- dashboard counts stay consistent with the list view.
+  v_is_unrestricted := (auth.role() = 'service_role') OR public.is_current_user_super_admin();
+  v_tenant_id := public.get_current_tenant_id();
+
   RETURN (
     SELECT jsonb_build_object(
-      'pending',    (SELECT count(*) FROM internal.job_queue WHERE status = 'pending'),
-      'processing', (SELECT count(*) FROM internal.job_queue WHERE status = 'processing'),
-      'done',       (SELECT count(*) FROM internal.job_queue WHERE status = 'done'),
-      'failed',     (SELECT count(*) FROM internal.job_queue WHERE status = 'failed'),
-      'dead',       (SELECT count(*) FROM internal.job_queue WHERE status = 'dead')
+      'pending',    count(*) FILTER (WHERE status = 'pending'),
+      'processing', count(*) FILTER (WHERE status = 'processing'),
+      'done',       count(*) FILTER (WHERE status = 'done'),
+      'failed',     count(*) FILTER (WHERE status = 'failed'),
+      'dead',       count(*) FILTER (WHERE status = 'dead')
     )
+    FROM internal.job_queue
+    WHERE v_is_unrestricted OR tenant_id IS NULL OR tenant_id = v_tenant_id
   );
 END;
 $$;
@@ -3756,7 +3805,16 @@ BEGIN
       attempts = 0,
       error_message = NULL,
       updated_at = pg_catalog.now()
-  WHERE id = p_id;
+  WHERE id = p_id
+    -- IDOR guard (added): tenant-scoped admins may only retry their own
+    -- tenant's jobs (or platform-wide ones). Cross-tenant calls silently
+    -- affect 0 rows rather than raising, matching terminate_user_sessions.
+    AND (
+      auth.role() = 'service_role'
+      OR public.is_current_user_super_admin()
+      OR tenant_id IS NULL
+      OR tenant_id = public.get_current_tenant_id()
+    );
 END;
 $$;
 
@@ -3774,7 +3832,14 @@ BEGIN
   SET status = 'dead',
       finished_at = pg_catalog.now(),
       updated_at = pg_catalog.now()
-  WHERE id = p_id;
+  WHERE id = p_id
+    -- IDOR guard (added): same as admin_retry_job.
+    AND (
+      auth.role() = 'service_role'
+      OR public.is_current_user_super_admin()
+      OR tenant_id IS NULL
+      OR tenant_id = public.get_current_tenant_id()
+    );
 END;
 $$;
 

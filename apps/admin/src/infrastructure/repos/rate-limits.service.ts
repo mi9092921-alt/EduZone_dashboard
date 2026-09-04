@@ -12,14 +12,20 @@ import { createAdminClient } from '@/infrastructure/supabase/admin';
  */
 
 // ── Get active blocks (blocked_until > now) ──────────────────────
-export async function getActiveBlocks(): Promise<RateLimitWithEmail[]> {
+// IDOR guard: this reads via the service-role client (bypasses RLS), and
+// rate_limits.tenant_id carries user_id/ip_address/email — cross-tenant
+// PII. `tenantId` MUST be supplied by the action boundary (the caller's
+// own tenant, or omitted only for super_admin) — see getActiveBlocksAction.
+export async function getActiveBlocks(tenantId?: string): Promise<RateLimitWithEmail[]> {
   const admin = createAdminClient();
-  const { data, error } = await admin
+  let query = admin
     .from('rate_limits')
     .select('*, users!rate_limits_user_id_fkey(email)')
     .not('blocked_until', 'is', null)
-    .gt('blocked_until', new Date().toISOString())
-    .order('blocked_until', { ascending: false });
+    .gt('blocked_until', new Date().toISOString());
+  if (tenantId) query = query.eq('tenant_id', tenantId);
+
+  const { data, error } = await query.order('blocked_until', { ascending: false });
   if (error) throw mapDbError(error, 'rate-limits.service.ts');
 
   // M9: map the joined row explicitly instead of `as unknown as` spreading
@@ -76,16 +82,19 @@ export async function clearBlock(id: string): Promise<void> {
 }
 
 // ── Top offenders (last 24h) ─────────────────────────────────────
-export async function getTopOffenders(): Promise<TopOffender[]> {
+// IDOR guard: same as getActiveBlocks — service-role read, must be
+// tenant-scoped by the caller (getTopOffendersAction).
+export async function getTopOffenders(tenantId?: string): Promise<TopOffender[]> {
   const admin = createAdminClient();
   const since = new Date(Date.now() - 24 * 3600_000).toISOString();
 
-  const { data, error } = await admin
+  let query = admin
     .from('rate_limits')
     .select('user_id, ip_address, action, hit_count, users!rate_limits_user_id_fkey(email)')
-    .gte('window_start', since)
-    .order('hit_count', { ascending: false })
-    .limit(100);
+    .gte('window_start', since);
+  if (tenantId) query = query.eq('tenant_id', tenantId);
+
+  const { data, error } = await query.order('hit_count', { ascending: false }).limit(100);
   if (error) throw mapDbError(error, 'rate-limits.service.ts');
 
   const mapped = (data ?? []).map((row: Record<string, unknown>) => ({

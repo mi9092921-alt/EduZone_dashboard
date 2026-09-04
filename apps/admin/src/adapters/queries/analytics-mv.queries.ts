@@ -2,9 +2,9 @@ import { useQuery } from '@tanstack/react-query';
 
 import { queryKeys } from './keys';
 
+import { getAnalyticsCourseStatsAction } from '@/adapters/actions/admin.actions';
 import {
   getUserStats,
-  getCourseStats,
   getDailyActivity,
   getUserRegistrationTrend,
   getGeographicDistribution,
@@ -27,7 +27,10 @@ export function useUserStats(tenantId?: string) {
 export function useCourseStats(tenantId?: string) {
   return useQuery({
     queryKey: queryKeys.analytics.courseStats(tenantId),
-    queryFn: () => getCourseStats(tenantId),
+    // M-CLIENT-ADMIN: getCourseStats() reads via the service-role client
+    // (bypasses RLS) and must never be called from browser code — route
+    // through the tenant-scoped server action instead.
+    queryFn: () => getAnalyticsCourseStatsAction(tenantId),
     staleTime: 60_000,
   });
 }
