@@ -1511,7 +1511,19 @@ BEGIN
     v_row.is_preview
     OR public.has_course_access(v_uid, v_row.course_id)
     OR v_row.teacher_id = v_uid
-    OR public.is_admin_with_session_validation();
+    OR public.is_current_user_super_admin()
+    -- SEC-FIX (RLS-hardening review): is_admin_with_session_validation()
+    -- only proves the caller holds an admin/super_admin role SOMEWHERE —
+    -- it does not check which tenant. Used alone here, any tenant's admin
+    -- could call get_lesson_content() for another tenant's paid lesson and
+    -- receive a playable videoPath, confirmed live in a local RLS-matrix
+    -- test (Tenant B admin retrieved Tenant A's non-preview lesson
+    -- content). The tenant match below is the same AND pattern already
+    -- used correctly for this same function everywhere else in
+    -- 09_rls.sql (e.g. "is_admin_with_session_validation() AND tenant_id
+    -- = get_current_tenant_id()"); this call site was missing it.
+    OR (public.is_admin_with_session_validation()
+        AND v_row.tenant_id = public.get_current_tenant_id());
 
   INSERT INTO audit.lesson_access_log (
     lesson_id, course_id, user_id, tenant_id, device_id,

@@ -1,0 +1,11 @@
+{
+  "name": "@eduzone/rls-local-test-harness",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Disposable local Postgres 17 harness for exercising supabase/schema RLS + permission policies without a live Supabase Cloud project. Not part of the app build; used only by scripts/security tests.",
+  "type": "module",
+  "devDependencies": {
+    "embedded-postgres": "17.10.0-beta.17",
+    "pg": "^8.13.1"
+  }
+}

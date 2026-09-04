@@ -1423,4 +1423,78 @@ VALUES
 
 ON CONFLICT (version) DO NOTHING;
 
+-- ============================================================================
+-- PHASE 30: Tenant B (Test Tenant) role parity for cross-tenant RLS matrix
+-- testing (security-hardening task). Test Tenant previously had only a
+-- single admin user, which is not enough to exercise the same
+-- admin/teacher/student cross-tenant matrix already covered for the
+-- EduZone QA Tenant. super_admin is intentionally NOT duplicated per
+-- tenant: is_current_user_super_admin() / the RLS policies in
+-- 09_rls.sql treat super_admin as a single platform-wide role, not a
+-- per-tenant one, so a second super_admin account would not exercise
+-- any additional isolation boundary. Flagging this reading explicitly
+-- rather than assuming it.
+-- ============================================================================
+
+INSERT INTO auth.users (
+  id, instance_id, email, encrypted_password,
+  email_confirmed_at, created_at, updated_at,
+  role, aud, raw_app_meta_data, raw_user_meta_data,
+  is_super_admin, confirmation_token, recovery_token,
+  email_change_token_new, email_change
+) VALUES
+  ('bbbbbbbb-1111-1111-1111-111111111111',
+   '00000000-0000-0000-0000-000000000000',
+   'teacher@test.eduzone.local',
+   '$2b$10$7opT0.uTD98DJbJG4xiT4uom0y7/nv3WeLDLwTeM6.mIQMVbZYlky',
+   now(), now(), now(), 'authenticated', 'authenticated',
+   '{"provider":"email","providers":["email"]}', '{}',
+   false, '','','',''),
+
+  ('bbbbbbbb-2222-2222-2222-222222222222',
+   '00000000-0000-0000-0000-000000000000',
+   'student@test.eduzone.local',
+   '$2b$10$avfqgi31QRl7CmQ6vSELhOjKVvctuFpiqs7GwI3tOiq1JmRt0A..y',
+   now(), now(), now(), 'authenticated', 'authenticated',
+   '{"provider":"email","providers":["email"]}', '{}',
+   false, '','','','')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO auth.identities
+  (id, user_id, provider, identity_data, created_at, updated_at, provider_id, last_sign_in_at)
+VALUES
+  ('bbbbbbbb-1111-1111-1111-111111111111',
+   'bbbbbbbb-1111-1111-1111-111111111111', 'email',
+   '{"sub":"bbbbbbbb-1111-1111-1111-111111111111","email":"teacher@test.eduzone.local"}',
+   now(), now(), 'teacher@test.eduzone.local', NULL),
+
+  ('bbbbbbbb-2222-2222-2222-222222222222',
+   'bbbbbbbb-2222-2222-2222-222222222222', 'email',
+   '{"sub":"bbbbbbbb-2222-2222-2222-222222222222","email":"student@test.eduzone.local"}',
+   now(), now(), 'student@test.eduzone.local', NULL)
+ON CONFLICT (provider, provider_id) DO NOTHING;
+
+INSERT INTO public.users (id, email, first_name, last_name, primary_role, tenant_id, account_status, token_version, region_id)
+VALUES
+  ('bbbbbbbb-1111-1111-1111-111111111111',
+   'teacher@test.eduzone.local', 'Test', 'Teacher', 'teacher',
+   '11111111-1111-1111-1111-111111111111', 'active', 1, 'me-south-1'),
+
+  ('bbbbbbbb-2222-2222-2222-222222222222',
+   'student@test.eduzone.local', 'Test', 'Student', 'student',
+   '11111111-1111-1111-1111-111111111111', 'active', 1, 'me-south-1')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.user_roles (user_id, role_id, tenant_id)
+SELECT u.id, r.id, u.tenant_id
+FROM public.users u
+JOIN public.roles r
+  ON r.name = u.primary_role
+  AND r.tenant_id = public.system_tenant_id()
+WHERE u.id IN (
+  'bbbbbbbb-1111-1111-1111-111111111111',
+  'bbbbbbbb-2222-2222-2222-222222222222'
+)
+ON CONFLICT DO NOTHING;
+
 COMMIT;
