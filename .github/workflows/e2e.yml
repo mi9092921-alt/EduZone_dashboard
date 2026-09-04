@@ -18,10 +18,12 @@ name: E2E (Playwright)
 #   3. Add "e2e" to the required status checks of main (Settings → Branches
 #      → Branch protection) so a failing E2E run blocks the merge, per §19.
 #
-# Schema policy: `supabase db reset` applies supabase/schema/*.sql through
-# schema_paths in supabase/config.toml — this READS the canonical schema and
-# changes nothing about the shared-DB contract (Execution Plan §20 stays
-# under repo coordination).
+# Schema policy: `db reset` alone does NOT apply supabase/schema/*.sql --
+# see the "Start local Supabase" step below for why and how it's applied.
+# schema_paths in supabase/config.toml stays the canonical source of truth
+# (Execution Plan §20 stays under repo coordination); this workflow only
+# reads it, same as before -- just via psql now instead of relying on
+# `db reset` to do it implicitly, which it never actually did.
 
 on:
   pull_request:
@@ -57,10 +59,48 @@ jobs:
           version: latest
 
       - name: Start local Supabase (canonical schema + QA seed)
+        # `supabase db reset` only re-applies whatever files already exist
+        # under supabase/migrations/ (confirmed against Supabase's own CLI
+        # docs: "applies all local migrations found in supabase/migrations
+        # directory"). It does NOT read schema_paths in config.toml directly
+        # -- that's a separate two-step "declarative schema" workflow
+        # (`db diff -f <name>` generates a migration file from schema_paths,
+        # then `db reset`/`migration up` applies *that*). This repo's
+        # supabase/migrations/ contains only a README.md, no generated
+        # migration has ever been committed, so `db reset` alone has always
+        # been a no-op against our actual schema: every custom table,
+        # function, RLS policy, and the QA seed data in
+        # schema/11_seed_reference.sql was silently never created. That is
+        # the real reason QA logins have failed with "Invalid email or
+        # password" no matter what the seed file's content was -- the file
+        # was simply never executed, regardless of hashes or Vault.
+        #
+        # Apply schema_paths directly and deterministically with psql
+        # instead of depending on `db diff`'s shadow-database diffing (which
+        # has documented ordering/staleness issues) -- every CI run starts
+        # from a fresh container, so there's nothing to diff against and no
+        # need for incremental migration generation here.
         working-directory: supabase
         run: |
           supabase start
           supabase db reset
+          eval "$(supabase status -o env)"
+          for f in \
+            schema/01_extensions.sql \
+            schema/02_types.sql \
+            schema/03_tables.sql \
+            schema/04_constraints.sql \
+            schema/05_indexes.sql \
+            schema/07_functions.sql \
+            schema/06_views.sql \
+            schema/08_triggers.sql \
+            schema/09_rls.sql \
+            schema/10_permissions.sql \
+            schema/11_seed_reference.sql \
+          ; do
+            echo "Applying $f ..."
+            psql "$DB_URL" -v ON_ERROR_STOP=1 -f "$f"
+          done
 
       - name: Export local Supabase URL and anon key
         working-directory: supabase
