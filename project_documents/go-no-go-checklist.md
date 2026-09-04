@@ -10,13 +10,17 @@
 
 ### ✅ Quality & Testing
 
-| Check                                 | Owner | Status | Notes                          |
-| ------------------------------------- | ----- | ------ | ------------------------------ |
-| All Cypress E2E tests pass (12 flows) | QA    | ☐      | Run: `npx cypress run`         |
-| Unit test coverage ≥ 80%              | Dev   | ☐      | Run: `vitest run --coverage`   |
-| Storybook interaction tests pass      | Dev   | ☐      |                                |
-| No TypeScript errors (`tsc --noEmit`) | Dev   | ☐      |                                |
-| No Critical/High CVEs (`pnpm audit`)  | Dev   | ☐      | Accepted: picomatch (dev-only) |
+| Check                                                                                                                                                                                                                     | Owner | Status | Notes                                                                                                                                          |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Playwright E2E tests pass (4 spec files / 15 tests: auth login+logout, user list & filters, a11y audits, UX/RTL/keyboard regression)                                                                                  | QA    | ☐      | Run: `pnpm --filter @eduzone/admin exec playwright test`. Gate defined in `.github/workflows/e2e.yml`, **dormant** until `E2E_ENABLED=true` — see activation checklist in that file. |
+| Cypress E2E tests pass (15 spec files: moderation — ban/suspend/lock/bulk-lock; courses — create/enroll/revoke; warnings; audit-chain verify; notifications; settings — maintenance-mode/app-lock; auth token-version) | QA    | ☐      | Run: `pnpm --filter @eduzone/admin exec cypress run`. **Not yet ported to Playwright** — see ⚠️ note below. Not currently wired into any CI workflow. |
+| Unit test coverage ≥ 80%                                                                                                                                                                                                | Dev   | ☐      | Run: `vitest run --coverage`                                                                                                                     |
+| Storybook interaction tests pass                                                                                                                                                                                       | Dev   | ☐      |                                                                                                                                                    |
+| No TypeScript errors (`tsc --noEmit`)                                                                                                                                                                                  | Dev   | ☐      |                                                                                                                                                    |
+| No Critical/High CVEs (`pnpm audit`)                                                                                                                                                                                   | Dev   | ☐      | Accepted: picomatch (dev-only)                                                                                                                    |
+
+> [!WARNING]
+> **RFC-012 (2026-03-08)** mandates Vitest + Playwright and retiring Cypress. As of this update, that migration is **incomplete**: Playwright covers only 4 of the 15 real E2E flows (auth + basic user list). The other 11 flows — all user-moderation actions, courses, warnings, audit-chain verification, notifications, and settings — exist **only** in Cypress and have no Playwright equivalent yet. Cypress must **not** be removed (dependency, specs, or `cypress.env.json.example`) until those 11 flows are ported and verified green in Playwright. Until then, both suites are required launch gates. Tracking: port remaining flows, then re-run this checklist update to drop the Cypress row.
 
 ### 🔒 Security
 
