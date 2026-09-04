@@ -5,6 +5,42 @@
 
 BEGIN;
 
+
+-- ============================================================================
+-- PHASE 0 (pre-bootstrap): Provision the PII encryption key in Supabase Vault
+-- ============================================================================
+-- private.get_kms_key() (07_functions.sql) fails closed: it raises unless a
+-- Vault secret named 'eduzone_kms_key' already exists, and every insert or
+-- update on public.users runs through the email/phone hardening trigger that
+-- calls it. This whole file is one transaction (BEGIN ... COMMIT below), so
+-- without this the very first public.users write in PHASE 4 aborts the
+-- entire seed and silently rolls back everything already inserted above it
+-- (tenants, roles, auth.users, auth.identities, ...) -- which is exactly why
+-- QA logins fail with "Invalid email or password" no matter what the
+-- password hash is: no rows ever survive the COMMIT.
+--
+-- This inserts a fixed, non-secret placeholder key -- fine for throwaway
+-- local/CI databases only. It is intentionally guarded (IF NOT EXISTS) and a
+-- no-op wherever a real key has already been provisioned out-of-band, so it
+-- never overwrites a genuine production secret; production/staging projects
+-- must still provision their own value before their first deploy, exactly
+-- as private.get_kms_key()'s own comment already requires.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'vault')
+     AND NOT EXISTS (
+       SELECT 1 FROM vault.decrypted_secrets WHERE name = 'eduzone_kms_key'
+     )
+  THEN
+    PERFORM vault.create_secret(
+      'qa-ci-local-dev-only-placeholder-key-do-not-use-in-prod-32b',
+      'eduzone_kms_key',
+      'QA/CI/local-dev-only PII key, auto-provisioned by 11_seed_reference.sql'
+    );
+  END IF;
+END;
+$$;
+
 -- ============================================================================
 -- PHASE 0A: System Tenant & Roles (REQUIRED SYSTEM BOOTSTRAP)
 -- ============================================================================
