@@ -25,12 +25,27 @@ BEGIN;
 -- never overwrites a genuine production secret; production/staging projects
 -- must still provision their own value before their first deploy, exactly
 -- as private.get_kms_key()'s own comment already requires.
+--
+-- Nothing in this repo's own migrations ever runs `CREATE EXTENSION
+-- supabase_vault` (checked: no occurrence anywhere under supabase/schema/).
+-- The block below used to only check `pg_namespace` for a pre-existing
+-- `vault` schema and silently do nothing if it wasn't there yet -- on a
+-- fresh `supabase db reset` (local/CI) that check is false, so the secret
+-- was never created, get_kms_key() then raised on the first PHASE 4 write,
+-- and the whole transaction (including every auth.users/auth.identities
+-- row inserted above) rolled back -- reproducing the exact "Invalid email
+-- or password" QA-login failure this phase was meant to fix. Enabling the
+-- extension explicitly first closes that gap; `IF NOT EXISTS` makes it a
+-- no-op everywhere it's already enabled (including hosted projects, where
+-- Vault must live in a schema literally named `vault` per Supabase's own
+-- docs, so this is safe there too).
+CREATE EXTENSION IF NOT EXISTS supabase_vault WITH SCHEMA vault CASCADE;
+
 DO $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'vault')
-     AND NOT EXISTS (
-       SELECT 1 FROM vault.decrypted_secrets WHERE name = 'eduzone_kms_key'
-     )
+  IF NOT EXISTS (
+    SELECT 1 FROM vault.decrypted_secrets WHERE name = 'eduzone_kms_key'
+  )
   THEN
     PERFORM vault.create_secret(
       'qa-ci-local-dev-only-placeholder-key-do-not-use-in-prod-32b',
