@@ -67,9 +67,15 @@ jobs:
         run: supabase status -o env >> "$GITHUB_ENV"
 
       - name: Export public env for the Next.js app
+        # `supabase status -o env` exports API_URL / ANON_KEY (not
+        # SUPABASE_URL / SUPABASE_ANON_KEY) — confirmed against the
+        # Supabase CLI's own docs and community scripts. The previous
+        # names here were always unset, so NEXT_PUBLIC_SUPABASE_URL and
+        # NEXT_PUBLIC_SUPABASE_ANON_KEY resolved to empty strings and
+        # failed the app's env schema validation during `next build`.
         run: |
-          echo "NEXT_PUBLIC_SUPABASE_URL=$SUPABASE_URL" >> "$GITHUB_ENV"
-          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY" >> "$GITHUB_ENV"
 
       - name: Production build
         run: pnpm --filter @eduzone/admin build
