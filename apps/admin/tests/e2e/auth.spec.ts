@@ -8,7 +8,22 @@ test.describe('Authentication & Session Heartbeat', () => {
     test('successfully logs in and redirects to dashboard', async ({ page }) => {
       await page.goto('/login');
 
-      await page.getByLabel(/email/i).fill('admin@eduzone-test.com');
+      // Use a QA account DIFFERENT from the one auth.setup.ts uses
+      // (admin@eduzone-test.com), not just a different password. This
+      // test performs a real, fresh login, and public.sessions has an
+      // AFTER INSERT trigger -- trg_sessions_management ->
+      // trg_enforce_single_active_session() (supabase/schema/08_triggers.sql,
+      // 07_functions.sql) -- that deactivates the PREVIOUS session for
+      // that same user_id on every new login, not just on logout. With
+      // fullyParallel: true, this real login was silently invalidating
+      // the shared 'playwright/.auth/user.json' session (the same
+      // admin@eduzone-test.com account) that users.spec.ts, a11y.spec.ts
+      // and ux-regression.spec.ts all depend on, redirecting them to
+      // /login mid-run. super_admin@eduzone-test.com is a separate QA
+      // account (same tenant, supabase/AGENTS.md QA accounts table) so
+      // this test's own login/logout cycle can never step on that
+      // shared session, however the two run relative to each other.
+      await page.getByLabel(/email/i).fill('super_admin@eduzone-test.com');
       // Canonical QA seed password (supabase/schema/11_seed_reference.sql,
       // supabase/AGENTS.md QA accounts table) -- "Password123" was never
       // a valid credential and always failed with "Invalid email or
@@ -50,11 +65,22 @@ test.describe('Authentication & Session Heartbeat', () => {
     // Logging in fresh here (same flow as the 'Login flow' test above)
     // gives this test its own independent session/JWT, so the real
     // logout it performs only revokes that private session.
+    //
+    // That independent session still needs to be on a DIFFERENT QA
+    // account than the shared one, though: public.sessions' AFTER INSERT
+    // trigger (trg_sessions_management -> trg_enforce_single_active_session,
+    // supabase/schema/08_triggers.sql, 07_functions.sql) deactivates the
+    // PREVIOUS session for that user_id on every fresh login too, not
+    // just on logout -- so logging in fresh here with
+    // admin@eduzone-test.com would still kill the shared setup session
+    // the instant this test's login completes, before logout is even
+    // called. super_admin@eduzone-test.com (same tenant, supabase/AGENTS.md
+    // QA accounts table) avoids that collision entirely.
     test.use({ storageState: { cookies: [], origins: [] } });
 
     test('logs out successfully', async ({ page }) => {
       await page.goto('/login');
-      await page.getByLabel(/email/i).fill('admin@eduzone-test.com');
+      await page.getByLabel(/email/i).fill('super_admin@eduzone-test.com');
       await page.getByLabel(/password/i).fill('Admin@12345');
       await page.getByRole('button', { name: /sign in/i }).click();
       await expect(page).toHaveURL(/\/(en|ar)\/?$/);
