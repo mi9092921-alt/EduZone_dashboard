@@ -1,5 +1,15 @@
 ﻿EduZone Testing Strategy v1.0 **| INTERNAL**
 
+> [!WARNING]
+> **This document is superseded and does not reflect the current stack or CI state (updated 2026-09-05).** It was written 2026-03-08 as a pre-implementation plan; parts of it (notably the Section 5 flow table below) never matched what was actually built — file names like `bulk-suspend.cy.ts`, `hash-chain.cy.ts`, `teacher/my-courses.cy.ts`, and `permissions/gate.cy.ts` do not exist in the repo. Separately, **RFC-012** (2026-03-08, `project_documents/RFC_DECISION_LOG.md`) mandates **Vitest + Playwright**, retiring Cypress — a decision this document predates and does not mention.
+>
+> **For ground truth, use:**
+> - `project_documents/go-no-go-checklist.md` — current E2E tool split (Playwright: 4 spec files / 16 tests, verified green; Cypress: 15 spec files, still required — migration incomplete) and the actual Cypress flow list.
+> - `apps/admin/cypress/e2e/` and `apps/admin/tests/e2e/` — real spec files, not the table below.
+> - `.github/workflows/e2e.yml` and `project_documents/milestone_reports/M15_ci_cd_production_gates_report.md` — actual CI gate behavior (E2E is a conditional, now-active gate; not an unconditional "PR blocked if red" as §1.2 below describes).
+>
+> The rest of this document is kept as historical/pre-implementation reference only.
+
 **EduZone**
 
 **Testing Strategy**
@@ -480,6 +490,9 @@ describe('BulkActionPanel', () => {
 # **5. Cypress E2E Test Flows**
 
 13 critical flows — all must pass before any deployment to staging or production.
+
+> [!CAUTION]
+> **The table below does not match the actual `apps/admin/cypress/e2e/` files and predates RFC-012.** Several spec names here were never implemented under these names (e.g. `bulk-suspend.cy.ts`, `hash-chain.cy.ts`) and two rows (`teacher/my-courses.cy.ts`, `permissions/gate.cy.ts`) don't exist in the repo at all. For the real, current 15-flow list, see the Cypress row in `project_documents/go-no-go-checklist.md` or list `apps/admin/cypress/e2e/**/*.cy.ts` directly.
 
 | **#**  |           **Spec File**           |   **Role**    |          **Flow**           |                                    **Assertions**                                     |
 | :----: | :-------------------------------: | :-----------: | :-------------------------: | :-----------------------------------------------------------------------------------: |
