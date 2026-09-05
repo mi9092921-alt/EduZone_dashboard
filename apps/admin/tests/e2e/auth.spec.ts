@@ -95,4 +95,76 @@ test.describe('Authentication & Session Heartbeat', () => {
       await expect(page).toHaveURL(/.*login/);
     });
   });
+
+  test.describe('Token version mismatch', () => {
+    // Same isolation requirement as the 'Logout flow' block above: this
+    // test provokes a real client-side supabase.auth.signOut() call.
+    // supabase-js's signOut() defaults to { scope: 'global' }, which
+    // revokes the refresh token server-side for the WHOLE account, not
+    // just this browser context -- so running this against the shared
+    // 'playwright/.auth/user.json' session (admin@eduzone-test.com)
+    // would kill users.spec.ts/a11y.spec.ts/ux-regression.spec.ts
+    // mid-run under fullyParallel: true, exactly like the logout test
+    // above. super_admin@eduzone-test.com keeps it isolated.
+    test.use({ storageState: { cookies: [], origins: [] } });
+
+    // check_dashboard_access is only re-checked for token_version
+    // mismatches by the 1-minute heartbeat in
+    // src/adapters/hooks/useSessionCheck.ts (setInterval(checkSession,
+    // 60_000)). AuthProvider's own mount-time hydration
+    // (src/features/auth/components/AuthProvider.tsx) calls the same
+    // RPC but only ever checks `allowed`, never token_version, and on
+    // denial redirects to plain /login with NO ?reason= param. A fresh
+    // page.goto() therefore can't be used to force an early check the
+    // way cy.visit() was used in the old Cypress version of this test
+    // (which also targeted a '/users/admins' route that doesn't exist
+    // anywhere in src/app/[locale]/users) -- the real mismatch path only
+    // fires once the interval ticks, so this test has to wait for it for
+    // real rather than forcing a second navigation.
+    test('forces logout via the session heartbeat on token_version mismatch', async ({ page }) => {
+      test.setTimeout(90_000);
+
+      await page.goto('/login');
+      await page.getByLabel(/email/i).fill('super_admin@eduzone-test.com');
+      await page.getByLabel(/password/i).fill('Admin@12345');
+      await page.getByRole('button', { name: /sign in/i }).click();
+      await expect(page).toHaveURL(/\/(en|ar)\/?$/);
+
+      // Confirm the real initial hydration (AuthProvider's mount-time
+      // checkDashboardAccess call) has already completed and succeeded
+      // before installing the mock below -- otherwise the mock would
+      // intercept THAT call instead and the user would never actually
+      // finish logging in.
+      await expect(page.locator('#user-menu-button')).toBeVisible();
+
+      // Only now start returning a mismatched token_version -- a number
+      // no real seed account is likely to hold -- from the RPC. `allowed:
+      // true` so this exercises the token_version branch specifically in
+      // useSessionCheck.ts, not the separate `!allowed` denial branch.
+      await page.route('**/rest/v1/rpc/check_dashboard_access', (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ allowed: true, role: 'super_admin', token_version: 999999 }),
+        }),
+      );
+
+      // Wait for the heartbeat's next tick to actually call the (now
+      // mocked) RPC. Real interval, real ~60s -- see the comment above on
+      // why this can't be forced sooner than that.
+      await page.waitForResponse(
+        (res) => res.url().includes('/rest/v1/rpc/check_dashboard_access'),
+        { timeout: 75_000 },
+      );
+
+      await expect(page).toHaveURL(/reason=session_invalidated/, { timeout: 10_000 });
+
+      // Exact copy from LoginPage.tsx's reasonMessages map -- not a loose
+      // /Session Invalidated|Logged out/i guess like the old Cypress test
+      // used, which would also match unrelated banners.
+      await expect(
+        page.getByText('Your session has been invalidated. Please log in again.'),
+      ).toBeVisible();
+    });
+  });
 });
