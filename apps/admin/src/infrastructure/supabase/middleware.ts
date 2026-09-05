@@ -52,6 +52,15 @@ export async function updateSession(request: NextRequest, response?: NextRespons
         user = data.user;
         break;
       }
+      // "Auth session missing!" means this request carried no session
+      // cookie at all -- correct, deterministic behavior for a genuinely
+      // logged-out visitor (e.g. the /login page itself), not a transient
+      // failure. Retrying can't conjure a cookie that was never sent, so
+      // stop immediately instead of wasting 300ms and flooding the logs
+      // on every unauthenticated request.
+      if (error.name === 'AuthSessionMissingError' || /session missing/i.test(error.message)) {
+        break;
+      }
       console.error(
         `[MIDDLEWARE] auth.getUser() returned an error (attempt ${attempt}/${MAX_GET_USER_ATTEMPTS}):`,
         error.message,

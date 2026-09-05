@@ -54,7 +54,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // v13: Use the SECURITY DEFINER RPC to bypass RLS token_version validation.
         // Direct SELECT on users fails if JWT lacks token_version/tenant_id custom claims.
         // M11: RPC call lives in infrastructure/repos/auth-rpc.service.ts.
-        const access = await checkDashboardAccess();
+        let access = await checkDashboardAccess();
+
+        if (!access.ok) {
+          // checkDashboardAccess() already retries PGRST303 internally
+          // (see auth-rpc.service.ts), but AuthProvider mounts fresh on
+          // every full page navigation -- exactly the "first request on a
+          // fresh render" case the still-open upstream PostgREST bug
+          // targets (https://github.com/orgs/supabase/discussions/48123),
+          // so its retries can still be exhausted here. Treating any
+          // RPC-level failure (couldn't confirm access) the same as a real
+          // access denial (confirmed no access) signs a perfectly valid
+          // session out over a transient hiccup. One more bounded wait
+          // doesn't weaken the actual check -- check_dashboard_access()
+          // still runs the real authorization below either way.
+          console.warn('[AuthProvider] check_dashboard_access RPC failed once, retrying:', access.error);
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+          access = await checkDashboardAccess();
+        }
 
         if (!access.ok) {
           console.error('[AuthProvider] check_dashboard_access RPC failed:', access.error);
