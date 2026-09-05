@@ -35,14 +35,30 @@ test.describe('Authentication & Session Heartbeat', () => {
   });
 
   test.describe('Logout flow', () => {
-    // test.use() cannot be called inside a test() body -- Playwright
-    // rejects that at runtime. Since the outer describe's login-flow
-    // test.use() above overrides the chromium project's default
-    // authenticated storageState, this nested describe restores it for
-    // the tests that need to start already logged in.
-    test.use({ storageState: 'playwright/.auth/user.json' });
+    // Do NOT reuse the shared 'playwright/.auth/user.json' storageState
+    // here. That snapshot is the SAME real Supabase Auth session used by
+    // every other test in the chromium project (auth.setup.ts logs in
+    // once and every test loads a copy of those cookies). Calling the
+    // real logout action -- logout_current_user() bumps token_version
+    // and revokes the row in auth.sessions for auth.uid(), see
+    // supabase/schema/07_functions.sql -- revokes that session for the
+    // whole account, not just this browser context. With
+    // fullyParallel: true this was intermittently killing whichever
+    // sibling tests (users.spec.ts, other auth.spec.ts assertions, ...)
+    // happened to still be using that shared session, since their
+    // supabase.auth.getUser() calls would start failing mid-run.
+    // Logging in fresh here (same flow as the 'Login flow' test above)
+    // gives this test its own independent session/JWT, so the real
+    // logout it performs only revokes that private session.
+    test.use({ storageState: { cookies: [], origins: [] } });
 
     test('logs out successfully', async ({ page }) => {
+      await page.goto('/login');
+      await page.getByLabel(/email/i).fill('admin@eduzone-test.com');
+      await page.getByLabel(/password/i).fill('Admin@12345');
+      await page.getByRole('button', { name: /sign in/i }).click();
+      await expect(page).toHaveURL(/\/(en|ar)\/?$/);
+
       await page.goto('/activities');
 
       // Click profile and logout (see note above on #user-menu-button)
