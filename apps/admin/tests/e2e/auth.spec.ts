@@ -19,8 +19,12 @@ test.describe('Authentication & Session Heartbeat', () => {
       // matched, which is why this click used to time out after 30s.
       await page.getByRole('button', { name: /sign in/i }).click();
 
-      // Verify redirect
-      await expect(page).toHaveURL(/.*activities/);
+      // Verify redirect. LoginPage.tsx calls router.push('/') on success
+      // (see src/features/auth/components/LoginPage.tsx), which the
+      // locale middleware resolves to /en or /ar -- there is no redirect
+      // to /activities anywhere in the app, so that pattern never matched
+      // the real post-login URL.
+      await expect(page).toHaveURL(/\/(en|ar)\/?$/);
 
       // Verify the user menu is present. Its accessible name is the
       // user's email (see aria-label on #user-menu-button in
