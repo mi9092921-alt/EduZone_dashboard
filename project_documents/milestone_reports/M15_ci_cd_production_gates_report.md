@@ -48,10 +48,11 @@ PR → Secret Scan → Dependency Audit → Architecture Check → Lint → Type
 ### 3.2 `.github/workflows/deploy.yml` — parity كامل مع بوابات PR
 - أُضيفت **Secret Scan (Gitleaks)** + **Dependency Audit** + **Architecture Check** — الضغط المباشر على `main` لم يعد قادرًا على تجاوز أي بوابة إنتاجية.
 
-### 3.3 `.github/workflows/e2e.yml` — بوابة E2E (مُعرَّفة/خاملة)
+### 3.3 `.github/workflows/e2e.yml` — بوابة E2E (مُفعَّلة ✅ — تحديث 2026-09-05)
 - شرط التشغيل: `if: vars.E2E_ENABLED == 'true'` (+ `workflow_dispatch`).
 - السلسلة: تثبيت pnpm/Node (نفس الإصدارات) → Supabase CLI → `supabase start` + `supabase db reset` (يطبّق `supabase/schema/*.sql` عبر `schema_paths` — قراءة للـschema القانوني دون تغيير عقد §20) → استخراج `supabase status -o env` إلى `NEXT_PUBLIC_*` → build → `playwright install --with-deps chromium` → `playwright test --project=chromium` → رفع تقرير artifact عند الفشل.
 - سبب الشرطية (سابقة المستودع نفسها في باب audit): تشغيله دون backend حقيقي = بوابة حمراء دائمًا تحمي لا شيء؛ الخمول الواعي أفضل، مع checklist تفعيل موثقة داخل الملف.
+- **تحديث 2026-09-05:** checklist التفعيل نُفِّذ بالكامل. أثناء التشغيل الفعلي ظهرت 3 أعطال حقيقية أُصلحت (وليست app logic): (1) `e2e.yml` كان يقرأ `$SUPABASE_URL`/`$SUPABASE_ANON_KEY` بدل الأسماء الفعلية لمخرجات `supabase status -o env` (`$API_URL`/`$ANON_KEY`)؛ (2) القيم كانت تُصدَّر بعلامات اقتباس حرفية غير منزوعة؛ (3) 6 حسابات QA في `11_seed_reference.sql` كانت تحمل bcrypt hashes لا تطابق كلمة المرور الموثقة `Admin@12345` (مؤكَّد رياضيًا)؛ إضافة لذلك: توفير PII encryption key في Supabase Vault (كان غيابه يُسقط معاملة الـseed بأكملها بصمت)، وتصحيح locator واحد في `users.spec.ts` كان ينقر مركز الصف فيسقط على زر "Copy to clipboard" (`stopPropagation`) بدل خلية آمنة. أول run أخضر كامل موثّق: [E2E (Playwright) #20](https://github.com/mi9092921-alt/EduZone_dashboard/actions/runs/33966559907/job/101307607401) — 16/16 passed، commit `d1d3ec9`. `E2E_ENABLED=true` مضبوط الآن بشكل دائم على المستودع.
 
 ### 3.4 `apps/admin/playwright.config.ts`
 - `webServer.command`: `pnpm run start` على CI (ضد production build مبني في خطوة سابقة) و`pnpm run dev` محليًا — سلوك محلي دون تغيير.
@@ -95,7 +96,7 @@ PR → Secret Scan → Dependency Audit → Architecture Check → Lint → Type
 | Typecheck (كامل الـworkspace) | `pnpm typecheck` | ✅ 4/4 tasks — exit=0 (يغطي `playwright.config.ts` و`auth.setup.ts` بترجمة strict) |
 | Lint (كامل الـworkspace) | `pnpm lint` | ✅ 4/4 tasks — exit=0 |
 | Unit | لم يتغير كود التطبيق — جناح vitest غير متأثر | ✅ آخر تشغيل: 43 ملفًا / 1068 (في M14 على نفس الشجرة) |
-| تشغيل E2E فعليًا | — | ⛔ **غير قابل محليًا** (يتطلب Docker + Supabase CLI) — البوابة **مُعرَّفة غير مُتحقق تشغيلها**، مفعّلة عبر checklist §3.3 |
+| تشغيل E2E فعليًا | GitHub Actions (Docker + Supabase CLI في الـrunner) | ✅ **مُتحقَّق — [run #20](https://github.com/mi9092921-alt/EduZone_dashboard/actions/runs/33966559907/job/101307607401)، 16/16 passed، commit `d1d3ec9`، 2026-09-05** (تحديث؛ كانت هذه الخانة "غير قابل محليًا" وقت كتابة التقرير الأصلي) |
 | Merge protection | إعداد GitHub UI | 📋 موثق في ترويسة ci.yml: جعل `build_and_test` (+`e2e` بعد التفعيل) required checks |
 
 **failing tests before/after:** لا اختبارات فاشلة قبل أو بعد (المرحلة بنية تحتية CI) — إثبات الأبواب: باب Architecture صريح وأخضر محليًا بنفس أمر CI.
@@ -104,7 +105,7 @@ PR → Secret Scan → Dependency Audit → Architecture Check → Lint → Type
 
 ## 7. ما تبقّى (خارج نطاق هذه المرحلة — بإجراءات محددة)
 
-1. **تفعيل E2E:** تشغيل `e2e.yml` مرة واحدة مراقَبة (Docker على الـrunner) ← ضبط أي فجوات runtime env ← `E2E_ENABLED=true` ← إضافة `e2e` كـrequired check.
+1. **تفعيل E2E:** ✅ **تم (2026-09-05)** — تشغيل `e2e.yml` فعليًا في GitHub Actions، إصلاح 3 أعطال حقيقية اكتُشفت أثناء التفعيل (راجع §3.3)، أول run أخضر: [#20](https://github.com/mi9092921-alt/EduZone_dashboard/actions/runs/33966559907/job/101307607401)، `E2E_ENABLED=true` مضبوط بشكل دائم. **متبقٍّ فقط:** إضافة `e2e` كـrequired status check على `main` (Settings → Branches — إجراء GitHub UI، خارج نطاق الملفات).
 2. **بوابة Security/RLS:** hardening `scripts/security/*.ts` (استبدال `console.assert` بتتبع فشل + `exit(1)`)، ثم توصيلها بـSupabase محلي في CI بنفس نمط e2e.yml (بدل `.env.test` السحابي).
 3. **Integration gate مستقلة:** فصل اختبارات MSW-level إلى مشروع vitest خاص كبوابة مسماة (حاليًا داخل Unit).
 4. **Deployment Smoke:** عند وجود pipeline نشر في المستودع (أو توثيق المسار الخارجي) — health endpoint + فحص صفحة دخول.
