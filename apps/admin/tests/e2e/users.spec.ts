@@ -8,10 +8,23 @@ test.describe('User Management', () => {
     // Ensure table is loaded. UsersTable.tsx renders a plain semantic
     // <table> (implicit role="table"), not an ARIA grid pattern.
     await expect(page.getByRole('table')).toBeVisible();
+
+    // The table shell above renders immediately, but while isLoading is
+    // true its <tbody> holds animate-pulse SKELETON rows -- plain <tr>
+    // with no onClick and no real form controls (just decorative <div>s,
+    // see UsersTable.tsx's skeletonRows.map branch). Real data rows
+    // (UserRow) are what carry onClick={() => onViewProfile(user)} and a
+    // genuine <input type="checkbox">. Without waiting for that, a test
+    // can click a skeleton row that does nothing (never opens the
+    // profile drawer) depending on how fast data arrives.
+    await expect(page.getByRole('row').nth(1).getByRole('checkbox')).toBeVisible();
   });
 
   test('displays user list with correct columns', async ({ page }) => {
-    await expect(page.getByRole('columnheader', { name: /user/i })).toBeVisible();
+    // exact: true -- the select-all checkbox's <th> has
+    // aria-label={t('select_all_users')} (UsersTable.tsx), so the loose
+    // /user/i pattern matched both it and the real "User" column header.
+    await expect(page.getByRole('columnheader', { name: 'User', exact: true })).toBeVisible();
     await expect(page.getByRole('columnheader', { name: /role/i })).toBeVisible();
     await expect(page.getByRole('columnheader', { name: /status/i })).toBeVisible();
   });
