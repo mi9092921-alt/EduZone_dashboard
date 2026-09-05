@@ -188,4 +188,70 @@ test.describe('User Management', () => {
       await expect(row.getByRole('cell', { name: 'Active', exact: true })).toBeVisible();
     });
   });
+
+  // Port of the Cypress "User Management: Ban User Flow (Cloud Safe)" spec
+  // (cypress/e2e/users/ban-user.cy.ts) -- same category of stale
+  // selectors/mocks as lock-user.cy.ts had (a "Security" tab and
+  // `**/rest/v1/rpc/*ban*` intercepts that don't exist in src/; the real
+  // mutation is the same service_role Server Action as lock/unlock).
+  //
+  // Unlike Lock, Ban has no reverse action anywhere in this app --
+  // UserRowActions.tsx renders only Lock, Unlock, Suspend, and Ban, and
+  // there is no corresponding "unban" account_status or menu item. That
+  // makes a real ban permanent from the UI's own perspective, so -- unlike
+  // the Lock/Unlock round trip above -- this test never actually submits
+  // a valid ban: it drives the dialog up to and past the confirmation
+  // check, then cancels.
+  //
+  // That validation step is also the real reason this port exists:
+  // banUserSchema (domain/schemas/user.schema.ts) requires confirm_text to
+  // literally equal 'BAN', but messages/en.json's
+  // ban_confirm_label/ban_confirm_placeholder told the user to type
+  // "CONFIRM" -- typing exactly what the dialog itself asked for could
+  // never have passed validation. Fixed alongside this test (see
+  // messages/en.json and messages/ar.json, both changed from "CONFIRM" to
+  // "BAN"); this test is what catches that regressing.
+  test.describe('Ban account confirmation text (Cloud Safe -- never submits)', () => {
+    test('rejects the old placeholder text, accepts the real one, then cancels without banning', async ({
+      page,
+    }) => {
+      // Sara Mohamed (teacher) -- distinct from Omar Abdullah, whom the
+      // Lock/Unlock test above mutates. This test never changes any row's
+      // state (it cancels instead of submitting), but targeting a
+      // different seeded user keeps it independent of that test's timing
+      // regardless.
+      await page.getByPlaceholder('Search users...').fill('Sara');
+      const row = page.getByRole('row', { name: /Sara Mohamed/i });
+      await expect(row).toBeVisible();
+
+      await row.getByRole('button', { name: 'User Options' }).click();
+      await page.getByRole('menuitem', { name: 'Ban Account' }).click();
+
+      const dialog = page.getByRole('dialog');
+      await expect(dialog.getByText('Ban Sara Mohamed')).toBeVisible();
+
+      // banUserSchema also requires a 5-500 char reason -- fill it first
+      // so the confirm-text assertions below are isolated to the one
+      // field this test actually cares about.
+      await dialog.getByLabel('Reason').fill('E2E validation check -- never submitted');
+
+      // ── The actual bug: the dialog said "CONFIRM", the schema required
+      // "BAN". Typing exactly what the (buggy) placeholder asked for must
+      // fail, not silently succeed.
+      await dialog.getByLabel('Type BAN to proceed').fill('CONFIRM');
+      await dialog.getByRole('button', { name: 'Ban Permanently' }).click();
+      await expect(dialog.getByText('You must type BAN to confirm')).toBeVisible();
+      // Still on the dialog -- nothing was submitted, so no toast fired.
+      await expect(page.getByRole('alert')).toHaveCount(0);
+
+      // ── The real, correct value clears the error ──────────────────────
+      await dialog.getByLabel('Type BAN to proceed').fill('BAN');
+      await expect(dialog.getByText('You must type BAN to confirm')).toHaveCount(0);
+
+      // ── Cancel instead of submitting -- Ban has no undo in this app ───
+      await dialog.getByRole('button', { name: 'Cancel' }).click();
+      await expect(dialog).toBeHidden();
+      await expect(row.getByRole('cell', { name: 'Active', exact: true })).toBeVisible();
+    });
+  });
 });
