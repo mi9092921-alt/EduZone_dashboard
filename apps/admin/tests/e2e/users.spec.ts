@@ -30,9 +30,18 @@ test.describe('User Management', () => {
   });
 
   test('can open user details dialog', async ({ page }) => {
-    // Click on the first user row
+    // Click on the first user row. NOT firstRow.click() -- Playwright
+    // clicks the row's bounding-box center, which for this column layout
+    // lands on the "Copy to clipboard" button inside the Contact Info
+    // cell. That button calls e.stopPropagation() (see CopyButton in
+    // UsersTable.tsx), so the click never reaches the <tr>'s
+    // onClick={() => onViewProfile(user)} and the drawer never opens.
+    // Confirmed via the failure screenshot: the copy tooltip is visible
+    // exactly where the click landed. The "User" cell (avatar + name)
+    // has no interactive children and no stopPropagation, so it's a
+    // safe, reliable click target.
     const firstRow = page.getByRole('row').nth(1);
-    await firstRow.click();
+    await firstRow.getByRole('cell').nth(1).click();
 
     // Check if dialog or details drawer appears
     await expect(page.getByRole('dialog')).toBeVisible();
