@@ -19,6 +19,19 @@ export interface DashboardAccessResult {
   until?: string;
 }
 
+// PGRST303 ("JWT issued at future") is a known transient upstream PostgREST
+// bug: a stale cached view of "now" inside PostgREST occasionally makes a
+// freshly-minted, genuinely valid JWT look like it was issued in the
+// future. It affects any fresh authenticated request -- not just login --
+// including this RPC firing from AuthProvider on every protected page
+// mount and from the useSessionCheck heartbeat, not only from LoginPage.
+// See the extensive report at
+// https://github.com/orgs/supabase/discussions/48123 and the still-open
+// https://github.com/PostgREST/postgrest/issues/5196. A short bounded
+// retry with the same token is the documented mitigation while it
+// settles; any other error is real and is returned immediately, unretried.
+const PGRST303_RETRY_DELAYS_MS = [500, 1500];
+
 /**
  * check_dashboard_access — SECURITY DEFINER, granted to authenticated.
  * Returns the caller's dashboard access status (role/tenant/token_version/maintenance).
@@ -27,20 +40,28 @@ export async function checkDashboardAccess(): Promise<
   { ok: true; access: DashboardAccessResult } | { ok: false; error: string }
 > {
   const { supabase } = container;
-  const { data, error } = await supabase.rpc('check_dashboard_access');
+  let lastError: { message: string; code: string; details: string | null; hint: string | null } | null = null;
 
-  if (error) {
-    // PostgrestError properties are non-enumerable — extract explicitly for the log.
-    console.error('[auth-rpc] check_dashboard_access failed:', {
-      message: error.message,
-      code: error.code,
-      details: error.details,
-      hint: error.hint,
-    });
-    return { ok: false, error: error.code || 'RPC_FAILED' };
+  for (let attempt = 0; attempt <= PGRST303_RETRY_DELAYS_MS.length; attempt++) {
+    const { data, error } = await supabase.rpc('check_dashboard_access');
+
+    if (!error) {
+      return { ok: true, access: (data ?? {}) as DashboardAccessResult };
+    }
+
+    lastError = { message: error.message, code: error.code, details: error.details, hint: error.hint };
+
+    const delayMs = error.code === 'PGRST303' ? PGRST303_RETRY_DELAYS_MS[attempt] : undefined;
+    if (delayMs !== undefined) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      continue;
+    }
+    break;
   }
 
-  return { ok: true, access: (data ?? {}) as DashboardAccessResult };
+  // PostgrestError properties are non-enumerable — extract explicitly for the log.
+  console.error('[auth-rpc] check_dashboard_access failed:', lastError);
+  return { ok: false, error: lastError?.code || 'RPC_FAILED' };
 }
 
 /**
