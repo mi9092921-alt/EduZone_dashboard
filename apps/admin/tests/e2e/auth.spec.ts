@@ -1,6 +1,24 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Authentication & Session Heartbeat', () => {
+  // Login flow, Logout flow, and Token version mismatch below each do
+  // their own independent fresh login as super_admin@eduzone-test.com
+  // (see the isolation comments on each block). With fullyParallel:
+  // true (playwright.config.ts) and 2 CI workers, Playwright is free to
+  // schedule any of these three on different workers at the same time --
+  // and public.sessions' trg_enforce_single_active_session
+  // (supabase/schema/08_triggers.sql) deactivates the PREVIOUS session
+  // for that same user_id on every new login. Two of these logging in
+  // concurrently silently kills whichever one went first, which is what
+  // made 'Login flow' and 'Logout flow' flaky in CI run #21 right after
+  // this third super_admin consumer was added (job
+  // 101321158774: 'Logout flow' landed back on /en/login because its own
+  // login had just been invalidated mid-test). Serial mode forces all
+  // three into the same worker, in declaration order, so their logins
+  // never overlap -- other spec files are unaffected and still run in
+  // parallel with this one.
+  test.describe.configure({ mode: 'serial' });
+
   test.describe('Login flow', () => {
     // Use 'no-auth' for these tests as we want to test the flow itself
     test.use({ storageState: { cookies: [], origins: [] } });
