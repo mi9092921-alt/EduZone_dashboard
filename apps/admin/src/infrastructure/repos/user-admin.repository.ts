@@ -133,31 +133,52 @@ export function makeUserAdminRepository(
     async controlAccount(
       input: ControlAccountInput,
     ): Promise<{ status?: string; until?: string } | null> {
-      const { data, error } = await admin.rpc('control_user_account', {
+      // Calls worker_control_user_account, NOT control_user_account.
+      // control_user_account gates on user_has_permission(auth.uid(), ...),
+      // which is always NULL when called via this service-role admin
+      // client (no user JWT on this connection) -- every call denied
+      // unconditionally, caught by E2E run #23. worker_control_user_account
+      // is the already-existing, already-correct sibling built for exactly
+      // this service-role calling convention: it takes the acting user's id
+      // explicitly (p_initiator_id), checks permission/tenant against that,
+      // and is the same RPC supabase/functions/bulk-worker/index.ts already
+      // calls the same way. Confirmed via rpc-catalog.ts / 10_permissions.sql
+      // that only the worker_* variant is actually service_role-granted.
+      const { data, error } = await admin.rpc('worker_control_user_account', {
+        p_initiator_id: input.actorId,
         p_user_id: input.userId,
         p_action: input.action,
         p_reason: input.reason,
         p_suspend_hours: input.suspendHours,
-        p_actor_id: input.actorId,
       });
 
       if (error) {
-        console.error('[user-admin.repository] control_user_account failed:', error);
-        throw new InfrastructureError(undefined, `control_user_account: ${error.message}`);
+        console.error('[user-admin.repository] worker_control_user_account failed:', error);
+        throw new InfrastructureError(undefined, `worker_control_user_account: ${error.message}`);
       }
       return data as { status?: string; until?: string } | null;
     },
 
     async terminateSessions(userId: string, reason: string, actorId: string): Promise<number | null> {
-      const { data, error } = await admin.rpc('terminate_user_sessions', {
+      // See controlAccount above — same fix, same reasoning.
+      // worker_terminate_user_sessions checks 'users.write' (not
+      // 'sessions.manage', which the direct terminate_user_sessions RPC
+      // and this action's own requirePermission(['sessions.manage',
+      // 'users.write']) both accept) and has no self-terminate-own-
+      // sessions exemption. Neither gap matters for this call site — it's
+      // always an admin acting on another user's sessions, and the seeded
+      // 'admin'/'super_admin' roles hold both permissions — but it's worth
+      // knowing if a role with 'sessions.manage' but not 'users.write' is
+      // ever introduced.
+      const { data, error } = await admin.rpc('worker_terminate_user_sessions', {
+        p_initiator_id: actorId,
         p_user_id: userId,
         p_reason: reason,
-        p_actor_id: actorId,
       });
 
       if (error) {
-        console.error('[user-admin.repository] terminate_user_sessions failed:', error);
-        throw new InfrastructureError(undefined, `terminate_user_sessions: ${error.message}`);
+        console.error('[user-admin.repository] worker_terminate_user_sessions failed:', error);
+        throw new InfrastructureError(undefined, `worker_terminate_user_sessions: ${error.message}`);
       }
       return data as number | null;
     },

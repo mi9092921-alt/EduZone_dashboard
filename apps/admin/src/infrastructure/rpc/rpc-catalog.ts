@@ -100,20 +100,53 @@ export const RPC_CATALOG: readonly RpcDefinition[] = [
   {
     name: 'control_user_account',
     classification: 'privileged',
+    owner: 'none — not currently called (2026-09-05)',
+    requiredPermission: 'users.lock',
+    notes:
+      'SECURITY DEFINER. Enforces user_has_permission(auth.uid(), users.lock) — auth.uid() ' +
+      'is NULL for any service-role caller, so this denies every call from a service-role ' +
+      'client unconditionally. user-admin.repository.ts called this directly until E2E run ' +
+      '#23 caught it always failing; switched to worker_control_user_account below, which is ' +
+      'built for the service-role calling convention. This entry and its owner note were ' +
+      'stale (claimed the repository as owner while the RPC could never have succeeded from ' +
+      'there) — left in the catalog as still-service-role-granted, but unused; do not restore ' +
+      'the repository call without also fixing this permission check.',
+  },
+  {
+    name: 'worker_control_user_account',
+    classification: 'privileged',
     owner: 'infrastructure/repos/user-admin.repository.ts (admin client)',
     requiredPermission: 'users.lock',
     notes:
-      'SECURITY DEFINER. Function enforces user_has_permission(users.lock). ' +
-      'Called via service-role admin client inside the repository (M8 port).',
+      'SECURITY DEFINER. Same operation as control_user_account, built for service-role ' +
+      'callers: takes the acting user explicitly as p_initiator_id (checked against ' +
+      "user_has_permission + the initiator's own tenant) instead of auth.uid(). Already used " +
+      "this way by supabase/functions/bulk-worker/index.ts; user-admin.repository.ts's " +
+      'controlAccount() now calls this too (2026-09-05) instead of control_user_account.',
   },
   {
     name: 'terminate_user_sessions',
     classification: 'privileged',
-    owner: 'infrastructure/repos/user-admin.repository.ts (admin client)',
+    owner: 'none — not currently called (2026-09-05)',
     requiredPermission: 'sessions.manage',
     notes:
-      'SECURITY DEFINER. EXECUTE granted to service_role ONLY (10_permissions.sql:498-500) — ' +
-      'authenticated callers get permission-denied. Tenant scoping inside the UPDATE.',
+      'SECURITY DEFINER. EXECUTE granted to service_role ONLY (10_permissions.sql:498-500), ' +
+      'but internally still checks p_user_id = auth.uid() / user_has_permission(auth.uid(), ' +
+      "...) — both always false for a service-role caller. Same fix as control_user_account " +
+      'above: user-admin.repository.ts now calls worker_terminate_user_sessions instead.',
+  },
+  {
+    name: 'worker_terminate_user_sessions',
+    classification: 'privileged',
+    owner: 'infrastructure/repos/user-admin.repository.ts (admin client)',
+    requiredPermission: 'users.write',
+    notes:
+      'SECURITY DEFINER. Takes the acting user explicitly as p_initiator_id, checked against ' +
+      "user_has_permission(p_initiator_id, 'users.write', ...) and the initiator's own tenant " +
+      '— note the permission name differs from terminate_user_sessions above (users.write, ' +
+      'not sessions.manage) and there is no self-terminate-own-sessions exemption. Already ' +
+      "used this way by supabase/functions/bulk-worker/index.ts; user-admin.repository.ts's " +
+      'terminateSessions() now calls this too (2026-09-05).',
   },
   {
     name: 'issue_warning',
