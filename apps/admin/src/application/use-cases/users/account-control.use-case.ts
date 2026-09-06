@@ -56,6 +56,7 @@ export class ControlUserAccountUseCase {
         action,
         reason: reason ?? null,
         suspendHours: suspendHours ?? null,
+        actorId: ctx.userId,
       });
 
       await this.audit.record(ctx, {
@@ -102,7 +103,11 @@ export class TerminateUserSessionsUseCase {
     reason?: string,
   ): Promise<TerminateSessionsResult> {
     try {
-      const count = await this.users.terminateSessions(userId, reason ?? 'admin_terminated');
+      const count = await this.users.terminateSessions(
+        userId,
+        reason ?? 'admin_terminated',
+        ctx.userId,
+      );
       await this.audit.record(ctx, {
         type: 'sessions_terminated',
         summary: 'All active sessions terminated',

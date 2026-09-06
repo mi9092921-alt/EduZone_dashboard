@@ -2373,7 +2373,15 @@ AS $$
 DECLARE
   v_count integer;
 BEGIN
-  IF auth.role() <> 'service_role' AND NOT public.is_admin_with_session_validation() THEN
+  -- Cron-safe guard (PERF-01 FIX): pg_cron executes this function as the
+  -- `postgres` role with NO JWT context, so auth.role() yields NULL/'anon'
+  -- and the previous admin-only guard would raise PERMISSION_DENIED every
+  -- minute. coalesce(auth.role(), current_user) lets the cron role through
+  -- while still accepting service_role API callers and session-validated
+  -- admins — the exact pattern already used by
+  -- internal.process_notification_fanout_jobs() in this file.
+  IF coalesce(auth.role(), current_user) NOT IN ('service_role', 'postgres', 'supabase_admin')
+     AND NOT public.is_admin_with_session_validation() THEN
     RAISE EXCEPTION 'PERMISSION_DENIED';
   END IF;
 
@@ -2391,9 +2399,47 @@ BEGIN
 END;
 $$;
 
+-- ============================================================================
+-- PERF-01 FIX: pg_cron scheduling registration for
+-- public.release_stale_job_locks(). The function existed but was never
+-- invoked automatically (jobs crashed mid-processing stayed `processing`
+-- forever until an admin noticed) — the same gap class as the
+-- manage_partitions schedule below. Runs every minute so a stalled job is
+-- back to `pending` within ≤ TTL + one cron cycle (LOCK_TTL_SECONDS = 1800).
+-- Defensive structure mirrors the manage_partitions registration verbatim:
+-- schedule only when pg_cron is installed and cron.job exists, and
+-- unschedule any previous registration first so re-running this file stays
+-- idempotent. pg_cron is not available in the local-test-harness embedded
+-- cluster (needs shared_preload_libraries); verify on staging via
+-- `SELECT * FROM cron.job WHERE jobname = 'release-stale-job-locks'` and
+-- cron.job_run_details.
+-- ============================================================================
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_extension WHERE extname = 'pg_cron'
+  ) THEN
+    IF EXISTS (
+      SELECT 1 FROM pg_tables WHERE schemaname = 'cron' AND tablename = 'job'
+    ) THEN
+      PERFORM cron.unschedule(jobid)
+      FROM cron.job
+      WHERE jobname = 'release-stale-job-locks';
+    END IF;
+
+    PERFORM cron.schedule(
+      'release-stale-job-locks',
+      '* * * * *',
+      'SELECT public.release_stale_job_locks();'
+    );
+  END IF;
+END $$;
+
 CREATE OR REPLACE FUNCTION public.terminate_user_sessions(
   p_user_id uuid,
-  p_reason text DEFAULT 'admin_force'
+  p_reason text DEFAULT 'admin_force',
+  p_actor_id uuid DEFAULT NULL
 )
 RETURNS integer
 LANGUAGE plpgsql
@@ -2401,10 +2447,46 @@ SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_count integer;
+  v_actor_tenant_id uuid;
 BEGIN
+  -- SECURITY FIX (2026-09-05): this RPC's PUBLIC EXECUTE was revoked in
+  -- v13 and it is now only ever called via the service-role admin client
+  -- (infrastructure/repos/user-admin.repository.ts), which carries no
+  -- user JWT -- auth.uid() is always NULL on that connection, so the
+  -- previous `p_user_id = auth.uid() OR user_has_permission(auth.uid(),
+  -- ...)` check denied every call unconditionally (an E2E Playwright run
+  -- caught the same bug in the sibling control_user_account below, which
+  -- shares this exact pattern). The caller-side requirePermission(...)
+  -- check in the Server Action (adapters/actions/user.actions.ts) was
+  -- and is correct -- this was purely the redundant internal check being
+  -- broken. Fixed by having the trusted server layer pass the
+  -- already-authorized acting user's id explicitly as p_actor_id.
+  --
+  -- Also tightens the actual UPDATE below to the actor's own tenant
+  -- (previously bypassed entirely for any service_role call via
+  -- `auth.role() = 'service_role' OR is_current_user_super_admin() OR
+  -- tenant_id = get_current_tenant_id()`, i.e. unscoped once this RPC
+  -- moved behind service_role). If cross-tenant session termination by
+  -- super_admin is actually required, that needs a deliberate, reviewed
+  -- exemption here (mirroring assertSameTenant's ctx.permissions
+  -- includes '*' check) rather than the blanket bypass this replaces.
+  IF p_actor_id IS NULL THEN
+    RAISE EXCEPTION 'PERMISSION_DENIED';
+  END IF;
+
+  SELECT tenant_id INTO v_actor_tenant_id
+    FROM public.users
+   WHERE id = p_actor_id
+     AND deleted_at IS NULL
+     AND account_status = 'active';
+
+  IF v_actor_tenant_id IS NULL THEN
+    RAISE EXCEPTION 'PERMISSION_DENIED';
+  END IF;
+
   IF NOT (
-    p_user_id = auth.uid()
-    OR public.user_has_permission(auth.uid(), 'sessions.manage'::text, public.get_current_tenant_id())
+    p_user_id = p_actor_id
+    OR public.user_has_permission(p_actor_id, 'sessions.manage'::text, v_actor_tenant_id)
   ) THEN
     RAISE EXCEPTION 'PERMISSION_DENIED';
   END IF;
@@ -2416,12 +2498,7 @@ BEGIN
       updated_at = pg_catalog.now()
   WHERE user_id = p_user_id
     AND is_active
-    AND (
-      auth.role() = 'service_role'
-      OR
-      public.is_current_user_super_admin()
-      OR tenant_id = public.get_current_tenant_id()
-    );
+    AND tenant_id = v_actor_tenant_id;
 
   GET DIAGNOSTICS v_count = ROW_COUNT;
   RETURN v_count;
@@ -2458,7 +2535,8 @@ CREATE OR REPLACE FUNCTION public.control_user_account(
   p_user_id uuid,
   p_action text,
   p_reason text DEFAULT NULL,
-  p_suspend_hours integer DEFAULT NULL
+  p_suspend_hours integer DEFAULT NULL,
+  p_actor_id uuid DEFAULT NULL
 )
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -2467,8 +2545,41 @@ AS $$
 DECLARE
   v_status text;
   v_until timestamptz;
+  v_actor_tenant_id uuid;
 BEGIN
-  IF NOT public.user_has_permission(auth.uid(), 'users.lock', public.get_current_tenant_id()) THEN
+  -- SECURITY FIX (2026-09-05): this RPC's PUBLIC EXECUTE was revoked in
+  -- v13 and it is now only ever called via the service-role admin client
+  -- (infrastructure/repos/user-admin.repository.ts), which carries no
+  -- user JWT -- auth.uid() is always NULL on that connection, so the
+  -- previous `user_has_permission(auth.uid(), ...)` check denied every
+  -- call unconditionally (auth.uid() = NULL never matches a row in
+  -- user_roles/user_permission_cache). E2E (Playwright) run #23 caught
+  -- this live: every Lock/Unlock/Suspend/Ban attempt failed with
+  -- PERMISSION_DENIED, masked client-side behind a generic error by an
+  -- unrelated parseRpcError bug. The caller-side
+  -- requirePermission('users.lock') check in the Server Action
+  -- (adapters/actions/user.actions.ts) was and is correct -- this was
+  -- purely the redundant internal check being broken. Fixed by having
+  -- the trusted server layer pass the already-authorized acting user's
+  -- id explicitly as p_actor_id, used for the permission check, the
+  -- tenant scope below (get_current_tenant_id() was equally NULL here,
+  -- which would otherwise have made the UPDATE silently match zero rows
+  -- even once the permission check itself was fixed), and locked_by
+  -- (previously auth.uid(), so every lock/suspend/ban recorded no actor
+  -- at all).
+  IF p_actor_id IS NULL THEN
+    RAISE EXCEPTION 'PERMISSION_DENIED';
+  END IF;
+
+  SELECT tenant_id INTO v_actor_tenant_id
+    FROM public.users
+   WHERE id = p_actor_id
+     AND deleted_at IS NULL
+     AND account_status = 'active';
+
+  IF v_actor_tenant_id IS NULL
+     OR NOT public.user_has_permission(p_actor_id, 'users.lock', v_actor_tenant_id)
+  THEN
     RAISE EXCEPTION 'PERMISSION_DENIED';
   END IF;
 
@@ -2491,16 +2602,24 @@ BEGIN
   SET account_status = v_status,
       lock_reason = CASE WHEN p_action = 'unlock' THEN NULL ELSE p_reason END,
       locked_at = CASE WHEN p_action = 'unlock' THEN NULL ELSE now() END,
-      locked_by = CASE WHEN p_action = 'unlock' THEN NULL ELSE auth.uid() END,
+      locked_by = CASE WHEN p_action = 'unlock' THEN NULL ELSE p_actor_id END,
       suspension_until = v_until,
       token_version = CASE WHEN p_action = 'unlock' THEN token_version ELSE token_version + 1 END,
       updated_at = now()
   WHERE id = p_user_id
-    AND tenant_id = public.get_current_tenant_id();
+    AND tenant_id = v_actor_tenant_id;
+
+  -- Was a silent no-op on a tenant mismatch before (get_current_tenant_id()
+  -- was NULL, so the WHERE clause above never matched anything even for a
+  -- legitimate same-tenant target); fail loud instead now that the tenant
+  -- filter is actually meaningful.
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'NOT_FOUND';
+  END IF;
 
   IF p_action <> 'unlock' THEN
     PERFORM private.revoke_auth_sessions(p_user_id);
-    PERFORM public.terminate_user_sessions(p_user_id, 'account_' || p_action);
+    PERFORM public.terminate_user_sessions(p_user_id, 'account_' || p_action, p_actor_id);
   END IF;
 
   RETURN jsonb_build_object('status', v_status, 'until', v_until);
@@ -3666,6 +3785,51 @@ END;
 $$;
 
 -- ============================================================================
+-- PERF-05 FIX: Batched tenant usage counts.
+-- Replaces the N+1 pattern in tenants.service.ts where every tenant row on
+-- the list page fired 2 separate head-count queries (users + courses) --
+-- ~100 network round trips for a 50-tenant page. One call to this function
+-- returns user + course counts for ALL requested tenants in a single round
+-- trip. Tenants with zero usage still get a row (0 counts), so the client
+-- merge never produces missing entries.
+-- Security: SECURITY DEFINER + admin-session guard, mirroring the sibling
+-- admin read functions in this file. Same PUBLIC-EXECUTE-with-internal-guard
+-- convention documented in the M11/M12 RPC boundary reports (no explicit
+-- GRANT line required in 10_permissions.sql).
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.get_tenants_usage(p_tenant_ids uuid[])
+RETURNS TABLE (tenant_id uuid, user_count bigint, course_count bigint)
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+BEGIN
+  IF auth.role() <> 'service_role' AND NOT public.is_admin_with_session_validation() THEN
+    RAISE EXCEPTION 'PERMISSION_DENIED';
+  END IF;
+
+  RETURN QUERY
+  SELECT
+    t.id,
+    (
+      SELECT count(*)
+      FROM public.users u
+      WHERE u.tenant_id = t.id
+        AND u.deleted_at IS NULL
+    ),
+    (
+      SELECT count(*)
+      FROM public.courses c
+      WHERE c.tenant_id = t.id
+        AND c.deleted_at IS NULL
+    )
+  FROM public.tenants t
+  WHERE t.id = ANY(p_tenant_ids)
+    AND t.deleted_at IS NULL;
+END;
+$$;
+
+-- ============================================================================
 -- IDOR FIX (P1-SEC-005 follow-up, audit pass on the 12 remaining
 -- service-role-only domains): admin_get_jobs / admin_get_job_counts /
 -- admin_retry_job / admin_cancel_job previously checked ONLY the caller's
@@ -3686,7 +3850,9 @@ $$;
 --
 -- DEPLOYMENT NOTE: admin_get_jobs now also returns `tenant_id` (it was
 -- silently never populated before, despite jobs.service.ts's TS row type
--- already expecting it) — this changes the function's return row type, so
+-- already expecting it) and — PERF-02 FIX — a `result jsonb` column carrying
+-- the worker's structured progress/outcome separately from `error_msg`.
+-- These change the function's return row type, so
 -- on an EXISTING database `CREATE OR REPLACE` will fail with "cannot
 -- change return type of existing function". Run this first:
 --   DROP FUNCTION IF EXISTS public.admin_get_jobs(int, int, text, text, timestamptz);
@@ -3716,6 +3882,7 @@ RETURNS TABLE (
   started_at      timestamptz,
   completed_at    timestamptz,
   error_msg       text,
+  result          jsonb,
   created_at      timestamptz,
   full_count      bigint
 )
@@ -3759,6 +3926,7 @@ BEGIN
     fj.locked_at, fj.lock_expires_at, fj.started_at,
     fj.finished_at AS completed_at, 
     fj.error_message AS error_msg, 
+    fj.result,
     fj.created_at,
     tc.cnt
   FROM filtered_jobs fj, total_count tc
@@ -3817,6 +3985,11 @@ BEGIN
       attempts = 0,
       error_message = NULL,
       updated_at = pg_catalog.now()
+      -- PERF-02 FIX: `result` is deliberately NOT reset here. It carries the
+      -- checkpoint (succeeded_ids/failed_ids) the bulk worker uses to skip
+      -- already-processed users on retry — zero double-impact (F-02). The
+      -- fatal-error column above is cleared because a retry means the old
+      -- error no longer applies; progress data lives in `result` now.
   WHERE id = p_id
     -- IDOR guard (added): tenant-scoped admins may only retry their own
     -- tenant's jobs (or platform-wide ones). Cross-tenant calls silently
@@ -3861,6 +4034,7 @@ RETURNS TABLE (
   job_type        text,
   status          text,
   error_msg       text,
+  result          jsonb,
   created_at      timestamptz,
   completed_at    timestamptz
 )
@@ -3879,6 +4053,7 @@ BEGIN
     jq.job_type,
     jq.status,
     jq.error_message AS error_msg,
+    jq.result,
     jq.created_at,
     jq.finished_at AS completed_at
   FROM internal.job_queue jq
@@ -3913,9 +4088,14 @@ BEGIN
     RAISE EXCEPTION 'INITIATOR_NOT_FOUND';
   END IF;
 
+  -- PERF-03 FIX: per-tenant fairness cap. The previous global count let one
+  -- tenant fill the shared queue (10 slots) and starve every other tenant
+  -- until its jobs drained. Counting only THIS initiator's tenant keeps the
+  -- same ceiling (max_pending_jobs = 10) but scoped per tenant.
   SELECT count(*) INTO v_pending_count
   FROM internal.job_queue
-  WHERE status = 'pending';
+  WHERE status = 'pending'
+    AND tenant_id = v_tenant_id;
 
   IF v_pending_count >= max_pending_jobs THEN
     RAISE EXCEPTION 'JOB_QUEUE_FULL: Too many pending operations';
@@ -3934,7 +4114,9 @@ CREATE OR REPLACE FUNCTION public.worker_update_bulk_job(
   p_status text DEFAULT NULL,
   p_error_message text DEFAULT NULL,
   p_finished_at timestamptz DEFAULT NULL,
-  p_release_lock boolean DEFAULT false
+  p_release_lock boolean DEFAULT false,
+  p_result jsonb DEFAULT NULL,
+  p_clear_error_message boolean DEFAULT false
 )
 RETURNS void
 LANGUAGE plpgsql
@@ -3948,7 +4130,16 @@ BEGIN
   UPDATE internal.job_queue
   SET
     status = coalesce(p_status, status),
-    error_message = coalesce(p_error_message, error_message),
+    error_message = CASE
+      WHEN p_clear_error_message THEN NULL
+      ELSE coalesce(p_error_message, error_message)
+    END,
+    -- PERF-02 FIX: structured progress/outcome {processed, total,
+    -- succeeded_ids, failed_ids, truncated} now lives in `result` instead of
+    -- being smuggled through error_message (which made the admin UI show
+    -- non-error data in an error column). Coalesce keeps last-write-wins
+    -- progress semantics.
+    result = coalesce(p_result, result),
     finished_at = coalesce(p_finished_at, finished_at),
     locked_by_worker_id = CASE WHEN p_release_lock THEN NULL ELSE locked_by_worker_id END,
     locked_at = CASE WHEN p_release_lock THEN NULL ELSE locked_at END,

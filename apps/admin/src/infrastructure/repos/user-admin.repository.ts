@@ -138,6 +138,7 @@ export function makeUserAdminRepository(
         p_action: input.action,
         p_reason: input.reason,
         p_suspend_hours: input.suspendHours,
+        p_actor_id: input.actorId,
       });
 
       if (error) {
@@ -147,10 +148,11 @@ export function makeUserAdminRepository(
       return data as { status?: string; until?: string } | null;
     },
 
-    async terminateSessions(userId: string, reason: string): Promise<number | null> {
+    async terminateSessions(userId: string, reason: string, actorId: string): Promise<number | null> {
       const { data, error } = await admin.rpc('terminate_user_sessions', {
         p_user_id: userId,
         p_reason: reason,
+        p_actor_id: actorId,
       });
 
       if (error) {

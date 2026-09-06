@@ -79,6 +79,12 @@ export async function deleteUserAction(userId: string) {
  *
  * v13: `control_user_account` has PUBLIC EXECUTE revoked; requires service_role.
  * Callers must be authenticated and hold the `users.lock` permission.
+ *
+ * SECURITY FIX (2026-09-05): the RPC itself now requires the acting user's
+ * id explicitly (see control_user_account in schema/07_functions.sql for
+ * why) — ControlUserAccountUseCase passes ctx.userId through. Also adds
+ * the same IDOR/BOLA tenant guard deleteUserAction already had above,
+ * which this action was missing.
  */
 export async function controlUserAccountAction(
   userId: string,
@@ -88,6 +94,11 @@ export async function controlUserAccountAction(
 ): Promise<{ success: boolean; accountStatus?: string; until?: string; error?: string }> {
   try {
     const ctx = await requirePermission('users.lock');
+
+    // IDOR/BOLA guard: block acting on a user outside the caller's tenant
+    // (super_admin exempt — see assertSameTenant).
+    assertSameTenant(ctx, await usersService.getUserTenantId(userId));
+
     return await new ControlUserAccountUseCase(makeUserAdminRepository(), makeAuditLogger()).execute(
       ctx,
       userId,
@@ -106,6 +117,9 @@ export async function controlUserAccountAction(
  *
  * v13: `terminate_user_sessions` has PUBLIC EXECUTE revoked; requires service_role.
  * Callers must be authenticated and hold the `sessions.manage` permission.
+ *
+ * SECURITY FIX (2026-09-05): same actor-id requirement and IDOR/BOLA guard
+ * as controlUserAccountAction above.
  */
 export async function terminateUserSessionsAction(
   userId: string,
@@ -113,6 +127,9 @@ export async function terminateUserSessionsAction(
 ): Promise<{ success: boolean; count?: number; error?: string }> {
   try {
     const ctx = await requirePermission(['sessions.manage', 'users.write']);
+
+    assertSameTenant(ctx, await usersService.getUserTenantId(userId));
+
     return await new TerminateUserSessionsUseCase(makeUserAdminRepository(), makeAuditLogger()).execute(
       ctx,
       userId,

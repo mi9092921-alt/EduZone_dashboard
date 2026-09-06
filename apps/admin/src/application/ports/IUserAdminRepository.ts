@@ -50,6 +50,10 @@ export interface ControlAccountInput {
   action: AccountAction;
   reason: string | null;
   suspendHours: number | null;
+  /** The already-authorized acting admin's id (RequestContext.userId). Required by the
+   * v13 RPC to check permission/tenant itself, since the service-role client it's
+   * called through carries no auth.uid(). */
+  actorId: string;
 }
 
 /** Input for the issue_warning RPC */
@@ -88,8 +92,9 @@ export interface IUserAdminRepository {
    */
   controlAccount(input: ControlAccountInput): Promise<{ status?: string; until?: string } | null>;
 
-  /** Runs the terminate_user_sessions RPC. Returns the terminated count. */
-  terminateSessions(userId: string, reason: string): Promise<number | null>;
+  /** Runs the terminate_user_sessions RPC. Returns the terminated count.
+   * actorId: the already-authorized acting user's id — see ControlAccountInput.actorId. */
+  terminateSessions(userId: string, reason: string, actorId: string): Promise<number | null>;
 
   /** Runs the issue_warning RPC. Returns the new warning id. */
   issueWarning(input: IssueWarningInput): Promise<string>;
