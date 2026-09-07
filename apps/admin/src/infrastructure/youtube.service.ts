@@ -111,7 +111,10 @@ function toItemMetadata(item: YtItemShape): YouTubeVideoMetadata {
     id: item.id,
     title: item.snippet?.title || '',
     duration_sec: durationStr ? parseISO8601Duration(durationStr) : 0,
-    thumbnail_url: thumbnailUrl,
+    // exactOptionalPropertyTypes: true forbids `thumbnail_url: undefined`
+    // on an optional (`?:`) field — the key must be omitted entirely when
+    // no thumbnail is available, not present with an undefined value.
+    ...(thumbnailUrl ? { thumbnail_url: thumbnailUrl } : {}),
   };
 }
 
