@@ -4208,8 +4208,17 @@ DECLARE
   v_until timestamptz;
   v_tenant_id uuid;
 BEGIN
+  -- TEMPORARY DIAGNOSTIC (remove once the E2E "Lock / Unlock account"
+  -- failure is root-caused): both PERMISSION_DENIED branches below raised
+  -- the identical generic message, so the client-side error log
+  -- ([user-admin.repository] worker_control_user_account failed: ...)
+  -- couldn't tell us which check actually failed, or with what values.
+  -- Embedding the runtime values in the exception message surfaces them
+  -- directly in that same console.error/InfrastructureError text, which
+  -- already flows into the Playwright [WebServer] output in CI -- no
+  -- extra step needed to inspect Postgres/container logs separately.
   IF coalesce(auth.role(), '') <> 'service_role' THEN
-    RAISE EXCEPTION 'PERMISSION_DENIED';
+    RAISE EXCEPTION 'PERMISSION_DENIED_DEBUG: auth.role()=% (expected service_role)', auth.role();
   END IF;
 
   SELECT tenant_id INTO v_tenant_id
@@ -4217,11 +4226,18 @@ BEGIN
   WHERE id = p_initiator_id AND deleted_at IS NULL;
 
   IF v_tenant_id IS NULL THEN
-    RAISE EXCEPTION 'INITIATOR_NOT_FOUND';
+    RAISE EXCEPTION 'INITIATOR_NOT_FOUND_DEBUG: p_initiator_id=%', p_initiator_id;
   END IF;
 
   IF NOT public.user_has_permission(p_initiator_id, 'users.lock', v_tenant_id) THEN
-    RAISE EXCEPTION 'PERMISSION_DENIED';
+    RAISE EXCEPTION 'PERMISSION_DENIED_DEBUG: initiator=%, tenant=%, user_roles_rows=%, role_permissions_match=%',
+      p_initiator_id,
+      v_tenant_id,
+      (SELECT count(*) FROM public.user_roles ur2 WHERE ur2.user_id = p_initiator_id AND ur2.tenant_id = v_tenant_id AND ur2.is_active),
+      (SELECT count(*) FROM public.user_roles ur3
+         JOIN public.role_permissions rp3 ON rp3.role_id = ur3.role_id
+         JOIN public.permissions pm3 ON pm3.id = rp3.permission_id
+         WHERE ur3.user_id = p_initiator_id AND ur3.tenant_id = v_tenant_id AND ur3.is_active AND pm3.name = 'users.lock');
   END IF;
 
   IF p_action NOT IN ('lock', 'unlock', 'suspend', 'ban') THEN
