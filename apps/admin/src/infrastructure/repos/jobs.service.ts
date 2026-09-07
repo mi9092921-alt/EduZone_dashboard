@@ -25,6 +25,7 @@ interface AdminGetJobsRow {
   started_at: string | null;
   completed_at: string | null;
   error_msg: string | null;
+  result: Record<string, unknown> | null;
   created_at: string;
 }
 
@@ -63,6 +64,7 @@ export async function getJobs(
       started_at: row.started_at ?? null,
       finished_at: row.completed_at ?? null,
       error_message: row.error_msg ?? null,
+      result: row.result ?? null,
       created_at: row.created_at,
       updated_at: row.created_at,
     }),

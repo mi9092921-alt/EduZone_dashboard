@@ -1,0 +1,25 @@
+=== apply run 2026-09-07T11:31:48.939Z ===
+order: 01_extensions.sql | 02_types.sql | 03_tables.sql | 04_constraints.sql | 05_indexes.sql | 07_functions.sql | 06_views.sql | 08_triggers.sql | 09_rls.sql | 10_permissions.sql | 11_seed_reference.sql
+iter 01_extensions.sql exists=true
+OK   01_extensions.sql
+iter 02_types.sql exists=true
+OK   02_types.sql
+iter 03_tables.sql exists=true
+OK   03_tables.sql
+iter 04_constraints.sql exists=true
+OK   04_constraints.sql
+iter 05_indexes.sql exists=true
+OK   05_indexes.sql
+iter 07_functions.sql exists=true
+OK   07_functions.sql
+iter 06_views.sql exists=true
+OK   06_views.sql
+iter 08_triggers.sql exists=true
+OK   08_triggers.sql
+iter 09_rls.sql exists=true
+OK   09_rls.sql
+iter 10_permissions.sql exists=true
+OK   10_permissions.sql
+iter 11_seed_reference.sql exists=true
+FAIL 11_seed_reference.sql: extension "supabase_vault" is not available
+pre-flight: {"entitlements":"offline_download_entitlements","users":"users","job_queue":"internal.job_queue","tenants_usage":"get_tenants_usage(uuid[])","release_locks":"release_stale_job_locks()","worker_update":"worker_update_bulk_job(uuid,text,text,timestamp with time zone,boolean,jsonb,boolean)"}

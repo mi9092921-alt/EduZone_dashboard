@@ -21,7 +21,11 @@ import type {
 } from '@/domain/types/course.types';
 import { parseVideoUrl } from '@/domain/video.utils';
 import { createAdminClient } from '@/infrastructure/supabase/admin';
-import { getYoutubeVideoDetails } from '@/infrastructure/youtube.service';
+import {
+  extractYoutubeId,
+  getYoutubeVideoDetails,
+  getYoutubeVideoDetailsBatch,
+} from '@/infrastructure/youtube.service';
 
 /**
  * Courses service — all Supabase queries for the courses domain.
@@ -441,10 +445,16 @@ export async function createLesson(sectionId: string, data: CreateLessonInput): 
   return lesson as Lesson;
 }
 
+/** A lesson whose YouTube metadata could not be resolved (video still created with duration 0). */
+export interface LessonMetadataPartialFailure {
+  lesson_index: number;
+  reason: string;
+}
+
 export async function createLessons(
   sectionId: string,
   data: CreateLessonInput[],
-): Promise<Lesson[]> {
+): Promise<{ lessons: Lesson[]; partial_failures: LessonMetadataPartialFailure[] }> {
   const { supabase } = container;
 
   // v13: Derive course_id + tenant_id from section
@@ -463,24 +473,61 @@ export async function createLessons(
     );
   }
 
-  // v13: Batch fetch YouTube durations
-  const enrichedData = await Promise.all(
-    data.map(async (item) => {
-      let duration = item.duration_sec ?? 0;
-      if (item.video_url && !item.duration_sec) {
-        const parsed = parseVideoUrl(item.video_url);
-        if (parsed.provider === 'youtube') {
-          console.log('[createLessons] Fetching YouTube metadata for:', item.video_url);
-          const metadata = await getYoutubeVideoDetails(item.video_url);
-          console.log('[createLessons] Metadata result:', metadata);
-          if (metadata) {
-            duration = metadata.duration_sec;
-          }
+  // PERF-06 FIX: one batched YouTube API call for the whole import (≤50 IDs
+  // per request) instead of one call per lesson. Metadata failures are
+  // per-lesson partial failures recorded in the response — a single bad
+  // video (404 / quota / timeout) can no longer fail the whole batch, and
+  // the affected lessons are still created with duration_sec = 0.
+  const partial_failures: LessonMetadataPartialFailure[] = [];
+  const youtubeTargets = data
+    .map((item, index) => ({ item, index }))
+    .filter(
+      ({ item }) =>
+        item.video_url &&
+        !item.duration_sec &&
+        parseVideoUrl(item.video_url).provider === 'youtube',
+    );
+
+  const metadataByInput = new Map<string, number>(); // input video_url -> duration_sec
+  const failureByInput = new Map<string, string>(); // input video_url -> reason
+
+  if (youtubeTargets.length > 0) {
+    const batch = await getYoutubeVideoDetailsBatch(
+      youtubeTargets.map(({ item }) => item.video_url as string),
+    );
+
+    for (const metadata of batch.results.values()) {
+      // Metadata is keyed by video ID; re-attach it to every input URL that
+      // resolves to that ID (dedupe-safe).
+      for (const { item } of youtubeTargets) {
+        if (extractYoutubeId(item.video_url as string) === metadata.id) {
+          metadataByInput.set(item.video_url as string, metadata.duration_sec);
         }
       }
-      return { ...item, duration_sec: duration };
-    }),
-  );
+    }
+    for (const failure of batch.partial_failures) {
+      failureByInput.set(failure.url_or_id, failure.reason);
+    }
+  }
+
+  const enrichedData = data.map((item, index) => {
+    let duration = item.duration_sec ?? 0;
+    if (item.video_url && !item.duration_sec) {
+      const parsed = parseVideoUrl(item.video_url);
+      if (parsed.provider === 'youtube') {
+        if (metadataByInput.has(item.video_url)) {
+          duration = metadataByInput.get(item.video_url)!;
+          console.log('[createLessons] Metadata resolved for:', item.video_url);
+        } else {
+          // Isolated failure — record it and fall back to duration 0.
+          const reason = failureByInput.get(item.video_url) ?? 'youtube_metadata_unavailable';
+          console.warn(`[createLessons] YouTube metadata failed for lesson ${index}: ${reason}`);
+          partial_failures.push({ lesson_index: index, reason });
+        }
+      }
+    }
+    return { ...item, duration_sec: duration };
+  });
 
   // 2. Insert Lessons
   const { data: lessons, error } = await supabase
@@ -535,7 +582,13 @@ export async function createLessons(
     }
   }
 
-  return lessons as Lesson[];
+  // PERF-06 FIX: the response reports per-lesson metadata failures instead
+  // of throwing — the batch itself always completes when the DB allows it.
+  if (partial_failures.length > 0) {
+    console.warn('[createLessons] Partial failures:', partial_failures);
+  }
+
+  return { lessons: lessons as Lesson[], partial_failures };
 }
 
 export async function updateLesson(id: string, data: Partial<CreateLessonInput>): Promise<Lesson> {

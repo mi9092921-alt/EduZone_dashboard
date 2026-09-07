@@ -235,6 +235,8 @@ export interface Job {
   finished_at: string | null;
   completed_at?: string | null; // Alias for finished_at in RPCs
   error_message: string | null;
+  /** PERF-02 FIX: structured worker progress/outcome, separate from error_message. */
+  result?: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 }

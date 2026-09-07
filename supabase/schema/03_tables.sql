@@ -1388,6 +1388,19 @@ ALTER TABLE internal.job_queue SET (
   autovacuum_analyze_threshold     = 10      -- minimum 10 changed rows before analyze
 );
 
+-- PERF-02 FIX: dedicated structured result/progress column for job_queue.
+-- Previously the bulk worker smuggled {processed, total, succeeded_ids,
+-- failed_ids, in_progress} JSON through error_message while a job was
+-- processing (and even when done), so the admin UI's error column displayed
+-- non-error data and retries wiped the checkpoint. `result` separates the
+-- two concerns semantically; error_message stays reserved for actual fatal
+-- errors. Nullable + additive: existing rows keep working, and reverting the
+-- worker logic later leaves a harmless unused column.
+ALTER TABLE internal.job_queue ADD COLUMN IF NOT EXISTS result jsonb;
+COMMENT ON COLUMN internal.job_queue.result IS
+  'Structured progress/outcome: {processed, total, succeeded_ids, failed_ids, truncated, remaining}. '
+  'error_message stays reserved for actual fatal errors, not progress data.';
+
 -- HIGH-07 FIX: Job progress tracking for checkpointing
 CREATE TABLE IF NOT EXISTS internal.job_progress (
   job_type text NOT NULL,

@@ -495,9 +495,18 @@ REVOKE EXECUTE ON FUNCTION public.sync_settings_cache() FROM anon;
 REVOKE EXECUTE ON FUNCTION public.sync_settings_cache() FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.sync_settings_cache() TO service_role;
 
-REVOKE EXECUTE ON FUNCTION public.terminate_user_sessions(uuid, text) FROM anon;
-REVOKE EXECUTE ON FUNCTION public.terminate_user_sessions(uuid, text) FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.terminate_user_sessions(uuid, text) TO service_role;
+-- P0 LOCK/UNLOCK FIX follow-up: terminate_user_sessions gained a mandatory
+-- p_actor_id third parameter (SECURITY FIX 2026-09-05 in 07_functions.sql —
+-- the service-role admin client carries no user JWT, so auth.uid() was always
+-- NULL and the old guard denied every call). These signature-pinned
+-- REVOKE/GRANT lines still referenced the old 2-arg signature, which made a
+-- fresh canonical deploy fail right here with "function
+-- public.terminate_user_sessions(uuid, text) does not exist" (the same
+-- cross-file consistency break the go-no-go checklist recorded for the first
+-- fix attempt). Updated to the current 3-arg signature.
+REVOKE EXECUTE ON FUNCTION public.terminate_user_sessions(uuid, text, uuid) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.terminate_user_sessions(uuid, text, uuid) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.terminate_user_sessions(uuid, text, uuid) TO service_role;
 REVOKE EXECUTE ON FUNCTION public.trg_refresh_user_validity() FROM anon;
 REVOKE EXECUTE ON FUNCTION public.trg_refresh_user_validity() FROM authenticated;
 REVOKE EXECUTE ON FUNCTION public.trg_schedule_mv_refresh() FROM anon;

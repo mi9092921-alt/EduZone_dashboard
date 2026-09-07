@@ -17,29 +17,35 @@ type TenantWithUsage = Tenant & {
 async function withTenantUsage(tenants: Tenant[]): Promise<TenantWithUsage[]> {
   const { supabase } = container;
 
-  return Promise.all(
-    tenants.map(async (tenant) => {
-      const [usersRes, coursesRes] = await Promise.all([
-        supabase
-          .from('users')
-          .select('id', { count: 'exact', head: true })
-          .eq('tenant_id', tenant.id)
-          .is('deleted_at', null),
-        supabase
-          .from('courses')
-          .select('id', { count: 'exact', head: true })
-          .eq('tenant_id', tenant.id)
-          .is('deleted_at', null),
-      ]);
+  if (tenants.length === 0) return [];
 
-      return {
-        ...tenant,
-        current_users: usersRes.count ?? 0,
-        current_courses: coursesRes.count ?? 0,
-        current_storage_bytes: 0,
-      };
-    }),
-  );
+  // PERF-05 FIX: one batched RPC for the whole page instead of 2 head-count
+  // queries per tenant — a 50-tenant page went from ~100 network round trips
+  // to exactly 1.
+  const tenantIds = tenants.map((tenant) => tenant.id);
+  const { data, error } = await supabase.rpc('get_tenants_usage', {
+    p_tenant_ids: tenantIds,
+  });
+  if (error) throw mapDbError(error, 'tenants.service.ts');
+
+  const usage = new Map<string, { user_count: number; course_count: number }>();
+  for (const row of (data ?? []) as Array<{
+    tenant_id: string;
+    user_count: number | string;
+    course_count: number | string;
+  }>) {
+    usage.set(row.tenant_id, {
+      user_count: Number(row.user_count ?? 0),
+      course_count: Number(row.course_count ?? 0),
+    });
+  }
+
+  return tenants.map((tenant) => ({
+    ...tenant,
+    current_users: usage.get(tenant.id)?.user_count ?? 0,
+    current_courses: usage.get(tenant.id)?.course_count ?? 0,
+    current_storage_bytes: 0,
+  }));
 }
 
 /**

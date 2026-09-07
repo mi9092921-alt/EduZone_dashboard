@@ -32,6 +32,7 @@ import {
   submitBulkAction,
   cancelBulkJob,
   subscribeToBulkProgress,
+  getBulkJobProgress,
 } from './bulk.service';
 
 // The service now calls /api/bulk-action (local API route)
@@ -144,5 +145,103 @@ describe('bulk.service', () => {
     expect(typeof unsubscribe).toBe('function');
     expect(() => unsubscribe()).not.toThrow();
     expect(container.supabase.removeChannel).toHaveBeenCalled();
+  });
+
+  // ── PERF-02: progress comes from job_queue.result first ────────
+  describe('PERF-02 — result column parsing', () => {
+    function captureHandler() {
+      let handler: ((payload: { new: Record<string, unknown> }) => void) | null = null;
+      (container.supabase.channel as ReturnType<typeof vi.fn>).mockReturnValueOnce({
+        on: vi.fn((_event: string, _filter: unknown, cb: typeof handler) => {
+          handler = cb;
+          return { subscribe: vi.fn() };
+        }),
+        subscribe: vi.fn(),
+      });
+      return () => handler!;
+    }
+
+    it('subscribeToBulkProgress — parses the structured result object', () => {
+      const onUpdate = vi.fn();
+      const getHandler = captureHandler();
+
+      subscribeToBulkProgress('job-777', onUpdate);
+
+      getHandler()({
+        new: {
+          status: 'processing',
+          result: { processed: 5, total: 10, succeeded: 5, failed: 0, failed_ids: [], succeeded_ids: ['u1'] },
+        },
+      });
+
+      expect(onUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ processed: 5, succeeded_ids: ['u1'] }),
+        'processing',
+      );
+    });
+
+    it('subscribeToBulkProgress — falls back to legacy error_message JSON', () => {
+      const onUpdate = vi.fn();
+      const getHandler = captureHandler();
+
+      subscribeToBulkProgress('job-888', onUpdate);
+
+      getHandler()({
+        new: {
+          status: 'processing',
+          error_message: JSON.stringify({ processed: 3, total: 10, failed_ids: ['u2'] }),
+        },
+      });
+
+      expect(onUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ processed: 3, failed_ids: ['u2'] }),
+        'processing',
+      );
+    });
+
+    it('getBulkJobProgress — prefers result over error_msg', async () => {
+      const mockRpc = container.supabase.rpc as ReturnType<typeof vi.fn>;
+      mockRpc.mockResolvedValue({
+        data: [
+          {
+            status: 'done',
+            error_msg: 'stale-progress-json',
+            result: {
+              processed: 10,
+              total: 10,
+              succeeded: 10,
+              failed: 0,
+              succeeded_ids: ['u1', 'u2'],
+              failed_ids: [],
+              truncated: false,
+            },
+          },
+        ],
+        error: null,
+      });
+
+      const res = await getBulkJobProgress('job-999');
+
+      expect(res!.status).toBe('done');
+      expect(res!.progress).toMatchObject({
+        processed: 10,
+        succeeded_ids: ['u1', 'u2'],
+        truncated: false,
+      });
+    });
+
+    it('getBulkJobProgress — falls back to legacy error_msg when result is absent', async () => {
+      const mockRpc = container.supabase.rpc as ReturnType<typeof vi.fn>;
+      mockRpc.mockResolvedValue({
+        data: [
+          { status: 'processing', error_msg: JSON.stringify({ processed: 2, total: 9, failed_ids: [] }) },
+        ],
+        error: null,
+      });
+
+      const res = await getBulkJobProgress('job-legacy');
+
+      expect(res!.progress).toMatchObject({ processed: 2, total: 9 });
+    });
   });
 });

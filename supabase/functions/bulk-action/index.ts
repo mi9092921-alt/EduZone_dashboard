@@ -127,8 +127,11 @@ const ACTION_PERMISSIONS: Record<BulkAction, string> = {
 
 /** Max records per bulk operation */
 const MAX_BULK_SIZE = 500;
-/** Max pending jobs in queue */
-const MAX_PENDING_JOBS = 10_000;
+// PERF-03 FIX: the dead `MAX_PENDING_JOBS = 10_000` constant was removed.
+// The only real queue cap lives in the admin_enqueue_bulk_job RPC (per
+// tenant, since the PERF-03 fairness fix) — duplicating a different number
+// here invited drift between the two layers. JOB_QUEUE_FULL arrives from
+// the RPC and is surfaced verbatim below.
 
 interface BulkRequest {
   action: BulkAction;

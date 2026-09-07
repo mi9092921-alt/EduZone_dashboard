@@ -84,10 +84,15 @@ export async function cancelBulkJob(jobId: string): Promise<void> {
 
 // ── Subscribe to job progress (Supabase Realtime) ────────────────
 function parseJobProgress(row: Record<string, unknown>): BulkProgress | null {
-  const raw = (row.error_message ?? row.error_msg) as string | undefined;
+  // PERF-02 FIX: progress now lives in the dedicated `result` jsonb column.
+  // Fall back to the legacy error_message JSON for rows written before the
+  // migration so in-flight older jobs keep rendering progress.
+  const raw = row.result ?? row.error_message;
   if (!raw) return null;
+  // supabase-js/realtime already deserializes jsonb columns to objects.
+  if (typeof raw === 'object') return raw as BulkProgress;
   try {
-    return JSON.parse(raw) as BulkProgress;
+    return JSON.parse(raw as string) as BulkProgress;
   } catch {
     return null;
   }
@@ -134,12 +139,26 @@ export async function getBulkJobProgress(
     return null;
   }
 
-  const rows = data as Array<{ status: string; error_msg?: string | null }> | null;
+  const rows = data as Array<{
+    status: string;
+    error_msg?: string | null;
+    result?: unknown;
+  }> | null;
   const job = rows?.[0];
   if (!job) return null;
 
   let progress: BulkProgress | null = null;
-  if (job.error_msg) {
+  // PERF-02 FIX: prefer the structured `result` column; error_msg is only a
+  // legacy fallback (and stays reserved for actual fatal errors now).
+  if (job.result && typeof job.result === 'object') {
+    progress = job.result as BulkProgress;
+  } else if (typeof job.result === 'string') {
+    try {
+      progress = JSON.parse(job.result) as BulkProgress;
+    } catch {
+      // result is not JSON
+    }
+  } else if (job.error_msg) {
     try {
       progress = JSON.parse(job.error_msg) as BulkProgress;
     } catch {

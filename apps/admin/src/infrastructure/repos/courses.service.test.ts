@@ -1,4 +1,7 @@
+import { http, HttpResponse } from 'msw';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+import { server } from '../../../tests/mocks/server';
 
 import {
   getCourses,
@@ -24,6 +27,10 @@ import {
 } from './courses.service';
 
 import { container } from '@/container';
+
+vi.mock('@/lib/env', () => ({
+  getServerEnv: () => ({ YOUTUBE_API_KEY: 'test-youtube-key' }),
+}));
 
 vi.mock('@/container', () => ({
   container: {
@@ -249,6 +256,56 @@ describe('courses.service', () => {
       p_section_id: 's1',
       p_ordered_ids: ['l1', 'l2', 'l3'],
     });
+  });
+
+  // ── PERF-06: one failed video of 10 must not fail the import batch ──
+  it('createLessons — isolates a dead video as a partial failure and still creates all lessons', async () => {
+    const makeId = (i: number) => `testid${String(i).padStart(5, '0')}`;
+    const ids = Array.from({ length: 10 }, (_, i) => makeId(i));
+    const missing = ids[9]!;
+    const lessons = ids.map((_, i) => ({ id: `lesson-${i}` }));
+
+    // YouTube API answers with 9 of the 10 requested videos.
+    server.use(
+      http.get('https://www.googleapis.com/youtube/v3/videos', ({ request }) => {
+        const url = new URL(request.url);
+        const requested = (url.searchParams.get('id') ?? '').split(',').filter(Boolean);
+        return HttpResponse.json({
+          items: requested
+            .filter((id) => id !== missing)
+            .map((id) => ({
+              id,
+              contentDetails: { duration: 'PT30S' },
+              snippet: { title: `Video ${id}` },
+            })),
+        });
+      }),
+    );
+
+    const sectionQ = setupQuery({ data: { course_id: 'c1', tenant_id: 'tenant-123' }, error: null });
+    const mainQ = setupQuery({ data: lessons, error: null });
+    mockFrom.mockImplementation((table: string) =>
+      table === 'sections' ? sectionQ : mainQ,
+    );
+
+    const result = await createLessons(
+      's1',
+      ids.map((id) => ({
+        title: `L-${id}`,
+        video_url: `https://www.youtube.com/watch?v=${id}`,
+        order_index: 1,
+      })),
+    );
+
+    // All 10 lessons were created (the failed video's lesson included, duration 0)…
+    expect(result.lessons).toHaveLength(10);
+    const insertedRows = mainQ.insert.mock.calls[0]![0] as Array<Record<string, unknown>>;
+    expect(insertedRows).toHaveLength(10);
+    // …9 lessons got the fetched duration, the dead one fell back to 0…
+    expect(insertedRows.filter((r) => r.duration_sec === 30)).toHaveLength(9);
+    expect(insertedRows[9]).toMatchObject({ duration_sec: 0 });
+    // …and the failure is reported explicitly instead of throwing.
+    expect(result.partial_failures).toEqual([{ lesson_index: 9, reason: 'video_not_found' }]);
   });
 
   it('getCourseEnrollments and getAllCourseEnrollments', async () => {

@@ -22,9 +22,13 @@ vi.mock('@/container', () => ({
 
 describe('tenants.service', () => {
   const mockFrom = container.supabase.from as any;
+  const mockRpc = (container.supabase as any).rpc as any;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // PERF-05: withTenantUsage resolves its batched usage RPC to "no rows"
+    // by default; individual tests override when they assert on usage.
+    mockRpc.mockResolvedValue({ data: [], error: null });
   });
 
   const setupQuery = (resolvedValue: any) => {
@@ -164,6 +168,85 @@ describe('tenants.service', () => {
       expect(q.in).toHaveBeenCalledWith('risk_level', ['high']);
       expect(q.gte).toHaveBeenCalledWith('created_at', '2026-01-01');
       expect(q.lte).toHaveBeenCalledWith('created_at', '2026-12-31');
+    });
+  });
+
+  // ── PERF-05: batched tenant usage (N+1 fix) ─────────────────
+  describe('getTenants usage batching (PERF-05)', () => {
+    it('issues exactly ONE rpc call for a 50-tenant page — no N+1', async () => {
+      const tenants = Array.from({ length: 50 }, (_, i) => ({
+        id: `t-${i}`,
+        name: `Tenant ${i}`,
+      }));
+      const q = setupQuery({ data: tenants, count: 50, error: null });
+      q.range.mockResolvedValue({ data: tenants, count: 50, error: null });
+      mockFrom.mockReturnValue(q);
+      mockRpc.mockResolvedValue({
+        data: tenants.map((t) => ({ tenant_id: t.id, user_count: 5, course_count: 2 })),
+        error: null,
+      });
+
+      const result = await getTenants({}, 1, 50);
+
+      // The usage lookup is a single batched RPC…
+      expect(mockRpc).toHaveBeenCalledTimes(1);
+      expect(mockRpc).toHaveBeenCalledWith('get_tenants_usage', {
+        p_tenant_ids: tenants.map((t) => t.id),
+      });
+      // …and the only table query is the tenants page itself (previously 2
+      // extra head-count queries per tenant ≈ 100 for this page).
+      expect(mockFrom).toHaveBeenCalledTimes(1);
+      expect(mockFrom).toHaveBeenCalledWith('tenants');
+
+      expect(result.data).toHaveLength(50);
+      expect(result.data[0]).toMatchObject({ current_users: 5, current_courses: 2 });
+    });
+
+    it('falls back to zero usage for tenants missing from the RPC result', async () => {
+      const q = setupQuery({
+        data: [{ id: 't1', name: 'A' }, { id: 't2', name: 'B' }],
+        count: 2,
+        error: null,
+      });
+      q.range.mockResolvedValue({
+        data: [{ id: 't1', name: 'A' }, { id: 't2', name: 'B' }],
+        count: 2,
+        error: null,
+      });
+      mockFrom.mockReturnValue(q);
+      mockRpc.mockResolvedValue({
+        data: [{ tenant_id: 't1', user_count: 3, course_count: 1 }],
+        error: null,
+      });
+
+      const result = await getTenants({}, 1, 10);
+
+      expect(result.data[0]).toMatchObject({ current_users: 3, current_courses: 1 });
+      expect(result.data[1]).toMatchObject({ current_users: 0, current_courses: 0 });
+    });
+
+    it('getTenantById also uses the single batched RPC', async () => {
+      const q = setupQuery({ data: { id: 't1', name: 'Test' }, error: null });
+      mockFrom.mockReturnValue(q);
+      mockRpc.mockResolvedValue({
+        data: [{ tenant_id: 't1', user_count: 7, course_count: 4 }],
+        error: null,
+      });
+
+      const result = await getTenantById('t1');
+
+      expect(mockRpc).toHaveBeenCalledTimes(1);
+      expect(mockRpc).toHaveBeenCalledWith('get_tenants_usage', { p_tenant_ids: ['t1'] });
+      expect(result).toMatchObject({ id: 't1', current_users: 7, current_courses: 4 });
+    });
+
+    it('propagates usage RPC errors as InfrastructureError', async () => {
+      const q = setupQuery({ data: [{ id: 't1' }], count: 1, error: null });
+      q.range.mockResolvedValue({ data: [{ id: 't1' }], count: 1, error: null });
+      mockFrom.mockReturnValue(q);
+      mockRpc.mockResolvedValue({ data: null, error: { message: 'boom' } });
+
+      await expect(getTenants({}, 1, 10)).rejects.toBeInstanceOf(Error);
     });
   });
 });
