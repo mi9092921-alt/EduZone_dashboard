@@ -5635,7 +5635,37 @@ SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
 BEGIN
   IF NEW.account_status IN ('locked', 'suspended', 'banned') AND OLD.account_status = 'active' THEN
-    PERFORM public.terminate_user_sessions(NEW.id, 'account_' || NEW.account_status);
+    -- SECURITY FIX (2026-09-08): this used to PERFORM
+    -- public.terminate_user_sessions(NEW.id, reason) -- but that RPC now
+    -- requires an explicit, non-NULL p_actor_id (see its definition
+    -- above) and raises PERMISSION_DENIED otherwise. A trigger has no
+    -- actor to supply: account_status was already changed by an
+    -- upstream, already-authorized caller (e.g. worker_control_user_account /
+    -- control_user_account, which check
+    -- user_has_permission(p_initiator_id, 'users.lock', ...) BEFORE
+    -- performing the UPDATE that fires this trigger), so re-authorizing
+    -- here is both impossible (no actor in trigger context — NEW/OLD are
+    -- just row data) and redundant (authorization already happened one
+    -- level up). This was firing unconditionally and rolling back every
+    -- lock/suspend/ban -- confirmed via CI run #29
+    -- ([WebServer] worker_control_user_account failed: PERMISSION_DENIED,
+    -- with none of that function's own _DEBUG-tagged exceptions
+    -- triggering, meaning the failure was happening downstream of its
+    -- own checks — in this trigger).
+    --
+    -- Terminate the sessions directly instead of routing through the
+    -- actor-gated RPC, matching how worker_control_user_account /
+    -- control_user_account already do this same UPDATE inline rather
+    -- than calling terminate_user_sessions from a SECURITY DEFINER
+    -- context with no real actor.
+    UPDATE public.sessions
+    SET is_active = false,
+        ended_at = coalesce(ended_at, pg_catalog.now()),
+        end_reason = 'account_' || NEW.account_status,
+        updated_at = pg_catalog.now()
+    WHERE user_id = NEW.id
+      AND is_active
+      AND tenant_id = NEW.tenant_id;
   END IF;
   RETURN NEW;
 END;
@@ -6376,7 +6406,17 @@ BEGIN
      AND deleted_at IS NULL;
 
   PERFORM private.revoke_auth_sessions(auth.uid());
-  PERFORM public.terminate_user_sessions(auth.uid(), 'self_logout');
+  -- SECURITY FIX (2026-09-08): terminate_user_sessions now requires an
+  -- explicit, non-NULL p_actor_id (see its definition above) -- calling it
+  -- with only 2 args left p_actor_id NULL, which now raises
+  -- PERMISSION_DENIED unconditionally and rolled back this entire
+  -- function (including the token_version bump and revoke_auth_sessions
+  -- above), breaking every real logout. Unlike the service-role admin
+  -- paths, this function genuinely IS the authenticated user acting on
+  -- themselves -- auth.uid() is valid here, so pass it as both the target
+  -- and the actor (satisfies terminate_user_sessions' `p_user_id =
+  -- p_actor_id` self-service check).
+  PERFORM public.terminate_user_sessions(auth.uid(), 'self_logout', auth.uid());
 END;
 $$;
 

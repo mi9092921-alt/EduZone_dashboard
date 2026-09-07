@@ -526,10 +526,28 @@ REVOKE EXECUTE ON FUNCTION public.worker_control_user_account(uuid, uuid, text, 
 REVOKE EXECUTE ON FUNCTION public.worker_terminate_user_sessions(uuid, uuid, text) FROM anon;
 REVOKE EXECUTE ON FUNCTION public.worker_terminate_user_sessions(uuid, uuid, text) FROM authenticated;
 
+-- SECURITY FIX (2026-09-08): control_user_account(uuid, uuid, text, text,
+-- integer) still had NO REVOKE/GRANT anywhere in this file even after the
+-- p_actor_id fix above -- it carried Postgres's default EXECUTE-to-PUBLIC
+-- grant. infrastructure/repos/user-admin.repository.ts now calls
+-- worker_control_user_account exclusively (this function is unreferenced
+-- in apps/ and supabase/functions/ — confirmed by grep), but it was still
+-- live and callable: any authenticated user holding 'users.lock' (any
+-- admin) could call it directly with their own id as p_actor_id --
+-- correctly passing its permission check -- and bypass both the Server
+-- Action's Zod validation and the M13 audit-log entry
+-- account-control.use-case.ts writes after the (now-unused) RPC path.
+-- Locking it down rather than dropping it outright, since
+-- VALIDATION.sql's Check 12B still expects it to exist and call
+-- private.revoke_auth_sessions.
+REVOKE EXECUTE ON FUNCTION public.control_user_account(uuid, uuid, text, text, integer) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.control_user_account(uuid, uuid, text, text, integer) FROM authenticated;
+
 -- decrypt_pii/dequeue_job/encrypt_pii are already granted to service_role above
 -- (see "4. INTERNAL ONLY"); only the two worker_* grants below are new here.
 GRANT EXECUTE ON FUNCTION public.worker_control_user_account(uuid, uuid, text, text, integer) TO service_role;
 GRANT EXECUTE ON FUNCTION public.worker_terminate_user_sessions(uuid, uuid, text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.control_user_account(uuid, uuid, text, text, integer) TO service_role;
 
 -- 5. SUPABASE AUTH HOOK
 -- Supabase Auth needs schema USAGE plus EXECUTE to invoke Postgres hooks.
