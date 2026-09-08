@@ -16,6 +16,7 @@
 - [Development](#-development)
 - [Testing](#-testing)
 - [Security](#-security)
+- [Database Schema Rules](#-database-schema-rules-critical)
 - [Launch Readiness](#-launch-readiness)
 - [Contributing](#-contributing)
 - [Documentation](#-documentation)
@@ -345,6 +346,96 @@ pnpm build-storybook        # Build static site
 
 ---
 
+## ⚠️ Database Schema Rules (CRITICAL)
+
+### 🚨 Shared Database — Two Repositories
+
+**This project shares a single Supabase instance with another repository:**
+
+- 📱 **[EduZone_App](https://github.com/mi9092921-alt/EduZone_App)** — Student app (Dart/Flutter)
+- 📊 **[EduZone_dashboard](https://github.com/mi9092921-alt/EduZone_dashboard)** — Admin dashboard (this repo, TypeScript/Next.js)
+
+**Any database change impacts both applications immediately.**
+
+### 🛑 Database Modification Rules
+
+**DO NOT** (these will break the project):
+
+```
+❌ Create new migration files or patches
+❌ Create new files inside supabase/schema/
+❌ Delete or archive active SQL files
+❌ Use SQL migrations workflow at all
+```
+
+**DO** (follow exactly):
+
+```
+✅ Modify existing files in supabase/schema/ directly (in-place edits)
+✅ Add new columns using ALTER TABLE ... ADD COLUMN IF NOT EXISTS (inline)
+✅ Example: See autovacuum modification in 03_tables.sql:1384
+✅ Archive external SQL files by numbering + moving to supabase/_archived_patches/
+✅ Prefer fixing application code (TypeScript/Dart) instead of database schema
+✅ Minimize any changes to supabase/schema/
+```
+
+### 📋 Pre-Modification Checklist
+
+Before modifying ANY database object (table, function, RPC, policy):
+
+- [ ] **Search both repositories** for all usages:
+  ```bash
+  # In EduZone_dashboard/
+  grep -r "function_name\|table_name\|rpc_name" apps/ supabase/ --include="*.ts" --include="*.tsx" --include="*.sql"
+  
+  # In EduZone_App (checkout separately if needed)
+  grep -r "function_name\|table_name\|rpc_name" lib/ android/ ios/ web/ --include="*.dart" --include="*.swift" --include="*.kt"
+  ```
+
+- [ ] **Check all call sites**:
+  - Direct RPC calls (`.rpc('name')` in Dart/TypeScript)
+  - SQL references (in other functions, RLS policies, triggers)
+  - Test files (unit/widget/e2e mocks that reference the name)
+  - Helper scripts and CI checks
+  - Documentation files
+
+- [ ] **Verify no existing validation scripts** depend on current behavior
+  - Some "tests" might actually be auditing incorrect security assumptions
+  - Don't assume test pass = behavior is correct
+
+- [ ] **Rename consistently** across both repos:
+  - Function name, parameter names, return type names
+  - All internal references and documentation
+  - Test file references and mock setups
+
+- [ ] **Run final grep** after changes to confirm zero dangling references:
+  ```bash
+  git grep "old_name" -- '*.ts' '*.tsx' '*.sql' '*.dart'
+  ```
+
+### 📝 Post-Modification Delivery
+
+After completing database changes, provide:
+
+1. **List of all modified files** (with reason for each)
+2. **Any ambiguous call sites** that couldn't be verified
+3. **Security findings** discovered during modification
+4. **Manual steps** required after applying changes
+5. **Separate patches for each repository** (never combine)
+
+### ⛔ Absolute Rules (Non-Negotiable)
+
+> These are repeated intentionally because they are critical:
+
+```
+Absolutely no migrations or patches!
+Only modify the original files, no discussion allowed.
+Prefer fixing application code instead of supabase/schema.
+Minimal intervention in supabase/schema files.
+```
+
+---
+
 ## 📚 Documentation
 
 ### Quick Reference
@@ -353,6 +444,7 @@ pnpm build-storybook        # Build static site
 |----------|---------|----------|------|
 | [README.md](README.md) | Project overview | Everyone | 10 min |
 | [CLAUDE.md](CLAUDE.md) | Architecture summary (AI-friendly) | Developers | 15 min |
+| [agent_prompt_eduzone_db.md](agent_prompt_eduzone_db.md) | Database modification rules (for agents) | Agents/AI | 15 min |
 | [supabase/README.md](supabase/README.md) | Database setup & operations | Everyone | 20 min |
 | [docs/SYSTEM_DESIGN.md](docs/SYSTEM_DESIGN.md) | Full architecture | Architects | 30 min |
 | [docs/SECURITY_DESIGN.md](docs/SECURITY_DESIGN.md) | Auth flows & threat model | Security | 25 min |
@@ -439,9 +531,10 @@ pnpm build-storybook        # Build static site
 ### Setup Your Development Environment
 
 1. **Read**: [docs/CODING_STANDARDS.md](docs/CODING_STANDARDS.md)
-2. **Clone**: `git clone https://github.com/mi9092921-alt/EduZone_dashboard.git`
-3. **Install**: `pnpm install --frozen-lockfile`
-4. **Start**: `supabase start && pnpm dev`
+2. **Read**: [Database Schema Rules](#-database-schema-rules-critical) (if modifying `supabase/`)
+3. **Clone**: `git clone https://github.com/mi9092921-alt/EduZone_dashboard.git`
+4. **Install**: `pnpm install --frozen-lockfile`
+5. **Start**: `supabase start && pnpm dev`
 
 ### Pull Request Checklist
 
@@ -451,16 +544,19 @@ pnpm build-storybook        # Build static site
 - [ ] `pnpm lint` ✅ (0 warnings)
 - [ ] `pnpm test` ✅ (coverage ≥80%)
 - [ ] Tests added for new logic
-- [ ] Database changes: **modify schema files only** (no migrations)
+- [ ] Database changes: **modify schema files only** (no migrations, see [Database Schema Rules](#-database-schema-rules-critical))
 - [ ] Updated documentation if relevant
+- [ ] For database changes: included pre-mod grep report from both repos
 
 ### Key Rules
 
 - ✅ Clean architecture layers respected (domain → app → infra → adapters)
 - ✅ No business logic in routes or Server Actions
+- ✅ Database: modify `supabase/schema/` in-place only (no migrations/patches)
+- ✅ For any DB change: verify impact on both EduZone_App and EduZone_dashboard
 - ❌ No `any` types (except unavoidable)
 - ❌ No hardcoded credentials
-- ❌ No SQL migrations (modify `supabase/schema/` files directly)
+- ❌ No SQL migrations or patches
 
 ---
 
@@ -478,11 +574,16 @@ pnpm build-storybook        # Build static site
 - 🚀 [Quick Start](#-quick-start)
 - 🧪 [Testing Guide](#-testing)
 - 🔐 [Security Principles](#-security)
+- ⚠️ [Database Rules](#-database-schema-rules-critical)
 - ⚠️ [Known Issues](#-launch-readiness)
 
 ### Database Issues?
 
 See [supabase/README.md](supabase/README.md) → Emergency Help
+
+### Making Database Changes?
+
+See [Database Schema Rules](#-database-schema-rules-critical) or [agent_prompt_eduzone_db.md](agent_prompt_eduzone_db.md)
 
 ### Architecture Questions?
 
