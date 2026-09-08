@@ -1,85 +1,98 @@
-# تعليمات وكيل تعديل قاعدة بيانات EduZone (Supabase مشتركة)
+# EduZone Database Agent Rules
 
-انسخ هذا كاملًا كبرومبت/تعليمات نظام لأي وكيل (Claude Code أو غيره) قبل تكليفه بأي تعديل على قاعدة البيانات.
+**Repository:** `mi9092921-alt/EduZone_dashboard`
+**Database:** shared with `mi9092921-alt/EduZone_App`
+**Mode:** strict change-control
 
----
+## 1. Mandatory execution loop
 
-## 0. السياق — اقرأه قبل أي شيء
+```text
+Check → Think → Modify → Verify → Repeat
+```
 
-- يوجد **مستودعان منفصلان يشتركان في نفس قاعدة بيانات Supabase واحدة**:
-  1. `EduZone_App` — تطبيق الطالب.
-  2. `EduZone_dashboard` — لوحة تحكم المعلمين/الإداريين/السوبر أدمن.
+Inspect the current schema and all call sites before changing anything.
 
-Repository:
-https://github.com/mi9092921-alt/EduZone_App الخاص بالطالب
+## 2. Canonical source
 
-Repository:
-https://github.com/mi9092921-alt/EduZone_dashboard الخاص بالمعلمين والإداريين والسوبر ادمين
+For development-stage schema work, the canonical SQL source is:
 
-- **أي تعديل في القاعدة يؤثر على المستودعين معًا فورًا**، حتى لو طلب المستخدم العمل على مستودع واحد فقط. لا يوجد "تعديل معزول" على قاعدة بيانات مشتركة.
-- **القاعدة لا تزال في مرحلة تطوير نشطة** — هذا يغيّر أسلوب العمل جذريًا:
-  - **ممنوع منعًا باتًا** إنشاء أي ملفات migrations أو patches أو حلول مؤقتة/انتقالية.
-  - كل إصلاح يُطبَّق **مباشرة وفي مكانه (in place)** داخل الملفات المرجعية الأساسية لمخطط القاعدة الموجودة حصريًا في `supabase/schema/` بجذر كل مستودع.
-  - **لا تُنشئ أي ملف SQL جديد داخل `supabase/schema/`** مهما كان السبب.
-  - أي ملف SQL خارجي/مسودة/ثانوي موجود خارج `supabase/schema/` — **لا يُحذف** بل يُرقَّم وينقل بالكامل إلى `supabase/_archived_patches/`.
-  - **الحد الأدنى من التدخل** في ملفات `supabase/schema/`: أي منطق يمكن تنفيذه في كود التطبيقين (Dart / TypeScript) بدل تضخيم المخطط، يُنقل إلى كود التطبيقين. لا تضف منطق أعمال في SQL يمكن أن يعيش في الـ application layer.
-  - **مفضَّل تعديل كود المشروع نفسه بدل supabase/schema كلما أمكن ذلك.**
-  - ممنوع أي مناقشة أو اجتهاد خارج نطاق التعليمات — نفّذ ما هو مطلوب فقط، ولا تنشئ وثائق/ملفات شرح إضافية لم يُطلب إنشاؤها صراحة.
+```text
+supabase/schema/
+```
 
-## 1. القاعدة الذهبية: لا تكسر أي شيء قائم
+`supabase/config.toml` defines the ordered schema inputs. Do not invent a second active schema source.
 
-قبل أي تعديل، وبعده:
+## 3. Shared database
 
-1. **افحص المستودعين كليهما بالكامل (grep شامل)** عن كل استخدام لأي دالة/جدول/RPC ستعدّله — ليس فقط في نفس المستودع الذي طلب المستخدم العمل عليه. يشمل ذلك:
-   - نداءات RPC الفعلية في الكود (`.rpc('...')` في Dart/TS).
-   - استخدام مباشر داخل SQL أخرى (RLS policies، دوال أخرى، triggers).
-   - ملفات الاختبار (unit/widget/e2e) التي تعمل mock/stub على نفس الاسم — هذه نقاط استدعاء حقيقية أيضًا ويجب تحديثها وإلا تنكسر الاختبارات.
-   - أدوات مساعدة (scripts، CI checks، hygiene tools) قد تحتوي على قوائم بأسماء الدوال/الـ providers.
-   - ملفات التوثيق (README, SECURITY.md, ROLE.md, إلخ) — إن طُلب منك تحديثها، حدّثها بدقة لتطابق الواقع الجديد ولا تترك أمثلة SQL/كود قديمة توحي بحل خاطئ.
-2. **لا تحذف أي دالة/جدول قديم قبل التأكد من نقل كل استخداماته** إلى البديل الصحيح.
-3. عند فصل دالة واحدة تخدم غرضين متعارضين (مثل بوابة دخول واحدة تُستخدم لتطبيقين بشروط تفويض مختلفة) — **الحل الصحيح هو الفصل إلى دالتين/بوابتين منفصلتين لكل استخدام**، وليس تخفيف الشرط أو حذفه بالكامل. تخفيف شرط أمني لحل تعارض وظيفي هو ثغرة أمنية، ولو بدا الحل أبسط.
-4. **كن حذرًا من أي فحص/اختبار (validation script) موجود مسبقًا في المستودع يبدو أنه "يكافئ" حلًا أمنيًا خاطئًا** (مثلًا فحص ينجح فقط إذا أُزيل قيد أمني). لا تتبع مثل هذا الفحص كدليل على الحل الصحيح — نفّذ الحل السليم هندسيًا، وصحّح الفحص نفسه ليطابق الحل السليم بدل العكس، واذكر ذلك صراحة في ملخصك النهائي.
-5. عند إعادة تسمية دالة/كلاس/ملف: **غيّر كل ما هو مرتبط فعليًا** (الملف نفسه، اسم الكلاس، الدوال، الـ providers/hooks، الـ types المصدَّرة، أسماء الاختبارات ومجموعاتها) — لا تكتفِ بتغيير جزئي يترك تضاربًا بين اسم الملف ومحتواه. تحقق أيضًا من الملفات المولَّدة تلقائيًا (مثل `*.g.dart`) وحدّثها يدويًا إن تعذّر إعادة توليدها، واذكر أنها تحتاج إعادة توليد فعلية لاحقًا (`build_runner` أو مكافئه).
-6. بعد كل تعديل: **نفّذ فحص grep نهائي شامل** في كامل كلا المستودعين للتأكد من عدم وجود أي مرجع متبقٍ للاسم/الوظيفة القديمة إلا ما هو متعمد (مثل جملة الحذف نفسها، أو تعليق تاريخي يشرح "حلّت محل X").
+Any schema/RPC/RLS/constraint/index change may affect both repositories.
 
-## 2. قبل توليد أي باتش نهائي
+Before changing a DB object:
 
-- **قاعدة البيانات وكلا المستودعين قد يتغيران بين استنساخك الأول وتسليمك النهائي.** لا تفترض أن نسخة `HEAD` التي استنسختها في بداية المهمة لا تزال هي الأحدث.
-- قبل توليد الباتش النهائي: نفّذ `git fetch origin main` وقارن مع النسخة التي تعمل عليها. إن كان هناك تقدّم في upstream:
-  - نفّذ `git rebase origin/main` وحُل أي تعارضات يدويًا بعناية (تحقق من أن كل تعارض قد حُلّ بالمحتوى الصحيح، لا بأخذ نسخة عشوائية).
-  - كرر فحص grep الشامل بعد الـ rebase — التعارضات قد "تُرجع" مراجع قديمة كنت قد أزلتها.
-- **تحقق دائمًا أن الباتش يُطبَّق فعليًا** عبر استنساخ نسخة جديدة تمامًا من كل مستودع وتشغيل `git apply --check` قبل التسليم. لا تُسلّم باتشًا لم تتحقق من تطبيقه.
-- ولّد **باتشًا منفصلًا لكل مستودع** (لا تدمجهما في ملف واحد)، لأن التسليم/المراجعة يتم لكل مستودع على حدة.
+```text
+dashboard usages
+student-app usages
+SQL references
+Edge Functions
+tests
+CI/scripts
+documentation
+```
 
-## 3. عند التسليم — الملخص المطلوب دائمًا
+If the corresponding student repository cannot be inspected, mark the cross-repository impact as **UNVERIFIED**; do not assume compatibility.
 
-في نهاية كل مهمة، قدّم:
+## 4. Security requirements
 
-1. قائمة كل الملفات المعدَّلة في كل مستودع (مع سبب موجز لكل تعديل).
-2. أي نقطة استدعاء لم تستطع تصنيفها بثقة (مثلًا: هل هذا الاستدعاء يخص تطبيق الطالب أم الداشبورد؟) — اذكرها صراحة للمراجعة اليدوية بدل حسم القرار بنفسك.
-3. أي ملاحظة أمنية اكتشفتها أثناء التنفيذ (مثل فحص validation يكافئ حلًا خاطئًا كما في البند 1.4).
-4. أي خطوة يدوية متبقية بعد تطبيق الباتش (مثل إعادة توليد ملفات مولَّدة تلقائيًا عبر build tools).
-5. لا تُنفّذ أي خطوة إضافية غير مذكورة في التكليف، ولا تُنشئ ملفات توثيق/شرح جديدة لم يُطلب إنشاؤها صراحة.
+For every privileged database function:
 
----
+- use the existing project security pattern;
+- explicitly control `search_path`;
+- keep grants least-privilege;
+- re-check authorization inside SECURITY DEFINER functions;
+- derive tenant scope from trusted context;
+- do not trust a client-provided tenant ID as an authorization boundary;
+- never embed passwords, service keys, or other secrets.
 
-## 4. تعليمات هذه المهمة تحديدًا (من issues.txt في EduZone_dashboard)
+## 5. Change restrictions
 
-- قاعدة البيانات مشتركة بين تطبيق الطالب وداشبورد (الأدمن/المعلمين/السوبر أدمن) — **أي تعديل يجب ألا يكسر أيًا من الطرفين**.
-- القاعدة في مرحلة تطوير نشطة، لذا: **كل الإصلاحات تُطبَّق مباشرة وفي مكانها على الملفات المرجعية داخل `supabase/schema/`** من جذر كل مستودع — **ممنوع نهائيًا إنشاء migrations أو patches أو أي حل مؤقت**.
+Do not:
 
-**المتطلبات الأساسية المطلوبة:**
+```text
+- create a second active schema source
+- change shared object names without tracing every caller
+- weaken RLS to make a test pass
+- broaden GRANTs for convenience
+- bypass authorization because a caller is an internal route
+- claim production readiness from source inspection alone
+```
 
-1. إصلاح الثغرات الأمنية من الجذور (وليس بتخفيف الشروط الأمنية أو إخفائها).
-2. توحيد وتأمين جميع جداول الميزات داخل المخطط الرئيسي (لا تُبقِ جداول/دوال فعّالة خارج `supabase/schema/`).
-3. حظر ملفات SQL الخارجية وأرشفتها:
-   - توحيد كل ملفات SQL الفعّالة حصرًا داخل `supabase/schema/`.
-   - أي ملف SQL خارجي/مسودة/ثانوي: **لا يُحذف**، بل يُرقَّم وينقل بالكامل إلى `supabase/_archived_patches/`.
-4. **لا ملفات جديدة داخل `supabase/schema/`** — التعديل يكون في الملفات الموجودة فقط.
+Apply the repository's established schema-change policy rather than inventing a new migration strategy inside an unrelated task.
 
-**تعليمات صريحة إضافية (مكررة عمدًا في المصدر لأهميتها):**
+## 6. Verification
 
-- Absolutely no migrations or patches!
-- Only modify the original files, no discussion allowed.
-- يُفضَّل تعديل كود المشروع نفسه (Application code) بدلًا من `supabase/schema` كلما كان ذلك ممكنًا.
-- مرة أخرى: ممنوع نهائيًا أي migrations أو patches، ومع أقل تدخل ممكن في ملفات `supabase/schema`.
+For every material database change:
+
+```text
+1. syntax / local parse
+2. schema reset or disposable DB verification
+3. direct SQL/RPC tests
+4. RLS negative tests where relevant
+5. application integration tests where relevant
+6. final reference search
+```
+
+For tenant isolation, verify both positive and negative cases.
+
+## 7. Reporting
+
+Finish every DB task with:
+
+```text
+Modified files
+Verified behavior
+Unverified assumptions
+Cross-repository impact
+Security impact
+Required manual/live steps
+```
+
+Never state PASS when the corresponding runtime evidence was not executed.

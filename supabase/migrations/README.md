@@ -1,35 +1,33 @@
-# Agent Task Prompt — EduZone Bug Fixes
+# Supabase Migrations Directory
 
-## ⚠️ MANDATORY CONSTRAINTS — READ BEFORE ANY ACTION
+**Baseline:** `main` @ `9f1a31659d929fcf5bbcdec58429c146021b777d`  
+**Reviewed:** 2026-09-08
 
-These rules are **absolute and non-negotiable**. Violating any of them will invalidate the entire task.
+## Current state
 
-```
-❌ NO migrations of any kind
-❌ NO patch files
-❌ NO architectural changes
-❌ NO new abstractions, services, or layers
-❌ NO discussions, questions, or alternative proposals
-❌ DO NOT modify any file inside /supabase/ unless explicitly stated below
-❌ DO NOT touch schema files
-✅ ONLY modify existing Flutter/Dart project files
-✅ Apply only the minimum change required to fix the reported issue
-✅ Fix code, not infrastructure
+This directory currently contains **documentation only**. It does not contain a timestamped active migration chain.
+
+```text
+supabase/migrations/
+└── README.md
 ```
 
-**If you are about to create a migration, patch, or new architecture — STOP. That action is forbidden.**
+The development-stage database uses the ordered files in `supabase/schema/`, as configured by `supabase/config.toml` under `db.migrations.schema_paths`.
 
----
+## Governance rule
 
-والاهم
-###قاعدة البيانات في مرحلة التطوير، لذا يجب تطبيق كافة الإصلاحات والتعديلات مباشرة على الملفات المرجعية الأساسية لمخطط القاعدة داخل المجلد `supabase/schema/` من الجذور، ويمنع منعاً باتاً إنشاء أي ملفات هجرة (migrations) أو رقع (patches) أو حلول مؤقتة.
-##المتطلبات الأساسية المطلوبة:
+Do not describe this directory as a complete historical migration system unless an actual migration chain is present and verified.
 
-1. إصلاح الثغرات الأمنية من الجذور:
-2. توحيد وتأمين جميع جداول الميزات داخل المخطط الرئيسي:
-3. حظر ملفات SQL الخارجية وأرشفتها:
+For the current project policy:
 
-- توحيد كافة ملفات SQL الفعالة حصرياً داخل `supabase/schema/`.
-- عدم حذف أي ملف SQL خارجي أو مسودة أو ملف ثانوي بل أرقامها ونقلها بالكامل إلى مجلد النسخ الاحتياطية `supabase/_archived_patches/`.
+```text
+Canonical SQL source → supabase/schema/
+No second active schema source
+No temporary SQL patch source
+```
 
-4. لا اريد ملفات جديدة داخل `supabase/schema/`.
+Historical/superseded SQL artifacts belong under `supabase/_archived_patches/` rather than being treated as active deployment inputs.
+
+## Verification requirement
+
+Database deployment semantics remain a release concern. A local schema reset or the presence of ordered SQL files does not by itself prove production rollback, upgrade, or restore safety.

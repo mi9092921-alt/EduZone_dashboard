@@ -1,39 +1,49 @@
-# Branch Protection — Required Configuration
+# Branch Protection — Release Policy
 
-## هذا الملف يوثق إعداد Branch Protection المطلوب على `main`
-## يجب تفعيله يدويًا في GitHub UI عند كل إنشاء جديد للمستودع.
+**Repository:** `mi9092921-alt/EduZone_dashboard`
+**Reviewed against:** `main` @ `9f1a31659d929fcf5bbcdec58429c146021b777d`
 
----
+## 1. Important distinction
 
-## الخطوات (GitHub UI)
+The current repository metadata inspected during documentation cleanup showed:
 
-```
-Settings → Branches → Add branch ruleset
-```
-
-| الإعداد | القيمة |
-|---|---|
-| Branch name pattern | `main` |
-| Require a pull request before merging | ✅ |
-| Required number of approvals | 1 (minimum) |
-| Require status checks to pass before merging | ✅ |
-| Required status checks | `build_and_test` (من `ci.yml`) |
-| Require branches to be up to date before merging | ✅ |
-| Do not allow bypassing the above settings | ✅ |
-| Restrict force pushes | ✅ |
-| Restrict deletions | ✅ |
-
-## Required Status Check: `build_and_test`
-
-هذا الـcheck يغطي السلسلة الكاملة من `ci.yml`:
-
-```
-Secret Scan → Dependency Audit → Architecture Check
-→ Lint → Typecheck → Unit Tests → Build → DB Lint
+```text
+main protected: false
+required status checks: off
 ```
 
-## ملاحظة
+Therefore this file is an **expected release policy**, not evidence that GitHub branch protection is currently enabled.
 
-- لا يمكن تعريف Branch Protection بملف في المستودع — يستلزم فعلًا يدويًا.
-- راجع `.github/workflows/ci.yml` للـjob name المطلوب (`build_and_test`).
-- تفعيل E2E لاحقًا يُضيف `e2e` كـrequired check بعد تفعيل `vars.E2E_ENABLED`.
+## 2. Required release policy for `main`
+
+Production-bound changes should require, at minimum:
+
+```text
+typecheck
+lint
+unit tests
+production build
+critical E2E/security gates
+```
+
+Database/security-sensitive changes should additionally require the applicable integration/RLS verification jobs.
+
+## 3. Merge rule
+
+Do not treat:
+
+```text
+“workflow exists”
+```
+
+as equivalent to:
+
+```text
+“workflow is a required protected check”
+```
+
+The repository owner must verify the actual GitHub Rules/Branch Protection configuration before declaring this control satisfied.
+
+## 4. Documentation rule
+
+Update this file when the actual GitHub protection configuration changes. Keep the status statement tied to observed GitHub settings, not intended configuration.
