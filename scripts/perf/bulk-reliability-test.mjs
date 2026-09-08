@@ -272,10 +272,6 @@ async function main() {
       if (!pass) failures.push('T2 double-impact');
     }
 
-    // __T4_SUMMARY__
-
-    // __T4_SUMMARY__
-
     // ══════════════════════════════════════════════════════════════
     // T4 — filter grew past 500 between submit and run → result says
     // truncated:true + remaining, never silent.
@@ -286,6 +282,16 @@ async function main() {
         userCount: 300,
         permissions: ['warnings.write'],
       });
+
+      const worker = createWorkerSimulator(serviceCtx, { batchSize: 50 });
+      // T3 leaves tenant A's 10 pending jobs + tenant B's 1 (no matching
+      // users) sitting in the queue. Drain those out FIRST — draining
+      // AFTER enqueueing the T4 job below would let drainQueue's FIFO
+      // dequeue_job() pick up and consume the T4 job itself (oldest
+      // pending first), leaving nothing for the explicit worker() call
+      // that follows and starving this assertion on a false negative.
+      await drainQueue(worker);
+
       const job = await enqueueJob(serviceCtx, {
         jobType: 'bulk_warn',
         tenantId: d.tenantId,
@@ -315,10 +321,6 @@ async function main() {
         ON CONFLICT (id) DO NOTHING`,
         [d.tenantId],
       );
-
-      const worker = createWorkerSimulator(serviceCtx, { batchSize: 50 });
-      // T3 leaves tenant A's 10 pending jobs (no users) — drain before T4.
-      await drainQueue(worker);
 
       const run = await worker();
 
