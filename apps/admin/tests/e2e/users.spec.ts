@@ -168,9 +168,17 @@ test.describe('User Management', () => {
       // Toast.tsx renders the global toast as a MUI Alert (role="alert").
       // lock_user_success in messages/en.json is "{name}'s account has
       // been locked."
-      await expect(page.getByRole('alert')).toContainText(
-        "Omar Abdullah's account has been locked.",
-      );
+      //
+      // Scoped with .filter({ hasText }) instead of a bare getByRole('alert')
+      // -- Next.js's own route announcer (a hidden, always-present
+      // <div role="alert" id="__next-route-announcer__">, injected by the
+      // App Router itself for a11y) also matches that role, and can be
+      // non-empty right after a client-side navigation, making an unscoped
+      // locator resolve to two elements. Same pattern already used in
+      // settings.spec.ts for this exact collision.
+      await expect(
+        page.getByRole('alert').filter({ hasText: 'Omar Abdullah' }),
+      ).toContainText("Omar Abdullah's account has been locked.");
       await expect(row.getByRole('cell', { name: 'Locked', exact: true })).toBeVisible();
 
       // ── Cloud-safe cleanup: restore the seed's 'active' state ───────
@@ -365,12 +373,21 @@ test.describe('User Management', () => {
       // "{count} selected" -- selectedCount is selectedIds.size from
       // UsersPage.tsx, so this also confirms both checkboxes actually
       // registered as two distinct selections, not one.
-      await expect(page.getByText('2', { exact: true })).toBeVisible();
-      // Not exact: true here -- BulkActionBar.tsx renders {selectedCount} in
-      // its own <div> but {t('selected')} as a bare text node next to it, so
-      // the smallest containing element's full text is "2 selected", never
-      // "selected" alone. An exact match against that string can never pass.
-      await expect(page.getByText('selected')).toBeVisible();
+      //
+      // Scoped to the "N selected" wrapper instead of a page-wide
+      // getByText('2', { exact: true }) -- UserStatsCards.tsx renders its
+      // own stat values (Locked/Suspended/Banned counts) as plain text
+      // too, and one of those can independently equal the current
+      // selection count, making an unscoped "2" ambiguous. The wrapper's
+      // own text is "2 selected" ({selectedCount} in its own <div>,
+      // {t('selected')} as a bare text node next to it), and "selected"
+      // only renders on this page from BulkActionBar.tsx (the courses
+      // page has its own copy in CourseBulkActionBar.tsx but that isn't
+      // mounted here), so getByText('selected') already resolves to this
+      // exact wrapper -- reusing it also lets us assert the live count.
+      const selectionSummary = page.getByText('selected');
+      await expect(selectionSummary).toBeVisible();
+      await expect(selectionSummary).toContainText('2');
 
       // bulk_action_lock is "Lock" -- distinct from the row menu's "Lock
       // Account" and the dialog's own "Confirm Lock" button below, so this
