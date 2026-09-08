@@ -2036,21 +2036,43 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.increment_warning_count(p_user_id uuid)
+CREATE OR REPLACE FUNCTION public.increment_warning_count(
+  p_user_id uuid,
+  p_actor_id uuid DEFAULT NULL
+)
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
 BEGIN
-  IF NOT public.user_has_permission(auth.uid(), 'warnings.write', public.get_current_tenant_id()) THEN
+  -- F-02 FIX (bulk path): the caller may pass the acting user explicitly.
+  -- The bulk worker path (worker_issue_warning via the service-role client)
+  -- has NO user JWT, so auth.uid() is always NULL there and the previous
+  -- auth.uid()-only check denied every bulk warn unconditionally (the
+  -- warnings INSERT was then rolled back with the whole RPC). The actor is
+  -- resolved through the exact same user_has_permission() path, scoped to
+  -- the TARGET user's tenant (get_current_tenant_id() is NULL for JWT-less
+  -- service-role calls, which would otherwise fall back to the system
+  -- tenant and never match a per-tenant cache/role row). The interactive
+  -- path (issue_warning) keeps passing one argument and resolves the actor
+  -- exactly as before (actor = auth.uid()); it warns users inside its own
+  -- tenant, so the target-user tenant scoping is equivalent there and
+  -- strictly safer for any cross-context caller.
+  IF NOT public.user_has_permission(
+       coalesce(p_actor_id, auth.uid()),
+       'warnings.write',
+       (SELECT u.tenant_id FROM public.users u WHERE u.id = p_user_id)
+     ) THEN
     RAISE EXCEPTION 'PERMISSION_DENIED';
   END IF;
 
   UPDATE public.users
   SET warning_count = warning_count + 1,
       updated_at = pg_catalog.now()
-  WHERE id = p_user_id
-    AND tenant_id = public.get_current_tenant_id();
+  WHERE id = p_user_id;
+  -- (The tenant guard lives in the permission check above; the previous
+  -- `tenant_id = get_current_tenant_id()` clause silently no-op'd on the
+  -- JWT-less bulk path where get_current_tenant_id() is NULL.)
 END;
 $$;
 
@@ -4319,7 +4341,11 @@ BEGIN
   )
   RETURNING id INTO v_id;
 
-  PERFORM public.increment_warning_count(p_user_id);
+  -- F-02 FIX: pass the already-verified initiator as the acting user —
+  -- increment_warning_count's permission check runs against p_initiator_id
+  -- (this function re-verified warnings.write for it above), not against
+  -- the JWT-less service-role context where auth.uid() is always NULL.
+  PERFORM public.increment_warning_count(p_user_id, p_initiator_id);
   RETURN v_id;
 END;
 $$;

@@ -46,6 +46,7 @@ storybook-static
 *.patch
 *.diff
 *.tsbuildinfo
+*.log
 apps/admin/tsconfig.tsbuildinfo
 packages/types/tsconfig.tsbuildinfo
 packages/ui/tsconfig.tsbuildinfo

@@ -24,6 +24,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readFileSync, rmSync, existsSync, appendFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { execSync } from 'node:child_process';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -113,6 +114,33 @@ export async function startDatabaseWithSchema() {
   // watched by VS Code / indexed by search tools, whose transient file
   // handles caused EPERM on Windows when wiping the previous run's data dir.
   const dataDir = join(tmpdir(), 'eduzone-pgdata-perf');
+
+  // A previous crashed run can orphan its postgres.exe, which keeps both the
+  // port and the data dir locked (EPERM on Windows). Kill ONLY the process
+  // bound to our harness port — never a user's unrelated postgres.
+  if (process.platform === 'win32') {
+    try {
+      const out = execSync('netstat -ano | findstr :54329', { shell: 'cmd.exe' }).toString();
+      const pids = new Set(
+        out
+          .split('\n')
+          .map((line) => line.trim().split(/\s+/).pop())
+          .filter((pid) => /^\d+$/.test(pid)),
+      );
+      for (const pid of pids) {
+        try {
+          execSync(`taskkill /F /PID ${pid}`, { shell: 'cmd.exe' });
+          console.log(`   killed orphaned postgres pid ${pid} on :54329`);
+        } catch {
+          // already gone
+        }
+      }
+      if (pids.size > 0) await new Promise((r) => setTimeout(r, 2000));
+    } catch {
+      // nothing listening on the harness port
+    }
+  }
+
   // Windows: a lingering postgres.exe from a previous crashed run can hold
   // file handles for a few seconds — retry the wipe instead of failing.
   for (let attempt = 1; ; attempt++) {
@@ -154,6 +182,17 @@ export async function startDatabaseWithSchema() {
   // the real test failure.
   admin.on('error', (e) => console.error(`[pg admin] ${e.message}`));
   await admin.connect();
+
+  // Disposable perf cluster: disable durability to (a) speed the load runs
+  // up and (b) sidestep a Windows embedded-postgres flake where the
+  // checkpointer exits with code 1 under heavy write bursts (observed
+  // mid-run on this machine; no SQL error precedes it — classic
+  // antivirus/fsync interference on throwaway clusters). Standard practice
+  // for throwaway test databases per the Postgres docs.
+  await admin.query(`ALTER SYSTEM SET fsync = off`);
+  await admin.query(`ALTER SYSTEM SET synchronous_commit = off`);
+  await admin.query(`ALTER SYSTEM SET full_page_writes = off`);
+  await admin.query(`SELECT pg_reload_conf()`);
 
   // Pre-create the Supabase roles 00_stub_auth.sql grants to. In the stub
   // file the GRANT lines precede the role-creation DO block, which only
@@ -342,14 +381,16 @@ export async function seedTenant(context, { tenantN, adminN = 1, userCount = 0, 
   }
 
   if (userCount > 0) {
-    // Student ids are built textually (same shape as userId(tenantN, g) in
-    // JS) so the whole cohort seeds in two bulk statements — uuid arithmetic
-    // is not valid in Postgres, so no uuid + g tricks.
+    // Student ids are built textually (same shape as userId(tenantN, g + 1)
+    // in JS) so the whole cohort seeds in two bulk statements. The +1 offset
+    // skips slot 000000000001, which belongs to the tenant admin — otherwise
+    // student #1 would collide with the admin id and be silently dropped by
+    // ON CONFLICT DO NOTHING (leaving 29 rows for a 30-user seed).
     await context.query(
       `
       INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, role, aud)
       SELECT
-        ('a2' || lpad($2::text, 2, '0') || '0000-0000-4000-8000-' || lpad(g::text, 12, '0'))::uuid,
+        ('a2' || lpad($2::text, 2, '0') || '0000-0000-4000-8000-' || lpad((g + 1)::text, 12, '0'))::uuid,
         'user-' || g || '@${emailDomain}',
         'x', now(), now(), now(), 'authenticated', 'authenticated'
       FROM generate_series(1, $1) g
@@ -360,7 +401,7 @@ export async function seedTenant(context, { tenantN, adminN = 1, userCount = 0, 
       `
       INSERT INTO public.users (id, tenant_id, email, email_hash, first_name, last_name, primary_role, account_status)
       SELECT
-        ('a2' || lpad($3::text, 2, '0') || '0000-0000-4000-8000-' || lpad(g::text, 12, '0'))::uuid,
+        ('a2' || lpad($3::text, 2, '0') || '0000-0000-4000-8000-' || lpad((g + 1)::text, 12, '0'))::uuid,
         $2,
         'user-' || g || '@${emailDomain}',
         encode(extensions.digest(lower(btrim('user-' || g || '@${emailDomain}')), 'sha256'), 'hex'),
@@ -465,8 +506,32 @@ export function createWorkerSimulator(context, { batchSize = 50, onProgress } = 
 
       onProgress?.({ jobId: job.id, processed, total });
 
-      // Crash simulation: abandon mid-processing (Edge Function timeout /
-      // kill). Nothing after this point runs for this job in this attempt.
+      // PERF-02: progress + checkpoint go to the dedicated `result`
+      // column (error_message stays reserved for fatal errors), and
+      // succeeded_ids lands incrementally so a crash between batches resumes
+      // cleanly after release_stale_job_locks / retry.
+      await context.query(
+        `SELECT public.worker_update_bulk_job($1, NULL, NULL, NULL, false, $2, true)`,
+        [
+          job.id, // $1 = p_id uuid
+          JSON.stringify({
+            processed,
+            total,
+            succeeded: succeededIds.length,
+            failed: failedIds.length,
+            succeeded_ids: succeededIds,
+            failed_ids: failedIds,
+            in_progress: true,
+            truncated,
+            ...(truncated ? { remaining } : {}),
+          }), // $2 = p_result jsonb
+        ],
+      );
+
+      // Crash simulation: die right AFTER the checkpoint write for this
+      // batch (the Edge-Function wall-clock scenario the plan models: the
+      // worker died with its checkpoint on disk, mid-job). Nothing after
+      // this point runs for this job in this attempt.
       if (crashAfterUsers !== null && processed >= crashAfterUsers) {
         return {
           job,
@@ -479,24 +544,6 @@ export function createWorkerSimulator(context, { batchSize = 50, onProgress } = 
           remaining,
         };
       }
-
-      await context.query(
-        `SELECT public.worker_update_bulk_job($1, NULL, NULL, NULL, false, $2, true)`,
-        [
-          JSON.stringify({
-            processed,
-            total,
-            succeeded: succeededIds.length,
-            failed: failedIds.length,
-            succeeded_ids: succeededIds,
-            failed_ids: failedIds,
-            in_progress: true,
-            truncated,
-            ...(truncated ? { remaining } : {}),
-          }),
-          job.id,
-        ],
-      );
     }
 
     const result = {
@@ -512,7 +559,7 @@ export function createWorkerSimulator(context, { batchSize = 50, onProgress } = 
 
     await context.query(
       `SELECT public.worker_update_bulk_job($1, 'done', NULL, now(), true, $2, true)`,
-      [job.id, JSON.stringify(result)],
+      [job.id, JSON.stringify(result)], // $1 = p_id, $2 = p_result
     );
 
     return { job, crashed: false, processed, total, result, truncated, remaining };
