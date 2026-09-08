@@ -15,7 +15,7 @@ eduzone/                          # pnpm workspace + Turborepo
 │       ├── src/
 │       │   ├── app/              # Next.js App Router (locale-based: [locale]/)
 │       │   │   ├── [locale]/     # Pages: courses, users, analytics, audit, settings…
-│       │   │   └── api/          # Route handlers: cron, proxy-asset, video
+│       │   │   └── api/          # Route handlers: cron, audit, bulk-action
 │       │   ├── domain/           # Types, Zod schemas, constants, domain services
 │       │   ├── application/      # Use cases, ports (IEventBus, ILogger, ITracer)
 │       │   ├── infrastructure/   # Supabase clients, repos (services), RPC, event-bus

@@ -44,6 +44,8 @@ supabase/db_url.txt
 *storybook.log
 storybook-static
 *.patch
+*.diff
+*.tsbuildinfo
 apps/admin/tsconfig.tsbuildinfo
 packages/types/tsconfig.tsbuildinfo
 packages/ui/tsconfig.tsbuildinfo
