@@ -352,10 +352,14 @@ test.describe('User Management', () => {
   // result. Compounding that: a real bulk lock has no bulk-undo (only
   // per-row Unlock), and would touch every currently selected user at
   // once -- multiple real seeded fixtures, not the one disposable target
-  // the single-user Lock/Unlock port uses. So, like Ban/Suspend, this
-  // drives real selection + the real confirm dialog, then cancels instead
-  // of submitting.
-  test.describe('Bulk lock selection & confirm dialog (Cloud Safe -- never submits)', () => {
+  // the single-user Lock/Unlock port uses. So, like Ban/Suspend, the first
+  // test below drives real selection + the real confirm dialog, then
+  // cancels instead of submitting. The second test goes one step further
+  // and really submits -- safe only because it targets exactly one user
+  // (Lina, seeded 'locked') for whom lock is idempotent; the
+  // multi-fixture blast radius described above is what keeps the general
+  // submit case out of E2E scope.
+  test.describe('Bulk lock dialog & real submit (Cloud Safe)', () => {
     test('selects two users, opens the real bulk-lock confirm dialog with the live count, then cancels', async ({
       page,
     }) => {
@@ -430,6 +434,84 @@ test.describe('User Management', () => {
       await page.getByRole('button', { name: 'Clear' }).click();
       await expect(page.getByRole('row').nth(1).getByRole('checkbox')).not.toBeChecked();
       await expect(page.getByRole('row').nth(2).getByRole('checkbox')).not.toBeChecked();
+    });
+
+    // Port of the Cypress "User Management: Bulk Lock Flow (Cloud Safe)" spec
+    // (cypress/e2e/users/bulk-lock.cy.ts), submit half. The selection +
+    // confirm-dialog half is the test above; this one covers the real
+    // submit -> job -> progress-panel path that the Cypress version faked
+    // with cy.intercept on both a non-existent RPC and a guessed Edge
+    // Function endpoint.
+    test('submits a real bulk-lock job against an already-locked account (idempotent -- seed state unchanged)', async ({
+      page,
+    }) => {
+      // ── Target: Lina Khalid ───────────────────────────────────────
+      // supabase/schema/11_seed_reference.sql seeds Lina
+      // (student2@eduzone-test.com) as 'locked', and no other spec in
+      // this file touches her row: Lock/Unlock mutates Omar, Ban/Suspend
+      // only open-then-cancel dialogs on Sara. Locking an already-locked
+      // account is a no-op end-state-wise whether or not the CI
+      // bulk-worker ever executes the job -- so unlike the multi-select
+      // case in the comment above, this single-target submit needs no
+      // restore step and cannot race with any other test (search box +
+      // selection are per-page isolated state; only DB rows are shared).
+      await page.getByPlaceholder('Search users...').fill('Lina');
+
+      const row = page.getByRole('row', { name: /Lina Khalid/i });
+      await expect(row).toBeVisible();
+      await expect(row.getByRole('cell', { name: 'Locked', exact: true })).toBeVisible();
+
+      await row.getByRole('checkbox').check();
+
+      const selectionSummary = page.getByText('selected');
+      await expect(selectionSummary).toBeVisible();
+      await expect(selectionSummary).toContainText('1');
+
+      await page.getByRole('button', { name: 'Lock', exact: true }).click();
+
+      const dialog = page.getByRole('dialog');
+      await expect(dialog.getByText('Confirm Bulk Lock')).toBeVisible();
+      await expect(
+        dialog.getByText('This will affect 1 user(s). This action cannot be easily undone.'),
+      ).toBeVisible();
+
+      // Timestamped reason: the route dedupes identical in-flight jobs
+      // (uq_job_dedupe on job_type + payload_hash, 409 DUPLICATE_JOB),
+      // so a CI retry re-submitting the byte-identical body while the
+      // first job is still pending would be rejected. A unique reason
+      // keeps each attempt submittable -- realistic too, reasons carry
+      // incident references in practice.
+      await dialog
+        .getByLabel('Reason (optional)')
+        .fill(`E2E idempotency probe ${Date.now()} on already-locked seed account`);
+
+      // Deterministic submit sync: the real POST /api/bulk-action
+      // (submitBulkAction, infrastructure/repos/bulk.service.ts ->
+      // enqueueBulkJob -> admin_enqueue_bulk_job) must return 2xx.
+      // This is the server-side result the Cypress mocks faked.
+      const submitResponse = page.waitForResponse(
+        (res) => res.url().includes('/api/bulk-action') && res.request().method() === 'POST',
+      );
+      await dialog.getByRole('button', { name: 'Confirm Lock' }).click();
+      expect((await submitResponse).ok()).toBe(true);
+
+      // ── Real submission artifacts ─────────────────────────────────
+      // Panel first: persistent. BulkProgressPanel.tsx renders a "Bulk
+      // lock" heading with the live status badge once onJobStarted
+      // fires -- no worker timing involved.
+      await expect(page.getByRole('heading', { name: 'Bulk lock' })).toBeVisible();
+      // Toast second: transient (autoHideDuration 4000ms, Toast.tsx),
+      // scoped with .filter({ hasText }) for the same __next-route-
+      // announcer collision the lock/unlock test documents.
+      await expect(
+        page.getByRole('alert').filter({ hasText: 'Bulk operation started' }),
+      ).toBeVisible();
+
+      // ── Idempotency: seed state unchanged ─────────────────────────
+      // Deliberately no terminal-status wait and no restore: the worker
+      // may or may not run in this harness, and either way Lina stays
+      // 'Locked'.
+      await expect(row.getByRole('cell', { name: 'Locked', exact: true })).toBeVisible();
     });
   });
 });
