@@ -24,6 +24,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          # Gitleaks resolves refs (base/head) to scope a PR scan; a
+          # shallow single-commit checkout leaves those refs unresolvable
+          # and fails the Secret Scan step with "failed to scan Git
+          # repository" on pull_request events (push events were
+          # unaffected). Full history costs a little fetch time but keeps
+          # the gate meaningful and enforceable on PRs.
+          fetch-depth: 0
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
