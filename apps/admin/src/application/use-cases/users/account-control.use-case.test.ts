@@ -62,8 +62,6 @@ describe('ControlUserAccountUseCase', () => {
       action: 'suspend',
       reason: 'cheating',
       suspendHours: 24,
-      // A-001 fix (3b3708b): the RPC needs an explicit actor because the call
-      // goes through the service-role client, where auth.uid() is NULL.
       actorId: 'admin-1',
     });
     expect(result).toEqual({
@@ -117,7 +115,6 @@ describe('TerminateUserSessionsUseCase', () => {
 
     const result = await new TerminateUserSessionsUseCase(repo, audit).execute(ctx, 'u1');
 
-    // A-001 fix (3b3708b): actorId (ctx.userId) is now passed explicitly.
     expect(repo.terminateSessions).toHaveBeenCalledWith('u1', 'admin_terminated', 'admin-1');
     expect(result).toEqual({ success: true, count: 4 });
     expect(audit.record).toHaveBeenCalledWith(
