@@ -2,7 +2,9 @@ name: CI
 
 # Execution Plan §19 — CI/CD Production Gates (PR chain, in order):
 #   Secret Scan → Dependency Audit → Architecture Check → Lint → Typecheck →
-#   Unit (coverage) → Production Build → Supabase DB Lint.
+#   Unit (coverage) → Production Build.
+# (Schema validity lives in e2e.yml, which applies the real schema to a
+# live database — see the NOTE at the end of this file.)
 #
 # E2E lives in e2e.yml (dormant until the disposable test backend is
 # provisioned — see that file). The security/RLS scripts under
@@ -102,5 +104,13 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'ci-placeholder-anon-key' }}
         run: pnpm turbo build
 
-      - name: Supabase DB Lint
-        run: supabase db lint
+      # NOTE: no `supabase db lint` step here, deliberately matching
+      # deploy.yml ("Main Branch Checks"). That step needs a running local
+      # database (`supabase start`), which this job never provisions, so it
+      # failed with ECONNREFUSED on every PR run and never passed once in
+      # this workflow's history -- a permanently-red gate proves nothing
+      # (same rationale as the --prod audit scope and E2E_ENABLED above).
+      # Schema validity is instead verified where a real database exists:
+      # e2e.yml applies every supabase/schema/*.sql file with
+      # psql -v ON_ERROR_STOP=1 (a strictly stronger check than lint) and
+      # then runs the full Playwright suite against the seeded stack.
