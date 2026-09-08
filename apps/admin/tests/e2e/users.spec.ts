@@ -366,7 +366,11 @@ test.describe('User Management', () => {
       // UsersPage.tsx, so this also confirms both checkboxes actually
       // registered as two distinct selections, not one.
       await expect(page.getByText('2', { exact: true })).toBeVisible();
-      await expect(page.getByText('selected', { exact: true })).toBeVisible();
+      // Not exact: true here -- BulkActionBar.tsx renders {selectedCount} in
+      // its own <div> but {t('selected')} as a bare text node next to it, so
+      // the smallest containing element's full text is "2 selected", never
+      // "selected" alone. An exact match against that string can never pass.
+      await expect(page.getByText('selected')).toBeVisible();
 
       // bulk_action_lock is "Lock" -- distinct from the row menu's "Lock
       // Account" and the dialog's own "Confirm Lock" button below, so this
