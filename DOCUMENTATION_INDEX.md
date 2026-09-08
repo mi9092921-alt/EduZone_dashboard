@@ -4,7 +4,7 @@
 **Reviewed:** 2026-09-08  
 **Purpose:** define documentation ownership and prevent competing sources of truth
 
-## Current operational documents
+## Current operational documents 
 
 | Path | Owner | Use for |
 |---|---|---|
