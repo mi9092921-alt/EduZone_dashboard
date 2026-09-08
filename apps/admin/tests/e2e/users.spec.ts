@@ -254,4 +254,73 @@ test.describe('User Management', () => {
       await expect(row.getByRole('cell', { name: 'Active', exact: true })).toBeVisible();
     });
   });
+
+  // Port of the Cypress "User Management: Suspend User Flow (Cloud Safe)"
+  // spec (cypress/e2e/users/suspend-user.cy.ts) -- same category of stale
+  // fixtures as lock-user/ban-user had (a "Security" tab, a bare
+  // `**/rest/v1/rpc/*suspend*` intercept, and a button literally named
+  // "Suspend" that don't exist in src/; the real mutation is the same
+  // service_role Server Action as lock/unlock/ban). The old spec also
+  // never actually filled in a duration -- its own comments admit the
+  // 48-hour selection step was guessed at and left commented out.
+  //
+  // Like Ban, Suspend has no reverse action anywhere in this app --
+  // UserRowActions.tsx only ever shows "Suspend Account" while
+  // account_status !== 'suspended', with no corresponding "unsuspend" menu
+  // item for when it is. (SuspendUserDialog does accept a suspend_hours
+  // duration after which the suspension would presumably lapse on its own,
+  // but there's no UI path to reverse it immediately.) So, like the Ban
+  // port, this never actually submits: it exercises the two pieces of real
+  // client-side behaviour worth locking down -- the suspend_hours bounds
+  // from suspendUserSchema (domain/schemas/user.schema.ts: 1-720) and the
+  // live "Suspended until {date}" preview (ActionDialogs.tsx watches the
+  // field and recomputes it) -- then cancels.
+  test.describe('Suspend duration validation (Cloud Safe -- never submits)', () => {
+    test('rejects an out-of-range duration, shows the live preview for a valid one, then cancels', async ({
+      page,
+    }) => {
+      // Sara Mohamed -- same target as the Ban port above. Neither test
+      // ever submits a mutation, so both reading her row in parallel is
+      // safe regardless of worker scheduling.
+      await page.getByPlaceholder('Search users...').fill('Sara');
+      const row = page.getByRole('row', { name: /Sara Mohamed/i });
+      await expect(row).toBeVisible();
+
+      await row.getByRole('button', { name: 'User Options' }).click();
+      await page.getByRole('menuitem', { name: 'Suspend Account' }).click();
+
+      const dialog = page.getByRole('dialog');
+      // suspend_user_title in messages/en.json is "Suspend {name}".
+      await expect(dialog.getByText('Suspend Sara Mohamed')).toBeVisible();
+
+      // The Reason field reuses lock_reason_label ("Reason") -- same as
+      // the Lock dialog -- scoped to this dialog since Ban/Lock's own
+      // "Reason" fields are unmounted right now.
+      await dialog.getByLabel('Reason').fill('Policy violation flagged by automated E2E check');
+
+      // ── The real bug surface: suspend_hours bounds (1-720) ─────────
+      // The <input type="number" min={1} max={720}> only affects the
+      // browser's spinner/:invalid styling, not what .fill() can enter or
+      // what the app accepts -- suspendUserSchema (zodResolver) is the
+      // actual gate. 0 is below the schema's min(1).
+      await dialog.getByLabel('Duration (Hours)').fill('0');
+      await dialog.getByRole('button', { name: 'Suspend User' }).click();
+      await expect(dialog.getByText('Minimum 1 hour')).toBeVisible();
+      // Still on the dialog -- nothing was submitted, so no toast fired.
+      await expect(page.getByRole('alert')).toHaveCount(0);
+
+      // ── A valid value clears the error and drives the live preview ──
+      // suspended_until in messages/en.json is "Suspended until {date}" --
+      // ActionDialogs.tsx only renders it once `hours` is truthy, and
+      // recomputes it from Date.now() on every change to suspend_hours.
+      await dialog.getByLabel('Duration (Hours)').fill('48');
+      await expect(dialog.getByText('Minimum 1 hour')).toHaveCount(0);
+      await expect(dialog.getByText(/Suspended until/)).toBeVisible();
+
+      // ── Cancel instead of submitting -- Suspend has no undo in this app
+      await dialog.getByRole('button', { name: 'Cancel' }).click();
+      await expect(dialog).toBeHidden();
+      await expect(row.getByRole('cell', { name: 'Active', exact: true })).toBeVisible();
+    });
+  });
 });
