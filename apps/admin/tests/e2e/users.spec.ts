@@ -323,4 +323,92 @@ test.describe('User Management', () => {
       await expect(row.getByRole('cell', { name: 'Active', exact: true })).toBeVisible();
     });
   });
+
+  // Port of the Cypress "User Management: Bulk Lock Flow (Cloud Safe)" spec
+  // (cypress/e2e/users/bulk-lock.cy.ts). That version mocked
+  // `**/functions/v1/bulk-actions*` AND `**/rest/v1/rpc/*bulk*` as
+  // alternatives ("if it's an RPC... Alternatively...") -- guessing at two
+  // different possible backends rather than confirming either, and by its
+  // own admission only asserted the UI reaching a "Processing"/"Pending"
+  // label, not a real result.
+  //
+  // The real flow (BulkActionBar.tsx, useSubmitBulkAction ->
+  // adapters/mutations/bulk.mutations.ts) is neither of those guesses: it's
+  // a real RPC that enqueues a row for the `bulk-worker` Edge Function
+  // (supabase/functions/bulk-worker/index.ts) to process asynchronously,
+  // returning a job_id. That worker isn't part of this CI harness (e2e.yml
+  // only starts the Postgres/Auth/Storage stack, not Edge Functions), so
+  // there is no reliable, verifiable "done" state to assert here even if
+  // the job were submitted -- unlike Lock/Unlock's synchronous RPC, this
+  // would leave the test asserting its own optimistic UI state, not a real
+  // result. Compounding that: a real bulk lock has no bulk-undo (only
+  // per-row Unlock), and would touch every currently selected user at
+  // once -- multiple real seeded fixtures, not the one disposable target
+  // the single-user Lock/Unlock port uses. So, like Ban/Suspend, this
+  // drives real selection + the real confirm dialog, then cancels instead
+  // of submitting.
+  test.describe('Bulk lock selection & confirm dialog (Cloud Safe -- never submits)', () => {
+    test('selects two users, opens the real bulk-lock confirm dialog with the live count, then cancels', async ({
+      page,
+    }) => {
+      // ── Select two real data rows via their own checkboxes ──────────
+      // UsersTable.tsx: each row's <input type="checkbox" checked={isSelected}
+      // onChange={() => onSelectToggle(user.id)}> is independent of the
+      // header "select all" checkbox tested implicitly by beforeEach above.
+      // Rows 1 and 2 (row 0 is the header) are whichever two seeded users
+      // sort first -- irrelevant here since this test only reads the
+      // resulting count and cancels, never depending on which two.
+      await page.getByRole('row').nth(1).getByRole('checkbox').check();
+      await page.getByRole('row').nth(2).getByRole('checkbox').check();
+
+      // ── The real selection bar (BulkActionBar.tsx) ──────────────────
+      // "{count} selected" -- selectedCount is selectedIds.size from
+      // UsersPage.tsx, so this also confirms both checkboxes actually
+      // registered as two distinct selections, not one.
+      await expect(page.getByText('2', { exact: true })).toBeVisible();
+      await expect(page.getByText('selected', { exact: true })).toBeVisible();
+
+      // bulk_action_lock is "Lock" -- distinct from the row menu's "Lock
+      // Account" and the dialog's own "Confirm Lock" button below, so this
+      // is unambiguous without needing to scope to the action bar.
+      await page.getByRole('button', { name: 'Lock', exact: true }).click();
+
+      // ── The real confirm dialog ──────────────────────────────────────
+      // bulk_confirm_title_lock is the static "Confirm Bulk Lock" (not
+      // per-count, unlike Suspend's per-name title) -- bulk_confirm_desc
+      // is where the live count actually appears: "This will affect
+      // {count} user(s). This action cannot be easily undone."
+      const dialog = page.getByRole('dialog');
+      await expect(dialog.getByText('Confirm Bulk Lock')).toBeVisible();
+      await expect(
+        dialog.getByText('This will affect 2 user(s). This action cannot be easily undone.'),
+      ).toBeVisible();
+
+      // bulk_reason_label is "Reason (optional)" -- unlike Lock/Suspend/
+      // Ban's per-user dialogs, there is no schema requiring this, so it's
+      // fine (and realistic) to leave it empty and still be able to
+      // proceed -- this test doesn't confirm either way, but leaving it
+      // blank here also documents that Confirm isn't gated on it.
+      await expect(dialog.getByLabel('Reason (optional)')).toBeVisible();
+
+      // ── Cancel instead of submitting -- see the long comment above for
+      // why this never confirms.
+      await dialog.getByRole('button', { name: 'Cancel' }).click();
+      await expect(dialog).toBeHidden();
+
+      // Cancelling only closes the dialog (BulkActionBar.tsx's
+      // handleCancel resets its own local pendingAction/reason state, not
+      // the parent's selectedIds) -- the selection itself is untouched,
+      // which is what lets an admin pick a different action after
+      // cancelling instead of starting the selection over.
+      await expect(page.getByText('2', { exact: true })).toBeVisible();
+
+      // ── Clearing the selection is a separate, explicit action ────────
+      // The bar's own "X" button (aria-label={tCommon('clear')} = "Clear")
+      // is the actual way to deselect everything.
+      await page.getByRole('button', { name: 'Clear' }).click();
+      await expect(page.getByRole('row').nth(1).getByRole('checkbox')).not.toBeChecked();
+      await expect(page.getByRole('row').nth(2).getByRole('checkbox')).not.toBeChecked();
+    });
+  });
 });
