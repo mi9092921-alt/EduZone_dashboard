@@ -53,6 +53,12 @@ const ACTIVITY_TYPES = [
   'bulk_action_completed',
   'bulk_action_progress',
   'bulk_export_completed',
+  'auth.login',
+  'auth.logout',
+  'course.opened',
+  'todo.created',
+  'todo.completed',
+  'navigation.screen_viewed',
 ];
 
 const RISK_LEVELS: RiskLevel[] = ['low', 'medium', 'high', 'critical'];
@@ -513,7 +519,13 @@ function MultiSelect({
                     </svg>
                   )}
                 </div>
-                {mode === 'activity' ? t(`activity_types.${opt}`) : t(`risk_levels.${opt}`)}
+                {mode === 'activity'
+                  ? t.has(`activity_types.${opt}`)
+                    ? t(`activity_types.${opt}`)
+                    : opt
+                  : t.has(`risk_levels.${opt}`)
+                    ? t(`risk_levels.${opt}`)
+                    : opt}
               </button>
             ))}
           </div>

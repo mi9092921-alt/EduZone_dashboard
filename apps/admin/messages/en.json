@@ -656,7 +656,23 @@
       "bulk_action_completed": "Bulk Action Completed",
       "bulk_action_progress": "Bulk Action Progress",
       "bulk_export_completed": "Bulk Export Completed",
-      "todo.created": "Todo Created"
+      "auth": {
+        "login": "Login",
+        "logout": "Logout"
+      },
+      "todo": {
+        "created": "Todo Created",
+        "completed": "Todo Completed",
+        "updated": "Todo Updated",
+        "deleted": "Todo Deleted"
+      },
+      "course": {
+        "opened": "Course Opened",
+        "completed": "Course Completed"
+      },
+      "navigation": {
+        "screen_viewed": "Screen Viewed"
+      }
     },
     "risk_levels": {
       "low": "Low",

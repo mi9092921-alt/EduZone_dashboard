@@ -457,6 +457,19 @@ GRANT EXECUTE ON FUNCTION public.check_rate_limit(text, uuid, inet, uuid) TO aut
 -- revoked from every role, including authenticated, so it is unreachable via PostgREST.
 REVOKE ALL ON FUNCTION public.check_rate_limit(text, integer, integer) FROM PUBLIC, anon, authenticated;
 
+-- PERF-05 FIX (get_tenants_usage): This SECURITY DEFINER function carries an
+-- internal is_admin_with_session_validation() guard that rejects non-admins at
+-- runtime. However, because 10_permissions.sql's ALTER DEFAULT PRIVILEGES REVOKE
+-- (line 279) strips the implicit PUBLIC EXECUTE grant that Postgres assigns at
+-- CREATE FUNCTION time, PostgREST's schema cache never learned about the function
+-- at all — every call from tenants.service.ts landed as a 404
+-- ("function public.get_tenants_usage(p_tenant_ids) not found in schema cache").
+-- Same root cause and same fix pattern as bind_device_for_current_user /
+-- get_lesson_content / api_update_profile above: explicit REVOKE + GRANT makes
+-- the function visible to PostgREST; the body still rejects non-admins.
+REVOKE ALL ON FUNCTION public.get_tenants_usage(uuid[]) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_tenants_usage(uuid[]) TO authenticated, service_role;
+
 -- 3. ADMIN ONLY - Revoked from anon AND authenticated; granted to service_role only
 REVOKE EXECUTE ON FUNCTION public.is_current_user_super_admin() FROM anon;
 REVOKE EXECUTE ON FUNCTION public.is_current_user_super_admin() FROM authenticated;
