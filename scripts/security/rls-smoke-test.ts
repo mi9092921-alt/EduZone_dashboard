@@ -8,7 +8,7 @@ function loadEnvTest() {
   const p = resolve(process.cwd(), '.env.test');
   if (!existsSync(p)) return;
   for (const line of readFileSync(p, 'utf8').split('\n')) {
-    const t = line.trim();
+    const t = line.replace(/\r$/, '').trim();
     if (!t || t.startsWith('#')) continue;
     const i = t.indexOf('=');
     if (i < 0) continue;
