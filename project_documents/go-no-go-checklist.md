@@ -111,7 +111,7 @@
 | Pre-production DB snapshot taken and labeled | DevOps | ☐      |
 | Previous Vercel deployment SHA noted         | DevOps | ☐      |
 | Rollback procedure tested on Staging         | Dev    | ☐      |
-| `docs/rollback-plan.md` reviewed by team     | Team   | ☐      |
+| `project_documents/rollback-plan.md` reviewed by team | Team   | ☐      |
 
 ---
 
