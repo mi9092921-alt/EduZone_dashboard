@@ -140,7 +140,11 @@ test.describe('Maintenance mode wizard (Cloud Safe -- write mocked)', () => {
     // that a translation fix would break, assert the wizard did NOT
     // advance: the Message field is still here and the final submit
     // ("Enable Maintenance", step 4 only) is still absent.
+    // Step 1 (Message) starts prefilled from the seeded
+    // maintenance_message ("Application is under maintenance.") --
+    // clear it first so the empty check actually exercises.
     await expect(page.getByLabel('Message (Arabic)')).toBeVisible();
+    await page.getByLabel('Message (Arabic)').fill('');
     await page.getByRole('button', { name: 'Next Step' }).click();
     await expect(page.getByLabel('Message (Arabic)')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Enable Maintenance' })).toHaveCount(0);
