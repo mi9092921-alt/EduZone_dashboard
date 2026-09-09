@@ -14,6 +14,7 @@ dist/
 # Environment variables
 .env
 .env.local
+.env.test
 .env.development.local
 .env.test.local
 .env.production.local
@@ -40,6 +41,7 @@ pnpm-debug.log*
 # Supabase
 supabase/.temp/
 supabase/db_url.txt
+supabase/db_url.test.txt
 
 *storybook.log
 storybook-static

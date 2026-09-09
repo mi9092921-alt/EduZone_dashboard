@@ -6,12 +6,14 @@ name: CI
 # (Schema validity lives in e2e.yml, which applies the real schema to a
 # live database — see the NOTE at the end of this file.)
 #
-# E2E lives in e2e.yml (dormant until the disposable test backend is
-# provisioned — see that file). The security/RLS scripts under
-# scripts/security (rls-smoke-test.ts, permission-exhaustive-test.ts) now
-# correctly call process.exit(1) on any detected leak and are CI-gate-ready.
-# They are NOT wired here because they require a live, seeded Supabase
-# backend — tracked for e2e.yml once the test-tenant environment is stable.
+# E2E lives in e2e.yml (runs when the repository variable E2E_ENABLED is
+# "true"). The security/RLS scripts under scripts/security
+# (rls-smoke-test.ts, permission-exhaustive-test.ts) correctly call
+# process.exit(1) on any detected leak and are wired as the "Security gate"
+# step of e2e.yml, running against the freshly-seeded local stack BEFORE
+# Playwright — a breach fails the job and the required "e2e" check blocks
+# the merge. They are NOT duplicated here because they require a live,
+# seeded Supabase backend, which only e2e.yml provisions.
 #
 # Merge protection (Execution Plan §19): mark the "build_and_test" job as a
 # required status check for main (Settings → Branches → Branch protection) so

@@ -1,6 +1,15 @@
-$dbUrlFile = Join-Path $PSScriptRoot 'db_url.txt'
+param(
+    [string]$ConfigFile = 'db_url.test.txt'
+)
+
+$dbUrlFile = if ([System.IO.Path]::IsPathRooted($ConfigFile)) {
+    $ConfigFile
+} else {
+    Join-Path $PSScriptRoot $ConfigFile
+}
+
 if (-not (Test-Path -LiteralPath $dbUrlFile)) {
-    throw 'supabase/db_url.txt is required for authenticated function deployment.'
+    throw "$ConfigFile is required for authenticated function deployment."
 }
 
 $configValues = @{}
@@ -11,7 +20,7 @@ foreach ($line in Get-Content -LiteralPath $dbUrlFile) {
 }
 
 if (-not $configValues['SUPABASE_ACCESS_TOKEN'] -or -not $configValues['SUPABASE_URL']) {
-    throw 'SUPABASE_ACCESS_TOKEN and SUPABASE_URL are required in supabase/db_url.txt.'
+    throw "SUPABASE_ACCESS_TOKEN and SUPABASE_URL are required in $ConfigFile."
 }
 
 $env:SUPABASE_ACCESS_TOKEN = $configValues['SUPABASE_ACCESS_TOKEN']

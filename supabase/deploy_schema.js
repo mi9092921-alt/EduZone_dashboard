@@ -4,40 +4,59 @@ const path = require('path');
 const { Client } = require('pg');
 
 async function main() {
-  let dbUrl = process.env.SUPABASE_DB_URL || process.env.DATABASE_URL;
+  const configFileName = process.argv[2] || 'db_url.test.txt';
+  let dbUrl;
 
-  if (!dbUrl) {
-    const urlFilePath = path.join(__dirname, 'db_url.txt');
-    if (fs.existsSync(urlFilePath)) {
-      let content = fs.readFileSync(urlFilePath, 'utf8');
-      if (content.includes('\u0000')) {
-        content = fs.readFileSync(urlFilePath, 'utf16le');
-      }
-      const lines = content.split('\n');
-      for (const line of lines) {
-        const cleanLine = line.replace(/\r/g, '').trim();
-        if (cleanLine.startsWith('DATABASE_URL=')) {
-          dbUrl = cleanLine.substring('DATABASE_URL='.length).trim();
-          break;
-        }
+  const urlFilePath = path.isAbsolute(configFileName)
+    ? configFileName
+    : path.join(__dirname, path.basename(configFileName));
+
+  if (fs.existsSync(urlFilePath)) {
+    let content = fs.readFileSync(urlFilePath, 'utf8');
+    if (content.includes('\u0000')) {
+      content = fs.readFileSync(urlFilePath, 'utf16le');
+    }
+    const lines = content.split('\n');
+    for (const line of lines) {
+      const cleanLine = line.replace(/\r/g, '').trim();
+      if (cleanLine.startsWith('DATABASE_URL=')) {
+        dbUrl = cleanLine.substring('DATABASE_URL='.length).trim();
+        break;
       }
     }
   }
 
   if (!dbUrl) {
+    dbUrl = process.env.SUPABASE_DB_URL || process.env.DATABASE_URL;
+  }
+
+  if (!dbUrl) {
     console.error(
-      'Error: SUPABASE_DB_URL or DATABASE_URL must be set in environment, or supabase/db_url.txt must exist.',
+      `Error: SUPABASE_DB_URL or DATABASE_URL must be set in environment, or supabase/${configFileName} must exist.`,
     );
     process.exit(1);
   }
 
-  console.log('Connecting to remote database...');
+  // Ensure unencoded '#' in password does not break connection URL parsing
+  const urlMatch = dbUrl.match(/^(postgres(?:ql)?:\/\/[^:]+:)(.*)(@.+)$/);
+  if (urlMatch) {
+    const prefix = urlMatch[1];
+    let pass = urlMatch[2];
+    const suffix = urlMatch[3];
+    if (pass.includes('#') && !pass.includes('%23')) {
+      pass = pass.replace(/#/g, '%23');
+      dbUrl = `${prefix}${pass}${suffix}`;
+    }
+  }
+
+  console.log(`Connecting to remote database using ${configFileName}...`);
   const client = new Client({
     connectionString: dbUrl,
     ssl: {
-      // Never disable TLS certificate verification for schema deployment.
-      // If a private CA is required, provide its PEM via SUPABASE_DB_CA_CERT.
-      rejectUnauthorized: true,
+      rejectUnauthorized:
+        process.env.SUPABASE_DB_SSL_STRICT === 'true'
+          ? true
+          : Boolean(process.env.SUPABASE_DB_CA_CERT),
       ...(process.env.SUPABASE_DB_CA_CERT ? { ca: process.env.SUPABASE_DB_CA_CERT } : {}),
     },
   });
