@@ -656,7 +656,23 @@
       "bulk_action_completed": "اكتمل الإجراء الجماعي",
       "bulk_action_progress": "تقدم الإجراء الجماعي",
       "bulk_export_completed": "اكتمل تصدير البيانات الجماعية",
-      "todo.created": "تم إنشاء مهمة"
+      "auth": {
+        "login": "تسجيل الدخول",
+        "logout": "تسجيل الخروج"
+      },
+      "todo": {
+        "created": "تم إنشاء مهمة",
+        "completed": "تم إكمال المهمة",
+        "updated": "تم تحديث المهمة",
+        "deleted": "تم حذف المهمة"
+      },
+      "course": {
+        "opened": "فتح الدورة",
+        "completed": "إكمال الدورة"
+      },
+      "navigation": {
+        "screen_viewed": "عرض الشاشة"
+      }
     },
     "risk_levels": {
       "low": "منخفض",

@@ -20,6 +20,18 @@ interface ActivityLocationsTabProps {
   userId: string;
 }
 
+/** Returns a formatted date/time string, or '—' if the value is missing or unparseable. */
+function safeFormat(
+  value: string | null | undefined,
+  locale: string,
+  options: Intl.DateTimeFormatOptions,
+): string {
+  if (!value) return '—';
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return '—';
+  return new Intl.DateTimeFormat(locale, options).format(d);
+}
+
 export function ActivityLocationsTab({ userId }: ActivityLocationsTabProps) {
   const t = useTranslations('activities');
   const locale = useLocale();
@@ -90,11 +102,14 @@ export function ActivityLocationsTab({ userId }: ActivityLocationsTabProps) {
                     <th className="text-start px-5 py-3 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">
                       {t('header_date')}
                     </th>
+                    <th className="text-start px-5 py-3 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">
+                      {t('header_map')}
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/30">
-                  {locationData.map((log) => (
-                    <tr key={log.id} className="hover:bg-muted/30 transition-colors group">
+                  {locationData.map((log, index) => (
+                    <tr key={`${log.id}-${index}`} className="hover:bg-muted/30 transition-colors group">
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
                           <div className="p-2 rounded-lg bg-background border border-border/40 group-hover:bg-card transition-colors">
@@ -132,16 +147,26 @@ export function ActivityLocationsTab({ userId }: ActivityLocationsTabProps) {
                       <td className="px-5 py-4 whitespace-nowrap">
                         <div className="flex flex-col text-[11px]">
                           <span className="text-foreground font-bold">
-                            {new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(
-                              new Date(log.timestamp),
-                            )}
+                            {safeFormat(log.timestamp, locale, { dateStyle: 'medium' })}
                           </span>
                           <span className="text-muted-foreground mt-0.5 uppercase text-[10px]">
-                            {new Intl.DateTimeFormat(locale, { timeStyle: 'short' }).format(
-                              new Date(log.timestamp),
-                            )}
+                            {safeFormat(log.timestamp, locale, { timeStyle: 'short' })}
                           </span>
                         </div>
+                      </td>
+                      <td className="px-5 py-4">
+                        {log.latitude != null && log.longitude != null && (
+                          <a
+                            href={`https://maps.google.com/?q=${log.latitude},${log.longitude}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Open in Google Maps"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wide bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 border border-blue-500/20 transition-colors"
+                          >
+                            <Public fontSize="inherit" />
+                            Maps
+                          </a>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -207,14 +232,10 @@ export function ActivityLocationsTab({ userId }: ActivityLocationsTabProps) {
                       <td className="px-5 py-4 whitespace-nowrap">
                         <div className="flex flex-col text-[11px]">
                           <span className="text-foreground/80 font-bold">
-                            {new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(
-                              new Date(log.created_at),
-                            )}
+                            {safeFormat(log.created_at, locale, { dateStyle: 'medium' })}
                           </span>
                           <span className="text-muted-foreground mt-0.5 uppercase text-[10px]">
-                            {new Intl.DateTimeFormat(locale, { timeStyle: 'short' }).format(
-                              new Date(log.created_at),
-                            )}
+                            {safeFormat(log.created_at, locale, { timeStyle: 'short' })}
                           </span>
                         </div>
                       </td>

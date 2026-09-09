@@ -3946,9 +3946,10 @@ $$;
 -- trip. Tenants with zero usage still get a row (0 counts), so the client
 -- merge never produces missing entries.
 -- Security: SECURITY DEFINER + admin-session guard, mirroring the sibling
--- admin read functions in this file. Same PUBLIC-EXECUTE-with-internal-guard
--- convention documented in the M11/M12 RPC boundary reports (no explicit
--- GRANT line required in 10_permissions.sql).
+-- admin read functions in this file. The function body rejects non-admins via
+-- is_admin_with_session_validation(). An explicit GRANT EXECUTE to
+-- authenticated + service_role IS required in 10_permissions.sql because the
+-- ALTER DEFAULT PRIVILEGES REVOKE there strips the implicit PUBLIC grant.
 -- ============================================================================
 CREATE OR REPLACE FUNCTION public.get_tenants_usage(p_tenant_ids uuid[])
 RETURNS TABLE (tenant_id uuid, user_count bigint, course_count bigint)

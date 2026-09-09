@@ -142,7 +142,9 @@ function EventItem({
           </div>
           <div className="flex items-center gap-2 mt-0.5">
             <span className={cn('text-[10px] font-medium uppercase', riskColors[event.risk_level])}>
-              {t(`risk_levels.${event.risk_level}`)}
+              {t.has(`risk_levels.${event.risk_level}`)
+                ? t(`risk_levels.${event.risk_level}`)
+                : event.risk_level}
             </span>
             {event.user_id && (
               <span className="text-[10px] text-muted-foreground font-mono truncate">
