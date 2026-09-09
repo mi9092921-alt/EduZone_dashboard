@@ -281,7 +281,15 @@ export async function startDatabaseWithSchema() {
     } catch {
       // already down
     }
-    rmSync(dataDir, { recursive: true, force: true });
+    for (let attempt = 1; attempt <= 10; attempt++) {
+      try {
+        rmSync(dataDir, { recursive: true, force: true });
+        break;
+      } catch {
+        if (attempt >= 10) break;
+        await new Promise((r) => setTimeout(r, 300 * attempt));
+      }
+    }
   }
 
   return { stop };

@@ -1,6 +1,6 @@
 {
   "tool": "scripts/perf/bulk-load-test.mjs",
-  "date": "2026-09-09T00:15:01.823Z",
+  "date": "2026-09-09T11:59:48.099Z",
   "environment": {
     "postgres": "17 (embedded, local-test-harness)",
     "note": "DB-side bulk path only. The Deno bulk-worker Edge Function and its Supabase wall-clock ceiling are NOT measurable here — record the staging Edge Function limit in edge_function_wall_clock_limit once verified on a real project.",
@@ -8,22 +8,22 @@
   },
   "scenarios": {
     "s1_single_job_500_users": {
-      "elapsed_ms": 490,
+      "elapsed_ms": 679,
       "processed": 500
     },
     "s2_concurrent_5x100": {
-      "elapsed_ms_wall_clock": 533,
+      "elapsed_ms_wall_clock": 409,
       "jobs_done": 5,
       "users_double_warned": 0
     },
     "s3_kill_recovery": {
-      "release_call_ms": 10,
-      "resume_processing_ms": 200,
+      "release_call_ms": 62,
+      "resume_processing_ms": 334,
       "lock_ttl_seconds": 1800
     },
     "s4_fairness": {
-      "b_enqueue_ms": 0,
-      "drain_ms_for_11_jobs": 96,
+      "b_enqueue_ms": 1,
+      "drain_ms_for_11_jobs": 75,
       "b_final_status": "done",
       "a_jobs_done": 10
     }
