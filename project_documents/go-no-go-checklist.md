@@ -12,7 +12,7 @@
 
 | Check                                                                                                                                                                                                                     | Owner | Status | Notes                                                                                                                                          |
 | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| Playwright E2E tests pass (5 spec files / 22 tests: auth login+logout+token-version, user list & filters + lock/unlock + suspend duration validation, global app-lock settings, a11y audits, UX/RTL/keyboard regression) | QA    | ✅      | Run: `pnpm --filter @eduzone/admin exec playwright test`. **Confirmed green**: [E2E (Playwright) #33](https://github.com/mi9092921-alt/EduZone_dashboard/actions/runs/34174008508/job/101899711029) — 22 passed (1.4m), commit `4730369`. Gate live in `.github/workflows/e2e.yml` (`E2E_ENABLED=true`). |
+| Playwright E2E tests pass (5 spec files / 24 tests: auth login+logout+token-version, user list & filters + lock/unlock + suspend duration validation + bulk-lock dialog/cancel + bulk-lock real submit, global app-lock settings, a11y audits, UX/RTL/keyboard regression) | QA    | ✅      | Run: `pnpm --filter @eduzone/admin exec playwright test`. **Confirmed green**: [E2E (Playwright)](https://github.com/mi9092921-alt/EduZone_dashboard/actions/runs/34292862362/job/102283005259) — 24 passed (5m56s). Gate live in `.github/workflows/e2e.yml` (`E2E_ENABLED=true`). |
 | Cypress E2E tests pass (15 spec files: moderation — ban/suspend/lock/bulk-lock; courses — create/enroll/revoke; warnings; audit-chain verify; notifications; settings — maintenance-mode/app-lock; auth token-version) | QA    | ☐      | Run: `pnpm --filter @eduzone/admin exec cypress run`. **Not yet ported to Playwright** — see ⚠️ note below. Not currently wired into any CI workflow. |
 | Unit test coverage ≥ 80%                                                                                                                                                                                                | Dev   | ☐      | Run: `vitest run --coverage`                                                                                                                     |
 | Storybook interaction tests pass                                                                                                                                                                                       | Dev   | ☐      |                                                                                                                                                    |
@@ -34,8 +34,7 @@
 >
 > **`users/suspend-user` ported (run #33).** Added as a new `Suspend duration validation (Cloud Safe -- never submits)` describe block in `users.spec.ts`. Same category as Ban: `UserRowActions.tsx` has no "unsuspend" menu item for when `account_status === 'suspended'`, so this never submits either — it drives `suspendUserSchema`'s real `suspend_hours` bounds (1-720; 0 is rejected with "Minimum 1 hour") and the live "Suspended until {date}" preview, then cancels. Target: Sara Mohamed (same as the Ban port, zero mutation risk either way). [E2E (Playwright) #33](https://github.com/mi9092921-alt/EduZone_dashboard/actions/runs/34174008508/job/101899711029) — 22/22 passed, commit `4730369`.
 >
-> Cypress must **not** be removed (dependency, specs, or `cypress.env.json.example`) until all flows are ported and verified green in Playwright. Until then, both suites are required launch gates. **8 flows remain**, all still real Cypress-only files with no Playwright equivalent:
-> - `users/bulk-lock.cy.ts`
+> Cypress must **not** be removed (dependency, specs, or `cypress.env.json.example`) until all flows are ported and verified green in Playwright. Until then, both suites are required launch gates. **7 flows remain**, all still real Cypress-only files with no Playwright equivalent:
 > - `courses/create-course.cy.ts`
 > - `courses/enroll-student.cy.ts`
 > - `courses/revoke-enrollment.cy.ts`
@@ -43,6 +42,8 @@
 > - `audit/verify-chain.cy.ts`
 > - `notifications/notifications-flow.cy.ts`
 > - `settings/maintenance-mode.cy.ts`
+>
+> `users/bulk-lock.cy.ts` was ported as a real-submit test in `users.spec.ts` (`Bulk lock dialog & real submit`: single idempotent target Lina Khalid, timestamped reason defeats `uq_job_dedupe` 409 on retries) — verified green with the dialog/cancel test beside it. Two CI infra fixes landed with that port: `ci.yml` checkout now uses `fetch-depth: 0` (Gitleaks failed on all PRs without it) and the never-passing `supabase db lint` step was removed (needs a live DB; schema validity is owned by e2e.yml's `psql -v ON_ERROR_STOP=1` apply).
 >
 > Port one at a time, verify green in a real CI run before moving to the next, then re-run this checklist update to shrink the list.
 
