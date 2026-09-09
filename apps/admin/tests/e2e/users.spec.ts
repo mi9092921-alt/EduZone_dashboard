@@ -426,7 +426,14 @@ test.describe('User Management', () => {
       // the parent's selectedIds) -- the selection itself is untouched,
       // which is what lets an admin pick a different action after
       // cancelling instead of starting the selection over.
-      await expect(page.getByText('2', { exact: true })).toBeVisible();
+      //
+      // Scoped to the selection wrapper (same as the pre-dialog assert
+      // above), NOT page-wide: the header Notifications bell badge
+      // renders its own unread count as plain text, and any other test
+      // that sends a real notification (e.g. notifications.spec.ts)
+      // makes a bare getByText('2') ambiguous -> strict-mode flake.
+      await expect(selectionSummary).toBeVisible();
+      await expect(selectionSummary).toContainText('2');
 
       // ── Clearing the selection is a separate, explicit action ────────
       // The bar's own "X" button (aria-label={tCommon('clear')} = "Clear")
@@ -444,10 +451,10 @@ test.describe('User Management', () => {
     // Function endpoint.
     test('submits a real bulk-lock job against an already-locked account (idempotent -- seed state unchanged)', async ({
       page,
-    }, testInfo) => {
-      // Self-diagnostics (same detach/timeout signature seen in some CI
-      // runs -- see audit.spec.ts): print URL + page errors + failed
-      // requests if this fails, so the log carries the cause.
+    }) => {
+      // Self-diagnostics: print URL + page errors + failed requests if
+      // this fails, so the log carries the cause (added while chasing
+      // the search-debounce selection wipe documented below).
       const events: string[] = [];
       page.on('pageerror', (err) => events.push(`pageerror: ${err.message}`));
       page.on('requestfailed', (req) =>
@@ -469,6 +476,18 @@ test.describe('User Management', () => {
       // restore step and cannot race with any other test (search box +
       // selection are per-page isolated state; only DB rows are shared).
       await page.getByPlaceholder('Search users...').fill('Lina');
+
+      // Settle the 400ms search debounce BEFORE selecting (UserFiltersBar
+      // handleSearchUpdate -> parent handleFiltersChange CLEARS
+      // selectedIds). Checking while the debounce is still pending lets
+      // it wipe the selection mid-dialog: BulkActionBar + dialog unmount,
+      // the Confirm click detaches, and the POST is never sent (timeout).
+      // keepPreviousData (users.queries.ts) means no skeleton flash --
+      // Omar's row vanishes exactly when the filtered result lands, so
+      // his absence proves no debounce is pending. This same race is a
+      // real UX bug (fast admins lose selections); the E2E just waits
+      // it out, it doesn't paper over it.
+      await expect(page.getByRole('row', { name: /Omar Abdullah/i })).toHaveCount(0);
 
       const row = page.getByRole('row', { name: /Lina Khalid/i });
       await expect(row).toBeVisible();
@@ -530,7 +549,6 @@ test.describe('User Management', () => {
       await expect(row.getByRole('cell', { name: 'Locked', exact: true })).toBeVisible();
       } catch (err) {
         console.log(`[bulk-e2e-diag] url=${page.url()} events=${JSON.stringify(events)}`);
-        await testInfo.attach('failure-dom', { body: await page.content(), contentType: 'text/html' });
         throw err;
       }
     });
