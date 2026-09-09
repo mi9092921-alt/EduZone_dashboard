@@ -426,7 +426,14 @@ test.describe('User Management', () => {
       // the parent's selectedIds) -- the selection itself is untouched,
       // which is what lets an admin pick a different action after
       // cancelling instead of starting the selection over.
-      await expect(page.getByText('2', { exact: true })).toBeVisible();
+      //
+      // Scoped to the selection wrapper (same as the pre-dialog assert
+      // above), NOT page-wide: the header Notifications bell badge
+      // renders its own unread count as plain text, and any other test
+      // that sends a real notification (e.g. notifications.spec.ts)
+      // makes a bare getByText('2') ambiguous -> strict-mode flake.
+      await expect(selectionSummary).toBeVisible();
+      await expect(selectionSummary).toContainText('2');
 
       // ── Clearing the selection is a separate, explicit action ────────
       // The bar's own "X" button (aria-label={tCommon('clear')} = "Clear")
