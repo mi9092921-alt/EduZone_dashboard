@@ -143,10 +143,10 @@ async function main() {
       await Promise.all(workerContexts.map((c) => c.end()));
 
       // Zero double-processing: every job done exactly once; every user
-      // warned exactly once (F-02 semantics under concurrency).
-      // Scoped to THIS scenario's 5 job ids / tenant ids — S1 already left
-      // its own completed job + 500 warnings in the same shared database,
-      // so an unscoped global count would double-count across scenarios.
+      // warned exactly once (F-02 semantics under concurrency). Scoped to
+      // THIS scenario's 5 job ids / 5 tenant ids — S1 already left a done
+      // job and 500 warnings in the same shared database, so an unscoped
+      // count would silently include them and produce a false failure.
       const jobIds = jobs.map((j) => j.id);
       const tenantIds = tenants.map((t) => t.tenantId);
       const doneCount = await serviceCtx.query(
@@ -155,7 +155,8 @@ async function main() {
       );
       const dupWarnings = await serviceCtx.query(
         `SELECT count(*)::int AS n FROM (
-           SELECT tenant_id, user_id FROM public.warnings WHERE tenant_id = ANY($1::uuid[])
+           SELECT tenant_id, user_id FROM public.warnings
+           WHERE tenant_id = ANY($1::uuid[])
            GROUP BY tenant_id, user_id HAVING count(*) > 1
          ) d`,
         [tenantIds],
@@ -301,23 +302,23 @@ async function main() {
         a11Error = err.message;
       }
 
-      // B's job runs to completion while A's 10 stay pending. dequeue_job()
-      // is a plain FIFO queue (no per-tenant ordering) — A's 10 jobs were
-      // enqueued first, so a single worker() call would legitimately claim
-      // one of A's (0-user) jobs before ever reaching B's. Drain until we
-      // specifically observe bJob's own run, which is what "B completes
-      // its job" actually means for fairness — not "the very next dequeue
-      // is B's".
-      let bRun = null;
+      // T3's acceptance criterion is the CAP + B's enqueue not being
+      // blocked — dequeue_job (internal.dequeue_job, 07_functions.sql) is
+      // strict `ORDER BY priority DESC, run_at ASC`, global across tenants,
+      // with no per-tenant round-robin. So A's 10 older jobs are picked
+      // before B's job — that is expected, not a fairness bug. What must
+      // be proven is that B's job is never lost or starved behind A's
+      // backlog: drain the whole queue and confirm every job (A's 10 +
+      // B's 1) reaches 'done', with B's own count intact.
+      const drainStarted = Date.now();
+      let drainIterations = 0;
       for (let i = 0; i < 20; i++) {
+        drainIterations++;
         const r = await worker();
         if (!r) break;
-        if (r.job.id === bJob.id) {
-          bRun = r;
-          break;
-        }
       }
-      assert(bRun !== null, 'S4: bJob was eventually dequeued and processed');
+      const drainMs = ms(drainStarted);
+
       const bDone = await serviceCtx.query(
         `SELECT status FROM internal.job_queue WHERE id = $1`,
         [bJob.id],
@@ -326,54 +327,38 @@ async function main() {
         `SELECT count(*)::int AS n FROM public.warnings WHERE tenant_id = $1`,
         [b.tenantId],
       );
-      const aStillPending = await serviceCtx.query(
-        `SELECT count(*)::int AS n FROM internal.job_queue WHERE status='pending' AND tenant_id=$1`,
+      const aDoneCount = await serviceCtx.query(
+        `SELECT count(*)::int AS n FROM internal.job_queue WHERE status='done' AND tenant_id=$1`,
         [a.tenantId],
       );
 
-      const aTotalJobs = await serviceCtx.query(
-        `SELECT count(*)::int AS n FROM internal.job_queue WHERE tenant_id=$1`,
-        [a.tenantId],
-      );
-      const aBadStatus = await serviceCtx.query(
-        `SELECT count(*)::int AS n FROM internal.job_queue
-         WHERE tenant_id=$1 AND status NOT IN ('pending','done')`,
-        [a.tenantId],
-      );
-
-      // Fairness (T3) is an ENQUEUE-time guarantee, not a processing-order
-      // guarantee: A being capped must not block B's job from being
-      // accepted or from completing. It does NOT promise A's already-queued
-      // jobs stay untouched while B is served — a single FIFO worker will
-      // legitimately reach some of A's jobs first. What must hold: none of
-      // A's original 10 jobs vanished or errored, B was never blocked, and
-      // B's job completed with correct results.
       const pass =
         bJob !== null &&
         a11Error !== null &&
         a11Error.includes('JOB_QUEUE_FULL') &&
-        bRun.processed === 25 &&
         bDone.rows[0].status === 'done' &&
         bWarnings.rows[0].n === 25 &&
-        aTotalJobs.rows[0].n === 10 &&
-        aBadStatus.rows[0].n === 0;
+        aDoneCount.rows[0].n === 10;
       record(
-        'S4: fairness — tenant B completes its job while A is queue-capped',
+        "S4: fairness — B's enqueue is never blocked by A's full queue; " +
+          "both drain cleanly and B's job is never lost behind A's backlog",
         pass,
         {
           a_fill_ms: aFillMs,
           b_enqueue_ms: bEnqueueMs,
           a_11th_rejected: a11Error ? a11Error.split('\n')[0] : 'NOT REJECTED',
-          b_processed: bRun.processed,
+          drain_iterations_for_11_jobs: drainIterations,
+          drain_ms_for_11_jobs: drainMs,
+          b_final_status: bDone.rows[0].status,
           b_warnings: bWarnings.rows[0].n,
-          a_jobs_still_pending: aStillPending.rows[0].n,
-          a_jobs_total_accounted_for: aTotalJobs.rows[0].n,
+          a_jobs_done: aDoneCount.rows[0].n,
         },
       );
       baseline.scenarios.s4_fairness = {
         b_enqueue_ms: bEnqueueMs,
-        b_processed: bRun.processed,
-        a_jobs_still_pending: aStillPending.rows[0].n,
+        drain_ms_for_11_jobs: drainMs,
+        b_final_status: bDone.rows[0].status,
+        a_jobs_done: aDoneCount.rows[0].n,
       };
       if (!pass) process.exitCode = 1;
     }

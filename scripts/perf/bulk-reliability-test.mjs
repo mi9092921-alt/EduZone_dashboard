@@ -283,14 +283,14 @@ async function main() {
         permissions: ['warnings.write'],
       });
 
-      const worker = createWorkerSimulator(serviceCtx, { batchSize: 50 });
-      // T3 leaves tenant A's 10 pending jobs + tenant B's 1 (no matching
-      // users) sitting in the queue. Drain those out FIRST — draining
-      // AFTER enqueueing the T4 job below would let drainQueue's FIFO
-      // dequeue_job() pick up and consume the T4 job itself (oldest
-      // pending first), leaving nothing for the explicit worker() call
-      // that follows and starving this assertion on a false negative.
-      await drainQueue(worker);
+      // Defensive: drain any leftover pending jobs from earlier scenarios
+      // BEFORE enqueueing T4's own job. This must run before the T4 job
+      // exists in the queue — draining after enqueueing would let the
+      // drain's worker() call dequeue and fully process the T4 job itself
+      // (leaving nothing for the explicit `worker()` call below to run,
+      // which surfaces as a spurious "T4 run completed" failure with
+      // run === null).
+      await drainQueue(createWorkerSimulator(serviceCtx, { batchSize: 50 }));
 
       const job = await enqueueJob(serviceCtx, {
         jobType: 'bulk_warn',
@@ -321,6 +321,8 @@ async function main() {
         ON CONFLICT (id) DO NOTHING`,
         [d.tenantId],
       );
+
+      const worker = createWorkerSimulator(serviceCtx, { batchSize: 50 });
 
       const run = await worker();
 

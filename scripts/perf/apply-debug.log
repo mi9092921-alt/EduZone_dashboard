@@ -1,4 +1,4 @@
-=== apply run 2026-09-08T12:36:11.353Z ===
+=== apply run 2026-09-09T00:15:01.022Z ===
 order: 01_extensions.sql | 02_types.sql | 03_tables.sql | 04_constraints.sql | 05_indexes.sql | 07_functions.sql | 06_views.sql | 08_triggers.sql | 09_rls.sql | 10_permissions.sql | 11_seed_reference.sql
 iter 01_extensions.sql exists=true
 OK   01_extensions.sql
