@@ -34,12 +34,13 @@
 >
 > **`users/suspend-user` ported (run #33).** Added as a new `Suspend duration validation (Cloud Safe -- never submits)` describe block in `users.spec.ts`. Same category as Ban: `UserRowActions.tsx` has no "unsuspend" menu item for when `account_status === 'suspended'`, so this never submits either — it drives `suspendUserSchema`'s real `suspend_hours` bounds (1-720; 0 is rejected with "Minimum 1 hour") and the live "Suspended until {date}" preview, then cancels. Target: Sara Mohamed (same as the Ban port, zero mutation risk either way). [E2E (Playwright) #33](https://github.com/mi9092921-alt/EduZone_dashboard/actions/runs/34174008508/job/101899711029) — 22/22 passed, commit `4730369`.
 >
-> Cypress must **not** be removed (dependency, specs, or `cypress.env.json.example`) until all flows are ported and verified green in Playwright. Until then, both suites are required launch gates. **5 flows remain**, all still real Cypress-only files with no Playwright equivalent:
-> - `courses/revoke-enrollment.cy.ts`
+> Cypress must **not** be removed (dependency, specs, or `cypress.env.json.example`) until all flows are ported and verified green in Playwright. Until then, both suites are required launch gates. **4 flows remain**, all still real Cypress-only files with no Playwright equivalent:
 > - `warnings/issue-warning.cy.ts`
 > - `audit/verify-chain.cy.ts`
 > - `notifications/notifications-flow.cy.ts`
 > - `settings/maintenance-mode.cy.ts`
+>
+> `courses/revoke-enrollment.cy.ts` is **BLOCKED, not portable**: the only revoke UI in the codebase (`RevokeEnrollmentDialog`, mounted solely by `CourseEnrollmentsTab`) lives in unmounted dead code -- `CourseDetailPage` has no route or importer, and the reachable `StudentProgressPage` rows carry no actions. A Playwright test would exercise dead code while prod lacks the feature (worse than no test). Covered instead at the logic layer in the unit gate (1125 tests green): `enrollStudentSchema`/`revokeEnrollmentSchema` bounds + revoke not-found fails-closed + RPC error mapping. Unblocking the UI E2E needs a product decision: wire revoke into `StudentProgressPage` (or revive the enrollments tab) first.
 >
 > `courses/enroll-student.cy.ts` was ported into `courses.spec.ts` (validation test that never submits + real enroll on the reachable Students tab then delete-the-course restore). The port exposed that `CourseDetailPage`/`CourseEnrollmentsTab` (with the only UI revoke button) are unmounted dead code -- worth a cleanup ticket.
 >
