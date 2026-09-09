@@ -35,6 +35,7 @@ import {
 import { alpha, useTheme } from '@mui/material/styles';
 import { useState, useEffect } from 'react';
 
+import { useRole } from '@/adapters/hooks/usePermission';
 import { useToastStore } from '@/adapters/stores/toast.store';
 import {
   getAccessRules,
@@ -46,6 +47,9 @@ import {
 export function AccessRulesManager({ tenantId }: { tenantId?: string }) {
   const theme = useTheme();
   const { showToast } = useToastStore();
+  // access_rules SELECT policy is admin-only server-side. Do not fire the
+  // query at all for non-admins — RLS would 403 and spam the console.
+  const { hasRole: canManageRules } = useRole(['super_admin', 'admin']);
   const [rules, setRules] = useState<AccessRule[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -64,8 +68,12 @@ export function AccessRulesManager({ tenantId }: { tenantId?: string }) {
   };
 
   useEffect(() => {
+    if (!canManageRules) {
+      setIsLoading(false);
+      return;
+    }
     fetchRules();
-  }, [tenantId]);
+  }, [tenantId, canManageRules]);
 
   const handleToggle = async (id: string, current: boolean) => {
     try {
@@ -118,6 +126,15 @@ export function AccessRulesManager({ tenantId }: { tenantId?: string }) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
         <CircularProgress size={24} />
+      </Box>
+    );
+
+  if (!canManageRules)
+    return (
+      <Box sx={{ mt: 4 }}>
+        <Typography variant="body2" color="text.secondary">
+          Access rules are restricted to administrators.
+        </Typography>
       </Box>
     );
 

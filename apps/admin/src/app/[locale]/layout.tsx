@@ -13,6 +13,7 @@ export const metadata: Metadata = {
   title: 'EduZone Admin Dashboard',
   description: 'Multi-tenant Learning Management Platform — Admin & Management Control Plane',
   keywords: ['EduZone', 'Admin', 'Dashboard', 'LMS', 'Learning Management'],
+  icons: { icon: '/icon.svg' },
 };
 
 export default async function RootLayout({

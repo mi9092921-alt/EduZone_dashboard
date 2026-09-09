@@ -178,7 +178,7 @@ export function AuditLogsTab() {
             {filters.activity_type?.map((type) => (
               <Chip
                 key={type}
-                label={t(`activity_types.${type}`)}
+                label={t.has(`activity_types.${type}`) ? t(`activity_types.${type}`) : type}
                 onDelete={() => handleTypeFilter(filters.activity_type!.filter((x) => x !== type))}
               />
             ))}
@@ -304,7 +304,10 @@ function LogRow({
         </td>
         <td className="px-4 py-2.5">
           <span className="text-xs font-medium text-foreground bg-muted px-2 py-0.5 rounded-md">
-            {t(`activity_types.${log.activity_type}`)}
+            {/* Unknown future activity types fall back to the raw value instead of logging MISSING_MESSAGE */}
+            {t.has(`activity_types.${log.activity_type}`)
+              ? t(`activity_types.${log.activity_type}`)
+              : log.activity_type}
           </span>
         </td>
         <td className="px-4 py-2.5">

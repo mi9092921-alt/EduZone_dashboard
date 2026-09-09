@@ -131,7 +131,10 @@ function EventItem({
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-semibold text-foreground truncate">
-              {t(`activity_types.${event.activity_type}`)}
+              {/* Unknown future activity types fall back to the raw value instead of logging MISSING_MESSAGE */}
+              {t.has(`activity_types.${event.activity_type}`)
+                ? t(`activity_types.${event.activity_type}`)
+                : event.activity_type}
             </span>
             <span className="text-[10px] text-muted-foreground font-mono shrink-0">
               {formatTime(event.created_at)}

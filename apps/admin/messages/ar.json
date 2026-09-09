@@ -655,7 +655,8 @@
       "bulk_action_queued": "تمت جدولة إجراء جماعي",
       "bulk_action_completed": "اكتمل الإجراء الجماعي",
       "bulk_action_progress": "تقدم الإجراء الجماعي",
-      "bulk_export_completed": "اكتمل تصدير البيانات الجماعية"
+      "bulk_export_completed": "اكتمل تصدير البيانات الجماعية",
+      "todo.created": "تم إنشاء مهمة"
     },
     "risk_levels": {
       "low": "منخفض",
