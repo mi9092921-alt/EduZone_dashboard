@@ -9,6 +9,14 @@ jobs:
     environment: production
     steps:
       - uses: actions/checkout@v5
+        with:
+          # Same as ci.yml: Gitleaks resolves refs (base/head) to scope a
+          # push/merge scan; a shallow single-commit checkout leaves those
+          # refs unresolvable and fails the Secret Scan step with
+          # "unknown revision" on merge pushes (the scan itself finds no
+          # leaks — the failure is purely the git range). Full history keeps
+          # the gate meaningful and enforceable on main.
+          fetch-depth: 0
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
