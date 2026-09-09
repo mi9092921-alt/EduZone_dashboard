@@ -655,7 +655,8 @@
       "bulk_action_queued": "Bulk Action Queued",
       "bulk_action_completed": "Bulk Action Completed",
       "bulk_action_progress": "Bulk Action Progress",
-      "bulk_export_completed": "Bulk Export Completed"
+      "bulk_export_completed": "Bulk Export Completed",
+      "todo.created": "Todo Created"
     },
     "risk_levels": {
       "low": "Low",
