@@ -529,7 +529,6 @@ test.describe('User Management', () => {
       // 'Locked'.
       await expect(row.getByRole('cell', { name: 'Locked', exact: true })).toBeVisible();
       } catch (err) {
-        // eslint-disable-next-line no-console
         console.log(`[bulk-e2e-diag] url=${page.url()} events=${JSON.stringify(events)}`);
         await testInfo.attach('failure-dom', { body: await page.content(), contentType: 'text/html' });
         throw err;

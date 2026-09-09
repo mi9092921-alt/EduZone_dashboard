@@ -72,7 +72,6 @@ test.describe('Audit chain verification', () => {
     // rows -- here they can only appear if the crypto actually ran.)
     await expect(page.getByText(/Chain intact|Tamper detected/)).toBeVisible();
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.log(`[audit-e2e-diag] url=${page.url()} events=${JSON.stringify(events)}`);
       await testInfo.attach('failure-dom', { body: await page.content(), contentType: 'text/html' });
       throw err;
