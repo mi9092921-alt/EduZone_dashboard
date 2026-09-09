@@ -340,6 +340,40 @@ describe('courses.service', () => {
     );
   });
 
+  it('revokeEnrollment throws when the enrollment record does not exist', async () => {
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'enrollments') {
+        return setupQuery({ data: null, error: null });
+      }
+      return setupQuery({ error: null });
+    });
+
+    // Fails closed before touching the RPC: no silent no-op revoke.
+    await expect(revokeEnrollment('missing', 'admin', 'some reason')).rejects.toThrow(
+      'Enrollment not found',
+    );
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it('revokeEnrollment maps RPC failures instead of leaking raw errors', async () => {
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'enrollments') {
+        return setupQuery({ data: { user_id: 'u1', course_id: 'c1' }, error: null });
+      }
+      return setupQuery({ error: null });
+    });
+    mockRpc.mockResolvedValueOnce({ data: null, error: { message: 'PERMISSION_DENIED', code: 'P0001' } });
+
+    await expect(revokeEnrollment('e1', 'admin', 'some reason')).rejects.toThrow();
+    expect(mockRpc).toHaveBeenCalledWith(
+      'revoke_enrollment',
+      expect.objectContaining({
+        p_user_id: 'u1',
+        p_course_id: 'c1',
+      }),
+    );
+  });
+
   it('getCourseStats handles success and catch block', async () => {
     const qSuccess = setupQuery({ data: { course_id: 'c1' }, error: null });
     mockAdminFrom.mockReturnValueOnce(qSuccess);
