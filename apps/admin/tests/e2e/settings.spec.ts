@@ -118,10 +118,16 @@ test.describe('Maintenance mode wizard (Cloud Safe -- write mocked)', () => {
     await expect(page.getByText('معالج وضع الصيانة')).toBeVisible();
   }
 
+  // MUI Switch renders a plain checkbox input here (no switch role in
+  // this tree), and step 0 carries exactly one of them.
+  function wizardToggle(page: Page) {
+    return page.locator('input[type="checkbox"]').first();
+  }
+
   test('blocks advancing past Message with an empty message', async ({ page }) => {
     await openWizard(page);
 
-    const wizardSwitch = page.getByRole('switch');
+    const wizardSwitch = wizardToggle(page);
     await expect(wizardSwitch).toBeVisible();
     if (!(await wizardSwitch.isChecked())) await wizardSwitch.check();
 
@@ -143,7 +149,7 @@ test.describe('Maintenance mode wizard (Cloud Safe -- write mocked)', () => {
   test('walks the full wizard and submits the real enable payload', async ({ page }) => {
     await openWizard(page);
 
-    const wizardSwitch = page.getByRole('switch');
+    const wizardSwitch = wizardToggle(page);
     if (!(await wizardSwitch.isChecked())) await wizardSwitch.check();
 
     await page.getByRole('button', { name: 'Next Step' }).click();
@@ -175,7 +181,7 @@ test.describe('Maintenance mode wizard (Cloud Safe -- write mocked)', () => {
     // in handleSubmit) -- the switch is visible again. By then every
     // captured body is already recorded (capture happens on request,
     // before the mocked response resolves the mutation).
-    await expect(page.getByRole('switch')).toBeVisible();
+    await expect(wizardToggle(page)).toBeVisible();
     expect(writeBodies.some((b) => b.includes('maintenance_mode'))).toBe(true);
     expect(writeBodies.some((b) => b.includes('maintenance_message'))).toBe(true);
     expect(writeBodies.some((b) => b.includes('maintenance_ends_at'))).toBe(true);
