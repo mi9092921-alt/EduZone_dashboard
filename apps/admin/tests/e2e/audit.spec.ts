@@ -23,6 +23,11 @@ test.describe('Audit chain verification', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/audit');
 
+    // Fail loudly with the actual URL if navigation ever lands
+    // elsewhere (seen once as courses content in a degraded run) --
+    // downstream assertions would otherwise misreport the cause.
+    await expect(page).toHaveURL(/\/audit/);
+
     // Chain-state line (ChainVerifier.tsx: label_last_seq) proves the
     // read path (useAuditChainState) resolved against the live backend.
     await expect(page.getByText('Latest Seq:')).toBeVisible();
@@ -35,6 +40,10 @@ test.describe('Audit chain verification', () => {
     // to intercept, same as the users lock flow.
     const logsResponse = page.waitForResponse(
       (res) => res.url().includes('/rest/v1/activity_logs') && res.request().method() === 'GET',
+      // Explicit budget (not the 30s test budget): a missed fetch is a
+      // product/backend signal and should fail fast with this call in
+      // the log -- not burn the whole test on click-detach retries.
+      { timeout: 15000 },
     );
 
     await page.getByRole('button', { name: 'Verify Hash Chain', exact: true }).click();

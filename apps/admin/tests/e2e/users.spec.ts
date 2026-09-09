@@ -491,6 +491,9 @@ test.describe('User Management', () => {
       // This is the server-side result the Cypress mocks faked.
       const submitResponse = page.waitForResponse(
         (res) => res.url().includes('/api/bulk-action') && res.request().method() === 'POST',
+        // Explicit budget: fail fast with this call in the log instead
+        // of burning the whole test on click-detach retries.
+        { timeout: 15000 },
       );
       await dialog.getByRole('button', { name: 'Confirm Lock' }).click();
       expect((await submitResponse).ok()).toBe(true);
