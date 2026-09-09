@@ -333,6 +333,7 @@ GRANT EXECUTE ON FUNCTION public.enroll_in_course(uuid) TO authenticated, servic
 -- or renew a student's enrollment. The function body enforces courses.manage
 -- permission, tenant isolation, and status-transition rules internally.
 -- Same least-privilege pattern as enroll_in_course above.
+REVOKE ALL ON FUNCTION public.extend_enrollment(uuid, uuid, timestamptz) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.extend_enrollment(uuid, uuid, timestamptz) FROM anon;
 GRANT EXECUTE ON FUNCTION public.extend_enrollment(uuid, uuid, timestamptz) TO authenticated, service_role;
 
