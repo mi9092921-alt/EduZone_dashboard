@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 
 test.describe('User Management', () => {
   // Uses global auth state by default
@@ -512,6 +512,76 @@ test.describe('User Management', () => {
       // may or may not run in this harness, and either way Lina stays
       // 'Locked'.
       await expect(row.getByRole('cell', { name: 'Locked', exact: true })).toBeVisible();
+    });
+  });
+
+  // Port of the Cypress "Warning Flows" spec
+  // (cypress/e2e/warnings/issue-warning.cy.ts). That version mocked the
+  // user list, drove a "Security" tab that exists nowhere in src/, and
+  // mocked the warning RPC twice -- including a fabricated
+  // auto_suspended/suspension_until payload. The real
+  // issue_warning/increment_warning_count RPCs (07_functions.sql) do no
+  // auto-suspending at all: they insert the warning row and bump
+  // warning_count. The real UI is the row menu's 'Issue Warning' item
+  // -> IssueWarningDialog (ActionDialogs.tsx) -> issueWarningAction
+  // Server Action (adapters/mutations/users.mutations.ts), so -- like
+  // the single-user lock flow -- there is no browser-visible RPC to
+  // intercept; the toast + dialog close are the verifiable result.
+  test.describe('Issue warning (Cloud Safe -- counter-only side effect)', () => {
+    // Target: Omar Abdullah (seeded 'active'). A warning touches only
+    // warning_count/warnings rows -- never account_status -- so this
+    // cannot race the Lock/Unlock test (asserts Active) or the
+    // Ban/Suspend tests (Sara, dialogs-only). No restore needed and no
+    // threshold side effects exist at any count (verified in SQL).
+    async function openWarnDialog(page: Page, reason: string) {
+      await page.getByPlaceholder('Search users...').fill('Omar');
+
+      const row = page.getByRole('row', { name: /Omar Abdullah/i });
+      await expect(row).toBeVisible();
+
+      await row.getByRole('button', { name: 'User Options' }).click();
+      await page.getByRole('menuitem', { name: 'Issue Warning' }).click();
+
+      const dialog = page.getByRole('dialog');
+      await expect(dialog.getByText("Issue Warning to Omar Abdullah")).toBeVisible();
+      await dialog.getByLabel('Reason').fill(reason);
+      return { row, dialog };
+    }
+
+    test('rejects a short reason without submitting', async ({ page }) => {
+      const { dialog } = await openWarnDialog(page, 'Too short');
+
+      // issueWarningSchema: reason min 20 (domain/schemas/user.schema.ts)
+      // -- 'Too short' (9 chars) fails client-side; the Server Action
+      // never fires (the Cypress version's 'First strike'/'Third strike'
+      // reasons would fail the same way).
+      await dialog.getByRole('button', { name: 'Issue Warning', exact: true }).click();
+      await expect(dialog.getByText('Reason must be at least 20 characters')).toBeVisible();
+
+      await dialog.getByRole('button', { name: 'Cancel' }).click();
+      await expect(dialog).toBeHidden();
+    });
+
+    test('issues a real warning and confirms no status side effect', async ({ page }) => {
+      const { row, dialog } = await openWarnDialog(
+        page,
+        'Disruptive behavior flagged by automated E2E check',
+      );
+
+      // Severity/action stay at their defaults (Low / none) -- only the
+      // reason is required.
+      await dialog.getByRole('button', { name: 'Issue Warning', exact: true }).click();
+
+      // warn_user_success is "Warning has been issued to {name}."
+      // (messages/en.json) -- same alert scoping as the lock test.
+      await expect(
+        page.getByRole('alert').filter({ hasText: 'Warning has been issued to Omar Abdullah' }),
+      ).toBeVisible();
+      await expect(dialog).toBeHidden();
+
+      // No status side effect: Omar is still Active (the warn path never
+      // writes account_status -- verified in issue_warning SQL).
+      await expect(row.getByRole('cell', { name: 'Active', exact: true })).toBeVisible();
     });
   });
 });
