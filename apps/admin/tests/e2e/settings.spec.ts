@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 
 // Port of cypress/e2e/settings/app-lock.cy.ts ("Global App Lock Flow (Cloud
 // Safe)"). Neither of that file's two tests could have been passing as
@@ -89,5 +89,105 @@ test.describe('System Lock', () => {
         hasText: 'System is currently locked for all users — unlock it in Settings page',
       }),
     ).toBeVisible();
+  });
+});
+
+// Port of cypress/e2e/settings/maintenance-mode.cy.ts ("Maintenance Mode
+// Flow"). That version mocked the config GET/PATCH endpoints and guessed
+// a single Maintenance switch that saves on toggle. The real UI is a
+// 5-step MaintenanceWizard (status -> message -> deadline -> roles ->
+// users -> submit; MaintenanceWizard.tsx) writing via enable/disable
+// mutations (plain settings_kv upserts, settings.service.ts -- same
+// transport correction as the app-lock port above documents).
+//
+// Cloud Safety: unlike notification/course rows (tenant data, invisible
+// to other specs), maintenance_mode is GLOBAL -- enabling it for real
+// makes check_dashboard_access deny fresh logins, which would break the
+// parallel auth.spec.ts trio mid-run. So, exactly like the app-lock test
+// above, the write is intercepted (GETs continue to the real backend;
+// only the mutating settings_kv calls are fulfilled) while the FULL
+// wizard interaction runs for real, and the test asserts the captured
+// request payloads -- what the app WOULD persist -- plus wizard
+// progression. Zero global side effects, zero restore needed.
+test.describe('Maintenance mode wizard (Cloud Safe -- write mocked)', () => {
+  async function openWizard(page: Page) {
+    await page.goto('/settings');
+    await page.getByRole('tab', { name: 'Maintenance', exact: true }).click();
+    // Wizard header is hardcoded Arabic (MaintenanceWizard.tsx), the
+    // step labels come from settings.maintenance_wizard.
+    await expect(page.getByText('معالج وضع الصيانة')).toBeVisible();
+  }
+
+  // MUI Switch renders a plain checkbox input here (no switch role in
+  // this tree), and step 0 carries exactly one of them.
+  function wizardToggle(page: Page) {
+    return page.locator('input[type="checkbox"]').first();
+  }
+
+  test('blocks advancing past Message with an empty message', async ({ page }) => {
+    await openWizard(page);
+
+    const wizardSwitch = wizardToggle(page);
+    await expect(wizardSwitch).toBeVisible();
+    if (!(await wizardSwitch.isChecked())) await wizardSwitch.check();
+
+    await page.getByRole('button', { name: 'Next Step' }).click();
+
+    // Step 1 (Message). NOTE (real i18n gap, same class as the missing
+    // course-detail tab keys): the empty-message error uses
+    // tVal('message_min'), which has NO entry in messages/en.json's
+    // validation namespace -- so instead of asserting fallback text
+    // that a translation fix would break, assert the wizard did NOT
+    // advance: the Message field is still here and the final submit
+    // ("Enable Maintenance", step 4 only) is still absent.
+    // Step 1 (Message) starts prefilled from the seeded
+    // maintenance_message ("Application is under maintenance.") --
+    // clear it first so the empty check actually exercises.
+    await expect(page.getByLabel('Message (Arabic)')).toBeVisible();
+    await page.getByLabel('Message (Arabic)').fill('');
+    await page.getByRole('button', { name: 'Next Step' }).click();
+    await expect(page.getByLabel('Message (Arabic)')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Enable Maintenance' })).toHaveCount(0);
+  });
+
+  test('walks the full wizard and submits the real enable payload', async ({ page }) => {
+    await openWizard(page);
+
+    const wizardSwitch = wizardToggle(page);
+    if (!(await wizardSwitch.isChecked())) await wizardSwitch.check();
+
+    await page.getByRole('button', { name: 'Next Step' }).click();
+    await page.getByLabel('Message (Arabic)').fill('صيانة مجدولة لاختبار E2E');
+
+    // Deadline (optional) and roles/users (optional) stay empty --
+    // ends_at then defaults server-side to +24h.
+    await page.getByRole('button', { name: 'Next Step' }).click();
+    await page.getByRole('button', { name: 'Next Step' }).click();
+    await page.getByRole('button', { name: 'Next Step' }).click();
+    await expect(page.getByRole('button', { name: 'Enable Maintenance' })).toBeVisible();
+
+    // Intercept the write (see the Cloud Safety note above): GETs pass
+    // through so the page keeps reading real settings; the three
+    // mutating upserts (mode/message/ends_at) are captured + fulfilled.
+    const writeBodies: string[] = [];
+    await page.route('**/rest/v1/settings_kv*', async (route) => {
+      if (route.request().method() === 'GET') {
+        await route.continue();
+        return;
+      }
+      writeBodies.push(route.request().postData() ?? '');
+      await route.fulfill({ status: 201, contentType: 'application/json', body: '[]' });
+    });
+
+    await page.getByRole('button', { name: 'Enable Maintenance' }).click();
+
+    // The wizard resets to step 0 on mutation success (setActiveStep(0)
+    // in handleSubmit) -- the switch is visible again. By then every
+    // captured body is already recorded (capture happens on request,
+    // before the mocked response resolves the mutation).
+    await expect(wizardToggle(page)).toBeVisible();
+    expect(writeBodies.some((b) => b.includes('maintenance_mode'))).toBe(true);
+    expect(writeBodies.some((b) => b.includes('maintenance_message'))).toBe(true);
+    expect(writeBodies.some((b) => b.includes('maintenance_ends_at'))).toBe(true);
   });
 });
