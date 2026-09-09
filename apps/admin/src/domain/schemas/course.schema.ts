@@ -100,6 +100,17 @@ export const revokeEnrollmentSchema = z.object({
 });
 export type RevokeEnrollmentFormInput = z.infer<typeof revokeEnrollmentSchema>;
 
+export const extendEnrollmentSchema = z.object({
+  new_expires_at: z
+    .string()
+    .min(1, 'Expiration date is required')
+    .refine((val) => {
+      const date = new Date(val);
+      return !isNaN(date.getTime()) && date.getTime() > Date.now();
+    }, 'New expiration date must be in the future'),
+});
+export type ExtendEnrollmentFormInput = z.infer<typeof extendEnrollmentSchema>;
+
 export const deleteCourseSchema = z.object({
   confirm: z.literal(true, {
     errorMap: () => ({ message: 'You must confirm deletion' }),

@@ -1,6 +1,6 @@
 'use client';
 
-import { Download, Search, People } from '@mui/icons-material';
+import { Download, Search, People, UpdateOutlined, Block } from '@mui/icons-material';
 import {
   Box,
   Typography,
@@ -17,6 +17,8 @@ import {
   TextField,
   useTheme,
   LinearProgress,
+  IconButton,
+  Tooltip,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import { useParams } from 'next/navigation';
@@ -28,6 +30,8 @@ import { useStudentProgress } from '@/adapters/queries/teacher.queries';
 import { TablePagination } from '@/components/ui/TablePagination';
 import type { StudentProgress } from '@/domain/types/warning.types';
 import { EnrollStudentDialog } from '@/features/courses/components/EnrollStudentDialog';
+import { ExtendEnrollmentDialog } from '@/features/courses/components/ExtendEnrollmentDialog';
+import { RevokeEnrollmentDialog } from '@/features/courses/components/RevokeEnrollmentDialog';
 
 function getInitials(first: string | null, last: string | null) {
   return [(first ?? '')[0], (last ?? '')[0]].filter(Boolean).join('').toUpperCase() || '?';
@@ -64,6 +68,8 @@ export function StudentProgressPage() {
   const [pageSize, setPageSize] = useState(10);
   const [search, setSearch] = useState('');
   const [isEnrollOpen, setIsEnrollOpen] = useState(false);
+  const [extendTarget, setExtendTarget] = useState<StudentProgress | null>(null);
+  const [revokeTarget, setRevokeTarget] = useState<StudentProgress | null>(null);
 
   useCourseById(courseId);
   const { data, isLoading, refetch } = useStudentProgress(courseId, page, pageSize);
@@ -241,20 +247,33 @@ export function StudentProgressPage() {
                 >
                   {t('table_header_status')}
                 </TableCell>
+                <TableCell
+                  align="right"
+                  sx={{
+                    fontWeight: 800,
+                    textTransform: 'uppercase',
+                    fontSize: '0.7rem',
+                    color: alpha(theme.palette.text.primary, 0.6),
+                    letterSpacing: '0.05em',
+                    py: 2,
+                  }}
+                >
+                  {t('actions')}
+                </TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {isLoading ? (
                 Array.from({ length: pageSize }).map((_, i) => (
                   <TableRow key={i}>
-                    <TableCell colSpan={4}>
+                    <TableCell colSpan={5}>
                       <LinearProgress sx={{ borderRadius: 1 }} />
                     </TableCell>
                   </TableRow>
                 ))
               ) : students.length === 0 ? (
                 <TableRow sx={{ backgroundColor: 'transparent' }}>
-                  <TableCell colSpan={4} align="center" sx={{ py: 12, border: 0 }}>
+                  <TableCell colSpan={5} align="center" sx={{ py: 12, border: 0 }}>
                     <Box
                       sx={{
                         display: 'flex',
@@ -377,26 +396,82 @@ export function StudentProgressPage() {
                           </Box>
                         </TableCell>
                         <TableCell align="center">
-                          <Chip
-                            label={row.completed ? t('status_completed') : t('status_in_progress')}
-                            size="small"
-                            sx={{
-                              fontWeight: 800,
-                              fontSize: '0.65rem',
-                              textTransform: 'uppercase',
-                              height: 24,
-                              backgroundColor: (theme) =>
-                                row.completed
-                                  ? alpha(theme.palette.success.main, 0.1)
-                                  : alpha(theme.palette.warning.main, 0.1),
-                              color: row.completed ? 'success.main' : 'warning.main',
-                              border: '1px solid',
-                              borderColor: (theme) =>
-                                row.completed
-                                  ? alpha(theme.palette.success.main, 0.2)
-                                  : alpha(theme.palette.warning.main, 0.2),
-                            }}
-                          />
+                          {(() => {
+                            const isCompleted = row.completed || row.status === 'completed';
+                            const isRevoked = row.status === 'revoked';
+                            const isExpired = row.status === 'expired';
+
+                            const chipColor = isCompleted
+                              ? 'success'
+                              : isRevoked
+                                ? 'error'
+                                : isExpired
+                                  ? 'warning'
+                                  : 'primary';
+                            const chipLabel = isCompleted
+                              ? t('status_completed')
+                              : isRevoked
+                                ? t('status_revoked') || 'REVOKED'
+                                : isExpired
+                                  ? t('status_expired') || 'EXPIRED'
+                                  : t('status_in_progress');
+
+                            return (
+                              <Chip
+                                label={chipLabel}
+                                size="small"
+                                sx={{
+                                  fontWeight: 800,
+                                  fontSize: '0.65rem',
+                                  textTransform: 'uppercase',
+                                  height: 24,
+                                  backgroundColor: (theme) => alpha(theme.palette[chipColor].main, 0.1),
+                                  color: `${chipColor}.main`,
+                                  border: '1px solid',
+                                  borderColor: (theme) => alpha(theme.palette[chipColor].main, 0.2),
+                                }}
+                              />
+                            );
+                          })()}
+                        </TableCell>
+                        <TableCell align="right">
+                          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 0.5, alignItems: 'center' }}>
+                            <Tooltip title={t('extend')}>
+                              <span>
+                                <IconButton
+                                  size="small"
+                                  disabled={row.completed || row.status === 'completed'}
+                                  onClick={() => setExtendTarget(row)}
+                                  sx={{
+                                    color: 'text.secondary',
+                                    '&:hover': {
+                                      color: 'primary.main',
+                                      bgcolor: alpha(theme.palette.primary.main, 0.08),
+                                    },
+                                  }}
+                                >
+                                  <UpdateOutlined sx={{ fontSize: 18 }} />
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                            {row.status === 'active' && !row.completed && (
+                              <Tooltip title={t('revoke')}>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => setRevokeTarget(row)}
+                                  sx={{
+                                    color: 'text.secondary',
+                                    '&:hover': {
+                                      color: 'error.main',
+                                      bgcolor: alpha(theme.palette.error.main, 0.08),
+                                    },
+                                  }}
+                                >
+                                  <Block sx={{ fontSize: 18 }} />
+                                </IconButton>
+                              </Tooltip>
+                            )}
+                          </Box>
                         </TableCell>
                       </TableRow>
                     );
@@ -414,6 +489,41 @@ export function StudentProgressPage() {
           onPageSizeChange={setPageSize}
         />
       </Box>
+
+      {/* Extend Enrollment Dialog */}
+      <ExtendEnrollmentDialog
+        open={!!extendTarget}
+        onClose={() => {
+          setExtendTarget(null);
+          refetch();
+        }}
+        enrollmentId={extendTarget?.enrollment_id ?? null}
+        courseId={courseId}
+        studentName={
+          extendTarget
+            ? [extendTarget.first_name, extendTarget.last_name].filter(Boolean).join(' ') ||
+              t('unknown')
+            : ''
+        }
+        currentExpiresAt={extendTarget?.expires_at}
+      />
+
+      {/* Revoke Enrollment Dialog */}
+      <RevokeEnrollmentDialog
+        open={!!revokeTarget}
+        onClose={() => {
+          setRevokeTarget(null);
+          refetch();
+        }}
+        enrollmentId={revokeTarget?.enrollment_id ?? null}
+        courseId={courseId}
+        studentName={
+          revokeTarget
+            ? [revokeTarget.first_name, revokeTarget.last_name].filter(Boolean).join(' ') ||
+              t('unknown')
+            : ''
+        }
+      />
     </Box>
   );
 }

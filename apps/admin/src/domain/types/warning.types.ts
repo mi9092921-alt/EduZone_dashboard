@@ -59,6 +59,7 @@ export interface TeacherStudent {
 
 // ── Student progress (for P4-TEACHER-003) ────────────────────────
 export interface StudentProgress {
+  enrollment_id: string;
   user_id: string;
   first_name: string | null;
   last_name: string | null;
@@ -67,6 +68,9 @@ export interface StudentProgress {
   progress_pct: number;
   last_watched: string | null;
   completed: boolean;
+  status: 'active' | 'completed' | 'revoked' | 'expired';
+  expires_at: string | null;
+  enrolled_at: string;
 }
 
 // ── Course analytics (for P4-TEACHER-004) ────────────────────────

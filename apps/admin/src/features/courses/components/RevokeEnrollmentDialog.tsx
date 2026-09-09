@@ -19,7 +19,9 @@ import type { Enrollment } from '@/domain/types/course.types';
 import { getEnrollmentStudentName } from '@/domain/types/course.types';
 
 interface RevokeEnrollmentDialogProps {
-  enrollment: Enrollment | null;
+  enrollment?: Enrollment | null;
+  enrollmentId?: string | null;
+  studentName?: string;
   courseId: string;
   open: boolean;
   onClose: () => void;
@@ -27,6 +29,8 @@ interface RevokeEnrollmentDialogProps {
 
 export function RevokeEnrollmentDialog({
   enrollment,
+  enrollmentId,
+  studentName: propStudentName,
   courseId,
   open,
   onClose,
@@ -34,6 +38,10 @@ export function RevokeEnrollmentDialog({
   const t = useTranslations('common');
   const revokeMutation = useRevokeEnrollment();
   const [error, setError] = useState<string | null>(null);
+
+  const resolvedEnrollmentId = enrollment?.id ?? enrollmentId ?? null;
+  const resolvedStudentName =
+    propStudentName ?? (enrollment ? getEnrollmentStudentName(enrollment) : '');
 
   const {
     register,
@@ -46,11 +54,11 @@ export function RevokeEnrollmentDialog({
   });
 
   const onSubmit = async (data: RevokeEnrollmentFormInput) => {
-    if (!enrollment) return;
+    if (!resolvedEnrollmentId) return;
     setError(null);
     try {
       await revokeMutation.mutateAsync({
-        enrollmentId: enrollment.id,
+        enrollmentId: resolvedEnrollmentId,
         courseId,
         reason: data.reason,
       });
@@ -69,15 +77,13 @@ export function RevokeEnrollmentDialog({
     }
   };
 
-  const studentName = enrollment ? getEnrollmentStudentName(enrollment) : '';
-
   return (
     <ConfirmDialog
       open={open}
       onClose={handleClose}
       onConfirm={handleSubmit(onSubmit)}
       title={t('revoke_enrollment_title')}
-      description={t('revoke_confirm_msg', { name: studentName })}
+      description={t('revoke_confirm_msg', { name: resolvedStudentName })}
       confirmLabel={t('revoke_confirm_btn') || t('revoke')}
       cancelLabel={t('cancel')}
       confirmColor="error"

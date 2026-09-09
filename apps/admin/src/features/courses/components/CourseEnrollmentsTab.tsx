@@ -1,6 +1,6 @@
 'use client';
 
-import { Search, PersonAdd, Block, Download } from '@mui/icons-material';
+import { Search, PersonAdd, Block, Download, UpdateOutlined } from '@mui/icons-material';
 import {
   Box,
   Typography,
@@ -8,6 +8,7 @@ import {
   Chip,
   Button,
   IconButton,
+  Tooltip,
   LinearProgress,
   TextField,
   InputAdornment,
@@ -23,6 +24,7 @@ import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 
 import { EnrollStudentDialog } from './EnrollStudentDialog';
+import { ExtendEnrollmentDialog } from './ExtendEnrollmentDialog';
 import { RevokeEnrollmentDialog } from './RevokeEnrollmentDialog';
 
 import { useCourseEnrollments } from '@/adapters/queries/courses.queries';
@@ -50,6 +52,7 @@ export function CourseEnrollmentsTab({ courseId }: CourseEnrollmentsTabProps) {
   const [enrollOpen, setEnrollOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [revokeTarget, setRevokeTarget] = useState<Enrollment | null>(null);
+  const [extendTarget, setExtendTarget] = useState<Enrollment | null>(null);
 
   const { data, isLoading } = useCourseEnrollments(courseId, page, pageSize);
   const enrollments = data?.data ?? [];
@@ -356,15 +359,31 @@ export function CourseEnrollmentsTab({ courseId }: CourseEnrollmentsTabProps) {
                       />
                     </TableCell>
                     <TableCell align="right">
-                      {enrollment.status === 'active' && (
-                        <IconButton
-                          size="small"
-                          onClick={() => setRevokeTarget(enrollment)}
-                          sx={{ color: 'text.secondary', '&:hover': { color: 'error.main' } }}
-                        >
-                          <Block sx={{ fontSize: 18 }} />
-                        </IconButton>
-                      )}
+                      <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 0.5, alignItems: 'center' }}>
+                        <Tooltip title={t('extend')}>
+                          <span>
+                            <IconButton
+                              size="small"
+                              disabled={enrollment.status === 'completed'}
+                              onClick={() => setExtendTarget(enrollment)}
+                              sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}
+                            >
+                              <UpdateOutlined sx={{ fontSize: 18 }} />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                        {enrollment.status === 'active' && (
+                          <Tooltip title={t('revoke')}>
+                            <IconButton
+                              size="small"
+                              onClick={() => setRevokeTarget(enrollment)}
+                              sx={{ color: 'text.secondary', '&:hover': { color: 'error.main' } }}
+                            >
+                              <Block sx={{ fontSize: 18 }} />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                      </Box>
                     </TableCell>
                   </TableRow>
                 );
@@ -394,6 +413,14 @@ export function CourseEnrollmentsTab({ courseId }: CourseEnrollmentsTabProps) {
         courseId={courseId}
         open={!!revokeTarget}
         onClose={() => setRevokeTarget(null)}
+      />
+      <ExtendEnrollmentDialog
+        enrollmentId={extendTarget?.id ?? null}
+        courseId={courseId}
+        studentName={extendTarget ? getEnrollmentStudentName(extendTarget) : ''}
+        currentExpiresAt={extendTarget?.expires_at}
+        open={!!extendTarget}
+        onClose={() => setExtendTarget(null)}
       />
     </Box>
   );

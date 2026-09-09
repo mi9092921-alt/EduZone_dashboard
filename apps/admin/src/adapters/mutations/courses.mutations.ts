@@ -23,6 +23,7 @@ import {
   reorderLessons,
   enrollStudent,
   revokeEnrollment,
+  extendEnrollment,
   saveLearningObjectives,
   savePrerequisites,
 } from '@/infrastructure/repos/courses.service';
@@ -220,6 +221,26 @@ export function useRevokeEnrollment() {
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: queryKeys.enrollments.byCourse(vars.courseId) });
       qc.invalidateQueries({ queryKey: queryKeys.courses.all });
+      qc.invalidateQueries({ queryKey: ['teacher', 'studentProgress', vars.courseId] });
+    },
+  });
+}
+
+/**
+ * Extend or renew a student's enrollment expiry.
+ * Invalidates the course's student-progress list so the teacher view
+ * reflects the updated status and expiry immediately.
+ */
+export function useExtendEnrollment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { enrollmentId: string; courseId: string; newExpiresAt: string }) =>
+      extendEnrollment(vars.enrollmentId, vars.newExpiresAt),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: queryKeys.enrollments.byCourse(vars.courseId) });
+      qc.invalidateQueries({ queryKey: queryKeys.courses.all });
+      // Invalidate student-progress so StudentProgressPage refreshes
+      qc.invalidateQueries({ queryKey: ['teacher', 'studentProgress', vars.courseId] });
     },
   });
 }

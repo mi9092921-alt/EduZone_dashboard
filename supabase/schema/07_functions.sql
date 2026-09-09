@@ -2794,6 +2794,137 @@ BEGIN
 END;
 $$;
 
+-- ── Extend / Renew enrollment ──────────────────────────────────────────────
+-- Business contract:
+--   ACTIVE   → update expires_at only (status stays active)
+--   EXPIRED  → set status = 'active', update expires_at
+--   REVOKED  → set status = 'active', update expires_at (audit trail preserved)
+--   COMPLETED → REJECTED (do not silently erase completion semantics)
+--   p_new_expires_at <= now() → REJECTED
+--
+-- Security contract:
+--   Tenant derived from get_current_tenant_id() — never from caller body.
+--   auth.uid() must hold courses.manage in the current tenant.
+--   Course, user, and enrollment must all belong to the same tenant.
+--   Audit logged best-effort (same pattern as update_lesson_progress).
+--
+-- Cross-repository impact: UNVERIFIED — shared DB with EduZone_App.
+-- EduZone_App's student-facing enrollment path uses enroll_in_course() and
+-- update_lesson_progress(), not this admin-only RPC. No student-app call site
+-- was found during dashboard inspection, but the student repository could not
+-- be confirmed exhaustively.
+CREATE OR REPLACE FUNCTION public.extend_enrollment(
+  p_user_id     uuid,
+  p_course_id   uuid,
+  p_new_expires_at timestamptz
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_actor_id    uuid := auth.uid();
+  v_tenant_id   uuid := public.get_current_tenant_id();
+  v_enrollment  record;
+BEGIN
+  -- 1. Caller must be authenticated
+  IF v_actor_id IS NULL THEN
+    RAISE EXCEPTION 'PERMISSION_DENIED: not authenticated';
+  END IF;
+
+  -- 2. Caller must hold courses.manage in current tenant
+  IF NOT public.user_has_permission(v_actor_id, 'courses.manage', v_tenant_id) THEN
+    RAISE EXCEPTION 'PERMISSION_DENIED';
+  END IF;
+
+  -- 3. New expiry must be strictly in the future
+  IF p_new_expires_at IS NULL OR p_new_expires_at <= pg_catalog.now() THEN
+    RAISE EXCEPTION 'INVALID_EXPIRY: new expiry must be a future timestamp';
+  END IF;
+
+  -- 4. Load the enrollment — must exist and belong to the current tenant
+  SELECT e.*
+    INTO v_enrollment
+    FROM public.enrollments e
+   WHERE e.user_id    = p_user_id
+     AND e.course_id  = p_course_id
+     AND e.tenant_id  = v_tenant_id
+     AND e.deleted_at IS NULL;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'ENROLLMENT_NOT_FOUND';
+  END IF;
+
+  -- 5. Verify course belongs to same tenant (defense-in-depth, BOLA guard)
+  IF NOT EXISTS (
+    SELECT 1 FROM public.courses
+     WHERE id = p_course_id
+       AND tenant_id = v_tenant_id
+       AND deleted_at IS NULL
+  ) THEN
+    RAISE EXCEPTION 'COURSE_NOT_FOUND';
+  END IF;
+
+  -- 6. Verify student belongs to same tenant
+  IF NOT EXISTS (
+    SELECT 1 FROM public.users
+     WHERE id = p_user_id
+       AND tenant_id = v_tenant_id
+       AND deleted_at IS NULL
+  ) THEN
+    RAISE EXCEPTION 'USER_NOT_IN_TENANT';
+  END IF;
+
+  -- 7. Status transition rules
+  IF v_enrollment.status = 'completed' THEN
+    RAISE EXCEPTION 'INVALID_STATUS: cannot extend a completed enrollment';
+  END IF;
+
+  -- 8. Apply update — active stays active; expired/revoked reactivated
+  UPDATE public.enrollments
+     SET expires_at    = p_new_expires_at,
+         status        = CASE
+                           WHEN status IN ('expired', 'revoked') THEN 'active'
+                           ELSE status
+                         END,
+         -- Clear revoke fields when reactivating
+         revoked_at    = CASE WHEN status = 'revoked' THEN NULL ELSE revoked_at END,
+         revoked_by    = CASE WHEN status = 'revoked' THEN NULL ELSE revoked_by END,
+         revoke_reason = CASE WHEN status = 'revoked' THEN NULL ELSE revoke_reason END,
+         updated_at    = pg_catalog.now()
+   WHERE user_id  = p_user_id
+     AND course_id = p_course_id
+     AND tenant_id = v_tenant_id;
+
+  -- 9. Best-effort audit log (same pattern as update_lesson_progress)
+  BEGIN
+    PERFORM internal.log_activity_internal(
+      v_actor_id,
+      'enrollment_extended',
+      jsonb_build_object(
+        'course_id',        p_course_id,
+        'student_id',       p_user_id,
+        'enrollment_id',    v_enrollment.id,
+        'prev_status',      v_enrollment.status,
+        'prev_expires_at',  v_enrollment.expires_at,
+        'new_expires_at',   p_new_expires_at,
+        'action',           CASE
+                              WHEN v_enrollment.status IN ('expired', 'revoked')
+                              THEN 'reactivated'
+                              ELSE 'extended'
+                            END
+      ),
+      NULL,
+      NULL,
+      'medium',
+      v_tenant_id
+    );
+  EXCEPTION WHEN OTHERS THEN
+    NULL;
+  END;
+END;
+$$;
+
 CREATE OR REPLACE FUNCTION public.reorder_course_sections(
   p_course_id uuid,
   p_ordered_ids uuid[]

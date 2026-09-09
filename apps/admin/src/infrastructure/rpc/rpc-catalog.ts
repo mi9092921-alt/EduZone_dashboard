@@ -189,6 +189,17 @@ export const RPC_CATALOG: readonly RpcDefinition[] = [
     notes: 'SECURITY DEFINER. Tenant-pinned UPDATE on enrollments.',
   },
   {
+    name: 'extend_enrollment',
+    classification: 'tenant-scoped',
+    owner: 'infrastructure/repos/courses.service.ts',
+    requiredPermission: 'courses.manage',
+    notes:
+      'SECURITY DEFINER. Extends or renews enrollment expiry. ' +
+      'Status transitions: active→active (extends expiry), expired/revoked→active (renews). ' +
+      'COMPLETED is rejected. Tenant derived from get_current_tenant_id(), ' +
+      'never from request body. Audit logged via log_activity_internal.',
+  },
+  {
     name: 'reorder_course_sections',
     classification: 'tenant-scoped',
     owner: 'infrastructure/repos/courses.service.ts',

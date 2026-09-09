@@ -8,9 +8,10 @@ name: CI
 #
 # E2E lives in e2e.yml (dormant until the disposable test backend is
 # provisioned — see that file). The security/RLS scripts under
-# scripts/security are not yet wired as gates: they rely on console.assert
-# (which does not fail the process) and need a seeded test backend — tracked
-# in project_documents/milestone_reports/M15_ci_cd_production_gates_report.md.
+# scripts/security (rls-smoke-test.ts, permission-exhaustive-test.ts) now
+# correctly call process.exit(1) on any detected leak and are CI-gate-ready.
+# They are NOT wired here because they require a live, seeded Supabase
+# backend — tracked for e2e.yml once the test-tenant environment is stable.
 #
 # Merge protection (Execution Plan §19): mark the "build_and_test" job as a
 # required status check for main (Settings → Branches → Branch protection) so

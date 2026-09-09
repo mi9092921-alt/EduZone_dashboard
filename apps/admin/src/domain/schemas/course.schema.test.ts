@@ -1,6 +1,13 @@
 import { describe, it, expect } from 'vitest';
 
-import { createCourseSchema, sectionSchema, lessonSchema, enrollStudentSchema, revokeEnrollmentSchema } from './course.schema';
+import {
+  createCourseSchema,
+  sectionSchema,
+  lessonSchema,
+  enrollStudentSchema,
+  revokeEnrollmentSchema,
+  extendEnrollmentSchema,
+} from './course.schema';
 
 describe('course domain schemas', () => {
   it('validates createCourseSchema - paid course needs price', () => {
@@ -80,4 +87,21 @@ describe('course domain schemas', () => {
 
     expect(revokeEnrollmentSchema.safeParse({ reason: 'x'.repeat(501) }).success).toBe(false);
   });
+
+  it('validates extendEnrollmentSchema - requires valid future date', () => {
+    // Empty date
+    expect(extendEnrollmentSchema.safeParse({ new_expires_at: '' }).success).toBe(false);
+
+    // Invalid date string
+    expect(extendEnrollmentSchema.safeParse({ new_expires_at: 'not-a-date' }).success).toBe(false);
+
+    // Past date (yesterday)
+    const past = new Date(Date.now() - 86400000).toISOString();
+    expect(extendEnrollmentSchema.safeParse({ new_expires_at: past }).success).toBe(false);
+
+    // Future date (+30 days)
+    const future = new Date(Date.now() + 30 * 86400000).toISOString();
+    expect(extendEnrollmentSchema.safeParse({ new_expires_at: future }).success).toBe(true);
+  });
 });
+

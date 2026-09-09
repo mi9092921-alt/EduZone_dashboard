@@ -23,6 +23,7 @@ import {
   getAllCourseEnrollments,
   enrollStudent,
   revokeEnrollment,
+  extendEnrollment,
   getCourseStats,
 } from './courses.service';
 
@@ -367,6 +368,64 @@ describe('courses.service', () => {
     await expect(revokeEnrollment('e1', 'admin', 'some reason')).rejects.toThrow();
     expect(mockRpc).toHaveBeenCalledWith(
       'revoke_enrollment',
+      expect.objectContaining({
+        p_user_id: 'u1',
+        p_course_id: 'c1',
+      }),
+    );
+  });
+
+  it('extendEnrollment calls RPC with correct arguments', async () => {
+    const q = setupQuery({ error: null });
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'enrollments') {
+        return setupQuery({ data: { user_id: 'u1', course_id: 'c1' }, error: null });
+      }
+      return q;
+    });
+    mockRpc.mockResolvedValue({ error: null });
+
+    const newExpiry = '2026-10-01T00:00:00.000Z';
+    await extendEnrollment('e1', newExpiry);
+    expect(mockRpc).toHaveBeenCalledWith(
+      'extend_enrollment',
+      expect.objectContaining({
+        p_user_id: 'u1',
+        p_course_id: 'c1',
+        p_new_expires_at: newExpiry,
+      }),
+    );
+  });
+
+  it('extendEnrollment throws when the enrollment record does not exist', async () => {
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'enrollments') {
+        return setupQuery({ data: null, error: null });
+      }
+      return setupQuery({ error: null });
+    });
+
+    await expect(extendEnrollment('missing', '2026-10-01T00:00:00.000Z')).rejects.toThrow(
+      'Enrollment not found',
+    );
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it('extendEnrollment maps RPC failures cleanly', async () => {
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'enrollments') {
+        return setupQuery({ data: { user_id: 'u1', course_id: 'c1' }, error: null });
+      }
+      return setupQuery({ error: null });
+    });
+    mockRpc.mockResolvedValueOnce({
+      data: null,
+      error: { message: 'INVALID_STATUS: cannot extend a completed enrollment', code: 'P0001' },
+    });
+
+    await expect(extendEnrollment('e1', '2026-10-01T00:00:00.000Z')).rejects.toThrow();
+    expect(mockRpc).toHaveBeenCalledWith(
+      'extend_enrollment',
       expect.objectContaining({
         p_user_id: 'u1',
         p_course_id: 'c1',

@@ -93,7 +93,7 @@ async function testTeacherCannotInsertUserRoles() {
 // Run all tests
 (async () => {
   try {
-    console.log('Starging RLS Smoke Tests...');
+    console.log('Starting RLS Smoke Tests...');
     await testTeacherCannotReadUsers();
     await testTeacherCannotReadSettings();
     await testTeacherCannotWriteSettings();

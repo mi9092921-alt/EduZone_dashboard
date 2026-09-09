@@ -59,7 +59,7 @@ export const NAV_ITEMS: NavItem[] = [
     path: '/activities',
     roles: ['super_admin', 'admin'],
   },
-  { id: 'audit', label: 'audit', icon: Security, path: '/audit', roles: ['super_admin'] },
+  { id: 'audit', label: 'audit', icon: Security, path: '/audit', roles: ['super_admin', 'admin'] },
   { id: 'jobs', label: 'jobs', icon: WorkOutline, path: '/jobs', roles: ['super_admin'] },
   { id: 'tenants', label: 'tenants', icon: Business, path: '/tenants', roles: ['super_admin'] },
   {

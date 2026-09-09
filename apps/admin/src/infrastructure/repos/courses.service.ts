@@ -825,6 +825,46 @@ export async function revokeEnrollment(
   if (error) throw mapDbError(error, 'courses.service.ts');
 }
 
+/**
+ * Extend (or renew) a student's enrollment expiry.
+ *
+ * Security posture:
+ *   - We resolve user_id/course_id from the DB before calling the RPC so we
+ *     never trust a client-supplied user_id for the actual mutation.
+ *   - The SECURITY DEFINER RPC re-validates tenant membership, permission
+ *     (`courses.manage`), and status-transition rules server-side.
+ *   - The actor identity is derived from `auth.uid()` inside the SQL function.
+ *
+ * @param enrollmentId - UUID of the enrollments row
+ * @param newExpiresAt - New expiry as ISO-8601 UTC string (must be in the future)
+ */
+export async function extendEnrollment(
+  enrollmentId: string,
+  newExpiresAt: string,
+): Promise<void> {
+  const { supabase } = container;
+
+  // Resolve user_id + course_id — prevents IDOR: we look up the actual owner
+  // of this enrollment row rather than accepting it from the caller.
+  const { data: enrollment, error: fetchError } = await supabase
+    .from('enrollments')
+    .select('user_id, course_id')
+    .eq('id', enrollmentId)
+    .is('deleted_at', null)
+    .single();
+
+  if (fetchError || !enrollment) throw fetchError || new Error('Enrollment not found');
+
+  const { error } = await supabase.rpc('extend_enrollment', {
+    p_user_id: enrollment.user_id,
+    p_course_id: enrollment.course_id,
+    p_new_expires_at: newExpiresAt,
+  });
+
+  if (error) throw mapDbError(error, 'courses.service.ts');
+}
+
+
 // ══════════════════════════════════════════════════
 // STATS
 // ══════════════════════════════════════════════════

@@ -329,6 +329,13 @@ GRANT EXECUTE ON FUNCTION public.is_teacher_of_course(uuid, uuid) TO authenticat
 REVOKE EXECUTE ON FUNCTION public.enroll_in_course(uuid) FROM anon;
 GRANT EXECUTE ON FUNCTION public.enroll_in_course(uuid) TO authenticated, service_role;
 
+-- extend_enrollment(uuid, uuid, timestamptz): admin/teacher operation to extend
+-- or renew a student's enrollment. The function body enforces courses.manage
+-- permission, tenant isolation, and status-transition rules internally.
+-- Same least-privilege pattern as enroll_in_course above.
+REVOKE EXECUTE ON FUNCTION public.extend_enrollment(uuid, uuid, timestamptz) FROM anon;
+GRANT EXECUTE ON FUNCTION public.extend_enrollment(uuid, uuid, timestamptz) TO authenticated, service_role;
+
 -- courses-subsystem-production-hardening-plan.md Phase 2/3: server-side
 -- lesson-progress write RPC, replacing the client-resolved-tenant direct
 -- upsert. Same authenticated-only exposure as the other user-callable

@@ -155,7 +155,7 @@ export async function getStudentProgress(
   const { data, error, count } = await supabase
     .from('enrollments')
     .select(
-      'user_id, status, enrolled_at, completed_at, progress_pct, last_watched_at, users!user_id(first_name, last_name, email, avatar_url)',
+      'id, user_id, status, expires_at, enrolled_at, progress_pct, last_watched_at, users!user_id(first_name, last_name, email, avatar_url)',
       { count: 'exact' },
     )
     .eq('course_id', courseId)
@@ -171,6 +171,7 @@ export async function getStudentProgress(
   const students: StudentProgress[] = (data ?? []).map((row: Record<string, unknown>) => {
     const user = row.users as Record<string, string | null> | null;
     return {
+      enrollment_id: String(row.id),
       user_id: String(row.user_id),
       first_name: user?.first_name ?? null,
       last_name: user?.last_name ?? null,
@@ -180,6 +181,9 @@ export async function getStudentProgress(
       progress_pct: Number(row.progress_pct ?? 0),
       last_watched: (row.last_watched_at as string | null) ?? null,
       completed: row.status === 'completed',
+      status: (row.status as StudentProgress['status']) ?? 'active',
+      expires_at: (row.expires_at as string | null) ?? null,
+      enrolled_at: String(row.enrolled_at ?? ''),
     };
   });
 
