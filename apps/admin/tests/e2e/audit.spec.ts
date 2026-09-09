@@ -33,7 +33,22 @@ test.describe('Audit chain verification', () => {
     await expect(page.getByText('Latest Seq:')).toBeVisible();
   });
 
-  test('verifies the real hash chain and renders a genuine verdict', async ({ page }) => {
+  test('verifies the real hash chain and renders a genuine verdict', async ({ page }, testInfo) => {
+    // Self-diagnostics: two CI runs failed here with detach/timeout
+    // signatures and one page-state confusion (courses content under
+    // an audit test). Collect page errors + failed requests + URL so
+    // the next failure log tells us exactly what the app did instead
+    // of another opaque timeout.
+    const events: string[] = [];
+    page.on('pageerror', (err) => events.push(`pageerror: ${err.message}`));
+    page.on('requestfailed', (req) =>
+      events.push(`reqfail: ${req.method()} ${req.url()} :: ${req.failure()?.errorText}`),
+    );
+    page.on('response', (res) => {
+      if (res.status() >= 400)
+        events.push(`http${res.status()}: ${res.request().method()} ${res.url()}`);
+    });
+    try {
     // Deterministic fetch sync: the verifier pulls real rows with a
     // plain table SELECT (audit.service.ts
     // getActivityLogsForVerification, browser client) -- no RPC layer
@@ -56,5 +71,11 @@ test.describe('Audit chain verification', () => {
     // (The Cypress version asserted these strings against mocked
     // rows -- here they can only appear if the crypto actually ran.)
     await expect(page.getByText(/Chain intact|Tamper detected/)).toBeVisible();
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.log(`[audit-e2e-diag] url=${page.url()} events=${JSON.stringify(events)}`);
+      await testInfo.attach('failure-dom', { body: await page.content(), contentType: 'text/html' });
+      throw err;
+    }
   });
 });

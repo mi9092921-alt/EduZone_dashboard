@@ -444,7 +444,20 @@ test.describe('User Management', () => {
     // Function endpoint.
     test('submits a real bulk-lock job against an already-locked account (idempotent -- seed state unchanged)', async ({
       page,
-    }) => {
+    }, testInfo) => {
+      // Self-diagnostics (same detach/timeout signature seen in some CI
+      // runs -- see audit.spec.ts): print URL + page errors + failed
+      // requests if this fails, so the log carries the cause.
+      const events: string[] = [];
+      page.on('pageerror', (err) => events.push(`pageerror: ${err.message}`));
+      page.on('requestfailed', (req) =>
+        events.push(`reqfail: ${req.method()} ${req.url()} :: ${req.failure()?.errorText}`),
+      );
+      page.on('response', (res) => {
+        if (res.status() >= 400)
+          events.push(`http${res.status()}: ${res.request().method()} ${res.url()}`);
+      });
+      try {
       // ── Target: Lina Khalid ───────────────────────────────────────
       // supabase/schema/11_seed_reference.sql seeds Lina
       // (student2@eduzone-test.com) as 'locked', and no other spec in
@@ -515,6 +528,12 @@ test.describe('User Management', () => {
       // may or may not run in this harness, and either way Lina stays
       // 'Locked'.
       await expect(row.getByRole('cell', { name: 'Locked', exact: true })).toBeVisible();
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.log(`[bulk-e2e-diag] url=${page.url()} events=${JSON.stringify(events)}`);
+        await testInfo.attach('failure-dom', { body: await page.content(), contentType: 'text/html' });
+        throw err;
+      }
     });
   });
 
