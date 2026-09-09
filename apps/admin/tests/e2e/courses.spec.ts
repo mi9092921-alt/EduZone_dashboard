@@ -128,17 +128,25 @@ test.describe('Course Creation', () => {
   // (cypress/e2e/courses/enroll-student.cy.ts). That version mocked the
   // course list, the student lookup, AND both the table-insert and the
   // RPC enroll endpoints as alternatives -- then asserted a success
-  // banner its own mocks never rendered. The real flow is: course detail
-  // -> Enrollments tab -> EnrollStudentDialog (MUI Autocomplete over the
-  // real student list) -> enroll_student RPC -> row appears. Revoke in
-  // the same test restores seed state.
-  test.describe('Student enrollment & revocation (Cloud Safe -- self-restoring)', () => {
-    // Target pair: Lina Khalid (student2@eduzone-test.com, seeded
-    // 'locked' -- no other spec touches her) + 'Database Design
-    // Principles' (no other spec touches its enrollments either).
-    const courseTitle = 'Database Design Principles';
-
-    async function openEnrollmentsTab(page: Page) {
+  // banner its own mocks never rendered.
+  //
+  // Tracing the REAL flow required correcting two wrong turns:
+  //  - The rendered detail page is TeacherCourseDetailPage (the
+  //    [id]/page.tsx route mounts it), NOT features/courses'
+  //    CourseDetailPage. Its tabs are Students(=default) / Curriculum /
+  //    Analytics / Course Details -- there is no Enrollments tab to
+  //    click. (CourseDetailPage + CourseEnrollmentsTab, with the only
+  //    UI revoke button in the codebase, are unmounted dead code: no
+  //    route or importer references them. Worth a cleanup ticket --
+  //    and it means no reachable UI can revoke an enrollment.)
+  //  - The reachable enroll UI is StudentProgressPage (Students tab):
+  //    'Enroll Student' button -> the same EnrollStudentDialog (MUI
+  //    Autocomplete over the real student list) -> enroll_student RPC.
+  //    Its rows carry no actions, so restore happens by deleting the
+  //    course created inside the test (soft-delete hides it and its
+  //    enrollments from every UI query).
+  test.describe('Student enrollment (Cloud Safe -- self-restoring)', () => {
+    async function gotoCourseDetail(page: Page, title: string) {
       // Courses list -> detail. The title cell carries no interactive
       // children (thumbnail img has alt=""), so clicking it follows the
       // row's onViewCourse navigation instead of hitting a nested
@@ -146,36 +154,22 @@ test.describe('Course Creation', () => {
       await page.goto('/courses');
       await expect(page.getByRole('table')).toBeVisible();
       await expect(page.getByRole('row').nth(1).getByRole('checkbox')).toBeVisible();
-      const courseRow = page.getByRole('row', { name: courseTitle });
+      const courseRow = page.getByRole('row', { name: title });
       await expect(courseRow).toBeVisible();
       await courseRow.getByRole('cell').nth(1).click();
 
-      // Detail page tabs. NOTE (real i18n gap, not a test defect):
-      // general_info_tab / enrollments_tab / settings_tab have no
-      // entries in messages/en.json (only curriculum_tab does), so
-      // next-intl falls back to rendering the raw keys. Locate the
-      // Enrollments tab by index (General=0, Curriculum=1,
-      // Enrollments=2, Settings=3) so this keeps working after the
-      // translations land -- worth its own ticket, out of scope here.
-      await expect(page.getByRole('tab').nth(2)).toBeVisible();
-      await page.getByRole('tab').nth(2).click();
-
-      // Tab loaded (not its content): the enroll action proves the query
-      // behind it resolved. Deliberately no "empty course" assertion
-      // here -- enroll_student is an UPSERT (ON CONFLICT reactivates a
-      // revoked row, 07_functions.sql), so this test converges from ANY
-      // start state: clean seed, revoked leftover, even an active
-      // leftover from a retry that died between enroll and revoke. The
-      // assertions below (ACTIVE after enroll, REVOKED after revoke)
-      // hold in all three cases.
+      // Detail confirms by its own heading. The Students tab (with the
+      // enroll action) is the default -- no tab clicking involved.
+      await expect(page.getByRole('heading', { name: title })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Enroll Student', exact: true })).toBeVisible();
     }
 
     test('rejects an empty enrollment without submitting', async ({ page }) => {
-      await openEnrollmentsTab(page);
+      // Zero-mutation: a seeded course, dialog opened then cancelled.
+      await gotoCourseDetail(page, 'Database Design Principles');
 
       // Opener and dialog submit share 'Enroll Student'
-      // (common.enroll_student_btn) -- submit is dialog-scoped below.
+      // (common.btn_enroll_student) -- submit is dialog-scoped below.
       await page.getByRole('button', { name: 'Enroll Student', exact: true }).click();
 
       const dialog = page.getByRole('dialog');
@@ -191,9 +185,38 @@ test.describe('Course Creation', () => {
       await expect(dialog).toBeHidden();
     });
 
-    test('enrolls Lina, verifies her row, then revokes to restore seed state', async ({ page }) => {
-      await openEnrollmentsTab(page);
+    test('enrolls Lina in a freshly created course, then deletes the course to restore seed state', async ({
+      page,
+    }) => {
+      // ── Unique course: isolates parallel runs and CI retries ────
+      // Timestamped title (same pattern as the create-course test):
+      // no other spec creates courses, and each attempt gets its own
+      // row + slug. Lina (seeded 'locked', untouched by any other
+      // spec) is the student; enroll_student is additionally an
+      // UPSERT (ON CONFLICT reactivates, 07_functions.sql), so even a
+      // retry landing on a leftover converges instead of 409/duplicate
+      // failing.
+      const title = `E2E Enroll Target ${Date.now()}`;
 
+      await page.goto('/courses');
+      await expect(page.getByRole('table')).toBeVisible();
+      await expect(page.getByRole('row').nth(1).getByRole('checkbox')).toBeVisible();
+
+      await page.getByRole('button', { name: 'Create Course', exact: true }).click();
+      const createDialog = page.getByRole('dialog');
+      await expect(createDialog.getByText('Create New Course')).toBeVisible();
+      await createDialog.getByLabel('Course Title').fill(title);
+      const createResponse = page.waitForResponse(
+        (res) => res.url().includes('/rest/v1/courses') && res.request().method() === 'POST',
+      );
+      await createDialog.getByRole('button', { name: 'Create Course', exact: true }).click();
+      expect((await createResponse).ok()).toBe(true);
+      await expect(
+        page.getByRole('alert').filter({ hasText: 'Course created successfully' }),
+      ).toBeVisible();
+
+      // ── Enroll Lina via the real Students-tab dialog ────────────
+      await gotoCourseDetail(page, title);
       await page.getByRole('button', { name: 'Enroll Student', exact: true }).click();
 
       const dialog = page.getByRole('dialog');
@@ -208,8 +231,8 @@ test.describe('Course Creation', () => {
       await page.getByRole('option', { name: /Lina Khalid/i }).click();
 
       // Deterministic submit sync: the real enroll_student RPC
-      // (courses.service.ts enrollStudent, browser client). A duplicate
-      // surfaces as ConflictError/duplicate_enrollment_error, not 2xx.
+      // (courses.service.ts enrollStudent, browser client, admin holds
+      // courses.manage in seed role_permissions).
       const enrollResponse = page.waitForResponse(
         (res) => res.url().includes('/rest/v1/rpc/enroll_student') && res.request().method() === 'POST',
       );
@@ -218,39 +241,32 @@ test.describe('Course Creation', () => {
       await expect(dialog).toBeHidden();
 
       // The dialog toasts nothing on success (EnrollStudentDialog.tsx
-      // just closes) -- the new enrollment row is the real result.
+      // just closes) -- the new progress row is the real result. The
+      // Students tab shows progress rows (status chip 'In Progress',
+      // email masked) rather than enrollment rows.
       const row = page.getByRole('row', { name: /Lina Khalid/i });
       await expect(row).toBeVisible();
-      await expect(row.getByText('ACTIVE')).toBeVisible();
+      await expect(row.getByText('In Progress')).toBeVisible();
 
-      // ── Restore: revoke the enrollment we just created ──────────
-      // The row's only button is the revoke IconButton (rendered only
-      // for status==='active', CourseEnrollmentsTab.tsx) -- it carries
-      // no accessible name, but unambiguity comes from row scoping.
-      await row.getByRole('button').click();
+      // ── Restore: delete the course created above ────────────────
+      // Soft-delete (deleteCourse use case) hides the course and, with
+      // it, this enrollment from every UI query. Same proven steps as
+      // the create-course test.
+      await page.goto('/courses');
+      await expect(page.getByRole('table')).toBeVisible();
+      await expect(page.getByRole('row').nth(1).getByRole('checkbox')).toBeVisible();
+      const createdRow = page.getByRole('row', { name: title });
+      await expect(createdRow).toBeVisible();
+      await createdRow.getByRole('button').click();
+      await page.getByRole('menuitem', { name: 'Delete' }).click();
 
-      // RevokeEnrollmentDialog.tsx (ConfirmDialog): title 'Revoke
-      // Enrollment', reason required min 5 (revokeEnrollmentSchema),
-      // confirm 'Revoke Access'.
-      const revokeDialog = page.getByRole('dialog');
-      await expect(revokeDialog.getByText('Revoke Enrollment')).toBeVisible();
-      await revokeDialog.getByLabel('Reason for Revocation').fill('E2E cleanup after enroll-port check');
-
-      const revokeResponse = page.waitForResponse(
-        (res) =>
-          res.url().includes('/rest/v1/rpc/revoke_enrollment') && res.request().method() === 'POST',
-      );
-      await revokeDialog.getByRole('button', { name: 'Revoke Access', exact: true }).click();
-      expect((await revokeResponse).ok()).toBe(true);
-      await expect(revokeDialog).toBeHidden();
-
-      // Revoked rows stay listed (getCourseEnrollments filters nothing
-      // by status) with a REVOKED chip -- and the revoke action is gone
-      // for non-active rows. Either way the seed's effective state
-      // (Lina not actively enrolled in course 3) is restored, and no
-      // other spec touches enrollments at all.
-      await expect(row.getByText('REVOKED')).toBeVisible();
-      await expect(row.getByRole('button')).toHaveCount(0);
+      const deleteDialog = page.getByRole('dialog');
+      await expect(deleteDialog.getByText('Delete Course')).toBeVisible();
+      await deleteDialog.getByRole('button', { name: 'Delete', exact: true }).click();
+      await expect(
+        page.getByRole('alert').filter({ hasText: 'has been deleted successfully' }),
+      ).toBeVisible();
+      await expect(page.getByRole('row', { name: title })).toHaveCount(0);
     });
   });
 });
