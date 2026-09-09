@@ -173,7 +173,9 @@ test.describe('Course Creation', () => {
       await page.getByRole('button', { name: 'Enroll Student', exact: true }).click();
 
       const dialog = page.getByRole('dialog');
-      await expect(dialog.getByText('Enroll Student')).toBeVisible();
+      // Title span and submit button share the text -- .first() pins the
+      // title (the submit is asserted separately, dialog-scoped below).
+      await expect(dialog.getByText('Enroll Student', { exact: true }).first()).toBeVisible();
 
       await dialog.getByRole('button', { name: 'Enroll Student', exact: true }).click();
 
@@ -220,7 +222,9 @@ test.describe('Course Creation', () => {
       await page.getByRole('button', { name: 'Enroll Student', exact: true }).click();
 
       const dialog = page.getByRole('dialog');
-      await expect(dialog.getByText('Enroll Student')).toBeVisible();
+      // Title span and submit button share the text -- .first() pins the
+      // title (the submit is asserted separately, dialog-scoped below).
+      await expect(dialog.getByText('Enroll Student', { exact: true }).first()).toBeVisible();
 
       // MUI Autocomplete over the REAL student list (useUsers query,
       // primary_role=student). Typing filters server-side; the option
