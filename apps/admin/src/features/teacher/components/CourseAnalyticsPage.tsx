@@ -123,12 +123,12 @@ export function CourseAnalyticsPage() {
         const estDropOff = Math.min(100, Math.max(0, Math.round(5 + sIdx * 4 + lIdx * 2)));
         flat.push({
           id: l.id,
-          title: `${sIdx + 1}.${lIdx + 1} ${l.title}`,
+          title: `${flat.length + 1}. ${l.title}`,
           watchTime: durationMin > 0 ? `${durationMin} min` : '—',
           dropOff: estDropOff,
           dropColor: estDropOff < 10 ? 'success' : estDropOff < 25 ? 'warning' : 'error',
           comments: 0,
-          rating: 5.0,
+          rating: 4.8,
         });
       });
     });
@@ -156,7 +156,7 @@ export function CourseAnalyticsPage() {
   const bars = bucketCounts.map((b) => ({
     label: b.label,
     count: b.count,
-    height: students.length ? Math.max(10, Math.round((b.count / maxBucketCount) * 100)) : 10,
+    height: b.count > 0 ? Math.max(12, Math.round((b.count / maxBucketCount) * 100)) : 0,
   }));
 
   // Dynamic enrollment points for the trend chart
@@ -458,24 +458,52 @@ export function CourseAnalyticsPage() {
                 border: '1px solid',
                 borderColor: 'divider',
                 boxShadow: (t) => t.shadows[1],
+                display: 'flex',
+                flexDirection: 'column',
               }}
             >
-              <Box sx={{ p: 4 }}>
-                <Typography variant="h6" sx={{ fontWeight: 800, color: 'text.primary', mb: 0.5 }}>
-                  {t('progress_dist')}
-                </Typography>
-                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 500 }}>
-                  {t('completion_pct')}
-                </Typography>
+              <Box sx={{ p: 4, flex: 1, display: 'flex', flexDirection: 'column' }}>
                 <Box
                   sx={{
                     display: 'flex',
-                    alignItems: 'flex-end',
                     justifyContent: 'space-between',
-                    gap: 2,
-                    mt: 5,
-                    height: 240,
-                    px: 2,
+                    alignItems: 'flex-start',
+                    mb: 0.5,
+                  }}
+                >
+                  <Box>
+                    <Typography
+                      variant="h6"
+                      sx={{ fontWeight: 800, color: 'text.primary', mb: 0.5 }}
+                    >
+                      {t('progress_dist')}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 500 }}>
+                      {t('completion_pct')}
+                    </Typography>
+                  </Box>
+                  <Chip
+                    size="small"
+                    label={`${students.length} ${t('total_enrolled')}`}
+                    sx={{
+                      fontWeight: 700,
+                      fontSize: '0.72rem',
+                      bgcolor: alpha(theme.palette.primary.main, 0.08),
+                      color: 'primary.main',
+                      borderRadius: 2,
+                    }}
+                  />
+                </Box>
+
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'stretch',
+                    justifyContent: 'space-between',
+                    gap: { xs: 1.5, sm: 2 },
+                    mt: 3,
+                    height: 230,
+                    px: 1,
                   }}
                 >
                   {bars.map((bar) => (
@@ -483,37 +511,98 @@ export function CourseAnalyticsPage() {
                       key={bar.label}
                       sx={{
                         flex: 1,
+                        height: '100%',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
-                        gap: 1.5,
+                        justifyContent: 'flex-end',
+                        gap: 1,
                       }}
                     >
-                      <Box
-                        sx={{
-                          width: '100%',
-                          height: `${bar.height}%`,
-                          borderRadius: '6px 6px 0 0',
-                          backgroundColor: 'primary.main',
-                          opacity: 0.1,
-                          transition: 'all 300ms cubic-bezier(0.4, 0, 0.2, 1)',
-                          cursor: 'pointer',
-                          '&:hover': {
-                            opacity: 1,
-                            transform: 'scaleY(1.05)',
-                            transformOrigin: 'bottom',
-                          },
-                        }}
-                      />
+                      {/* Student count badge */}
                       <Typography
                         variant="caption"
-                        sx={{ fontSize: '0.65rem', color: 'text.disabled', fontWeight: 800 }}
+                        sx={{
+                          fontSize: '0.75rem',
+                          fontWeight: 800,
+                          color: bar.count > 0 ? 'primary.main' : 'text.disabled',
+                          minHeight: 18,
+                        }}
+                      >
+                        {bar.count}
+                      </Typography>
+
+                      {/* Bar Track & Fill */}
+                      <Box
+                        sx={{
+                          position: 'relative',
+                          width: '100%',
+                          flex: 1,
+                          display: 'flex',
+                          alignItems: 'flex-end',
+                          justifyContent: 'center',
+                          bgcolor: alpha(theme.palette.primary.main, 0.05),
+                          borderRadius: '8px',
+                          p: '4px',
+                          transition: 'background-color 200ms',
+                          '&:hover': {
+                            bgcolor: alpha(theme.palette.primary.main, 0.1),
+                          },
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            width: '100%',
+                            height: `${bar.height}%`,
+                            borderRadius: '6px',
+                            background: `linear-gradient(180deg, ${theme.palette.primary.light} 0%, ${theme.palette.primary.main} 100%)`,
+                            opacity: bar.count > 0 ? 0.95 : 0,
+                            transition: 'all 350ms cubic-bezier(0.4, 0, 0.2, 1)',
+                            cursor: 'pointer',
+                            boxShadow:
+                              bar.count > 0
+                                ? `0 4px 12px ${alpha(theme.palette.primary.main, 0.35)}`
+                                : 'none',
+                            '&:hover': {
+                              opacity: 1,
+                              filter: 'brightness(1.1)',
+                              transform: 'scaleY(1.02)',
+                              transformOrigin: 'bottom',
+                            },
+                          }}
+                        />
+                      </Box>
+
+                      {/* X-axis bucket label */}
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          fontSize: '0.7rem',
+                          color: 'text.secondary',
+                          fontWeight: 700,
+                          whiteSpace: 'nowrap',
+                        }}
                       >
                         {bar.label}
                       </Typography>
                     </Box>
                   ))}
                 </Box>
+
+                {students.length === 0 && (
+                  <Typography
+                    variant="caption"
+                    align="center"
+                    sx={{
+                      color: alpha(theme.palette.text.primary, 0.5),
+                      fontWeight: 600,
+                      mt: 1.5,
+                      display: 'block',
+                    }}
+                  >
+                    {tCommon('no_student_data')}
+                  </Typography>
+                )}
               </Box>
             </Box>
           </Box>
@@ -632,57 +721,57 @@ export function CourseAnalyticsPage() {
                             {row.title}
                           </Typography>
                         </TableCell>
-                      <TableCell>
-                        <Typography
-                          variant="body2"
-                          sx={{ fontWeight: 600, color: alpha(theme.palette.text.primary, 0.6) }}
-                        >
-                          {row.watchTime}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <TableCell>
                           <Typography
                             variant="body2"
-                            sx={{ fontWeight: 800, color: `${row.dropColor}.main`, minWidth: 45 }}
+                            sx={{ fontWeight: 600, color: alpha(theme.palette.text.primary, 0.6) }}
                           >
-                            {row.dropOff}%
+                            {row.watchTime}
                           </Typography>
-                          <LinearProgress
-                            variant="determinate"
-                            value={row.dropOff}
-                            color={row.dropColor as 'success' | 'warning' | 'error'}
-                            sx={{
-                              width: 80,
-                              height: 6,
-                              borderRadius: 3,
-                              backgroundColor: 'action.disabledBackground',
-                              '& .MuiLinearProgress-bar': { borderRadius: 3 },
-                            }}
-                          />
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Typography
-                          variant="body2"
-                          sx={{ fontWeight: 600, color: alpha(theme.palette.text.primary, 0.6) }}
-                        >
-                          {t('comments_count', { count: row.comments })}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Star sx={{ fontSize: 18, color: 'warning.main' }} />
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <Typography
+                              variant="body2"
+                              sx={{ fontWeight: 800, color: `${row.dropColor}.main`, minWidth: 45 }}
+                            >
+                              {row.dropOff}%
+                            </Typography>
+                            <LinearProgress
+                              variant="determinate"
+                              value={row.dropOff}
+                              color={row.dropColor as 'success' | 'warning' | 'error'}
+                              sx={{
+                                width: 80,
+                                height: 6,
+                                borderRadius: 3,
+                                backgroundColor: 'action.disabledBackground',
+                                '& .MuiLinearProgress-bar': { borderRadius: 3 },
+                              }}
+                            />
+                          </Box>
+                        </TableCell>
+                        <TableCell>
                           <Typography
                             variant="body2"
-                            sx={{ fontWeight: 800, color: 'text.primary' }}
+                            sx={{ fontWeight: 600, color: alpha(theme.palette.text.primary, 0.6) }}
                           >
-                            {row.rating}
+                            {t('comments_count', { count: row.comments })}
                           </Typography>
-                        </Box>
-                      </TableCell>
-                    </TableRow>
-                  )))}
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Star sx={{ fontSize: 18, color: 'warning.main' }} />
+                            <Typography
+                              variant="body2"
+                              sx={{ fontWeight: 800, color: 'text.primary' }}
+                            >
+                              {row.rating}
+                            </Typography>
+                          </Box>
+                        </TableCell>
+                      </TableRow>
+                    )))}
                 </TableBody>
               </Table>
             </TableContainer>
