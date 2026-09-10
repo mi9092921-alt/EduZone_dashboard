@@ -54,12 +54,7 @@ const pg = new EmbeddedPostgres({
   password: 'postgres',
   port: 54329,
   persistent: false,
-  // Portable across environments: GitHub Actions runners are non-root,
-  // but a sandboxed/root container (or `docker run` without --user) is
-  // not uncommon for local use — embedded-postgres refuses to run as
-  // root otherwise. This is the library's own supported way to handle
-  // that, and removes any need to `su` to a system `postgres` user.
-  createPostgresUser: true,
+  createPostgresUser: isRoot,
 });
 
 await pg.initialise();
