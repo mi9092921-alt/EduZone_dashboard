@@ -13,9 +13,9 @@ import {
   Fade,
   Divider,
 } from '@mui/material';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 import { CourseAnalyticsPage } from './CourseAnalyticsPage';
 import { StudentProgressPage } from './StudentProgressPage';
@@ -25,11 +25,26 @@ import { CourseInfoForm } from '@/features/courses/components/CourseInfoForm';
 import { CurriculumBuilder } from '@/features/courses/components/CurriculumBuilder';
 import { useRouter } from '@/i18n/routing';
 
+const COURSE_TAB_SLUGS = ['students', 'curriculum', 'analytics', 'details'] as const;
+
+/** Maps a ?tab= slug to a tab index; unknown/missing slugs fall back to 0. */
+function courseTabIndexFromSlug(slug: string | null): number {
+  const idx = (COURSE_TAB_SLUGS as readonly string[]).indexOf(slug ?? '');
+  return idx >= 0 ? idx : 0;
+}
+
 export function TeacherCourseDetailPage() {
   const t = useTranslations('common');
   const router = useRouter();
   const { id: courseId } = useParams() as { id: string };
-  const [activeTab, setActiveTab] = useState(0);
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState(() => courseTabIndexFromSlug(searchParams.get('tab')));
+
+  // Stay in sync when navigating between ?tab= links for the same course
+  // (client-side navigation reuses the component instead of remounting).
+  useEffect(() => {
+    setActiveTab(courseTabIndexFromSlug(searchParams.get('tab')));
+  }, [searchParams]);
 
   const { data: course, isLoading, isError } = useCourseById(courseId);
 
@@ -60,6 +75,7 @@ export function TeacherCourseDetailPage() {
 
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
+    router.replace(`/courses/${courseId}?tab=${COURSE_TAB_SLUGS[newValue]}`, { scroll: false });
   };
 
   return (

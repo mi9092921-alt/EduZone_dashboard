@@ -58,7 +58,10 @@ export interface UserLocationLog {
   accuracy: number | null;
   device_info: Record<string, unknown>;
   source: string | null;
-  timestamp: string;
+  logged_at: string;
+  created_at: string;
+  /** Legacy alias — prefer logged_at (matches user_location_logs table). */
+  timestamp?: string;
 }
 
 export interface CoordinatePoint {

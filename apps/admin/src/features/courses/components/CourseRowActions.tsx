@@ -1,6 +1,6 @@
 'use client';
 
-import { MoreVert, Visibility, Edit, Publish, Archive, Delete } from '@mui/icons-material';
+import { MoreVert, Visibility, Edit, Publish, Archive, Delete, Drafts } from '@mui/icons-material';
 import { useTranslations } from 'next-intl';
 
 import { Button } from '@/components/ui/Button';
@@ -13,6 +13,7 @@ interface CourseRowActionsProps {
   onEdit: (course: Course) => void;
   onPublish: (course: Course) => void;
   onArchive: (course: Course) => void;
+  onDraft: (course: Course) => void;
   onDelete: (course: Course) => void;
 }
 
@@ -22,6 +23,7 @@ export function CourseRowActions({
   onEdit,
   onPublish,
   onArchive,
+  onDraft,
   onDelete,
 }: CourseRowActionsProps) {
   const t = useTranslations('common');
@@ -70,6 +72,15 @@ export function CourseRowActions({
           icon={<Archive className="text-amber-500 text-sm" />}
         >
           {t('archive')}
+        </DropdownItem>
+      )}
+      {course.status !== 'draft' && (
+        <DropdownItem
+          onClick={() => onDraft(course)}
+          className="text-slate-600 dark:text-slate-400"
+          icon={<Drafts className="text-slate-500 text-sm" />}
+        >
+          {t('draft')}
         </DropdownItem>
       )}
 
