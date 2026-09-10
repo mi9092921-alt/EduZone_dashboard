@@ -74,33 +74,26 @@ $$;
 -- storage.objects), sized to exactly what 10_permissions.sql /
 -- VALIDATION.sql reference. RLS is enabled on storage.objects by
 -- default in every real Supabase project, so it is enabled here too.
--- Minimal stub of Supabase Vault (schema `vault`), sized to exactly
--- what private.get_kms_key() reads (vault.decrypted_secrets, keyed by
--- `name`). The key below is a random TEST-ONLY value generated fresh
--- for this disposable harness — it is never used anywhere outside
--- this local database and must never be treated as a real secret.
+--
+-- Note: Supabase Vault (schema `vault`) is intentionally NOT stubbed
+-- here. supabase/schema/11_seed_reference.sql itself runs
+-- `CREATE EXTENSION IF NOT EXISTS supabase_vault WITH SCHEMA vault
+-- CASCADE;` before it needs vault.create_secret() -- exactly like a real
+-- Supabase-managed Postgres image. This harness ships a matching
+-- `supabase_vault` stub extension (installed by
+-- install-stub-extensions.mjs) so that statement succeeds unmodified,
+-- rather than pre-creating a same-named schema/table by hand here, which
+-- Postgres then refuses to let a same-named extension "adopt" (`schema
+-- vault is not a member of extension "supabase_vault"`).
+--
+-- The `vault` *schema* itself, however, must already exist before that
+-- CREATE EXTENSION ... WITH SCHEMA vault call: Postgres requires the
+-- target schema of an unfixed-schema extension to pre-exist, and on a
+-- real Supabase-managed Postgres image the `vault` schema is always
+-- present regardless of whether the extension is enabled. This mirrors
+-- that -- only the schema, none of its objects (those belong to the
+-- extension script).
 CREATE SCHEMA IF NOT EXISTS vault;
-
-CREATE TABLE IF NOT EXISTS vault._secrets (
-  name              text PRIMARY KEY,
-  decrypted_secret  text NOT NULL
-);
-
-CREATE VIEW vault.decrypted_secrets AS
-  SELECT name, decrypted_secret FROM vault._secrets;
-
-CREATE OR REPLACE FUNCTION vault.create_secret(p_secret text, p_name text)
-RETURNS uuid
-LANGUAGE plpgsql AS $$
-BEGIN
-  INSERT INTO vault._secrets (name, decrypted_secret)
-  VALUES (p_name, p_secret)
-  ON CONFLICT (name) DO UPDATE SET decrypted_secret = EXCLUDED.decrypted_secret;
-  RETURN gen_random_uuid();
-END;
-$$;
-
-SELECT vault.create_secret(md5(random()::text || clock_timestamp()::text) || md5(random()::text), 'eduzone_kms_key');
 
 CREATE SCHEMA IF NOT EXISTS storage;
 
@@ -123,9 +116,6 @@ CREATE TABLE IF NOT EXISTS storage.objects (
 );
 
 ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
-
-GRANT USAGE ON SCHEMA auth TO authenticated, anon, authenticator;
-GRANT SELECT ON auth.users, auth.sessions, auth.identities TO authenticated, anon;
 
 DO $$
 BEGIN
@@ -156,3 +146,8 @@ BEGIN
   GRANT authenticated, anon, service_role TO authenticator;
 END
 $$;
+
+-- Roles must exist before they can be GRANTed to -- this has to run
+-- after the DO block above, not before it.
+GRANT USAGE ON SCHEMA auth TO authenticated, anon, authenticator;
+GRANT SELECT ON auth.users, auth.sessions, auth.identities TO authenticated, anon;

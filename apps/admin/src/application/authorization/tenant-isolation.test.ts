@@ -11,6 +11,16 @@ function createMockSupabaseForTenant(params: {
   userId: string;
   role: string;
   tenantId: string;
+  /**
+   * What the DB-backed `user_has_permission` RPC should report — this is
+   * now the final authority for every permission decision (see
+   * authorization.service.ts), so tests that expect a same-tenant call to
+   * succeed must simulate the database actually granting it. Tests below
+   * that expect denial do so via TENANT_MISMATCH (evaluated before the
+   * RPC is ever reached) or the super_admin role check, so they are
+   * unaffected by this value either way.
+   */
+  rpcResult?: boolean;
 }) {
   return {
     auth: {
@@ -31,7 +41,7 @@ function createMockSupabaseForTenant(params: {
         error: null,
       }),
     }),
-    rpc: vi.fn().mockResolvedValue({ data: false, error: null }),
+    rpc: vi.fn().mockResolvedValue({ data: params.rpcResult ?? true, error: null }),
   } as unknown as SupabaseClient;
 }
 

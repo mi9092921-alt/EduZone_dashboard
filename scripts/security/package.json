@@ -1,0 +1,19 @@
+{
+  "name": "@eduzone/security-tests",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Fast, Docker-free RLS + permission regression tests (fast-gate-*.ts), run against the disposable local Postgres harness in local-test-harness/. Complementary to the deeper, Docker/live-Supabase-based rls-smoke-test.ts + permission-exhaustive-test.ts, which stay wired into .github/workflows/e2e.yml. Not part of the app build or the pnpm workspace.",
+  "type": "module",
+  "scripts": {
+    "test:rls": "tsx fast-gate-rls.ts",
+    "test:permissions": "tsx fast-gate-permissions.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/pg": "^8.11.10",
+    "pg": "^8.13.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

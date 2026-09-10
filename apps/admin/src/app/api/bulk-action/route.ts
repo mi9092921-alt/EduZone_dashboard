@@ -1,7 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 
-import { roleAllowsPermission } from '@/application/authorization/policy';
 import { createRequestId } from '@/application/ports/IAuditLogger';
 import { mapDbError } from '@/domain/errors';
 import {
@@ -375,12 +374,21 @@ export async function POST(request: NextRequest) {
       return errorJson('UNAUTHORIZED', 'User profile not found', 401);
     }
 
-    // ── Verify permission (super_admin bypasses all checks) ───────────
+    // ── Verify permission (super_admin is the only explicit bypass) ───
+    // P1-SEC-005 FIX: this route used to short-circuit on
+    // `roleAllowsPermission()` — a static, hardcoded role allowlist — and
+    // only fell back to the DB-backed `user_has_permission` RPC when that
+    // allowlist said no. That let a role's generic allowlist entry
+    // override a real, tenant-specific permission revocation (e.g. an
+    // admin whose `users.lock` grant was explicitly removed via
+    // role_permissions/user_permission_cache for their tenant would still
+    // pass here, because the static policy still said "admin can do
+    // this"). This route runs every subsequent query through the
+    // service_role client (no RLS backstop), so the DB permission check
+    // below is now the sole, final authority for every non-super_admin
+    // caller — never bypassed by role alone.
     const permission = ACTION_PERMISSIONS[body.action];
-    if (
-      callerProfile.primary_role !== 'super_admin' &&
-      !roleAllowsPermission(callerProfile.primary_role, permission)
-    ) {
+    if (callerProfile.primary_role !== 'super_admin') {
       // M11: RPC call delegated to infrastructure/repos/jobs-rpc.service.ts
       const hasPerm = await logUserHasPermissionSafe(
         supabase,

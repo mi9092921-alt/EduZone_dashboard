@@ -1,6 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-import { roleAllowsPermission } from '@/application/authorization/policy';
 import { createRequestId } from '@/application/ports/IAuditLogger';
 import { createRequestContext, type RequestContext } from '@/domain/types/context.types';
 import type { PrimaryRole } from '@/domain/types/user.types';
@@ -87,27 +86,35 @@ export async function authorizeCaller(
     throw new AuthorizationError('Cross-tenant access forbidden', 'TENANT_MISMATCH', 403);
   }
 
-  // 5. Permission evaluation
+  // 5. Permission evaluation — the database is the final source of truth
+  // for every permission decision from this point on, with `super_admin`
+  // (handled in step 3, above) as the only explicit exception.
+  //
+  // There used to be a `roleAllowsPermission()` fast-path here that
+  // returned an allow *without ever consulting the database* whenever a
+  // static, hardcoded role->permission allowlist said yes. That allowlist
+  // cannot see per-tenant `role_permissions` customizations or per-user
+  // `user_permission_cache` overrides/revocations/expiries, so it could
+  // silently grant access the database would have denied (a permission
+  // revoked for one admin in one tenant, a role's grant that a tenant
+  // deliberately narrowed, an expired cache entry, etc.) — i.e. exactly
+  // the "role allows, but the permission itself is denied" case this
+  // service exists to prevent. `roleAllowsPermission` is intentionally no
+  // longer consulted here: every non-super_admin caller is now confirmed
+  // against `user_has_permission` (tenant-scoped, DB-backed) before any
+  // mutation is authorized.
   const permissions = Array.isArray(permission) ? permission : [permission];
 
-  // Fast-path evaluation via policy
-  if (roleAllowsPermission(role, permissions)) {
-    return createRequestContext({
-      userId,
-      tenantId: callerTenantId,
-      role,
-      permissions,
-      requestId,
-    });
-  }
-
-  // Database-backed permission check via RPC
   for (const p of permissions) {
-    const { data: hasPerm } = await supabase.rpc('user_has_permission', {
+    const { data: hasPerm, error: rpcError } = await supabase.rpc('user_has_permission', {
       p_user_id: userId,
       p_permission: p,
       p_tenant_id: callerTenantId ?? null,
     });
+
+    // Fail closed: an RPC error must never be treated as an implicit
+    // allow — try the next requested permission (if any) instead.
+    if (rpcError) continue;
 
     if (hasPerm) {
       return createRequestContext({
