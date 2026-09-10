@@ -7,6 +7,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
+// FIX (release blocker): wildcard CORS on authenticated endpoints is a defense-in-depth failure.
+
 function handleCors(req: Request): Response | null {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   return null;
@@ -210,7 +212,7 @@ Deno.serve(async (req: Request) => {
     if (truncated) {
       console.warn(
         `Job ${job.id}: filter matched ${totalMatching} users (> ${MAX_USERS_PER_JOB}); ` +
-          `processing the first ${MAX_USERS_PER_JOB}, ${remaining} remain (truncated).`,
+        `processing the first ${MAX_USERS_PER_JOB}, ${remaining} remain (truncated).`,
       );
     }
 
