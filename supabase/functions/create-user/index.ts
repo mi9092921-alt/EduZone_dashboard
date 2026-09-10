@@ -6,6 +6,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
+// FIX (release blocker): wildcard CORS on authenticated endpoints is a defense-in-depth failure.
+
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {

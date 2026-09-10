@@ -843,7 +843,8 @@
     "avg_label": "Avg: {val}%",
     "less_label": "Less",
     "more_label": "More",
-    "no_activity_risk": "No activity matching risk filter"
+    "no_activity_risk": "No activity matching risk filter",
+    "status_completed": "completed"
   },
   "settings": {
     "page_title": "System Settings",
@@ -1071,6 +1072,7 @@
     "header_region": "Region / Location",
     "header_coordinates": "Coordinates",
     "header_accuracy": "Accuracy",
+    "header_map": "Map",
     "label_high_precision": "High-Precision Logs",
     "label_session_history": "Session History",
     "label_lat": "Lat",

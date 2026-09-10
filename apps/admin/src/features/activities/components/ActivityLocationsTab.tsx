@@ -14,6 +14,7 @@ import React, { useState } from 'react';
 
 import { useActivityLogs } from '@/adapters/queries/audit.queries';
 import { useUserLocationLogs } from '@/adapters/queries/user_locations.queries';
+import { useUserSessions } from '@/adapters/queries/user_sessions.queries';
 import { cn } from '@/lib/utils';
 
 interface ActivityLocationsTabProps {
@@ -44,8 +45,11 @@ export function ActivityLocationsTab({ userId }: ActivityLocationsTabProps) {
 
   const { data: locationLogs, isLoading: isLocationsLoading } = useUserLocationLogs(userId);
 
+  const { data: sessions, isLoading: isSessionsLoading } = useUserSessions(userId);
+
   const logs = auditData?.data ?? [];
   const locationData = locationLogs ?? [];
+  const sessionList = sessions ?? [];
 
   // Filter for unique sessions based on IP and Region
   const uniqueSessions = logs.filter(
@@ -54,7 +58,34 @@ export function ActivityLocationsTab({ userId }: ActivityLocationsTabProps) {
       self.findIndex((t) => t.ip_address === log.ip_address && t.region_id === log.region_id),
   );
 
-  if (isAuditLoading || isLocationsLoading) {
+  // Prefer real login sessions (sessions table carries ip/region/started_at).
+  // activity_logs is only a fallback: it has no region column and its ip is
+  // often null upstream, so it can only fill the date.
+  const rawSessionRows =
+    sessionList.length > 0
+      ? sessionList.map((s) => ({
+          key: s.id,
+          ip: s.ip_address,
+          region: s.region_id,
+          date: s.started_at,
+        }))
+      : uniqueSessions.map((log) => ({
+          key: log.id,
+          ip: log.ip_address,
+          region: log.region_id ?? null,
+          date: log.created_at,
+        }));
+
+  // Keys must be unique for React reconciliation — drop repeated ids
+  // (partitioned reads can return the same row twice), keeping first.
+  const seenSessionKeys = new Set<string>();
+  const sessionRows = rawSessionRows.filter((row) => {
+    if (seenSessionKeys.has(row.key)) return false;
+    seenSessionKeys.add(row.key);
+    return true;
+  });
+
+  if (isAuditLoading || isLocationsLoading || isSessionsLoading) {
     return (
       <div className="space-y-4 p-4">
         {[1, 2, 3, 4].map((i) => (
@@ -64,7 +95,7 @@ export function ActivityLocationsTab({ userId }: ActivityLocationsTabProps) {
     );
   }
 
-  if (uniqueSessions.length === 0 && locationData.length === 0) {
+  if (sessionRows.length === 0 && locationData.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center opacity-60">
         <Place className="text-4xl mb-3 text-muted-foreground" />
@@ -147,10 +178,10 @@ export function ActivityLocationsTab({ userId }: ActivityLocationsTabProps) {
                       <td className="px-5 py-4 whitespace-nowrap">
                         <div className="flex flex-col text-[11px]">
                           <span className="text-foreground font-bold">
-                            {safeFormat(log.timestamp, locale, { dateStyle: 'medium' })}
+                            {safeFormat(log.logged_at ?? log.created_at ?? log.timestamp, locale, { dateStyle: 'medium' })}
                           </span>
                           <span className="text-muted-foreground mt-0.5 uppercase text-[10px]">
-                            {safeFormat(log.timestamp, locale, { timeStyle: 'short' })}
+                            {safeFormat(log.logged_at ?? log.created_at ?? log.timestamp, locale, { timeStyle: 'short' })}
                           </span>
                         </div>
                       </td>
@@ -177,8 +208,8 @@ export function ActivityLocationsTab({ userId }: ActivityLocationsTabProps) {
         </section>
       )}
 
-      {/* ── Session History Section (Audit Fallback) ──────────────── */}
-      {uniqueSessions.length > 0 && (
+      {/* ── Session History Section ─────────────────────────────────────── */}
+      {sessionRows.length > 0 && (
         <section className="space-y-3">
           <div className="flex items-center gap-2 px-1 text-muted-foreground opacity-60">
             <Language className="text-lg" />
@@ -204,8 +235,8 @@ export function ActivityLocationsTab({ userId }: ActivityLocationsTabProps) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/20">
-                  {uniqueSessions.map((log) => (
-                    <tr key={log.id} className="hover:bg-muted/10 transition-colors group">
+                  {sessionRows.map((row) => (
+                    <tr key={row.key} className="hover:bg-muted/10 transition-colors group">
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
                           <div className="p-2 rounded-lg bg-background border border-border/40">
@@ -213,9 +244,9 @@ export function ActivityLocationsTab({ userId }: ActivityLocationsTabProps) {
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="font-mono text-xs font-bold text-foreground/80">
-                              {log.ip_address || '—'}
+                              {row.ip || '—'}
                             </span>
-                            {log.ip_address && <CopyButton value={log.ip_address} />}
+                            {row.ip && <CopyButton value={row.ip} />}
                           </div>
                         </div>
                       </td>
@@ -225,17 +256,17 @@ export function ActivityLocationsTab({ userId }: ActivityLocationsTabProps) {
                             <Public fontSize="inherit" />
                           </div>
                           <span className="font-bold text-foreground/80 uppercase">
-                            {log.region_id || (locale === 'ar' ? 'غير معروف' : 'Unknown')}
+                            {row.region || (locale === 'ar' ? 'غير معروف' : 'Unknown')}
                           </span>
                         </div>
                       </td>
                       <td className="px-5 py-4 whitespace-nowrap">
                         <div className="flex flex-col text-[11px]">
                           <span className="text-foreground/80 font-bold">
-                            {safeFormat(log.created_at, locale, { dateStyle: 'medium' })}
+                            {safeFormat(row.date, locale, { dateStyle: 'medium' })}
                           </span>
                           <span className="text-muted-foreground mt-0.5 uppercase text-[10px]">
-                            {safeFormat(log.created_at, locale, { timeStyle: 'short' })}
+                            {safeFormat(row.date, locale, { timeStyle: 'short' })}
                           </span>
                         </div>
                       </td>

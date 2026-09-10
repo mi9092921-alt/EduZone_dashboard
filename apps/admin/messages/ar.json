@@ -843,7 +843,8 @@
     "avg_label": "المتوسط: {val}%",
     "less_label": "أقل",
     "more_label": "أكثر",
-    "no_activity_risk": "لا يوجد نشاط يطابق فلتر المخاطر"
+    "no_activity_risk": "لا يوجد نشاط يطابق فلتر المخاطر",
+    "status_completed": "مكتمل"
   },
   "settings": {
     "page_title": "إعدادات النظام",
@@ -1071,6 +1072,7 @@
     "header_region": "المنطقة / الموقع",
     "header_coordinates": "الإحداثيات",
     "header_accuracy": "الدقة",
+    "header_map": "الخريطة",
     "label_high_precision": "سجلات دقيقة (GPS)",
     "label_session_history": "سجل الجلسات",
     "label_lat": "خط العرض",

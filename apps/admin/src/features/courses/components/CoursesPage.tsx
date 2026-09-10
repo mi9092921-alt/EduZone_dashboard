@@ -53,7 +53,7 @@ export function CoursesPage() {
   );
 
   const handleEditCourse = useCallback(
-    (course: Course) => router.push(`/courses/${course.id}`),
+    (course: Course) => router.push(`/courses/${course.id}?tab=details`),
     [router],
   );
 
@@ -67,6 +67,13 @@ export function CoursesPage() {
   const handleArchiveCourse = useCallback(
     (course: Course) => {
       updateMutation.mutate({ id: course.id, data: { status: 'archived' } });
+    },
+    [updateMutation],
+  );
+
+  const handleDraftCourse = useCallback(
+    (course: Course) => {
+      updateMutation.mutate({ id: course.id, data: { status: 'draft' } });
     },
     [updateMutation],
   );
@@ -243,6 +250,7 @@ export function CoursesPage() {
             onEditCourse={handleEditCourse}
             onPublishCourse={handlePublishCourse}
             onArchiveCourse={handleArchiveCourse}
+            onDraftCourse={handleDraftCourse}
             onDeleteCourse={handleDeleteCourse}
           />
         </div>

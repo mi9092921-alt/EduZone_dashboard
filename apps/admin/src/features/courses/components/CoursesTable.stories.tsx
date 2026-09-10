@@ -73,6 +73,7 @@ const meta: Meta<typeof CoursesTable> = {
     onEditCourse: fn(),
     onPublishCourse: fn(),
     onArchiveCourse: fn(),
+    onDraftCourse: fn(),
     onDeleteCourse: fn(),
   },
 };

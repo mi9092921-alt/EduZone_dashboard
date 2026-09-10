@@ -49,6 +49,7 @@ interface CoursesTableProps {
   onEditCourse: (course: Course) => void;
   onPublishCourse: (course: Course) => void;
   onArchiveCourse: (course: Course) => void;
+  onDraftCourse: (course: Course) => void;
   onDeleteCourse: (course: Course) => void;
 }
 
@@ -66,6 +67,7 @@ export function CoursesTable({
   onEditCourse,
   onPublishCourse,
   onArchiveCourse,
+  onDraftCourse,
   onDeleteCourse,
 }: CoursesTableProps) {
   const t = useTranslations('common');
@@ -312,6 +314,7 @@ export function CoursesTable({
                           onEdit={onEditCourse}
                           onPublish={onPublishCourse}
                           onArchive={onArchiveCourse}
+                          onDraft={onDraftCourse}
                           onDelete={onDeleteCourse}
                         />
                       </td>
