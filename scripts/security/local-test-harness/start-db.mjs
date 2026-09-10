@@ -4,6 +4,7 @@
 // recreated on every run — this is a throwaway test fixture, not a
 // persistent database.
 import EmbeddedPostgres from 'embedded-postgres';
+import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { rmSync } from 'fs';
@@ -12,6 +13,40 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const dataDir = join(__dirname, '.pgdata');
 
 rmSync(dataDir, { recursive: true, force: true });
+
+// Postgres refuses to run its server process as root — that is the ONLY
+// reason embedded-postgres's `createPostgresUser` option exists (it makes
+// the library create a dedicated unprivileged `postgres` OS user/group
+// and drop to it). GitHub Actions runners execute job steps as the
+// unprivileged `runner` user already, so this is never needed there —
+// and asking for it anyway is actively harmful: GitHub's runner images
+// ship PostgreSQL preinstalled, which has *already* created a `postgres`
+// system group (but no matching user). embedded-postgres's own
+// `createPostgresUser` logic only checks for an existing *user* named
+// postgres, not the group, so it unconditionally runs `groupadd
+// postgres` — which fails on "group already exists" — and treats that
+// failure as fatal instead of tolerating it, aborting the whole harness.
+// Gating this on actually running as root sidesteps that bug entirely on
+// any normal CI runner, while still working in a root sandbox/container.
+const isRoot = typeof process.getuid === 'function' && process.getuid() === 0;
+
+if (isRoot) {
+  // Defensive belt-and-braces for root-based environments that might hit
+  // the exact same "group exists, user doesn't" situation GitHub Actions
+  // does: provision the postgres user ourselves, tolerating an
+  // already-existing group, before embedded-postgres gets a chance to
+  // run its own (buggy) groupadd/useradd pair.
+  try {
+    execSync('id -u postgres', { stdio: 'ignore' });
+  } catch {
+    try {
+      execSync('getent group postgres', { stdio: 'ignore' });
+    } catch {
+      execSync('groupadd postgres');
+    }
+    execSync('useradd -g postgres postgres');
+  }
+}
 
 const pg = new EmbeddedPostgres({
   databaseDir: dataDir,
