@@ -549,14 +549,16 @@ function ActivityTab({ user, t, locale }: { user: User, t: TranslationFn, locale
   );
 }
 
-const DEFAULT_ENROLLMENT_THEME = {
+type EnrollmentStatusLabelKey = 'status_active' | 'completed_label' | 'status_expired' | 'status_revoked';
+
+const DEFAULT_ENROLLMENT_THEME: { bg: string; text: string; border: string; labelKey: EnrollmentStatusLabelKey } = {
   bg: 'bg-emerald-500/10 dark:bg-emerald-500/20',
   text: 'text-emerald-600 dark:text-emerald-400',
   border: 'border-emerald-500/20',
   labelKey: 'status_active',
 };
 
-const ENROLLMENT_STATUS_THEMES: Record<string, { bg: string; text: string; border: string; labelKey: string }> = {
+const ENROLLMENT_STATUS_THEMES: Record<string, { bg: string; text: string; border: string; labelKey: EnrollmentStatusLabelKey }> = {
   active: DEFAULT_ENROLLMENT_THEME,
   completed: {
     bg: 'bg-blue-500/10 dark:bg-blue-500/20',
@@ -693,7 +695,7 @@ function EnrollmentsTab({ user, t, locale }: { user: User, t: TranslationFn, loc
                         {enr.course_title || 'Course'}
                       </h4>
                       <span className={cn("text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-lg border", statusTheme.bg, statusTheme.text, statusTheme.border)}>
-                        {t(statusTheme.labelKey as any)}
+                        {t(statusTheme.labelKey)}
                       </span>
                     </div>
 
