@@ -1,12 +1,16 @@
 'use client';
 
+import { Suspense } from 'react';
+
 import { AuditPage } from '@/features/audit';
 import { AdminShell } from '@/features/layout';
 
 export default function AuditRoute() {
   return (
     <AdminShell>
-      <AuditPage />
+      <Suspense>
+        <AuditPage />
+      </Suspense>
     </AdminShell>
   );
 }
