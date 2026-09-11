@@ -1,5 +1,7 @@
 'use client';
 
+import { Suspense } from 'react';
+
 import { useAuthUser } from '@/adapters/stores/auth.store';
 import { CoursesPage } from '@/features/courses';
 import { AdminShell } from '@/features/layout';
@@ -9,5 +11,9 @@ export default function CoursesRoute() {
   const user = useAuthUser();
   const isTeacher = user?.primary_role === 'teacher';
 
-  return <AdminShell>{isTeacher ? <MyCoursesPage /> : <CoursesPage />}</AdminShell>;
+  return (
+    <AdminShell>
+      <Suspense>{isTeacher ? <MyCoursesPage /> : <CoursesPage />}</Suspense>
+    </AdminShell>
+  );
 }

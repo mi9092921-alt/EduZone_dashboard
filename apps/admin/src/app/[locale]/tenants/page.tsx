@@ -1,10 +1,14 @@
+import { Suspense } from 'react';
+
 import { AdminShell } from '@/features/layout';
 import { TenantsPage } from '@/features/tenants';
 
 export default function Page() {
   return (
     <AdminShell>
-      <TenantsPage />
+      <Suspense>
+        <TenantsPage />
+      </Suspense>
     </AdminShell>
   );
 }

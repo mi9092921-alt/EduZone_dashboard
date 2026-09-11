@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import React, { useState, useEffect, useRef } from 'react';
 
 import { useTenants } from '@/adapters/queries/tenants.queries';
+import { useUserById } from '@/adapters/queries/users.queries';
 import { useAuthUser } from '@/adapters/stores/auth.store';
 import { Select, SelectItem } from '@/components/ui/Select';
 import { searchUsers, type UserSearchResult } from '@/infrastructure/repos/users.service';
@@ -36,6 +37,24 @@ export function UserActivitySelector({
 
   // Track the last selected name locally to avoid re-searching it
   const lastSelectedName = useRef<string | null>(null);
+
+  // selectedUserId can arrive here without ever going through handleSelect --
+  // e.g. ActivitiesPage restores it straight from a ?user=<id> URL param
+  // after a page refresh. Without this, the search box shows blank even
+  // though a user IS selected. Fetch just that one profile to fill in the
+  // display name.
+  const { data: restoredUser } = useUserById(
+    selectedUserId && lastSelectedName.current === null ? selectedUserId : null,
+  );
+  useEffect(() => {
+    if (!restoredUser) return;
+    const fullName =
+      `${restoredUser.first_name || ''} ${restoredUser.last_name || ''}`.trim() ||
+      restoredUser.email ||
+      'User';
+    lastSelectedName.current = fullName;
+    setQuery(fullName);
+  }, [restoredUser]);
 
   // Fetch tenants for super_admin
   const { data: tenantsData } = useTenants({}, 1, 100);
