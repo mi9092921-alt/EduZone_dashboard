@@ -32,6 +32,7 @@ import {
 } from '@mui/icons-material';
 import { Tooltip } from '@mui/material'; // Using MUI Tooltip as requested/implied for pro-tips
 import Image from 'next/image';
+import { useSearchParams } from 'next/navigation';
 import { useTranslations, useLocale } from 'next-intl';
 import React, { useState, useEffect, useMemo, memo, useCallback } from 'react';
 
@@ -47,7 +48,6 @@ import {
 import { Button } from '@/components/ui/Button';
 import { StatsCard, StatsCardContent, StatsCardIcon } from '@/components/ui/Card';
 import { Drawer } from '@/components/ui/Drawer';
-import { useSearchParams } from 'next/navigation';
 import { getUserDisplayName, getUserInitials } from '@/domain/types/user.types';
 import type { User, Device, Session } from '@/domain/types/user.types';
 import { Link, usePathname, useRouter } from '@/i18n/routing';
