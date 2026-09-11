@@ -9,6 +9,7 @@ import {
   getCourseById,
   getCourseSections,
   getCourseEnrollments,
+  getUserEnrollments,
   getCoursesOverviewStats,
   getVideoViewsByUser,
   getLearningObjectives,
@@ -49,6 +50,19 @@ export function useCourseEnrollments(courseId: string | null, page: number, page
     queryKey: queryKeys.enrollments.byCourse(courseId!),
     queryFn: () => getCourseEnrollments(courseId!, page, pageSize),
     enabled: !!courseId,
+    placeholderData: (prev) => prev,
+  });
+}
+
+export function useUserEnrollments(
+  userId: string | null | undefined,
+  page: number = 1,
+  pageSize: number = 20,
+) {
+  return useQuery({
+    queryKey: [...queryKeys.enrollments.byUser(userId!), { page, pageSize }],
+    queryFn: () => getUserEnrollments(userId!, page, pageSize),
+    enabled: !!userId,
     placeholderData: (prev) => prev,
   });
 }
