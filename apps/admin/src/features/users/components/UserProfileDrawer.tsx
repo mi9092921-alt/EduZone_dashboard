@@ -47,10 +47,14 @@ import {
 import { Button } from '@/components/ui/Button';
 import { StatsCard, StatsCardContent, StatsCardIcon } from '@/components/ui/Card';
 import { Drawer } from '@/components/ui/Drawer';
+import { useSearchParams } from 'next/navigation';
 import { getUserDisplayName, getUserInitials } from '@/domain/types/user.types';
 import type { User, Device, Session } from '@/domain/types/user.types';
-import { Link } from '@/i18n/routing';
+import { Link, usePathname, useRouter } from '@/i18n/routing';
 import { cn } from '@/lib/utils';
+
+const TAB_KEYS = ['overview', 'activity', 'enrollments', 'security', 'access'] as const;
+type TabKey = (typeof TAB_KEYS)[number];
 
 type TranslationFn = ReturnType<typeof useTranslations>;
 
@@ -71,7 +75,26 @@ export function UserProfileDrawer({
   const tUsers = useTranslations('users');
   const tCommon = useTranslations('common');
   const locale = useLocale();
-  const [activeTab, setActiveTab] = useState(0);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const urlTab = searchParams.get('tab');
+  const activeTab = (() => {
+    if (!urlTab) return 0;
+    const index = TAB_KEYS.indexOf(urlTab as TabKey);
+    if (index !== -1) return index;
+    const num = parseInt(urlTab, 10);
+    if (!isNaN(num) && num >= 0 && num < TAB_KEYS.length) return num;
+    return 0;
+  })();
+
+  const handleTabChange = useCallback((tabId: number) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', TAB_KEYS[tabId] ?? 'overview');
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+  }, [router, pathname, searchParams]);
+
   const [avatarError, setAvatarError] = useState(false);
 
   useEffect(() => {
@@ -190,7 +213,7 @@ export function UserProfileDrawer({
           {TABS.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => handleTabChange(tab.id)}
               className={cn(
                 "flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap outline-none",
                 activeTab === tab.id

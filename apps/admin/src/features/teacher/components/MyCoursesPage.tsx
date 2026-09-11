@@ -18,9 +18,10 @@ import { useState, useCallback } from 'react';
 
 import { useTeacherCourses } from '@/adapters/queries/teacher.queries';
 import type { CourseFilters, CourseStatus } from '@/domain/types/course.types';
+import { useSearchParams } from 'next/navigation';
 import { CreateCourseDialog } from '@/features/courses/components/CreateCourseDialog';
 import { ImportCourseDialog } from '@/features/courses/components/ImportCourseDialog';
-import { useRouter } from '@/i18n/routing';
+import { usePathname, useRouter } from '@/i18n/routing';
 
 const getStatusColors = (status: string, opacity: string = '1A') => {
   switch (status) {
@@ -35,10 +36,63 @@ const getStatusColors = (status: string, opacity: string = '1A') => {
 
 export function MyCoursesPage() {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const t = useTranslations('common');
+
+  const setSearchParam = useCallback(
+    (key: string, value: string | null) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (value === null) {
+        params.delete(key);
+      } else {
+        params.set(key, value);
+      }
+      const query = params.toString();
+      router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    },
+    [router, pathname, searchParams],
+  );
+
   const [createOpen, setCreateOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<CourseStatus | undefined>(undefined);
+
+  const isCreateOpen =
+    searchParams.get('dialog') === 'create-course' ||
+    searchParams.get('dialog') === 'create' ||
+    createOpen;
+
+  const isImportOpen =
+    searchParams.get('dialog') === 'import-json' ||
+    searchParams.get('dialog') === 'import' ||
+    importOpen;
+
+  const handleOpenCreate = useCallback(() => {
+    setCreateOpen(true);
+    setSearchParam('dialog', 'create-course');
+  }, [setSearchParam]);
+
+  const handleCloseCreate = useCallback(() => {
+    setCreateOpen(false);
+    setSearchParam('dialog', null);
+  }, [setSearchParam]);
+
+  const handleOpenImport = useCallback(() => {
+    setImportOpen(true);
+    setSearchParam('dialog', 'import-json');
+  }, [setSearchParam]);
+
+  const handleCloseImport = useCallback(() => {
+    setImportOpen(false);
+    setSearchParam('dialog', null);
+  }, [setSearchParam]);
+
+  const urlStatus = searchParams.get('status') as CourseStatus | null;
+  const statusFilter: CourseStatus | undefined =
+    urlStatus === 'published' || urlStatus === 'draft' || urlStatus === 'archived'
+      ? urlStatus
+      : undefined;
+
   const [page] = useState(1);
   const pageSize = 50;
 
@@ -47,10 +101,14 @@ export function MyCoursesPage() {
   const courses = data?.data ?? [];
   const totalCount = data?.count ?? 0;
 
-  const handleTabChange = useCallback((_: unknown, val: number) => {
-    const map: (CourseStatus | undefined)[] = [undefined, 'published', 'draft', 'archived'];
-    setStatusFilter(map[val]);
-  }, []);
+  const handleTabChange = useCallback(
+    (_: unknown, val: number) => {
+      const map: (CourseStatus | undefined)[] = [undefined, 'published', 'draft', 'archived'];
+      const nextStatus = map[val];
+      setSearchParam('status', nextStatus ?? null);
+    },
+    [setSearchParam],
+  );
 
   const tabValue =
     statusFilter === 'published'
@@ -94,7 +152,7 @@ export function MyCoursesPage() {
           <Button
             variant="outlined"
             startIcon={<Upload />}
-            onClick={() => setImportOpen(true)}
+            onClick={handleOpenImport}
             sx={{
               textTransform: 'none',
               fontWeight: 600,
@@ -112,7 +170,7 @@ export function MyCoursesPage() {
           <Button
             variant="contained"
             startIcon={<Add />}
-            onClick={() => setCreateOpen(true)}
+            onClick={handleOpenCreate}
             sx={{
               textTransform: 'none',
               fontWeight: 600,
@@ -331,7 +389,7 @@ export function MyCoursesPage() {
           <Button
             variant="contained"
             startIcon={<Add />}
-            onClick={() => setCreateOpen(true)}
+            onClick={handleOpenCreate}
             sx={{
               textTransform: 'none',
               fontWeight: 600,
@@ -345,8 +403,8 @@ export function MyCoursesPage() {
         </Box>
       )}
 
-      <CreateCourseDialog open={createOpen} onClose={() => setCreateOpen(false)} />
-      <ImportCourseDialog open={importOpen} onClose={() => setImportOpen(false)} />
+      <CreateCourseDialog open={isCreateOpen} onClose={handleCloseCreate} />
+      <ImportCourseDialog open={isImportOpen} onClose={handleCloseImport} />
     </Box>
   );
 }

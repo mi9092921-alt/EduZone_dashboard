@@ -64,6 +64,27 @@ export function UsersPage() {
   const [dialogType, setDialogType] = useState<DialogType>(null);
   const [dialogUser, setDialogUser] = useState<User | null>(null);
   const [addUserOpen, setAddUserOpen] = useState(false);
+  const isAddUserOpen =
+    searchParams.get('dialog') === 'add-user' ||
+    searchParams.get('dialog') === 'create-user' ||
+    searchParams.get('dialog') === 'create' ||
+    addUserOpen;
+
+  const handleOpenAddUser = useCallback(() => {
+    setAddUserOpen(true);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('dialog', 'add-user');
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+  }, [router, pathname, searchParams]);
+
+  const handleCloseAddUser = useCallback(() => {
+    setAddUserOpen(false);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('dialog');
+    const query = params.toString();
+    router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }, [router, pathname, searchParams]);
+
   const [bulkJobId, setBulkJobId] = useState<string | null>(null);
   const [bulkAction, setBulkAction] = useState<BulkAction | null>(null);
 
@@ -90,6 +111,7 @@ export function UsersPage() {
     setClickedUser(null);
     const params = new URLSearchParams(searchParams.toString());
     params.delete('user');
+    params.delete('tab');
     const query = params.toString();
     router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
   }, [router, pathname, searchParams]);
@@ -194,7 +216,7 @@ export function UsersPage() {
           )}
         </div>
         <div className="flex items-center gap-3">
-          <Button onClick={() => setAddUserOpen(true)} className="gap-2">
+          <Button onClick={handleOpenAddUser} className="gap-2">
             <Add className="text-sm scale-90" />
             {t('create_user_btn')}
           </Button>
@@ -279,7 +301,7 @@ export function UsersPage() {
       <DeleteUserDialog user={dialogUser} open={dialogType === 'delete'} onClose={closeDialog} />
 
       {/* Add User Dialog */}
-      <AddUserDialog open={addUserOpen} onClose={() => setAddUserOpen(false)} />
+      <AddUserDialog open={isAddUserOpen} onClose={handleCloseAddUser} />
     </div>
   );
 }

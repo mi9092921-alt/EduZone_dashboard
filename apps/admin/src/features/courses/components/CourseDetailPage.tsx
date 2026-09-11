@@ -20,8 +20,12 @@ import { CourseInfoForm } from './CourseInfoForm';
 import { CourseSettingsTab } from './CourseSettingsTab';
 import { CurriculumBuilder } from './CurriculumBuilder';
 
+import { useSearchParams } from 'next/navigation';
 import { useCourseById } from '@/adapters/queries/courses.queries';
-import { useRouter } from '@/i18n/routing';
+import { usePathname, useRouter } from '@/i18n/routing';
+
+const COURSE_TAB_KEYS = ['details', 'curriculum', 'enrollments', 'settings'] as const;
+type CourseTabKey = (typeof COURSE_TAB_KEYS)[number];
 
 interface CourseDetailPageProps {
   courseId: string;
@@ -30,7 +34,26 @@ interface CourseDetailPageProps {
 export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
   const t = useTranslations('common');
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState(0);
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const urlTab = searchParams.get('tab');
+  const activeTab = (() => {
+    if (!urlTab) return 0;
+    if (urlTab === 'info' || urlTab === 'details') return 0;
+    const index = COURSE_TAB_KEYS.indexOf(urlTab as CourseTabKey);
+    if (index !== -1) return index;
+    const num = parseInt(urlTab, 10);
+    if (!isNaN(num) && num >= 0 && num < COURSE_TAB_KEYS.length) return num;
+    return 0;
+  })();
+
+  const handleTabChange = (v: number) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', COURSE_TAB_KEYS[v] ?? 'details');
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+  };
+
   const { data: course, isLoading } = useCourseById(courseId);
 
   if (isLoading) {
@@ -157,7 +180,7 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
       >
         <Tabs
           value={activeTab}
-          onChange={(_, v) => setActiveTab(v)}
+          onChange={(_, v) => handleTabChange(v)}
           sx={{
             '& .MuiTab-root': {
               textTransform: 'none',

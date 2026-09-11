@@ -13,12 +13,13 @@ import {
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 
+import { useSearchParams } from 'next/navigation';
 import { useUpdateTenant, useSuspendTenant } from '@/adapters/mutations/tenants.mutations';
 import { useTenantDetail, useTenantAuditLogs } from '@/adapters/queries/tenants.queries';
 import { Button } from '@/components/ui/Button';
 import type { ActivityLog } from '@/domain/types/audit.types';
 import type { TenantPlan, UpdateTenantInput } from '@/domain/types/tenant.types';
-import { useRouter } from '@/i18n/routing';
+import { usePathname, useRouter } from '@/i18n/routing';
 import { cn } from '@/lib/utils';
 
 
@@ -65,10 +66,22 @@ function shardFromRegion(regionId?: string | null): number {
 
 export function TenantDetailPage({ tenantId }: { tenantId: string }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const t = useTranslations('tenants');
   const tCommon = useTranslations('common');
 
-  const [tab, setTab] = useState<Tab>('overview');
+  const urlTab = searchParams.get('tab') as Tab | null;
+  const tab: Tab =
+    urlTab === 'users' || urlTab === 'courses' || urlTab === 'audit' || urlTab === 'overview'
+      ? urlTab
+      : 'overview';
+
+  const handleTabChange = (newTab: Tab) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', newTab);
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+  };
   const { data: tenant, isLoading } = useTenantDetail(tenantId);
   const updateMut = useUpdateTenant();
   const suspendMut = useSuspendTenant();
@@ -193,7 +206,7 @@ export function TenantDetailPage({ tenantId }: { tenantId: string }) {
           {TABS.map((t_tab) => (
             <button
               key={t_tab.id}
-              onClick={() => setTab(t_tab.id)}
+              onClick={() => handleTabChange(t_tab.id)}
               className={cn(
                 'flex items-center gap-1.5 px-4 py-2.5 text-xs font-bold transition-colors border-b-2 -mb-[1px]',
                 tab === t_tab.id
