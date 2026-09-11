@@ -168,12 +168,12 @@ environment: process.env.NEXT_PUBLIC_APP_ENV
 الإعداد الحالي هو:
 
 ```json
-"schedule": "*/5 * * * *"
+"schedule": "0 3 * * *"
 ```
 
-وهذا يعني تشغيل المهمة كل 5 دقائق.
+وهذا يعني تشغيل المهمة يوميًا 3 صباحًا UTC    .
 
-يجب التأكد من استخدام خطة Vercel Pro أو Enterprise، لأن خطة Hobby لا تسمح بالـ Cron المتكرر كل 5 دقائق.
+يجب التأكد من استخدام خطة Vercel Pro أو Enterprise، لأن خطة Hobby لا تسمح بالـ Cron المتكرر يوميًا 3 صباحًا UTC    .
 
 قبل التفعيل:
 
