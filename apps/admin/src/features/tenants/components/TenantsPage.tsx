@@ -8,6 +8,7 @@ import {
   Block,
   Search,
 } from '@mui/icons-material';
+import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useState, useCallback } from 'react';
 
@@ -20,7 +21,7 @@ import { useTenants } from '@/adapters/queries/tenants.queries';
 import { Button } from '@/components/ui/Button';
 import { TablePagination } from '@/components/ui/TablePagination';
 import type { Tenant, TenantFilters, TenantPlan, TenantStatus, CreateTenantInput } from '@/domain/types/tenant.types';
-import { useRouter } from '@/i18n/routing';
+import { usePathname, useRouter } from '@/i18n/routing';
 import { cn } from '@/lib/utils';
 
 
@@ -49,8 +50,24 @@ function formatBytes(bytes: number): string {
 
 export function TenantsPage() {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const t = useTranslations('tenants');
   const tCommon = useTranslations('common');
+
+  const setSearchParam = useCallback(
+    (key: string, value: string | null) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (value === null) {
+        params.delete(key);
+      } else {
+        params.set(key, value);
+      }
+      const query = params.toString();
+      router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    },
+    [router, pathname, searchParams],
+  );
 
   const [filters, setFilters] = useState<TenantFilters>({});
   const [page, setPage] = useState(1);
@@ -59,6 +76,21 @@ export function TenantsPage() {
 
   // Dialogs
   const [showCreate, setShowCreate] = useState(false);
+  const isCreateOpen =
+    searchParams.get('dialog') === 'create-tenant' ||
+    searchParams.get('dialog') === 'create' ||
+    showCreate;
+
+  const handleOpenCreate = useCallback(() => {
+    setShowCreate(true);
+    setSearchParam('dialog', 'create-tenant');
+  }, [setSearchParam]);
+
+  const handleCloseCreate = useCallback(() => {
+    setShowCreate(false);
+    setSearchParam('dialog', null);
+  }, [setSearchParam]);
+
   const [suspendTarget, setSuspendTarget] = useState<Tenant | null>(null);
   const [suspendReason, setSuspendReason] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<Tenant | null>(null);
@@ -85,7 +117,7 @@ export function TenantsPage() {
     if (!newSlug || !newName) return;
     const input: CreateTenantInput = { slug: newSlug, name: newName, plan: newPlan };
     await createMut.mutateAsync(input);
-    setShowCreate(false);
+    handleCloseCreate();
     setNewSlug('');
     setNewName('');
     setNewPlan('free');
@@ -112,7 +144,7 @@ export function TenantsPage() {
           <h1 className="text-2xl font-bold text-foreground tracking-tight">{t('title')}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">{t('subtitle')}</p>
         </div>
-        <Button onClick={() => setShowCreate(true)} variant="primary" size="md">
+        <Button onClick={handleOpenCreate} variant="primary" size="md">
           <Add className="text-sm" />
           {t('create_tenant_btn')}
         </Button>
@@ -303,7 +335,7 @@ export function TenantsPage() {
       </div>
 
       {/* ═══ Create Dialog ═══════════════════════════════════════ */}
-      {showCreate && (
+      {isCreateOpen && (
         <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/50 animate-in fade-in">
           <div className="bg-card rounded-2xl border border-border shadow-2xl w-full max-w-md mx-4 p-6 animate-in zoom-in-95">
             <h3 className="text-lg font-bold text-foreground mb-4">{t('dialog_create_title')}</h3>
@@ -331,7 +363,7 @@ export function TenantsPage() {
             </div>
             {createMut.error && <p className="text-xs text-destructive mt-2">{(createMut.error as Error).message}</p>}
             <div className="flex justify-end gap-2 mt-5">
-              <Button variant="ghost" size="sm" onClick={() => setShowCreate(false)}>{tCommon('cancel')}</Button>
+              <Button variant="ghost" size="sm" onClick={handleCloseCreate}>{tCommon('cancel')}</Button>
               <Button variant="primary" size="sm" onClick={handleCreate} isLoading={createMut.isPending} disabled={!newSlug || !newName}>{tCommon('save')}</Button>
             </div>
           </div>

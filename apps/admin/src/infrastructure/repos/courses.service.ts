@@ -775,6 +775,54 @@ export async function getAllCourseEnrollments(courseId: string): Promise<Enrollm
   });
 }
 
+export async function getUserEnrollments(
+  userId: string,
+  page: number = 1,
+  pageSize: number = 20,
+): Promise<PaginatedResult<Enrollment>> {
+  const { supabase } = container;
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  const { data, error, count } = await supabase
+    .from('enrollments')
+    .select(
+      '*, courses:courses!enrollments_course_id_fkey(id, title, description, thumbnail_url, level, status, price, is_free, total_lessons, category)',
+      { count: 'exact' },
+    )
+    .eq('user_id', userId)
+    .is('deleted_at', null)
+    .order('enrolled_at', { ascending: false })
+    .range(from, to);
+
+  if (error) throw mapDbError(error, 'courses.service.ts');
+
+  const total = count ?? 0;
+  const enrollments = (data ?? []).map((row: Record<string, unknown>) => {
+    const course = row.courses as Record<string, unknown> | null;
+    const { courses: _c, ...rest } = row;
+    return {
+      ...rest,
+      course_title: course?.title as string | undefined,
+      course_thumbnail_url: course?.thumbnail_url as string | undefined,
+      course_level: course?.level as string | undefined,
+      course_status: course?.status as string | undefined,
+      course_category: course?.category as string | undefined,
+      course_total_lessons:
+        (course?.total_lessons as number | undefined) ??
+        (rest.total_lessons as number | undefined),
+    } as Enrollment;
+  });
+
+  return {
+    data: enrollments,
+    count: total,
+    page,
+    pageSize,
+    totalPages: Math.ceil(total / pageSize),
+  };
+}
+
 export async function enrollStudent(
   userId: string,
   courseId: string,

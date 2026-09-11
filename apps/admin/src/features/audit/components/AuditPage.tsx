@@ -2,8 +2,9 @@
 
 import { Security, Speed, CleaningServices, Stream } from '@mui/icons-material';
 import { Tooltip } from '@mui/material';
+import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { AuditLogsTab } from './AuditLogsTab';
 import { LiveActivityStream } from './LiveActivityStream';
@@ -11,14 +12,44 @@ import { RateLimitsTab } from './RateLimitsTab';
 
 import { useFlushActivityLogs } from '@/adapters/mutations/audit.mutations';
 import { Button } from '@/components/ui/Button';
+import { usePathname, useRouter } from '@/i18n/routing';
 import { cn } from '@/lib/utils';
 
 type Tab = 'audit' | 'rateLimits';
 
+function isTab(value: string | null): value is Tab {
+  return value === 'audit' || value === 'rateLimits';
+}
+
 export function AuditPage() {
   const t = useTranslations('audit');
-  const [tab, setTab] = useState<Tab>('audit');
-  const [streamOpen, setStreamOpen] = useState(false);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const tabParam = searchParams.get('tab');
+  const tab: Tab = isTab(tabParam) ? tabParam : 'audit';
+  const streamOpen = searchParams.get('stream') === '1';
+
+  const setSearchParam = useCallback(
+    (key: string, value: string | null) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (value === null) {
+        params.delete(key);
+      } else {
+        params.set(key, value);
+      }
+      const query = params.toString();
+      router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    },
+    [router, pathname, searchParams],
+  );
+
+  const setTab = useCallback((next: Tab) => setSearchParam('tab', next), [setSearchParam]);
+  const setStreamOpen = useCallback(
+    (next: boolean) => setSearchParam('stream', next ? '1' : null),
+    [setSearchParam],
+  );
 
   const flush = useFlushActivityLogs();
   const [flushResult, setFlushResult] = useState<{

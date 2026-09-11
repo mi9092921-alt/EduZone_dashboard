@@ -21,6 +21,7 @@ import {
   reorderLessons,
   getCourseEnrollments,
   getAllCourseEnrollments,
+  getUserEnrollments,
   enrollStudent,
   revokeEnrollment,
   extendEnrollment,
@@ -318,6 +319,10 @@ describe('courses.service', () => {
 
     const res2 = await getAllCourseEnrollments('c1');
     expect(res2[0]!.user_email).toBe('e');
+
+    const res3 = await getUserEnrollments('u1', 1, 10);
+    expect(res3.data[0]!.id).toBe('e1');
+    expect(res3.count).toBe(1);
   });
 
   it('revokeEnrollment', async () => {

@@ -1,6 +1,7 @@
 'use client';
 
 import { Add } from '@mui/icons-material';
+import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useState, useCallback } from 'react';
 
@@ -22,10 +23,11 @@ import { UsersTable } from './UsersTable';
 import { UserStatsCards } from './UserStatsCards';
 
 import { useMutateUserAccount } from '@/adapters/mutations/users.mutations';
-import { useUsers } from '@/adapters/queries/users.queries';
+import { useUsers, useUserById } from '@/adapters/queries/users.queries';
 import { Button } from '@/components/ui/Button';
 import type { BulkAction } from '@/domain/types/bulk.types';
 import type { User, UserFilters, AccountAction } from '@/domain/types/user.types';
+import { usePathname, useRouter } from '@/i18n/routing';
 import { downloadJson } from '@/lib/utils';
 
 type DialogType =
@@ -41,14 +43,48 @@ type DialogType =
 export function UsersPage() {
   const t = useTranslations('users');
   const tCommon = useTranslations('common');
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const drawerUserId = searchParams.get('user');
+
   const [filters, setFilters] = useState<UserFilters>({});
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [drawerUser, setDrawerUser] = useState<User | null>(null);
+  // Holds the User object from the row that was clicked, so opening the
+  // drawer is instant (no fetch/flash). Cleared whenever it no longer
+  // matches the URL (e.g. after a refresh, where the app remounts with
+  // ?user=<id> already in the address bar but no click ever happened).
+  const [clickedUser, setClickedUser] = useState<User | null>(null);
+  const { data: fetchedDrawerUser } = useUserById(
+    drawerUserId && clickedUser?.id !== drawerUserId ? drawerUserId : null,
+  );
+  const drawerUser = clickedUser?.id === drawerUserId ? clickedUser : (fetchedDrawerUser ?? null);
   const [dialogType, setDialogType] = useState<DialogType>(null);
   const [dialogUser, setDialogUser] = useState<User | null>(null);
   const [addUserOpen, setAddUserOpen] = useState(false);
+  const isAddUserOpen =
+    searchParams.get('dialog') === 'add-user' ||
+    searchParams.get('dialog') === 'create-user' ||
+    searchParams.get('dialog') === 'create' ||
+    addUserOpen;
+
+  const handleOpenAddUser = useCallback(() => {
+    setAddUserOpen(true);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('dialog', 'add-user');
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+  }, [router, pathname, searchParams]);
+
+  const handleCloseAddUser = useCallback(() => {
+    setAddUserOpen(false);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('dialog');
+    const query = params.toString();
+    router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }, [router, pathname, searchParams]);
+
   const [bulkJobId, setBulkJobId] = useState<string | null>(null);
   const [bulkAction, setBulkAction] = useState<BulkAction | null>(null);
 
@@ -61,9 +97,24 @@ export function UsersPage() {
   const unlock = useMutateUserAccount();
 
   // ── Handlers ─────────────────────────────────────────────────
-  const handleViewProfile = useCallback((user: User) => {
-    setDrawerUser(user);
-  }, []);
+  const handleViewProfile = useCallback(
+    (user: User) => {
+      setClickedUser(user);
+      const params = new URLSearchParams(searchParams.toString());
+      params.set('user', user.id);
+      router.push(`${pathname}?${params.toString()}`, { scroll: false });
+    },
+    [router, pathname, searchParams],
+  );
+
+  const handleCloseDrawer = useCallback(() => {
+    setClickedUser(null);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('user');
+    params.delete('tab');
+    const query = params.toString();
+    router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }, [router, pathname, searchParams]);
 
   const handleAction = useCallback(
     (user: User, action: AccountAction) => {
@@ -165,7 +216,7 @@ export function UsersPage() {
           )}
         </div>
         <div className="flex items-center gap-3">
-          <Button onClick={() => setAddUserOpen(true)} className="gap-2">
+          <Button onClick={handleOpenAddUser} className="gap-2">
             <Add className="text-sm scale-90" />
             {t('create_user_btn')}
           </Button>
@@ -226,8 +277,8 @@ export function UsersPage() {
       {/* Profile Drawer */}
       <UserProfileDrawer
         user={drawerUser}
-        open={!!drawerUser}
-        onClose={() => setDrawerUser(null)}
+        open={!!drawerUserId}
+        onClose={handleCloseDrawer}
         onTerminateSessions={handleTerminateSessions}
         onResetDevices={handleResetDevices}
       />
@@ -250,7 +301,7 @@ export function UsersPage() {
       <DeleteUserDialog user={dialogUser} open={dialogType === 'delete'} onClose={closeDialog} />
 
       {/* Add User Dialog */}
-      <AddUserDialog open={addUserOpen} onClose={() => setAddUserOpen(false)} />
+      <AddUserDialog open={isAddUserOpen} onClose={handleCloseAddUser} />
     </div>
   );
 }

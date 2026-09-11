@@ -2,20 +2,57 @@
 
 import { Visibility, Place, History } from '@mui/icons-material';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 
 import { ActivityLocationsTab } from './ActivityLocationsTab';
 import { ActivityViewsTab } from './ActivityViewsTab';
 import { UserActivitySelector } from './UserActivitySelector';
 
 import { Card, CardContent } from '@/components/ui/Card';
+import { usePathname, useRouter } from '@/i18n/routing';
 import { cn } from '@/lib/utils';
 
 export function ActivitiesPage() {
   const t = useTranslations('activities');
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'views' | 'locations'>('views');
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const urlTab = searchParams.get('tab');
+  const activeTab: 'views' | 'locations' = urlTab === 'locations' ? 'locations' : 'views';
+
+  const urlUser = searchParams.get('user');
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(urlUser);
+
+  useEffect(() => {
+    setSelectedUserId(urlUser);
+  }, [urlUser]);
+
+  const handleTabChange = useCallback(
+    (tab: 'views' | 'locations') => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set('tab', tab);
+      router.push(`${pathname}?${params.toString()}`, { scroll: false });
+    },
+    [router, pathname, searchParams],
+  );
+
+  const handleSelectUser = useCallback(
+    (userId: string | null) => {
+      setSelectedUserId(userId);
+      const params = new URLSearchParams(searchParams.toString());
+      if (userId) {
+        params.set('user', userId);
+      } else {
+        params.delete('user');
+      }
+      const query = params.toString();
+      router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    },
+    [router, pathname, searchParams],
+  );
 
   const tabs = [
     { id: 'views', label: t('tab_views'), icon: Visibility },
@@ -33,7 +70,7 @@ export function ActivitiesPage() {
 
         <UserActivitySelector
           selectedUserId={selectedUserId}
-          onSelect={setSelectedUserId}
+          onSelect={handleSelectUser}
         />
       </div>
 
@@ -68,7 +105,7 @@ export function ActivitiesPage() {
               {tabs.map((tab) => (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id as 'views' | 'locations')}
+                  onClick={() => handleTabChange(tab.id as 'views' | 'locations')}
                   className={cn(
                     'relative flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-300',
                     activeTab === tab.id

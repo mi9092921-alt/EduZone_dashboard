@@ -78,6 +78,11 @@ export interface Enrollment extends BaseEnrollment {
   user_last_name?: string;
   user_avatar_url?: string;
   course_title?: string;
+  course_thumbnail_url?: string;
+  course_level?: string;
+  course_status?: string;
+  course_category?: string;
+  course_total_lessons?: number;
 }
 
 /** Computed student display name from joined enrollment fields */

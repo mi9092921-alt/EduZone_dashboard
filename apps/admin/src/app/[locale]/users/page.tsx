@@ -1,4 +1,5 @@
 import { dehydrate, HydrationBoundary, QueryClient } from '@tanstack/react-query';
+import { Suspense } from 'react';
 
 import { queryKeys } from '@/adapters/queries/keys';
 import { AdminShell } from '@/features/layout';
@@ -40,7 +41,9 @@ export default async function UsersRoute() {
   return (
     <AdminShell>
       <HydrationBoundary state={dehydrate(queryClient)}>
-        <UsersPage />
+        <Suspense>
+          <UsersPage />
+        </Suspense>
       </HydrationBoundary>
     </AdminShell>
   );

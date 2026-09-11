@@ -42,8 +42,10 @@ import {
   useTheme,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
+import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import React, { useState, useCallback } from 'react';
+
 
 import { PermissionGate } from '../../layout/components/PermissionGate';
 
@@ -61,13 +63,47 @@ import { useFeatureFlags, useFeatureFlagDetail, useRoles } from '@/adapters/quer
 import { useToastStore } from '@/adapters/stores/toast.store';
 import { toClientMessage } from '@/domain/errors';
 import type { CreateFeatureFlagInput, FeatureFlag } from '@/domain/types/feature-flag.types';
+import { usePathname, useRouter } from '@/i18n/routing';
 
 export function FeatureFlagsPage() {
   const theme = useTheme();
   const t = useTranslations('settings');
   const tCommon = useTranslations('common');
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const setSearchParam = useCallback(
+    (key: string, value: string | null) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (value === null) {
+        params.delete(key);
+      } else {
+        params.set(key, value);
+      }
+      const query = params.toString();
+      router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    },
+    [router, pathname, searchParams],
+  );
+
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const isCreateOpen =
+    searchParams.get('dialog') === 'create-flag' ||
+    searchParams.get('dialog') === 'create' ||
+    createOpen;
+
+  const handleOpenCreate = useCallback(() => {
+    setCreateOpen(true);
+    setSearchParam('dialog', 'create-flag');
+  }, [setSearchParam]);
+
+  const handleCloseCreate = useCallback(() => {
+    setCreateOpen(false);
+    setSearchParam('dialog', null);
+  }, [setSearchParam]);
+
   const [deleteTarget, setDeleteTarget] = useState<FeatureFlag | null>(null);
   const { showToast } = useToastStore();
 
@@ -141,7 +177,7 @@ export function FeatureFlagsPage() {
           <Button
             variant="contained"
             startIcon={<Add />}
-            onClick={() => setCreateOpen(true)}
+            onClick={handleOpenCreate}
             sx={{
               textTransform: 'none', fontWeight: 600, borderRadius: 2,
               backgroundColor: 'primary.main',
@@ -298,10 +334,10 @@ export function FeatureFlagsPage() {
 
         {/* Create Dialog */}
         <CreateFlagDialog
-          open={createOpen}
-          onClose={() => setCreateOpen(false)}
+          open={isCreateOpen}
+          onClose={handleCloseCreate}
           onSuccess={() => {
-            setCreateOpen(false);
+            handleCloseCreate();
             showToast(t('feature_flags.status_create_success'), 'success');
           }}
         />

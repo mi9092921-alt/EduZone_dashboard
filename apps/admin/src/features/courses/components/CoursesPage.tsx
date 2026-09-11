@@ -1,6 +1,7 @@
 'use client';
 
 import { Add, Upload } from '@mui/icons-material';
+import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useState, useCallback } from 'react';
 
@@ -18,13 +19,29 @@ import { useToast } from '@/adapters/stores/toast.store';
 import { Button } from '@/components/ui/Button';
 import type { Course, CourseFilters, CourseStatus } from '@/domain/types/course.types';
 import { formatVideoUrl } from '@/domain/video.utils';
-import { useRouter } from '@/i18n/routing';
+import { usePathname, useRouter } from '@/i18n/routing';
 import { getCourseById } from '@/infrastructure/repos/courses.service';
 
 export function CoursesPage() {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const t = useTranslations('common');
   const { showToast } = useToast();
+
+  const setSearchParam = useCallback(
+    (key: string, value: string | null) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (value === null) {
+        params.delete(key);
+      } else {
+        params.set(key, value);
+      }
+      const query = params.toString();
+      router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    },
+    [router, pathname, searchParams],
+  );
 
   // ── State ───────────────────────────────────────────────────────
   const [filters, setFilters] = useState<CourseFilters>({});
@@ -32,6 +49,36 @@ export function CoursesPage() {
   const [pageSize, setPageSize] = useState(10);
   const [createOpen, setCreateOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+
+  const isCreateOpen =
+    searchParams.get('dialog') === 'create-course' ||
+    searchParams.get('dialog') === 'create' ||
+    createOpen;
+
+  const isImportOpen =
+    searchParams.get('dialog') === 'import-json' ||
+    searchParams.get('dialog') === 'import' ||
+    importOpen;
+
+  const handleOpenCreate = useCallback(() => {
+    setCreateOpen(true);
+    setSearchParam('dialog', 'create-course');
+  }, [setSearchParam]);
+
+  const handleCloseCreate = useCallback(() => {
+    setCreateOpen(false);
+    setSearchParam('dialog', null);
+  }, [setSearchParam]);
+
+  const handleOpenImport = useCallback(() => {
+    setImportOpen(true);
+    setSearchParam('dialog', 'import-json');
+  }, [setSearchParam]);
+
+  const handleCloseImport = useCallback(() => {
+    setImportOpen(false);
+    setSearchParam('dialog', null);
+  }, [setSearchParam]);
   const [deleteTarget, setDeleteTarget] = useState<Course | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isBulkPending, setIsBulkPending] = useState(false);
@@ -205,11 +252,11 @@ export function CoursesPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <Button variant="outline" onClick={() => setImportOpen(true)} className="gap-2">
+          <Button variant="outline" onClick={handleOpenImport} className="gap-2">
             <Upload className="text-sm scale-90" />
             {t('import_json')}
           </Button>
-          <Button onClick={() => setCreateOpen(true)} className="gap-2">
+          <Button onClick={handleOpenCreate} className="gap-2">
             <Add className="text-sm scale-90" />
             {t('create_course')}
           </Button>
@@ -256,8 +303,8 @@ export function CoursesPage() {
         </div>
       </div>
 
-      <CreateCourseDialog open={createOpen} onClose={() => setCreateOpen(false)} />
-      <ImportCourseDialog open={importOpen} onClose={() => setImportOpen(false)} />
+      <CreateCourseDialog open={isCreateOpen} onClose={handleCloseCreate} />
+      <ImportCourseDialog open={isImportOpen} onClose={handleCloseImport} />
       <DeleteCourseDialog
         course={deleteTarget}
         open={!!deleteTarget}
