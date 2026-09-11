@@ -12,15 +12,14 @@ import {
   Breadcrumbs,
   Link as MuiLink,
 } from '@mui/material';
+import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
 
 import { CourseEnrollmentsTab } from './CourseEnrollmentsTab';
 import { CourseInfoForm } from './CourseInfoForm';
 import { CourseSettingsTab } from './CourseSettingsTab';
 import { CurriculumBuilder } from './CurriculumBuilder';
 
-import { useSearchParams } from 'next/navigation';
 import { useCourseById } from '@/adapters/queries/courses.queries';
 import { usePathname, useRouter } from '@/i18n/routing';
 

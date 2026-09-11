@@ -10,10 +10,10 @@ import {
   Block,
   CheckCircle,
 } from '@mui/icons-material';
+import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 
-import { useSearchParams } from 'next/navigation';
 import { useUpdateTenant, useSuspendTenant } from '@/adapters/mutations/tenants.mutations';
 import { useTenantDetail, useTenantAuditLogs } from '@/adapters/queries/tenants.queries';
 import { Button } from '@/components/ui/Button';

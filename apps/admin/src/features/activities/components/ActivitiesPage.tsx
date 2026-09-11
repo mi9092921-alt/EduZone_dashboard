@@ -2,10 +2,10 @@
 
 import { Visibility, Place, History } from '@mui/icons-material';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import React, { useState, useCallback, useEffect } from 'react';
 
-import { useSearchParams } from 'next/navigation';
 import { ActivityLocationsTab } from './ActivityLocationsTab';
 import { ActivityViewsTab } from './ActivityViewsTab';
 import { UserActivitySelector } from './UserActivitySelector';

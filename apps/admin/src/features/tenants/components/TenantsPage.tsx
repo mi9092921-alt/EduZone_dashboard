@@ -8,10 +8,10 @@ import {
   Block,
   Search,
 } from '@mui/icons-material';
+import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useState, useCallback } from 'react';
 
-import { useSearchParams } from 'next/navigation';
 import {
   useCreateTenant,
   useSuspendTenant,

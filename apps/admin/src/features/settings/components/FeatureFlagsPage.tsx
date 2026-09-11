@@ -42,11 +42,10 @@ import {
   useTheme,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
+import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import React, { useState, useCallback } from 'react';
 
-import { useSearchParams } from 'next/navigation';
-import { usePathname, useRouter } from '@/i18n/routing';
 
 import { PermissionGate } from '../../layout/components/PermissionGate';
 
@@ -64,6 +63,7 @@ import { useFeatureFlags, useFeatureFlagDetail, useRoles } from '@/adapters/quer
 import { useToastStore } from '@/adapters/stores/toast.store';
 import { toClientMessage } from '@/domain/errors';
 import type { CreateFeatureFlagInput, FeatureFlag } from '@/domain/types/feature-flag.types';
+import { usePathname, useRouter } from '@/i18n/routing';
 
 export function FeatureFlagsPage() {
   const theme = useTheme();

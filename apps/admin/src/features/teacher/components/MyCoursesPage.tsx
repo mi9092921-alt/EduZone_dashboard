@@ -13,12 +13,12 @@ import {
   Tabs,
   Tab,
 } from '@mui/material';
+import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useState, useCallback } from 'react';
 
 import { useTeacherCourses } from '@/adapters/queries/teacher.queries';
 import type { CourseFilters, CourseStatus } from '@/domain/types/course.types';
-import { useSearchParams } from 'next/navigation';
 import { CreateCourseDialog } from '@/features/courses/components/CreateCourseDialog';
 import { ImportCourseDialog } from '@/features/courses/components/ImportCourseDialog';
 import { usePathname, useRouter } from '@/i18n/routing';

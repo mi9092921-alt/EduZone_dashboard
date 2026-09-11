@@ -1,6 +1,7 @@
 'use client';
 
 import { Add, Upload } from '@mui/icons-material';
+import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useState, useCallback } from 'react';
 
@@ -17,7 +18,6 @@ import { useCourses } from '@/adapters/queries/courses.queries';
 import { useToast } from '@/adapters/stores/toast.store';
 import { Button } from '@/components/ui/Button';
 import type { Course, CourseFilters, CourseStatus } from '@/domain/types/course.types';
-import { useSearchParams } from 'next/navigation';
 import { formatVideoUrl } from '@/domain/video.utils';
 import { usePathname, useRouter } from '@/i18n/routing';
 import { getCourseById } from '@/infrastructure/repos/courses.service';
