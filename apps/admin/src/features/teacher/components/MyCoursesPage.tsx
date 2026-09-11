@@ -352,7 +352,7 @@ export function MyCoursesPage() {
                     >
                       <PlayCircleOutline sx={{ fontSize: 18 }} />
                       <Typography variant="body2" sx={{ fontWeight: 500, fontSize: '0.8125rem' }}>
-                        {t('lessons_count', { count: course.enrollment_count ?? 0 })}
+                        {t('lessons_count', { count: course.lesson_count ?? 0 })}
                       </Typography>
                     </Box>
                     <Box

@@ -742,11 +742,23 @@ CREATE POLICY todos_access ON public.todos
 
 DROP POLICY IF EXISTS warnings_select ON public.warnings;
 
+-- v13.x fix (PRD ISSUE-01 / implementation_plan P4-TEACHER-006): the previous
+-- policy made a teacher's own issued warnings invisible to them — the teacher
+-- Warnings page (filtered server-side by `issued_by = auth.uid()`, per
+-- FR-TEACHER-15) always rendered its empty state ("No warnings found") even
+-- when the teacher had issued warnings. The `issued_by` branch restores
+-- exactly that scope — and nothing more: FR-TEACHER-16 (teachers must NOT see
+-- warnings issued by other teachers/admins against their students) is still
+-- enforced, since the remaining branches stay self-warnings + same-tenant admin.
 CREATE POLICY warnings_select ON public.warnings
   FOR SELECT TO authenticated
   USING (
     tenant_id = public.get_current_tenant_id()
-    AND (user_id = (select auth.uid()) OR public.is_admin_with_session_validation())
+    AND (
+      user_id = (select auth.uid())
+      OR issued_by = (select auth.uid())
+      OR public.is_admin_with_session_validation()
+    )
   );
 
 DROP POLICY IF EXISTS warnings_admin_insert ON public.warnings;

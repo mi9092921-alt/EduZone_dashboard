@@ -48,6 +48,13 @@ export function AdminDashboard() {
   const t = useTranslations('common');
   const { data: stats, isLoading } = useDashboardStats();
 
+  const activityMetrics = [
+    { label: t('total_users'), value: stats?.totalUsers ?? 0, color: 'bg-indigo-500' },
+    { label: t('published_courses'), value: stats?.activeCourses ?? 0, color: 'bg-emerald-500' },
+    { label: t('dashboard_views'), value: stats?.totalViews ?? 0, color: 'bg-blue-500' },
+    { label: t('dashboard_progress'), value: stats?.totalProgress ?? 0, color: 'bg-teal-500' },
+  ];
+
   const primaryStats = [
     {
       label: t('total_users'),
@@ -186,12 +193,27 @@ export function AdminDashboard() {
                 {t('live')}
               </div>
             </CardHeader>
-            <CardContent className="h-[300px] flex items-center justify-center m-4">
-              <div className="flex flex-col items-center justify-center text-center space-y-2 p-8 rounded-xl border border-dashed border-border/60 bg-muted/20 w-full h-full">
-                <Analytics className="text-muted-foreground/40 w-8 h-8 mb-2" />
-                <p className="text-sm font-medium text-muted-foreground">
-                  {t('activity_empty_state')}
-                </p>
+            <CardContent className="space-y-5 pt-2">
+              {activityMetrics.map((metric) => {
+                const max = Math.max(...activityMetrics.map((item) => item.value), 1);
+                const width = Math.min(100, Math.round((metric.value / max) * 100));
+                return (
+                  <div key={metric.label} className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium text-muted-foreground">{metric.label}</span>
+                      <span className="font-bold text-foreground tabular-nums">
+                        {isLoading ? '—' : metric.value}
+                      </span>
+                    </div>
+                    <div className="h-2 rounded-full bg-muted overflow-hidden">
+                      <div className={`h-full rounded-full ${metric.color} transition-all`} style={{ width: `${width}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+              <div className="flex items-center gap-2 pt-1 text-xs text-muted-foreground">
+                <Analytics fontSize="small" />
+                <span>{t('dashboard_devices')}: {isLoading ? '—' : stats?.totalDevices ?? 0}</span>
               </div>
             </CardContent>
           </Card>
@@ -207,19 +229,15 @@ export function AdminDashboard() {
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="p-4 rounded-xl bg-indigo-50/50 dark:bg-indigo-500/5 border border-indigo-500/10 text-sm transition-all hover:bg-indigo-50 dark:hover:bg-indigo-500/10 cursor-default">
-                <p className="font-bold text-indigo-900 dark:text-indigo-200">
-                  {t('insights_course_up')}
-                </p>
+                <p className="font-bold text-indigo-900 dark:text-indigo-200">{t('dashboard_progress')}</p>
                 <p className="text-xs text-indigo-600/80 dark:text-indigo-400/80 mt-1 font-medium">
-                  {t('compared_last_week')}
+                  {isLoading ? '—' : `${stats?.totalProgress ?? 0}% average course progress`}
                 </p>
               </div>
               <div className="p-4 rounded-xl bg-emerald-50/50 dark:bg-emerald-500/5 border border-emerald-500/10 text-sm transition-all hover:bg-emerald-50 dark:hover:bg-emerald-500/10 cursor-default">
-                <p className="font-bold text-emerald-900 dark:text-emerald-200">
-                  {t('insights_users_peak')}
-                </p>
+                <p className="font-bold text-emerald-900 dark:text-emerald-200">{t('warnings')}</p>
                 <p className="text-xs text-emerald-600/80 dark:text-emerald-400/80 mt-1 font-medium">
-                  {t('sessions_increased')}
+                  {isLoading ? '—' : `${stats?.pendingWarnings ?? 0} pending warnings require attention`}
                 </p>
               </div>
             </CardContent>

@@ -342,6 +342,7 @@
     "page_title": "Student Warnings",
     "page_desc": "Monitor and issue disciplinary or academic warnings to students.",
     "btn_issue_new": "Issue Warning",
+    "btn_add_warning": "Add Warning",
     "policy_title": "Warning Policy",
     "policy_desc": "Any student who receives three <underline>high</underline> severity warnings in a single semester will be subject to automatic suspension review.",
     "btn_full_policy": "Full Policy",

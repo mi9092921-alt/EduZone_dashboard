@@ -2,6 +2,7 @@
 
 import { People, School, TrendingUp, Warning } from '@mui/icons-material';
 import { Typography, Box } from '@mui/material';
+import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 
 import { useTeacherDashboardStats } from '@/adapters/queries/analytics.queries';
@@ -18,6 +19,13 @@ import {
 export function TeacherDashboard() {
   const t = useTranslations('common');
   const { data: stats, isLoading } = useTeacherDashboardStats();
+
+  const engagementMetrics = [
+    { label: t('dashboard_progress'), value: stats?.totalProgress ?? 0, suffix: '%' },
+    { label: t('total_students'), value: stats?.totalUsers ?? 0, suffix: '' },
+    { label: t('dashboard_views'), value: stats?.totalViews ?? 0, suffix: '' },
+    { label: t('dashboard_lessons'), value: stats?.totalLessons ?? 0, suffix: '' },
+  ];
 
   const statCards = [
     {
@@ -124,8 +132,24 @@ export function TeacherDashboard() {
           <CardHeader>
             <CardTitle>{t('course_engagement')}</CardTitle>
           </CardHeader>
-          <CardContent className="h-[300px] flex items-center justify-center border-2 border-dashed border-border rounded-xl m-4">
-            <p className="text-body-muted italic">{t('engagement_empty_state')}</p>
+          <CardContent className="space-y-5 pt-2">
+            {engagementMetrics.map((metric) => {
+              const max = metric.suffix === '%' ? 100 : Math.max(...engagementMetrics.map((item) => item.value), 1);
+              const width = Math.min(100, Math.round((metric.value / max) * 100));
+              return (
+                <div key={metric.label} className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium text-muted-foreground">{metric.label}</span>
+                    <span className="font-bold text-foreground tabular-nums">
+                      {metric.value}{metric.suffix}
+                    </span>
+                  </div>
+                  <div className="h-2 rounded-full bg-muted overflow-hidden">
+                    <div className="h-full rounded-full bg-indigo-500 transition-all" style={{ width: `${width}%` }} />
+                  </div>
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
 
@@ -134,18 +158,18 @@ export function TeacherDashboard() {
             <CardTitle>{t('direct_actions')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="p-4 rounded-xl bg-indigo-50/30 border border-indigo-100 text-sm">
-              <p className="font-bold text-indigo-700">{t('course_creation')}</p>
-              <p className="text-[11px] text-indigo-600/70 font-medium">
+            <Link href="/en/courses?dialog=create-course" className="block p-4 rounded-xl bg-indigo-50/30 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-400/20 text-sm transition-colors hover:bg-indigo-50 dark:hover:bg-indigo-500/20">
+              <p className="font-bold text-indigo-700 dark:text-indigo-300">{t('course_creation')}</p>
+              <p className="text-[11px] text-indigo-600/70 dark:text-indigo-300/70 font-medium">
                 {t('course_creation_desc')}
               </p>
-            </div>
-            <div className="p-4 rounded-xl bg-emerald-50/30 border border-emerald-100 text-sm">
-              <p className="font-bold text-emerald-700">{t('student_outreach')}</p>
-              <p className="text-[11px] text-emerald-600/70 font-medium">
+            </Link>
+            <Link href="/warnings" className="block p-4 rounded-xl bg-emerald-50/30 dark:bg-emerald-500/10 border border-emerald-100 dark:border-emerald-400/20 text-sm transition-colors hover:bg-emerald-50 dark:hover:bg-emerald-500/20">
+              <p className="font-bold text-emerald-700 dark:text-emerald-300">{t('student_outreach')}</p>
+              <p className="text-[11px] text-emerald-600/70 dark:text-emerald-300/70 font-medium">
                 {t('student_outreach_desc')}
               </p>
-            </div>
+            </Link>
           </CardContent>
         </Card>
       </div>

@@ -179,11 +179,38 @@ describe('warnings.service', () => {
     const { getTeacherStudents } = await importService();
     const result = await getTeacherStudents('teacher-1');
 
-    // u1 appears once (deduped by user_id+course_id combination)
-    // u1 in c1, u1 in c2 → 2 entries (different courses), u2 in c1 → 3 total
-    expect(result).toHaveLength(3);
+    // Deduplicated by user_id: u1 (enrolled in c1 AND c2) appears ONCE —
+    // a warning targets the student, not a specific enrollment. u2 → 2 total.
+    expect(result).toHaveLength(2);
     const names = result.map((s) => s.email);
     expect(names).toEqual(expect.arrayContaining(['s@t.com', 'o@t.com']));
+  });
+
+  // ── getTenantStudents ───────────────────────────────────────────
+  it('getTenantStudents — returns tenant students for the admin selector', async () => {
+    const q = setupQuery({
+      data: [
+        { id: 'u1', first_name: 'Sara', last_name: 'Ali', email: 's@t.com', avatar_url: null },
+        { id: 'u2', first_name: 'Omar', last_name: 'K', email: 'o@t.com', avatar_url: null },
+      ],
+      error: null,
+    });
+    mockFrom.mockReturnValue(q);
+
+    const { getTenantStudents } = await importService();
+    const result = await getTenantStudents();
+
+    expect(result).toHaveLength(2);
+    expect(result[0]).toMatchObject({ id: 'u1', email: 's@t.com', course_title: '' });
+    expect(q.eq).toHaveBeenCalledWith('primary_role', 'student');
+  });
+
+  it('getTenantStudents — throws on Supabase error', async () => {
+    const q = setupQuery({ data: null, error: { code: 'DB_ERROR', message: 'fail' } });
+    mockFrom.mockReturnValue(q);
+
+    const { getTenantStudents } = await importService();
+    await expect(getTenantStudents()).rejects.toMatchObject({ code: 'DB_ERROR' });
   });
 
   // ── getStudentProgress ──────────────────────────────────────────

@@ -39,8 +39,8 @@ import { useTranslations, useLocale } from 'next-intl';
 import { useState, useCallback } from 'react';
 
 import { useIssueWarning } from '@/adapters/mutations/warnings.mutations';
-import { useTeacherWarnings, useTeacherStudents } from '@/adapters/queries/teacher.queries';
-import { useAuthUser } from '@/adapters/stores/auth.store';
+import { useTeacherWarnings, useWarnableStudents } from '@/adapters/queries/teacher.queries';
+import { useAuthUser, useAuthPermissions } from '@/adapters/stores/auth.store';
 import { useToastStore } from '@/adapters/stores/toast.store';
 import {
   StatsCard,
@@ -78,6 +78,11 @@ function getInitials(name: string) {
 export function WarningsPage() {
   const user = useAuthUser();
   const isTeacher = user?.primary_role === 'teacher';
+  // Issue-warning UI is permission-gated (PRD warnings.write matrix: admin +
+  // super_admin + teacher = YES) — previously the form was hidden from admins
+  // entirely, so they had no way to create warnings from this page.
+  const permissions = useAuthPermissions();
+  const canIssue = isTeacher || permissions.includes('warnings.write');
   const t = useTranslations('warnings');
   const tCommon = useTranslations('common');
   const locale = useLocale();
@@ -101,7 +106,7 @@ export function WarningsPage() {
   const { showToast } = useToastStore();
 
   // ── Data ─────────────────────────────────────────────────────────
-  const { data: students } = useTeacherStudents();
+  const { data: students } = useWarnableStudents();
   const issueMutation = useIssueWarning();
 
   const handleSubmit = useCallback(
@@ -152,7 +157,7 @@ export function WarningsPage() {
             </div>
           )}
         </div>
-        {isTeacher && (
+        {canIssue && (
           <Button
             variant="contained"
             startIcon={<ReportProblem />}
@@ -217,7 +222,7 @@ export function WarningsPage() {
       {/* Grid: Form + Table */}
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(12, 1fr)' }, gap: 3 }}>
         {/* Left: Issue Form */}
-        {isTeacher && (
+        {canIssue && (
           <MuiCard id="warning-form" sx={{ gridColumn: { xs: 'span 1', md: 'span 5', lg: 'span 4' }, borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none', alignSelf: 'flex-start', bgcolor: 'background.paper' }}>
             <Box sx={{ p: 2.5, borderBottom: '1px solid', borderColor: 'divider', backgroundColor: 'background.default' }}>
               <Typography variant="subtitle1" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -238,8 +243,8 @@ export function WarningsPage() {
                       sx={{ borderRadius: 2 }}
                     >
                       {(students ?? []).map((s) => (
-                        <MenuItem key={`${s.id}-${s.course_title}`} value={s.id}>
-                          {[s.first_name, s.last_name].filter(Boolean).join(' ') || s.email || 'Unknown'} ({s.course_title})
+                        <MenuItem key={s.id} value={s.id}>
+                          {[s.first_name, s.last_name].filter(Boolean).join(' ') || s.email || 'Unknown'}
                         </MenuItem>
                       ))}
                     </Select>
@@ -343,7 +348,7 @@ export function WarningsPage() {
         )}
 
         {/* Right: Warnings Table */}
-        <Box sx={{ gridColumn: { xs: 'span 1', md: isTeacher ? 'span 7' : 'span 12', lg: isTeacher ? 'span 8' : 'span 12' } }}>
+        <Box sx={{ gridColumn: { xs: 'span 1', md: canIssue ? 'span 7' : 'span 12', lg: canIssue ? 'span 8' : 'span 12' } }}>
           <MuiCard sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none', overflow: 'hidden', bgcolor: 'background.paper' }}>
             <Box sx={{ p: 2.5, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>

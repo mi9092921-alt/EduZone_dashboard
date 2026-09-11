@@ -9,6 +9,7 @@ import { getCourses } from '@/infrastructure/repos/courses.service';
 import {
   getWarnings,
   getTeacherStudents,
+  getTenantStudents,
   getStudentProgress,
 } from '@/infrastructure/repos/warnings.service';
 
@@ -37,11 +38,19 @@ export function useStudentProgress(courseId: string | null, page: number, pageSi
   });
 }
 
-export function useTeacherStudents() {
+export function useWarnableStudents() {
   const user = useAuthUser();
+  const isTeacher = user?.primary_role === 'teacher';
   return useQuery({
     queryKey: queryKeys.teacher.students(user?.id ?? ''),
-    queryFn: () => getTeacherStudents(user!.id),
+    queryFn: async () => {
+      if (isTeacher) {
+        // Teachers warn only students enrolled in their own courses (PRD FR-TEACHER-13).
+        return getTeacherStudents(user!.id);
+      }
+      // Admins/super_admins warn any student in their tenant (RLS-scoped).
+      return getTenantStudents();
+    },
     enabled: !!user?.id,
   });
 }

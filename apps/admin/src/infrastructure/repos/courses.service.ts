@@ -48,7 +48,10 @@ export async function getCourses(
   let query = supabase
     .from('courses')
     .select(
-      '*, lesson_count:lessons(count), teacher:users!courses_teacher_id_fkey(first_name, last_name)',
+      // ⚠️ `enrollments` needs an explicit FK hint: courses↔enrollments has TWO
+      // relationships (enrollments_course_id_fkey + enrollments_course_tenant_fkey)
+      // and PostgREST refuses to guess between them (PGRST201).
+      '*, lesson_count:lessons(count), enrollment_count:enrollments!enrollments_course_id_fkey(count), teacher:users!courses_teacher_id_fkey(first_name, last_name)',
       { count: 'exact' },
     )
     .is('deleted_at', null)
@@ -69,6 +72,12 @@ export async function getCourses(
   if (filters.teacher_id) query = query.eq('teacher_id', filters.teacher_id);
   if (filters.tenant_id) query = query.eq('tenant_id', filters.tenant_id);
 
+  // Students count: only current (active/completed) enrollments — revoked and
+  // expired students don't count. PostgREST applies embedded-resource filters
+  // BEFORE the count() aggregate, and parents with zero matches keep the row
+  // with count 0 (verified live against PostgREST v12).
+  query = query.in('enrollments.status', ['active', 'completed']);
+
   const { data, error, count } = await query;
   if (error) throw mapDbError(error, 'courses.service.ts');
 
@@ -85,6 +94,7 @@ export async function getCourses(
         (row.lesson_count as { count: number }[] | null)?.[0]?.count ??
         (row.total_lessons as number) ??
         0,
+      enrollment_count: (row.enrollment_count as { count: number }[] | null)?.[0]?.count ?? 0,
     } as Course;
   });
 

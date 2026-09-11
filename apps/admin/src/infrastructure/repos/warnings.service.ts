@@ -115,15 +115,17 @@ export async function getTeacherStudents(teacherId: string): Promise<TeacherStud
 
   if (enrErr) throw enrErr;
 
-  // Deduplicate students
+  // Deduplicate by user_id — a warning targets the STUDENT, not a specific
+  // enrollment. Previously the key was `user_id-course_id`, so a student
+  // enrolled in several of the teacher's courses appeared once per course
+  // in the "Issue Warning" student selector.
   const seen = new Set<string>();
   const students: TeacherStudent[] = [];
 
   for (const row of enrollments ?? []) {
     const user = (row as Record<string, unknown>).users as Record<string, string> | null;
-    const key = `${row.user_id}-${row.course_id}`;
-    if (seen.has(key) || !user) continue;
-    seen.add(key);
+    if (seen.has(row.user_id) || !user) continue;
+    seen.add(row.user_id);
     students.push({
       id: row.user_id,
       first_name: user.first_name ?? null,
@@ -136,6 +138,35 @@ export async function getTeacherStudents(teacherId: string): Promise<TeacherStud
   }
 
   return students;
+}
+
+/**
+ * Tenant-wide students — used by admins/super_admins on the Warnings page.
+ * Unlike getTeacherStudents (scoped to the teacher's own courses), admins
+ * issue warnings to any student in their tenant. RLS (users_select_merged)
+ * scopes the rows to the caller's tenant.
+ */
+export async function getTenantStudents(limit = 200): Promise<TeacherStudent[]> {
+  const { supabase } = container;
+
+  const { data, error } = await supabase
+    .from('users')
+    .select('id, first_name, last_name, email, avatar_url')
+    .eq('primary_role', 'student')
+    .is('deleted_at', null)
+    .order('first_name', { ascending: true })
+    .limit(limit);
+
+  if (error) throw mapDbError(error, 'warnings.service.ts');
+
+  return (data ?? []).map((u: Record<string, unknown>) => ({
+    id: String(u.id),
+    first_name: (u.first_name as string | null) ?? null,
+    last_name: (u.last_name as string | null) ?? null,
+    email: (u.email as string | null) ?? null,
+    avatar_url: (u.avatar_url as string | null) ?? null,
+    course_title: '',
+  }));
 }
 
 // ══════════════════════════════════════════════════
