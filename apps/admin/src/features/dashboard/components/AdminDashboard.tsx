@@ -186,14 +186,14 @@ export function AdminDashboard() {
       {/* Main Content Area */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <div className="xl:col-span-2 space-y-6">
-          <Card className="h-full min-h-[400px] border-border/40">
+          <Card className="border-border/40">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-lg font-bold">{t('activity_overview')}</CardTitle>
               <div className="p-1 px-3 bg-muted/40 rounded-full text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                 {t('live')}
               </div>
             </CardHeader>
-            <CardContent className="space-y-5 pt-2">
+            <CardContent className="space-y-3 pt-1">
               {activityMetrics.map((metric) => {
                 const max = Math.max(...activityMetrics.map((item) => item.value), 1);
                 const width = Math.min(100, Math.round((metric.value / max) * 100));
@@ -211,18 +211,20 @@ export function AdminDashboard() {
                   </div>
                 );
               })}
-              <div className="flex items-center gap-2 pt-1 text-xs text-muted-foreground">
+              <div className="flex items-center gap-2 pt-0 text-xs text-muted-foreground">
                 <Analytics fontSize="small" />
                 <span>{t('dashboard_devices')}: {isLoading ? '—' : stats?.totalDevices ?? 0}</span>
               </div>
             </CardContent>
           </Card>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 items-start gap-6">
+            <QueueHealthPanel />
+            <SecurityAlertPanel />
+          </div>
         </div>
 
         <div className="space-y-6">
-          <QueueHealthPanel />
-          <SecurityAlertPanel />
-
           <Card className="border-border/40">
             <CardHeader>
               <CardTitle className="text-lg font-bold">{t('recent_insights')}</CardTitle>

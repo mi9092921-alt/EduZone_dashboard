@@ -13,7 +13,7 @@ export function QueueHealthPanel() {
   return (
     <Card className="border-border/40 overflow-hidden relative">
       <div className="absolute top-0 w-full h-1 bg-gradient-to-r from-blue-500 via-emerald-400 to-indigo-500" />
-      <CardHeader className="pb-3 border-b border-border/20">
+      <CardHeader className="p-3 pb-2 border-b border-border/20">
         <div className="flex items-center gap-2">
           <Dns className="text-blue-500 w-5 h-5" />
           <CardTitle className="text-sm font-bold uppercase tracking-wider">
@@ -21,16 +21,16 @@ export function QueueHealthPanel() {
           </CardTitle>
         </div>
       </CardHeader>
-      <CardContent className="p-4 space-y-4">
+      <CardContent className="p-3 space-y-2">
         {isLoading ? (
           <div className="space-y-3">
             <div className="h-6 w-full animate-pulse bg-muted rounded" />
             <div className="h-6 w-full animate-pulse bg-muted rounded" />
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-2">
             {/* Pending Jobs */}
-            <div className="p-3 bg-blue-500/5 border border-blue-500/10 rounded-lg flex items-center justify-between">
+            <div className="p-2 bg-blue-500/5 border border-blue-500/10 rounded-lg flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Memory className="w-4 h-4 text-blue-500" />
                 <span className="text-xs font-semibold text-blue-900 dark:text-blue-300">
@@ -43,7 +43,7 @@ export function QueueHealthPanel() {
             </div>
 
             {/* Processing Jobs */}
-            <div className="p-3 bg-emerald-500/5 border border-emerald-500/10 rounded-lg flex items-center justify-between">
+            <div className="p-2 bg-emerald-500/5 border border-emerald-500/10 rounded-lg flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                 <span className="text-xs font-semibold text-emerald-900 dark:text-emerald-300">
@@ -56,7 +56,7 @@ export function QueueHealthPanel() {
             </div>
 
             {/* Failed Jobs */}
-            <div className="p-3 bg-rose-500/5 border border-rose-500/10 rounded-lg flex items-center justify-between col-span-2">
+            <div className="p-2 bg-rose-500/5 border border-rose-500/10 rounded-lg flex items-center justify-between col-span-2">
               <div className="flex items-center gap-2">
                 <ErrorOutline className="w-4 h-4 text-rose-500" />
                 <span className="text-xs font-semibold text-rose-900 dark:text-rose-300">
