@@ -554,6 +554,7 @@
     "placeholder_body": "أدخل نص التنبيه...",
     "btn_cancel": "إلغاء",
     "btn_send": "إرسال",
+    "status_sending": "جارٍ إرسال التنبيه...",
     "status_success": "تم إرسال التنبيه بنجاح",
     "confirm_delete_title": "حذف التنبيه",
     "confirm_delete_desc": "هل أنت متأكد من حذف هذا التنبيه؟ لا يمكن التراجع عن هذا الإجراء.",
