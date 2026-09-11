@@ -132,14 +132,42 @@ async function testTeacherCannotWriteSettings(client: SupabaseClient) {
 }
 
 async function testTeacherCannotInsertUserRoles(client: SupabaseClient) {
-  const { error } = await client
-    .from('user_roles')
-    .insert({ user_id: 'some_user_id', role_name: 'admin' });
+  const { data: userData } = await client.auth.getUser();
+  if (!userData?.user) throw new Error('Could not get user data');
+
+  // A real privilege-escalation shape: the teacher looks up the actual
+  // admin role_id (roles_select lets any authenticated user read roles
+  // in their own tenant / the system tenant) and tries to grant it to
+  // themselves. The previous version of this check inserted a
+  // nonexistent `role_name` column with a non-UUID `user_id`, which
+  // fails on a type/column error regardless of RLS — it could never
+  // actually detect an RLS breach on user_roles.
+  const { data: roleRow } = await client
+    .from('roles')
+    .select('id')
+    .eq('name', 'admin')
+    .limit(1)
+    .maybeSingle();
+
+  const { error } = await client.from('user_roles').insert({
+    user_id: userData.user.id,
+    role_id: roleRow?.id ?? '00000000-0000-0000-0000-000000000000',
+    tenant_id: TENANT_A,
+    granted_by: userData.user.id,
+  });
 
   if (error === null) {
-    breach('Teacher was able to insert into user_roles!');
+    breach('Teacher was able to grant themselves the admin role via user_roles!');
+    // Never leave a would-be escalation row behind, even though this
+    // branch should be unreachable.
+    await client
+      .from('user_roles')
+      .delete()
+      .eq('user_id', userData.user.id)
+      .eq('tenant_id', TENANT_A)
+      .eq('role_id', roleRow?.id ?? '00000000-0000-0000-0000-000000000000');
   } else {
-    ok('RLS OK: Teacher cannot insert cross-tenant user roles');
+    ok(`RLS OK: Teacher cannot self-escalate via user_roles (${error.message.slice(0, 80)})`);
   }
 }
 

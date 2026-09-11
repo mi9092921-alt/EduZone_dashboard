@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
 
+import {
+  planDuplicateSeqCleanup,
+  type ActivityLogChainRow,
+} from '@/domain/audit/duplicate-seq-cleanup';
+import { ConflictError } from '@/domain/errors';
 import { createAdminClient } from '@/infrastructure/supabase/admin';
 import { createServerClient } from '@/infrastructure/supabase/server';
 
@@ -14,10 +19,16 @@ import { createServerClient } from '@/infrastructure/supabase/server';
  * exception was added: service_role may delete a row only when another row
  * with the same seq already exists, making this a safe, idempotent cleanup.
  *
- * Strategy: for each duplicate seq group, keep the row whose entry_hash is
- * referenced as prev_hash by some other row (i.e. it is part of a chain that
- * continues forward).  If no such row exists, keep the one with the smallest
- * created_at.  Delete all others.
+ * `seq` is assigned by ONE global counter shared by every tenant
+ * (audit_chain_state is a singleton row), so a duplicate-seq group can
+ * legitimately contain rows from different tenants and different chain
+ * generations — a bare seq match is never enough, on its own, to decide
+ * which row is safe to delete. The actual decision is delegated to
+ * `planDuplicateSeqCleanup` (see domain/audit/duplicate-seq-cleanup.ts),
+ * which walks the real hash chain backward from audit_chain_state.last_hash
+ * and only ever discards rows that are provably *not* part of the live
+ * chain — regardless of tenant, and regardless of `seq`. See that module
+ * for the full rationale.
  *
  * Requires: super_admin role.
  */
@@ -44,11 +55,25 @@ export async function POST() {
     // ── Admin client (service_role bypasses RLS; trigger allows duplicate deletes) ──
     const admin = createAdminClient();
 
-    // ── Fetch all rows that share a seq with at least one other row ──
+    // ── Fetch the authoritative chain tip ─────────────────────
+    // This is the trust anchor for the whole operation: only rows
+    // reachable backward from this hash are ever treated as "live".
+    const { data: chainState, error: chainErr } = await admin
+      .from('audit_chain_state')
+      .select('last_hash')
+      .eq('id', 1)
+      .maybeSingle();
+
+    if (chainErr || !chainState) {
+      console.error('[cleanup-duplicate-seqs] failed to read audit_chain_state:', chainErr);
+      return NextResponse.json({ error: 'Failed to read audit chain state' }, { status: 500 });
+    }
+
+    // ── Fetch every row (tenant_id included — see module doc: a
+    // duplicate-seq group can legitimately span tenants) ─────────
     const { data: allLogs, error: fetchErr } = await admin
       .from('activity_logs')
-      .select('id, seq, prev_hash, entry_hash, created_at')
-      .order('seq', { ascending: true })
+      .select('id, seq, tenant_id, prev_hash, entry_hash, created_at')
       .order('created_at', { ascending: true });
 
     if (fetchErr) {
@@ -58,45 +83,46 @@ export async function POST() {
       return NextResponse.json({ error: 'Failed to scan audit logs' }, { status: 500 });
     }
 
-    // Group by seq
-    const bySeq = new Map<number, typeof allLogs>();
-    for (const row of allLogs ?? []) {
-      const bucket = bySeq.get(row.seq);
-      if (bucket) {
-        bucket.push(row);
-      } else {
-        bySeq.set(row.seq, [row]);
+    let plan;
+    try {
+      plan = planDuplicateSeqCleanup(
+        (allLogs ?? []) as ActivityLogChainRow[],
+        chainState.last_hash as string,
+      );
+    } catch (err) {
+      if (err instanceof ConflictError) {
+        // Fail closed: never delete anything when the stored chain itself
+        // can't be trusted. Audit immutability takes priority over
+        // completing the cleanup.
+        console.error('[cleanup-duplicate-seqs] refusing to modify a corrupted chain:', err.detail);
+        return NextResponse.json({ error: err.message }, { status: 409 });
       }
+      throw err;
     }
 
-    // Build set of entry_hashes referenced as prev_hash by some other row
-    const referencedAsParent = new Set((allLogs ?? []).map((r) => r.prev_hash).filter(Boolean));
-
-    const toDelete: string[] = [];
-
-    for (const [, rows] of bySeq) {
-      if (rows.length <= 1) continue; // no duplicates for this seq
-
-      // Keep the row whose entry_hash is used as prev_hash by a later entry
-      // (i.e. it is part of the chain that continues).  Fall back to oldest.
-      const keeper = rows.find((r) => referencedAsParent.has(r.entry_hash)) ?? rows[0]!; // already sorted by created_at ASC
-
-      for (const row of rows) {
-        if (row.id !== keeper.id) {
-          toDelete.push(row.id);
-        }
-      }
+    if (plan.conflicts.length > 0) {
+      console.error(
+        '[cleanup-duplicate-seqs] skipped seq groups where the chain appears forked:',
+        plan.conflicts,
+      );
     }
 
-    if (toDelete.length === 0) {
-      return NextResponse.json({ deleted: 0, message: 'No duplicate seq entries found' });
+    if (plan.toDelete.length === 0) {
+      return NextResponse.json({
+        deleted: 0,
+        message:
+          plan.conflicts.length > 0
+            ? `No safe deletions; ${plan.conflicts.length} seq group(s) look forked and were left untouched`
+            : 'No duplicate seq entries found',
+        conflicts: plan.conflicts.length > 0 ? plan.conflicts : undefined,
+      });
     }
 
     // Delete in batches of 100
     let deleted = 0;
     const BATCH = 100;
-    for (let i = 0; i < toDelete.length; i += BATCH) {
-      const batch = toDelete.slice(i, i + BATCH);
+    for (let i = 0; i < plan.toDelete.length; i += BATCH) {
+      const batch = plan.toDelete.slice(i, i + BATCH);
       const { error: delErr } = await admin.from('activity_logs').delete().in('id', batch);
 
       if (delErr) {
@@ -113,6 +139,7 @@ export async function POST() {
     return NextResponse.json({
       deleted,
       message: `Removed ${deleted} orphaned duplicate-seq entries from activity_logs`,
+      conflicts: plan.conflicts.length > 0 ? plan.conflicts : undefined,
     });
   } catch (err) {
     console.error('[cleanup-duplicate-seqs] Unhandled error:', err);

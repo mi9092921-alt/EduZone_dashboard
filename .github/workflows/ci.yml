@@ -2,9 +2,30 @@ name: CI
 
 # Execution Plan §19 — CI/CD Production Gates (PR chain, in order):
 #   Secret Scan → Dependency Audit → Architecture Check → Lint → Typecheck →
-#   Unit (coverage) → Production Build.
+#   Unit (coverage) → Security/RLS Gate (fast) → Production Build.
 # (Schema validity lives in e2e.yml, which applies the real schema to a
 # live database — see the NOTE at the end of this file.)
+#
+# Security/RLS Gate (fast): scripts/security/run-security-gate.sh boots a
+# disposable local Postgres 17 harness (scripts/security/local-test-harness,
+# no Docker), applies the REAL canonical supabase/schema/*.sql files against
+# it unmodified, and runs fast-gate-rls.ts + fast-gate-permissions.ts — an
+# RLS-bypass / permission-bypass / privilege-escalation regression suite —
+# against that live database. Light enough to run unconditionally on every
+# PR right after Unit tests, so this class of regression is caught before
+# spending time on a build. Blocking: any breach, any crash, or the harness
+# failing to boot fails this step (see run-security-gate.sh for how each
+# check ends in an actual process.exit(1), never a soft/advisory check).
+#
+# This is deliberately separate from, and does not replace, the deeper
+# scripts/security/rls-smoke-test.ts + permission-exhaustive-test.ts (SEC-1
+# cross-tenant + extend_enrollment privileged-RPC matrix), which run against
+# a real Docker-based local Supabase stack as the "Security gate" step of
+# e2e.yml. That gate is DEFINED BUT DORMANT (gated behind the E2E_ENABLED
+# repository variable) and, needing `supabase start`, too slow to place here
+# — see e2e.yml's own header for its activation checklist. The fast gate
+# here and the deep gate there cover the same class of bug from two angles;
+# neither one on its own is a reason to skip the other.
 #
 # E2E lives in e2e.yml (runs when the repository variable E2E_ENABLED is
 # "true"). The security/RLS scripts under scripts/security
@@ -91,6 +112,17 @@ jobs:
 
       - name: Test (Vitest)
         run: pnpm turbo test -- --coverage
+
+      - name: Security / RLS Gate (fast)
+        # Blocking: boots a disposable local Postgres 17 harness (no
+        # Docker), applies the real supabase/schema/*.sql files against
+        # it unmodified, and runs fast-gate-rls.ts +
+        # fast-gate-permissions.ts against that live database. Fails the
+        # job on any breach, any test crash, or if the harness itself
+        # fails to come up — never a soft/advisory check. See this
+        # file's header comment for how this relates to the deeper,
+        # Docker-based security gate in e2e.yml.
+        run: bash scripts/security/run-security-gate.sh
 
       - name: Production build
         # NEXT_PUBLIC_* values are public (browser-bundled), not secrets --
