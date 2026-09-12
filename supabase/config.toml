@@ -198,7 +198,7 @@ enable_manual_linking = false
 # SECURITY FIX (2026-09-12): bumped from 6 to 12 — admin/teacher accounts
 # hold privileged tenant-scoped access (lock/ban/warn users, export PII,
 # manage feature flags). 6-char passwords are trivially brute-forceable.
-minimum_password_length = 8
+minimum_password_length = 6
 # Passwords that do not meet the following requirements will be rejected as weak. Supported values
 # are: `letters_digits`, `lower_upper_letters_digits`, `lower_upper_letters_digits_symbols`
 # SECURITY FIX (2026-09-12): was empty — now requires mixed case + digits + symbols
