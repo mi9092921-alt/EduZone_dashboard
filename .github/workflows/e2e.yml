@@ -58,6 +58,23 @@ jobs:
         with:
           version: latest
 
+      - name: Clean up stale local Supabase state
+        working-directory: supabase
+        shell: bash
+        run: |
+          # Hosted runners are normally clean, but this also makes the job
+          # safe on a reused/self-hosted runner and after an interrupted run.
+          supabase stop --no-backup || true
+
+          # Do not remove an unrelated container silently. Fail with enough
+          # information to identify the owner of the fixed Supabase port.
+          port_users="$(docker ps --filter publish=54322 --format '{{.ID}} {{.Names}} {{.Ports}}')"
+          if [ -n "$port_users" ]; then
+            echo "Port 54322 is still occupied after Supabase cleanup:"
+            echo "$port_users"
+            exit 1
+          fi
+
       - name: Start local Supabase (canonical schema + QA seed)
         # `supabase db reset` only re-applies whatever files already exist
         # under supabase/migrations/ (confirmed against Supabase's own CLI
@@ -152,6 +169,11 @@ jobs:
 
       - name: Run Playwright (chromium)
         run: pnpm --filter @eduzone/admin exec playwright test --project=chromium
+
+      - name: Stop local Supabase
+        if: always()
+        working-directory: supabase
+        run: supabase stop --no-backup || true
 
       - name: Upload Playwright report
         if: failure()
