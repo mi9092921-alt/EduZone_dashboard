@@ -1,16 +1,42 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Cache-Control': 'private, no-store, max-age=0',
-};
+// FIX (release blocker — applied 2026-09-12): wildcard CORS on authenticated
+// endpoints allowed any origin to invoke this function. We now reflect only
+// the request Origin if it appears in the explicit allow-list (Supabase
+// project URL + dashboard origin(s)).
+const ALLOWED_ORIGINS: string[] = (() => {
+  const list = (Deno.env.get('ALLOWED_ORIGINS') || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+  if (supabaseUrl) {
+    try {
+      const u = new URL(supabaseUrl);
+      if (!list.includes(u.origin)) list.push(u.origin);
+    } catch {
+      /* ignore malformed SUPABASE_URL at module load */
+    }
+  }
+  return list;
+})();
 
-function jsonResponse(body: unknown, status: number) {
+function corsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get('Origin') || '';
+  const allowOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : '';
+  return {
+    'Access-Control-Allow-Origin': allowOrigin,
+    Vary: 'Origin',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Cache-Control': 'private, no-store, max-age=0',
+  };
+}
+
+function jsonResponse(req: Request, body: unknown, status: number) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    headers: { ...corsHeaders(req), 'Content-Type': 'application/json' },
   });
 }
 
@@ -31,14 +57,14 @@ function parseClientIp(header: string | null): string | null {
 serve(async (req) => {
   // Handle CORS preflight request
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders(req) });
   }
 
   try {
     const { lesson_id, device_id } = await req.json();
 
     if (!lesson_id || typeof lesson_id !== 'string') {
-      return jsonResponse({ error: 'Missing lesson_id' }, 400);
+      return jsonResponse(req, { error: 'Missing lesson_id' }, 400);
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -47,7 +73,7 @@ serve(async (req) => {
 
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      return jsonResponse({ error: 'Missing Authorization header' }, 401);
+      return jsonResponse(req, { error: 'Missing Authorization header' }, 401);
     }
 
     // SECTION-09 CRITICAL FIX: access control must be evaluated, and the
@@ -80,7 +106,7 @@ serve(async (req) => {
 
     const { data: userData, error: userError } = await userClient.auth.getUser();
     if (userError || !userData.user) {
-      return jsonResponse({ error: 'Unauthorized' }, 401);
+      return jsonResponse(req, { error: 'Unauthorized' }, 401);
     }
 
     const { data: lessonContent, error: accessError } = await userClient.rpc('get_lesson_content', {
@@ -92,15 +118,15 @@ serve(async (req) => {
     if (accessError || !lessonContent) {
       const reason = accessError?.message ?? '';
       if (reason.includes('AUTH_REQUIRED')) {
-        return jsonResponse({ error: 'Unauthorized' }, 401);
+        return jsonResponse(req, { error: 'Unauthorized' }, 401);
       }
       if (reason.includes('LESSON_NOT_FOUND')) {
-        return jsonResponse({ error: 'Lesson not found' }, 404);
+        return jsonResponse(req, { error: 'Lesson not found' }, 404);
       }
       // ACCESS_DENIED and any other unexpected failure are both a 403 from
       // the caller's point of view -- do not leak the raw Postgres error
       // (schema/constraint/internal detail) to the client.
-      return jsonResponse({ error: 'Access denied' }, 403);
+      return jsonResponse(req, { error: 'Access denied' }, 403);
     }
 
     const videoPath: string | null = lessonContent.videoPath ?? null;
@@ -132,6 +158,7 @@ serve(async (req) => {
     }
 
     return jsonResponse(
+      req,
       {
         has_access: true,
         video_url: videoUrl,
@@ -143,6 +170,6 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error('Unhandled error in get-lesson-content:', error);
-    return jsonResponse({ error: 'Internal server error' }, 500);
+    return jsonResponse(req, { error: 'Internal server error' }, 500);
   }
 });

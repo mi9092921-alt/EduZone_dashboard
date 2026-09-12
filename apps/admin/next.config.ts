@@ -2,6 +2,8 @@ import { withSentryConfig } from '@sentry/nextjs';
 import type { NextConfig } from 'next';
 import createNextIntlPlugin from 'next-intl/plugin';
 
+// @sentry/nextjs 10.x exports withSentryConfig from its package root.
+
 const withNextIntl = createNextIntlPlugin();
 
 const nextConfig: NextConfig = {
@@ -19,7 +21,7 @@ const nextConfig: NextConfig = {
       ...(process.env.NEXT_PUBLIC_SUPABASE_URL
         ? (() => {
             try {
-              const url = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL);
+              const url = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!);
               return [
                 {
                   protocol: url.protocol.replace(':', '') as 'http' | 'https',
@@ -46,8 +48,12 @@ const sentryConfig = {
   project: 'admin',
   widenClientFileUpload: true,
   hideSourceMaps: true,
-  disableLogger: true,
+  // `disableLogger` is deprecated in favor of
+  // `webpack.treeshake.removeDebugLogging` (@sentry/nextjs v10.73+).
+  // The old key still works but emits a build-time deprecation warning.
+  treeshake: {
+    removeDebugLogging: true,
+  },
 };
 
 export default withSentryConfig(withNextIntl(nextConfig), sentryConfig);
-// trigger restart

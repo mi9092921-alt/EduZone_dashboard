@@ -9,14 +9,47 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 // caller's real active enrollment (see below), not trusted from the
 // request body, so this audit trail can't be falsified by the client.
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+// FIX (release blocker — applied 2026-09-12): wildcard CORS on authenticated
+// endpoints allowed any origin to invoke this function. We now reflect only
+// the request Origin if it appears in the explicit allow-list (Supabase
+// project URL + dashboard origin(s)).
+const ALLOWED_ORIGINS: string[] = (() => {
+  const list = (Deno.env.get('ALLOWED_ORIGINS') || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+  if (supabaseUrl) {
+    try {
+      const u = new URL(supabaseUrl);
+      if (!list.includes(u.origin)) list.push(u.origin);
+    } catch {
+      /* ignore malformed SUPABASE_URL at module load */
+    }
+  }
+  return list;
+})();
+
+function corsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get('Origin') || '';
+  const allowOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : '';
+  return {
+    'Access-Control-Allow-Origin': allowOrigin,
+    Vary: 'Origin',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  };
+}
+
+function jsonBody(req: Request, body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders(req), 'Content-Type': 'application/json' },
+  });
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders(req) });
   }
 
   try {
@@ -41,10 +74,7 @@ serve(async (req) => {
     const { lesson_id, quality, access_expires_at: clientReportedExpiresAt } = await req.json();
 
     if (!lesson_id || !quality) {
-      return new Response(JSON.stringify({ error: 'lesson_id and quality are required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return jsonBody(req, { error: 'lesson_id and quality are required' }, 400);
     }
 
     const {
@@ -52,10 +82,7 @@ serve(async (req) => {
       error: userError,
     } = await supabaseClient.auth.getUser();
     if (userError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return jsonBody(req, { error: 'Unauthorized' }, 401);
     }
 
     // Resolve course_id from lesson.
@@ -73,10 +100,7 @@ serve(async (req) => {
       .single();
 
     if (lessonError || !lesson) {
-      return new Response(JSON.stringify({ error: 'Lesson not found' }), {
-        status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return jsonBody(req, { error: 'Lesson not found' }, 404);
     }
 
     // Re-derive the real entitlement expiry server-side instead of trusting
@@ -123,14 +147,9 @@ serve(async (req) => {
       console.error('Log insert failed:', logError);
     }
 
-    return new Response(JSON.stringify({ success: true }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return jsonBody(req, { success: true });
   } catch (error) {
     console.error('log-download-attempt unexpected failure', error);
-    return new Response(JSON.stringify({ error: 'Internal server error' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return jsonBody(req, { error: 'Internal server error' }, 500);
   }
 });

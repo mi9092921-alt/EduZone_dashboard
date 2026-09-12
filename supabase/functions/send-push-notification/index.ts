@@ -16,8 +16,21 @@ const json = (body: unknown, status = 200) =>
     headers: { 'Content-Type': 'application/json' },
   });
 
+// FIX (2026-09-12): Timing-unsafe `===` comparison of the worker auth token
+// allowed a timing-attack vector against a long-lived secret. Use a
+// constant-time comparison helper.
+function timingSafeEqualString(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let mismatch = 0;
+  for (let i = 0; i < a.length; i++) {
+    mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return mismatch === 0;
+}
+
 function authorized(req: Request): boolean {
-  return Boolean(workerAuthToken) && req.headers.get('X-Push-Worker-Token') === workerAuthToken;
+  const presented = req.headers.get('X-Push-Worker-Token') ?? '';
+  return Boolean(workerAuthToken) && presented.length > 0 && timingSafeEqualString(presented, workerAuthToken);
 }
 
 function base64Url(value: Uint8Array): string {

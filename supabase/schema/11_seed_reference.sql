@@ -260,7 +260,13 @@ INSERT INTO public.rate_limit_rules (action, window_seconds, max_hits, block_sec
   -- revalidate is called on every offline playback attempt while online,
   -- so its limit stays generous enough for normal play/seek/retry use.
   ('offline_download_authorize',    3600, 100, 600, true),
-  ('offline_entitlement_revalidate', 300,  60, 120, true)
+  ('offline_entitlement_revalidate', 300,  60, 120, true),
+  -- SECURITY FIX (2026-09-12): /api/bulk-action runs heavy work inline
+  -- (full user-table scans and, for 'export', storage upload + signed-URL
+  -- minting) on every call. This rule backs the check_rate_limit gate the
+  -- route now performs before its count query; 30/hour per user with a
+  -- 10-minute block is well above any legitimate admin workflow.
+  ('bulk_action',    3600,  30,  600, true)
 ON CONFLICT (action) DO NOTHING;
 
 INSERT INTO public.audit_chain_state (id, last_seq, last_hash)

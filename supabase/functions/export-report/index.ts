@@ -2,30 +2,57 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 // --- Inlined from _shared/cors.ts ---
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
-// FIX (release blocker): wildcard CORS on authenticated endpoints is a defense-in-depth failure.
+// FIX (release blocker — applied 2026-09-12): wildcard CORS on authenticated
+// endpoints allowed any origin to invoke this function. We now reflect only
+// the request Origin if it appears in the explicit allow-list (Supabase
+// project URL + dashboard origin(s)).
+const ALLOWED_ORIGINS: string[] = (() => {
+  const list = (Deno.env.get('ALLOWED_ORIGINS') || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+  if (supabaseUrl) {
+    try {
+      const u = new URL(supabaseUrl);
+      if (!list.includes(u.origin)) list.push(u.origin);
+    } catch {
+      /* ignore malformed SUPABASE_URL at module load */
+    }
+  }
+  return list;
+})();
+
+function corsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get('Origin') || '';
+  const allowOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : '';
+  return {
+    'Access-Control-Allow-Origin': allowOrigin,
+    Vary: 'Origin',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Credentials': 'true',
+  };
+}
 
 function handleCors(req: Request): Response | null {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders(req) });
   return null;
 }
-function jsonResponse(body: unknown, status = 200): Response {
+function jsonResponse(req: Request, body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    headers: { ...corsHeaders(req), 'Content-Type': 'application/json' },
   });
 }
 function errorResponse(
+  req: Request,
   code: string,
   message: string,
   status = 400,
   extra?: Record<string, unknown>,
 ): Response {
-  return jsonResponse({ error: code, message, ...extra }, status);
+  return jsonResponse(req, { error: code, message, ...extra }, status);
 }
 
 // --- Inlined from _shared/supabaseAdmin.ts ---
@@ -109,7 +136,7 @@ Deno.serve(async (req: Request) => {
   if (corsResponse) return corsResponse;
 
   if (req.method !== 'POST') {
-    return errorResponse('METHOD_NOT_ALLOWED', 'Only POST', 405);
+    return errorResponse(req, 'METHOD_NOT_ALLOWED', 'Only POST', 405);
   }
 
   try {
@@ -120,20 +147,21 @@ Deno.serve(async (req: Request) => {
     const reportType = body.report_type as ReportType;
     const requestedTenantId = body.tenant_id as string | undefined;
     if (requestedTenantId !== undefined && typeof requestedTenantId !== 'string') {
-      return errorResponse('INVALID_TENANT', 'Invalid tenant identifier', 400);
+      return errorResponse(req, 'INVALID_TENANT', 'Invalid tenant identifier', 400);
     }
     const tenantId =
       user.role === 'super_admin' ? (requestedTenantId ?? user.tenant_id) : user.tenant_id;
     if (requestedTenantId && requestedTenantId !== tenantId) {
-      return errorResponse('PERMISSION_DENIED', 'Cross-tenant reports are not permitted', 403);
+      return errorResponse(req, 'PERMISSION_DENIED', 'Cross-tenant reports are not permitted', 403);
     }
     const format = (body.format as string) ?? 'csv';
     if (format !== 'csv') {
-      return errorResponse('INVALID_FORMAT', 'Only CSV reports are supported', 400);
+      return errorResponse(req, 'INVALID_FORMAT', 'Only CSV reports are supported', 400);
     }
 
     if (!reportType || !VALID_REPORT_TYPES.includes(reportType)) {
       return errorResponse(
+        req,
         'INVALID_REPORT_TYPE',
         `Must be one of: ${VALID_REPORT_TYPES.join(', ')}`,
       );
@@ -234,7 +262,7 @@ Deno.serve(async (req: Request) => {
       p_tenant_id: user.tenant_id,
     });
 
-    return jsonResponse({
+    return jsonResponse(req, {
       download_url: signedUrl.signedUrl,
       expires_at: new Date(Date.now() + 3600_000).toISOString(),
       format: ext,
@@ -243,6 +271,7 @@ Deno.serve(async (req: Request) => {
     if (err && typeof err === 'object' && 'status' in err) {
       const authErr = err as { status: number; code: string; message: string };
       return errorResponse(
+        req,
         authErr.code,
         authErr.status === 401
           ? 'Unauthorized'
@@ -253,7 +282,7 @@ Deno.serve(async (req: Request) => {
       );
     }
     console.error('export-report error:', err);
-    return errorResponse('EXPORT_ERROR', 'Report export failed', 500);
+    return errorResponse(req, 'EXPORT_ERROR', 'Report export failed', 500);
   }
 });
 

@@ -17,6 +17,7 @@ import {
   workerIssueWarning,
   workerUpdateBulkJob,
 } from '@/infrastructure/repos/jobs-rpc.service';
+import { checkRateLimitForUser } from '@/infrastructure/repos/rate-limits.service';
 import { createAdminClient } from '@/infrastructure/supabase/admin';
 import { sanitizePostgrestSearchTerm } from '@/infrastructure/supabase/postgrest-filter';
 import { createServerClient } from '@/infrastructure/supabase/server';
@@ -372,6 +373,38 @@ export async function POST(request: NextRequest) {
 
     if (profileErr || !callerProfile) {
       return errorJson('UNAUTHORIZED', 'User profile not found', 401);
+    }
+
+    // ── Rate limit ────────────────────────────────────────────
+    // SECURITY FIX (2026-09-12): this route runs heavy work inline —
+    // exact-count scans over users and, for 'export', a storage upload
+    // plus signed-URL mint per call — and previously had no per-user
+    // throttle (only the job-queue-full guard bounded concurrency).
+    // check_rate_limit is DB-backed, SECURITY DEFINER, and fails open
+    // when no matching rule exists; the 'bulk_action' rule is seeded in
+    // 11_seed_reference.sql (30/hour, 10-min block). A failed RPC call is
+    // treated as blocked: failing open here would leave the heavy path
+    // unthrottled whenever the DB misbehaves.
+    const rl = await checkRateLimitForUser(supabase, 'bulk_action', userData.user.id);
+    if (!rl.allowed) {
+      // check_rate_limit returns retryAfter as a timestamptz string; the
+      // Retry-After header needs seconds, so convert it client-side.
+      let retryAfterSeconds: number | undefined;
+      if (typeof rl.retryAfter === 'string') {
+        const secs = Math.ceil((Date.parse(rl.retryAfter) - Date.now()) / 1000);
+        if (Number.isFinite(secs) && secs > 0) retryAfterSeconds = secs;
+      }
+      return NextResponse.json(
+        {
+          code: 'RATE_LIMITED',
+          message: 'Too many bulk actions. Try again later.',
+          error: 'Too many bulk actions. Try again later.',
+          retryAfter: rl.retryAfter ?? null,
+        },
+        retryAfterSeconds
+          ? { status: 429, headers: { 'Retry-After': String(retryAfterSeconds) } }
+          : { status: 429 },
+      );
     }
 
     // ── Verify permission (super_admin is the only explicit bypass) ───

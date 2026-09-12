@@ -753,3 +753,71 @@ REVOKE ALL ON FUNCTION public.admin_get_job_counts_tenant(uuid)
   FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.admin_get_job_counts_tenant(uuid)
   TO service_role;
+
+-- ═════════════════════════════════════════════════════════════════════════════
+-- SECURITY FIX (2026-09-12) — launch-readiness sweep, residual PUBLIC EXECUTE
+-- ═════════════════════════════════════════════════════════════════════════════
+-- Final sweep for public-schema SECURITY DEFINER functions that still carried
+-- Postgres's default EXECUTE TO PUBLIC (no explicit REVOKE/GRANT anywhere in
+-- this file). None of the four functions below has any caller in apps/admin/
+-- or supabase/functions/ (verified via grep), and none has a body guard, so
+-- each was anonymously invocable via POST /rest/v1/rpc/<name>:
+--
+--   1. refresh_all_materialized_views() — SECURITY DEFINER, no guard, no
+--      REVOKE: an anonymous caller could force three concurrent REFRESH
+--      MATERIALIZED VIEW CONCURRENTLY runs per request (private.mv_course_stats,
+--      public.vw_student_progress_timeline, public.vw_daily_revenue) — a cheap
+--      resource-exhaustion DoS. Locked to service_role only (the cron/worker
+--      path uses private.refresh_all_materialized_views, already locked).
+--
+--   2. check_and_increment_rate_limit(...) — SECURITY DEFINER, no guard: any
+--      caller could insert into public.rate_limits with an ARBITRARY
+--      p_tenant_id/p_user_id/p_ip_address and increment hit counts for a
+--      chosen key until blocked_until is set — i.e. force rate-limit lockouts
+--      for chosen victims and pollute rate-limit telemetry. No caller in the
+--      app (the app-facing RPC is check_rate_limit(text,uuid,inet,uuid),
+--      already locked at "Rate-Limit RPC Least Privilege" above). Locked to
+--      service_role only.
+--
+--   3. log_security_alert(text,text,text) — SECURITY DEFINER, no guard: anon
+--      could write unbounded attacker-controlled rows into audit.alert_log
+--      (audit spam / storage fill / misleading alerts). Locked to service_role.
+--
+--   4. find_user_by_email(text) — SECURITY DEFINER, no guard. Body scopes to
+--      get_current_tenant_id() (NULL for anon, so it returned nothing), but it
+--      still gave any authenticated in-tenant caller an email→uuid enumeration
+--      oracle. No caller anywhere; granted to authenticated + service_role to
+--      preserve potential legitimate in-tenant admin use, anon excluded.
+REVOKE ALL ON FUNCTION public.refresh_all_materialized_views()
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.refresh_all_materialized_views()
+  TO service_role;
+
+REVOKE ALL ON FUNCTION public.check_and_increment_rate_limit(text, uuid, inet, uuid, uuid)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.check_and_increment_rate_limit(text, uuid, inet, uuid, uuid)
+  TO service_role;
+
+REVOKE ALL ON FUNCTION public.log_security_alert(text, text, text)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.log_security_alert(text, text, text)
+  TO service_role;
+
+REVOKE ALL ON FUNCTION public.find_user_by_email(text)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.find_user_by_email(text)
+  TO authenticated, service_role;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- SECURITY FIX (2026-09-12) — audit_chain_state grant narrowing (LOW, hardening)
+-- ─────────────────────────────────────────────────────────────────────────────
+-- The table grant above ("GRANT SELECT, INSERT, UPDATE, DELETE ON
+-- public.activity_logs, public.audit_chain_state TO authenticated") gave
+-- authenticated DML on audit_chain_state, a table whose only legitimate
+-- client-visible operation is SELECT (its own RLS policies are SELECT-only
+-- and prevent_audit_mutation blocks writes at the trigger layer anyway).
+-- RLS made the extra grants unreachable today, but they widened the blast
+-- radius of any future RLS policy mistake — the exact pattern this file
+-- removes everywhere else. Narrow to SELECT-only.
+REVOKE INSERT, UPDATE, DELETE ON public.audit_chain_state FROM authenticated;
+GRANT SELECT ON public.audit_chain_state TO authenticated;
