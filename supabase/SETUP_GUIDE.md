@@ -24,6 +24,22 @@ supabase/deploy.js
 
 Use the project procedure associated with the target environment; do not assume local reset is a production deployment operation.
 
+### QA seed gate (F-01, 2026-09-13)
+
+`deploy.js` and `scripts/supabase-schema-deploy.mjs` skip
+`schema/11_seed_reference.sql` by default. That file plants the
+`*@eduzone-test.com` QA accounts whose shared password is documented in git —
+running it against staging/production would create known-password privileged
+accounts. To apply the seed, the target must be a disposable local/QA
+database **and** the run must set:
+
+```text
+ALLOW_QA_SEED_DATA=true
+```
+
+Schema files (`01`–`10`) apply unconditionally in both scripts. The local
+`supabase db reset` / E2E stack seeds via its own path and is unaffected.
+
 ## 2. Canonical schema
 
 The current canonical schema is the ordered set:
