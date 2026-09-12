@@ -1240,7 +1240,24 @@ BEGIN
   -- requires this guard so any future accidental re-GRANT cannot reopen the
   -- privilege-escalation / demotion-DoS path. See launch-blocker DB-3 in the
   -- security audit report.
-  IF pg_catalog.current_setting('role', true) IS DISTINCT FROM 'service_role'
+  --
+  -- CORRECTNESS FIX (found by actually running 11_seed_reference.sql /
+  -- any INSERT|UPDATE|DELETE on public.user_roles against this guard):
+  -- public.trg_sync_user_roles() -- a SECURITY DEFINER AFTER trigger on
+  -- user_roles that fires for every ordinary, RLS-permitted role
+  -- assignment an authenticated tenant admin makes through the app --
+  -- PERFORMs this function internally. SECURITY DEFINER only elevates the
+  -- Postgres ACL check (so the REVOKE above doesn't block that internal
+  -- call), it does NOT change auth.role(), which still reports the real
+  -- caller's JWT role ('authenticated'). Without this exemption, EVERY
+  -- ordinary role assignment in the product breaks with PERMISSION_DENIED
+  -- the moment this guard ships -- confirmed by running the seed file,
+  -- not by reading the diff. pg_trigger_depth() > 0 means "invoked from
+  -- inside another trigger", which is exactly (and only) this trusted,
+  -- already-RLS-gated call path; a direct PostgREST RPC call always has
+  -- pg_trigger_depth() = 0 and still hits the guard below.
+  IF pg_trigger_depth() = 0
+     AND pg_catalog.current_setting('role', true) IS DISTINCT FROM 'service_role'
      AND auth.role() IS DISTINCT FROM 'service_role'
      AND NOT public.is_current_user_super_admin() THEN
     RAISE EXCEPTION 'PERMISSION_DENIED' USING ERRCODE = '42501';
