@@ -2,6 +2,7 @@ import * as Sentry from '@sentry/nextjs';
 
 import { getServerEnv } from '@/lib/env';
 
+
 /**
  * Next.js instrumentation hook — runs once per server runtime at boot,
  * before any request is handled. Used here for fail-fast validation of

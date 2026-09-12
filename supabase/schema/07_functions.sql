@@ -1260,6 +1260,8 @@ BEGIN
      AND pg_catalog.current_setting('role', true) IS DISTINCT FROM 'service_role'
      AND auth.role() IS DISTINCT FROM 'service_role'
      AND NOT public.is_current_user_super_admin() THEN
+     AND auth.role() IS DISTINCT FROM 'service_role'
+     AND NOT public.is_current_user_super_admin() THEN
     RAISE EXCEPTION 'PERMISSION_DENIED' USING ERRCODE = '42501';
   END IF;
 
