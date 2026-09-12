@@ -55,6 +55,9 @@ const pg = new EmbeddedPostgres({
   port: 54329,
   persistent: false,
   createPostgresUser: isRoot,
+  // Keep the disposable harness encoding-compatible with the canonical SQL,
+  // which contains UTF-8 text and runs against UTF-8 databases in CI.
+  initdbFlags: ['--encoding=UTF8', '--locale=C'],
 });
 
 await pg.initialise();

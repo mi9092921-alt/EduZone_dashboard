@@ -2,37 +2,76 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 // --- Inlined from _shared/cors.ts ---
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
-// FIX (release blocker): wildcard CORS on authenticated endpoints is a defense-in-depth failure.
+// FIX (release blocker — applied 2026-09-12): wildcard CORS on authenticated
+// endpoints allowed any origin to invoke this function. We now reflect only
+// the request Origin if it appears in the explicit allow-list (Supabase
+// project URL + dashboard origin(s)).
+const ALLOWED_ORIGINS: string[] = (() => {
+  const list = (Deno.env.get('ALLOWED_ORIGINS') || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+  if (supabaseUrl) {
+    try {
+      const u = new URL(supabaseUrl);
+      if (!list.includes(u.origin)) list.push(u.origin);
+    } catch {
+      /* ignore malformed SUPABASE_URL at module load */
+    }
+  }
+  return list;
+})();
+
+function corsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get('Origin') || '';
+  const allowOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : '';
+  return {
+    'Access-Control-Allow-Origin': allowOrigin,
+    Vary: 'Origin',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Credentials': 'true',
+  };
+}
 
 function handleCors(req: Request): Response | null {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders(req) });
   return null;
 }
-function jsonResponse(body: unknown, status = 200): Response {
+function jsonResponse(req: Request, body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    headers: { ...corsHeaders(req), 'Content-Type': 'application/json' },
   });
 }
 function errorResponse(
+  req: Request,
   code: string,
   message: string,
   status = 400,
   extra?: Record<string, unknown>,
 ): Response {
-  return jsonResponse({ error: code, message, ...extra }, status);
+  return jsonResponse(req, { error: code, message, ...extra }, status);
+}
+
+// FIX (2026-09-12): Timing-unsafe `===` comparison of the service role key
+// allowed a timing-attack vector against a long-lived secret.
+function timingSafeEqualString(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let mismatch = 0;
+  for (let i = 0; i < a.length; i++) {
+    mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return mismatch === 0;
 }
 
 function requireServiceRole(req: Request): Response | null {
   const expected = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   const authorization = req.headers.get('Authorization');
-  if (!expected || !authorization || authorization !== `Bearer ${expected}`) {
-    return errorResponse('UNAUTHORIZED', 'Unauthorized', 401);
+  const presented = authorization?.startsWith('Bearer ') ? authorization.slice('Bearer '.length) : '';
+  if (!expected || !presented || !timingSafeEqualString(expected, presented)) {
+    return errorResponse(req, 'UNAUTHORIZED', 'Unauthorized', 401);
   }
   return null;
 }
@@ -103,7 +142,7 @@ Deno.serve(async (req: Request) => {
   if (serviceRoleError) return serviceRoleError;
 
   if (req.method !== 'POST') {
-    return errorResponse('METHOD_NOT_ALLOWED', 'Only POST', 405);
+    return errorResponse(req, 'METHOD_NOT_ALLOWED', 'Only POST', 405);
   }
 
   const admin = getSupabaseAdmin();
@@ -115,7 +154,7 @@ Deno.serve(async (req: Request) => {
     const payload = body.payload;
 
     if (!jobId || !payload) {
-      return errorResponse('INVALID_REQUEST', 'Missing job_id or payload');
+      return errorResponse(req, 'INVALID_REQUEST', 'Missing job_id or payload');
     }
 
     const filters = payload.filters as Record<string, unknown>;
@@ -148,7 +187,7 @@ Deno.serve(async (req: Request) => {
         errorMessage: JSON.stringify({ processed: 0, error: 'No users found' }),
         releaseLock: true,
       });
-      return jsonResponse({ message: 'No users to export' });
+      return jsonResponse(req, { message: 'No users to export' });
     }
 
     const userIds = users.map((u: { id: string }) => u.id);
@@ -268,7 +307,7 @@ Deno.serve(async (req: Request) => {
       p_risk_level: 'low',
     });
 
-    return jsonResponse({
+    return jsonResponse(req, {
       job_id: jobId,
       processed: users.length,
       download_url: signedUrl.signedUrl,
@@ -290,7 +329,7 @@ Deno.serve(async (req: Request) => {
       console.error('bulk-export failed to update job status:', updateErr);
     }
 
-    return errorResponse('EXPORT_ERROR', 'Unable to complete export', 500);
+    return errorResponse(req, 'EXPORT_ERROR', 'Unable to complete export', 500);
   }
 });
 

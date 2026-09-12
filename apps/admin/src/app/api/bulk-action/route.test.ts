@@ -178,7 +178,7 @@ describe('POST /api/bulk-action — authorization', () => {
     );
 
     expect(res.status).toBe(200);
-    expect(rpcSpy).not.toHaveBeenCalled();
+    expect(rpcSpy).not.toHaveBeenCalledWith('user_has_permission', expect.anything());
     // super_admin's own restrictTenantId is undefined -- the client-supplied
     // filters.tenant_id is honored precisely because the caller is the one
     // explicit exception, not because the tenant check was skipped.

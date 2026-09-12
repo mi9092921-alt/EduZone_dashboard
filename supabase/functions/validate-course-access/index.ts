@@ -1,14 +1,47 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+// FIX (release blocker — applied 2026-09-12): wildcard CORS on authenticated
+// endpoints allowed any origin to invoke this function. We now reflect only
+// the request Origin if it appears in the explicit allow-list (Supabase
+// project URL + dashboard origin(s)).
+const ALLOWED_ORIGINS: string[] = (() => {
+  const list = (Deno.env.get('ALLOWED_ORIGINS') || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+  if (supabaseUrl) {
+    try {
+      const u = new URL(supabaseUrl);
+      if (!list.includes(u.origin)) list.push(u.origin);
+    } catch {
+      /* ignore malformed SUPABASE_URL at module load */
+    }
+  }
+  return list;
+})();
+
+function corsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get('Origin') || '';
+  const allowOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : '';
+  return {
+    'Access-Control-Allow-Origin': allowOrigin,
+    Vary: 'Origin',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  };
+}
+
+function jsonBody(req: Request, body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders(req), 'Content-Type': 'application/json' },
+  });
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders(req) });
   }
 
   try {
@@ -22,10 +55,7 @@ serve(async (req) => {
     const { course_id, lesson_id } = body;
 
     if (!course_id && !lesson_id) {
-      return new Response(JSON.stringify({ error: 'course_id or lesson_id is required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return jsonBody(req, { error: 'course_id or lesson_id is required' }, 400);
     }
 
     const {
@@ -33,9 +63,7 @@ serve(async (req) => {
       error: userError,
     } = await supabaseClient.auth.getUser();
     if (userError || !user) {
-      return new Response(JSON.stringify({ allowed: false, expires_at: null }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return jsonBody(req, { allowed: false, expires_at: null });
     }
 
     let resolvedCourseId: string = course_id;
@@ -57,16 +85,12 @@ serve(async (req) => {
         .single();
 
       if (lessonError || !lesson || !lesson.is_published) {
-        return new Response(JSON.stringify({ allowed: false, expires_at: null }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+        return jsonBody(req, { allowed: false, expires_at: null });
       }
 
       // Preview lessons need no enrollment
       if (lesson.is_preview) {
-        return new Response(JSON.stringify({ allowed: true, expires_at: null }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+        return jsonBody(req, { allowed: true, expires_at: null });
       }
 
       resolvedCourseId = lesson.course_id;
@@ -88,22 +112,14 @@ serve(async (req) => {
       .limit(1);
 
     if (enrollmentError || !enrollments || enrollments.length === 0) {
-      return new Response(JSON.stringify({ allowed: false, expires_at: null }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return jsonBody(req, { allowed: false, expires_at: null });
     }
 
-    return new Response(
-      JSON.stringify({
-        allowed: true,
-        expires_at: enrollments[0].expires_at ?? null,
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-    );
-  } catch (error) {
-    return new Response(JSON.stringify({ allowed: false, expires_at: null }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    return jsonBody(req, {
+      allowed: true,
+      expires_at: enrollments[0].expires_at ?? null,
     });
+  } catch (error) {
+    return jsonBody(req, { allowed: false, expires_at: null }, 500);
   }
 });

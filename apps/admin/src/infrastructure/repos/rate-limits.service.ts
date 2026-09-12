@@ -1,3 +1,5 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
+
 import { mapDbError } from '@/domain/errors';
 import type {
   RateLimitRule,
@@ -10,6 +12,39 @@ import { createAdminClient } from '@/infrastructure/supabase/admin';
  * Rate limits service — uses service_role admin client directly.
  * No circular dependency on admin.actions.ts.
  */
+
+// ── Rate-limit gate for heavy API routes (M11 — RPC boundary) ────
+// SECURITY FIX (2026-09-12): /api/bulk-action runs heavy work inline
+// (exact-count scans over users and, for 'export', storage upload +
+// signed-URL minting per call) and previously had no per-user throttle.
+// check_rate_limit is DB-backed, SECURITY DEFINER, keyed to the caller's
+// auth.uid(), and fails open when no matching rule exists (the
+// 'bulk_action' rule is seeded in 11_seed_reference.sql: 30/hour,
+// 10-minute block). Returns a blocked result when throttled OR when the RPC
+// itself errored — failing open on a DB error would leave the heavy path
+// unthrottled exactly when the DB is struggling.
+export async function checkRateLimitForUser(
+  client: SupabaseClient,
+  action: string,
+  userId: string,
+): Promise<{ allowed: boolean; retryAfter?: string }> {
+  const { data, error } = await client.rpc('check_rate_limit', {
+    p_action: action,
+    p_user_id: userId,
+  });
+  if (error) {
+    // Log through the shared taxonomy (same console shape as the rest of
+    // the codebase) but degrade to "blocked" rather than throwing — the
+    // gate must stay fail-closed.
+    mapDbError(error, 'rate-limits.service.ts:check_rate_limit');
+    return { allowed: false };
+  }
+  const result = data as { allowed?: boolean; retryAfter?: string | null } | null;
+  return {
+    allowed: result?.allowed !== false,
+    ...(typeof result?.retryAfter === 'string' ? { retryAfter: result.retryAfter } : {}),
+  };
+}
 
 // ── Get active blocks (blocked_until > now) ──────────────────────
 // IDOR guard: this reads via the service-role client (bypasses RLS), and

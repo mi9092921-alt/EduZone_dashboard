@@ -2,35 +2,61 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 // ── CORS & Responses ──────────────────────────────────────────
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
-// FIX (release blocker): wildcard CORS on authenticated endpoints is a defense-in-depth failure.
+// FIX (release blocker — applied 2026-09-12): wildcard CORS on authenticated
+// endpoints allowed any origin to invoke this function with a victim's
+// session cookie/JWT. We now reflect only the request Origin if it appears
+// in the explicit allow-list (Supabase project URL + dashboard origin(s)).
+const ALLOWED_ORIGINS: string[] = (() => {
+  const list = (Deno.env.get('ALLOWED_ORIGINS') || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+  if (supabaseUrl) {
+    try {
+      const u = new URL(supabaseUrl);
+      if (!list.includes(u.origin)) list.push(u.origin);
+    } catch {
+      /* ignore malformed SUPABASE_URL at module load */
+    }
+  }
+  return list;
+})();
 
+function corsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get('Origin') || '';
+  const allowOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : '';
+  return {
+    'Access-Control-Allow-Origin': allowOrigin,
+    Vary: 'Origin',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Credentials': 'true',
+  };
+}
 
 function handleCors(req: Request): Response | null {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders(req) });
   }
   return null;
 }
 
-function jsonResponse(body: unknown, status = 200): Response {
+function jsonResponse(req: Request, body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    headers: { ...corsHeaders(req), 'Content-Type': 'application/json' },
   });
 }
 
 function errorResponse(
+  req: Request,
   code: string,
   message: string,
   status = 400,
   extra?: Record<string, unknown>,
 ): Response {
-  return jsonResponse({ error: code, message, ...extra }, status);
+  return jsonResponse(req, { error: code, message, ...extra }, status);
 }
 
 // ── Supabase Admin ────────────────────────────────────────────
@@ -130,7 +156,7 @@ const ACTION_PERMISSIONS: Record<BulkAction, string> = {
 /** Max records per bulk operation */
 const MAX_BULK_SIZE = 500;
 // PERF-03 FIX: the dead `MAX_PENDING_JOBS = 10_000` constant was removed.
-// The only real queue cap lives in the admin_enqueue_bulk_job RPC (per
+// The only real queue cap lives inside the admin_enqueue_bulk_job RPC (per
 // tenant, since the PERF-03 fairness fix) — duplicating a different number
 // here invited drift between the two layers. JOB_QUEUE_FULL arrives from
 // the RPC and is surfaced verbatim below.
@@ -148,7 +174,7 @@ Deno.serve(async (req: Request) => {
   if (corsResponse) return corsResponse;
 
   if (req.method !== 'POST') {
-    return errorResponse('METHOD_NOT_ALLOWED', 'Only POST is accepted', 405);
+    return errorResponse(req, 'METHOD_NOT_ALLOWED', 'Only POST is accepted', 405);
   }
 
   try {
@@ -157,13 +183,14 @@ Deno.serve(async (req: Request) => {
 
     if (!body.action || !VALID_ACTIONS.includes(body.action)) {
       return errorResponse(
+        req,
         'INVALID_ACTION',
         `Invalid action. Must be one of: ${VALID_ACTIONS.join(', ')}`,
       );
     }
 
     if (!body.filters || typeof body.filters !== 'object') {
-      return errorResponse('INVALID_FILTERS', 'filters must be an object');
+      return errorResponse(req, 'INVALID_FILTERS', 'filters must be an object');
     }
 
     // ── Authenticate + authorize ─────────────────────────────
@@ -183,7 +210,7 @@ Deno.serve(async (req: Request) => {
 
     if (f.search !== undefined) {
       if (typeof f.search !== 'string' || f.search.length > 100 || /[,()]/.test(f.search)) {
-        return errorResponse('INVALID_FILTERS', 'Invalid search filter');
+        return errorResponse(req, 'INVALID_FILTERS', 'Invalid search filter');
       }
     }
     if (
@@ -192,21 +219,21 @@ Deno.serve(async (req: Request) => {
         f.user_ids.length > MAX_BULK_SIZE ||
         f.user_ids.some((id) => typeof id !== 'string'))
     ) {
-      return errorResponse('INVALID_FILTERS', 'Invalid user_ids filter');
+      return errorResponse(req, 'INVALID_FILTERS', 'Invalid user_ids filter');
     }
 
     // Tenant scope is derived from the authenticated database profile. A
     // caller may only override it when the server-side primary role is the
     // explicit cross-tenant super_admin role.
     if (f.tenant_id !== undefined && typeof f.tenant_id !== 'string') {
-      return errorResponse('INVALID_FILTERS', 'Invalid tenant_id filter');
+      return errorResponse(req, 'INVALID_FILTERS', 'Invalid tenant_id filter');
     }
     if (
       f.tenant_id !== undefined &&
       f.tenant_id !== user.tenant_id &&
       user.role !== 'super_admin'
     ) {
-      return errorResponse('PERMISSION_DENIED', 'Cross-tenant bulk actions are not permitted', 403);
+      return errorResponse(req, 'PERMISSION_DENIED', 'Cross-tenant bulk actions are not permitted', 403);
     }
     if (user.role !== 'super_admin') {
       f.tenant_id = user.tenant_id;
@@ -228,25 +255,26 @@ Deno.serve(async (req: Request) => {
     const { count: estimatedCount, error: countErr } = await query;
     if (countErr) {
       console.error('bulk-action count query failed', countErr);
-      return errorResponse('INVALID_FILTERS', 'Unable to evaluate filters', 400, { count: 0 });
+      return errorResponse(req, 'INVALID_FILTERS', 'Unable to evaluate filters', 400, { count: 0 });
     }
 
     const count = estimatedCount ?? 0;
 
     if (count === 0) {
-      return errorResponse('INVALID_FILTERS', 'No users match the given filters', 400, {
+      return errorResponse(req, 'INVALID_FILTERS', 'No users match the given filters', 400, {
         count: 0,
       });
     }
 
     // ── Dry run → return count only ──────────────────────────
     if (body.dry_run) {
-      return jsonResponse({ estimated_count: count, dry_run: true });
+      return jsonResponse(req, { estimated_count: count, dry_run: true });
     }
 
     // ── Submit → validate limits ─────────────────────────────
     if (count > MAX_BULK_SIZE) {
       return errorResponse(
+        req,
         'PAYLOAD_TOO_LARGE',
         `Bulk operations are limited to ${MAX_BULK_SIZE} users. Found ${count}.`,
         400,
@@ -273,6 +301,7 @@ Deno.serve(async (req: Request) => {
     if (insertErr) {
       if (insertErr.message?.includes('JOB_QUEUE_FULL')) {
         return errorResponse(
+          req,
           'JOB_QUEUE_FULL',
           'Too many pending jobs. Please try again later.',
           429,
@@ -280,13 +309,14 @@ Deno.serve(async (req: Request) => {
       }
       if (insertErr.message?.includes('uq_job_dedupe')) {
         return errorResponse(
+          req,
           'DUPLICATE_JOB',
           'An identical bulk action is already processing. Please wait for it to finish.',
           409,
         );
       }
       console.error('bulk-action queue insert failed', insertErr);
-      return errorResponse('QUEUE_ERROR', 'Unable to queue bulk action', 500);
+      return errorResponse(req, 'QUEUE_ERROR', 'Unable to queue bulk action', 500);
     }
 
     // ── Log the activity ─────────────────────────────────────
@@ -305,6 +335,7 @@ Deno.serve(async (req: Request) => {
 
     // ── Return 202 Accepted ──────────────────────────────────
     return jsonResponse(
+      req,
       {
         job_id: job.id,
         estimated_count: count,
@@ -315,9 +346,9 @@ Deno.serve(async (req: Request) => {
     );
   } catch (err) {
     if (err instanceof AuthError) {
-      return errorResponse(err.code, err.message, err.status);
+      return errorResponse(req, err.code, err.message, err.status);
     }
     console.error('bulk-action error:', err);
-    return errorResponse('INTERNAL_ERROR', 'An unexpected error occurred', 500);
+    return errorResponse(req, 'INTERNAL_ERROR', 'An unexpected error occurred', 500);
   }
 });

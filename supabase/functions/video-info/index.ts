@@ -8,10 +8,43 @@ const EXTERNAL_API_URL = Deno.env.get('VIDEO_API_URL') || '';
 const EXTERNAL_API_KEY = Deno.env.get('VIDEO_API_KEY') || '';
 const REPLIT_TIMEOUT_MS = Number(Deno.env.get('VIDEO_REPLIT_TIMEOUT_MS') || 8000);
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+// FIX (release blocker — applied 2026-09-12): wildcard CORS on authenticated
+// endpoints allowed any origin to invoke this function. We now reflect only
+// the request Origin if it appears in the explicit allow-list (Supabase
+// project URL + dashboard origin(s)).
+const ALLOWED_ORIGINS: string[] = (() => {
+  const list = (Deno.env.get('ALLOWED_ORIGINS') || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+  if (supabaseUrl) {
+    try {
+      const u = new URL(supabaseUrl);
+      if (!list.includes(u.origin)) list.push(u.origin);
+    } catch {
+      /* ignore malformed SUPABASE_URL at module load */
+    }
+  }
+  return list;
+})();
+
+function corsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get('Origin') || '';
+  const allowOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : '';
+  return {
+    'Access-Control-Allow-Origin': allowOrigin,
+    Vary: 'Origin',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  };
+}
+
+function jsonBody(req: Request, body: unknown, status = 200, extraHeaders: Record<string, string> = {}) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders(req), 'Content-Type': 'application/json', ...extraHeaders },
+  });
+}
 
 // ─── Supabase REST helpers ────────────────────────────────────────────────────
 
@@ -166,7 +199,7 @@ function normalize(raw: any) {
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders(req) });
   }
 
   const startMs = Date.now();
@@ -206,17 +239,11 @@ serve(async (req) => {
     // re-check both call sites above before loosening this comment further.
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Missing Authorization header' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return jsonBody(req, { error: 'Missing Authorization header' }, 401);
     }
     const bearerToken = authHeader.replace(/^Bearer\s+/i, '').trim();
     if (!bearerToken) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return jsonBody(req, { error: 'Unauthorized' }, 401);
     }
 
     const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -225,19 +252,13 @@ serve(async (req) => {
     });
     const { data: authData, error: authError } = await authClient.auth.getUser(bearerToken);
     if (authError || !authData.user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return jsonBody(req, { error: 'Unauthorized' }, 401);
     }
 
     const { data: sessionValid, error: sessionError } =
       await authClient.rpc('validate_user_session');
     if (sessionError || sessionValid !== true) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return jsonBody(req, { error: 'Unauthorized' }, 401);
     }
 
     const { data: rateLimit, error: rateLimitError } = await authClient.rpc('check_rate_limit', {
@@ -246,17 +267,14 @@ serve(async (req) => {
     });
     if (rateLimitError) {
       console.error('video-info rate-limit check failed', rateLimitError);
-      return new Response(JSON.stringify({ error: 'Service unavailable' }), {
-        status: 503,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return jsonBody(req, { error: 'Service unavailable' }, 503);
     }
     if (rateLimit?.allowed === false) {
-      return new Response(JSON.stringify({ error: 'Too many requests' }), {
-        status: 429,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json',
+      return jsonBody(
+        req,
+        { error: 'Too many requests' },
+        429,
+        {
           'Retry-After': rateLimit.retryAfter
             ? Math.max(
                 1,
@@ -264,7 +282,7 @@ serve(async (req) => {
               ).toString()
             : '60',
         },
-      });
+      );
     }
 
     // Parse body
@@ -305,19 +323,13 @@ serve(async (req) => {
       if (accessError || !lessonContent) {
         const reason = accessError?.message ?? '';
         if (reason.includes('LESSON_NOT_FOUND')) {
-          return new Response(JSON.stringify({ error: 'Lesson not found' }), {
-            status: 404,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
+          return jsonBody(req, { error: 'Lesson not found' }, 404);
         }
         // ACCESS_DENIED and any other unexpected failure are both a 403
         // from the caller's point of view — do not leak the raw Postgres
         // error (schema/constraint/internal detail), mirroring
         // get-lesson-content/index.ts.
-        return new Response(JSON.stringify({ error: 'Access denied' }), {
-          status: 403,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+        return jsonBody(req, { error: 'Access denied' }, 403);
       }
 
       const provider: string | null = lessonContent.provider ?? null;
@@ -326,10 +338,7 @@ serve(async (req) => {
         // video-info is a YouTube-formats extractor only; a lesson whose
         // content isn't a YouTube reference has nothing for this function
         // to resolve, authorized or not.
-        return new Response(JSON.stringify({ error: 'Access denied' }), {
-          status: 403,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+        return jsonBody(req, { error: 'Access denied' }, 403);
       }
 
       // Server-authoritative from here on: use the lesson's own stored
@@ -341,10 +350,7 @@ serve(async (req) => {
     }
 
     if (!videoUrl) {
-      return new Response(JSON.stringify({ error: 'Video URL is required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return jsonBody(req, { error: 'Video URL is required' }, 400);
     }
 
     const urlHash = await hashUrl(videoUrl);
@@ -369,10 +375,7 @@ serve(async (req) => {
 
     // Fresh cache hit → return immediately
     if (freshData && !responseNeedsSeparateAudio(freshData)) {
-      return new Response(
-        JSON.stringify({ ...freshData, source: 'cache', time_ms: Date.now() - startMs }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      );
+      return jsonBody(req, { ...freshData, source: 'cache', time_ms: Date.now() - startMs });
     }
 
     // ── Fetch from Replit (8s timeout) ────────────────────────────────────────
@@ -407,10 +410,7 @@ serve(async (req) => {
       // Replit down or timed out → serve stale cache if available
       if (staleData && !responseNeedsSeparateAudio(staleData)) {
         console.warn('Replit unavailable, serving stale cache:', fetchErr.message);
-        return new Response(
-          JSON.stringify({ ...staleData, source: 'stale', time_ms: Date.now() - startMs }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-        );
+        return jsonBody(req, { ...staleData, source: 'stale', time_ms: Date.now() - startMs });
       }
 
       // No cache at all
@@ -418,20 +418,12 @@ serve(async (req) => {
         fetchErr.name === 'AbortError'
           ? 'Video server timed out, please try again'
           : 'Video server unavailable';
-      return new Response(JSON.stringify({ error: msg }), {
-        status: 503,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return jsonBody(req, { error: msg }, 503);
     }
 
-    return new Response(JSON.stringify(normalized), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return jsonBody(req, normalized);
   } catch (err: any) {
     console.error('Unhandled error in video-info:', err);
-    return new Response(JSON.stringify({ error: 'Internal server error' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return jsonBody(req, { error: 'Internal server error' }, 500);
   }
 });

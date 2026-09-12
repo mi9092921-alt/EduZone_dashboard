@@ -1,18 +1,48 @@
 import { serve } from 'https://deno.land/std@0.192.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
-// FIX (release blocker): wildcard CORS on authenticated endpoints is a defense-in-depth failure.
+// FIX (release blocker — applied 2026-09-12): wildcard CORS on authenticated
+// endpoints allowed any origin to invoke this function with a victim's
+// session cookie/JWT. We now reflect only the request Origin if it appears
+// in the explicit allow-list (Supabase project URL + dashboard origin(s)).
+// The allow-list is sourced from env so each environment (dev / staging /
+// prod) can pin its own set of trusted origins without code changes.
+const ALLOWED_ORIGINS: string[] = (() => {
+  const list = (Deno.env.get('ALLOWED_ORIGINS') || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  // The Supabase project URL itself is always a trusted same-origin caller
+  // (auth flow + Studio). Always allow it.
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+  if (supabaseUrl) {
+    try {
+      const u = new URL(supabaseUrl);
+      if (!list.includes(u.origin)) list.push(u.origin);
+    } catch {
+      /* ignore malformed SUPABASE_URL at module load */
+    }
+  }
+  return list;
+})();
 
+function corsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get('Origin') || '';
+  // Reflect the verified origin only; empty string means the browser blocks the response.
+  const allowOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : '';
+  return {
+    'Access-Control-Allow-Origin': allowOrigin,
+    Vary: 'Origin',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Credentials': 'true',
+  };
+}
 
-function jsonResponse(body: unknown, status = 200) {
+function jsonResponse(req: Request, body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    headers: { ...corsHeaders(req), 'Content-Type': 'application/json' },
   });
 }
 
@@ -30,17 +60,17 @@ function isValidOptionalText(value: unknown, max = 255): value is string | null 
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders(req) });
   }
 
   if (req.method !== 'POST') {
-    return jsonResponse({ error: 'METHOD_NOT_ALLOWED' }, 405);
+    return jsonResponse(req, { error: 'METHOD_NOT_ALLOWED' }, 405);
   }
 
   try {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer ')) {
-      return jsonResponse({ error: 'UNAUTHORIZED' }, 401);
+      return jsonResponse(req, { error: 'UNAUTHORIZED' }, 401);
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
@@ -48,7 +78,7 @@ serve(async (req) => {
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     if (!supabaseUrl || !anonKey || !serviceKey) {
       console.error('create-user configuration is incomplete');
-      return jsonResponse({ error: 'SERVICE_UNAVAILABLE' }, 503);
+      return jsonResponse(req, { error: 'SERVICE_UNAVAILABLE' }, 503);
     }
 
     // Keep the caller on the user-scoped client. The permission RPC and the
@@ -64,13 +94,13 @@ serve(async (req) => {
 
     const { data: authUser, error: authError } = await userClient.auth.getUser();
     if (authError || !authUser.user) {
-      return jsonResponse({ error: 'UNAUTHORIZED' }, 401);
+      return jsonResponse(req, { error: 'UNAUTHORIZED' }, 401);
     }
 
     const { data: sessionValid, error: sessionError } =
       await userClient.rpc('validate_user_session');
     if (sessionError || sessionValid !== true) {
-      return jsonResponse({ error: 'UNAUTHORIZED' }, 401);
+      return jsonResponse(req, { error: 'UNAUTHORIZED' }, 401);
     }
 
     const { data: adminProfile, error: profileError } = await userClient
@@ -81,7 +111,7 @@ serve(async (req) => {
       .single();
 
     if (profileError || !adminProfile) {
-      return jsonResponse({ error: 'UNAUTHORIZED' }, 401);
+      return jsonResponse(req, { error: 'UNAUTHORIZED' }, 401);
     }
 
     const { data: hasPerm, error: permError } = await userClient.rpc('user_has_permission', {
@@ -91,14 +121,14 @@ serve(async (req) => {
     });
 
     if (permError || hasPerm !== true) {
-      return jsonResponse({ error: 'PERMISSION_DENIED' }, 403);
+      return jsonResponse(req, { error: 'PERMISSION_DENIED' }, 403);
     }
 
     const body = await req.json();
     const { email, password, first_name, last_name, phone, primary_role } = body ?? {};
 
     if (!isValidEmail(email) || typeof password !== 'string' || password.length < 8) {
-      return jsonResponse({ error: 'INVALID_INPUT' }, 400);
+      return jsonResponse(req, { error: 'INVALID_INPUT' }, 400);
     }
 
     if (
@@ -106,7 +136,7 @@ serve(async (req) => {
       !isValidOptionalText(last_name) ||
       !isValidOptionalText(phone, 32)
     ) {
-      return jsonResponse({ error: 'INVALID_INPUT' }, 400);
+      return jsonResponse(req, { error: 'INVALID_INPUT' }, 400);
     }
 
     const allowedRoles = new Set(['student', 'teacher', 'admin']);
@@ -115,7 +145,7 @@ serve(async (req) => {
       (!allowedRoles.has(primary_role) ||
         (primary_role === 'admin' && adminProfile.primary_role !== 'super_admin'))
     ) {
-      return jsonResponse({ error: 'INVALID_ROLE' }, 403);
+      return jsonResponse(req, { error: 'INVALID_ROLE' }, 403);
     }
 
     const requestedRole = primary_role ?? 'student';
@@ -133,7 +163,7 @@ serve(async (req) => {
 
     if (createError || !created.user) {
       console.error('create-user auth creation failed', createError);
-      return jsonResponse({ error: 'USER_CREATION_FAILED' }, 409);
+      return jsonResponse(req, { error: 'USER_CREATION_FAILED' }, 409);
     }
 
     const profilePayload = {
@@ -163,12 +193,12 @@ serve(async (req) => {
       } else {
         console.error('create-user profile write failed; auth user rolled back');
       }
-      return jsonResponse({ error: 'USER_CREATION_FAILED' }, 500);
+      return jsonResponse(req, { error: 'USER_CREATION_FAILED' }, 500);
     }
 
-    return jsonResponse({ success: true, userId: created.user.id }, 201);
+    return jsonResponse(req, { success: true, userId: created.user.id }, 201);
   } catch (err) {
     console.error('create-user unexpected failure', err);
-    return jsonResponse({ error: 'INTERNAL_ERROR' }, 500);
+    return jsonResponse(req, { error: 'INTERNAL_ERROR' }, 500);
   }
 });
