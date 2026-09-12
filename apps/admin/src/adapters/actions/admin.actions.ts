@@ -5,6 +5,7 @@ import type { AccessRule, PaginatedResult } from '@eduzone/types';
 import {
   assertSameTenant,
   requirePermission,
+  requireSuperAdmin,
   requireUser,
   requireUserContext,
 } from '@/adapters/actions/boundary';
@@ -200,8 +201,12 @@ export async function addRoleOverrideAction(
 }
 
 export async function removeRoleOverrideAction(flagId: string, roleId: string): Promise<void> {
-  await requirePermission('feature_flags.manage');
-  return featureFlagsService.removeRoleOverrideAdmin(flagId, roleId);
+  const ctx = await requirePermission('feature_flags.manage');
+  // SECURITY FIX (2026-09-12): pass tenantId so removeRoleOverrideAdmin
+  // can scope the service-role delete (launch-blocker APP-1). super_admin
+  // (ctx.permissions includes '*') passes null for cross-tenant access.
+  const tenantId = ctx.permissions.includes('*') ? null : ctx.tenantId;
+  return featureFlagsService.removeRoleOverrideAdmin(flagId, roleId, tenantId);
 }
 
 export async function addUserOverrideAction(
@@ -214,8 +219,12 @@ export async function addUserOverrideAction(
 }
 
 export async function removeUserOverrideAction(flagId: string, userId: string): Promise<void> {
-  await requirePermission('feature_flags.manage');
-  return featureFlagsService.removeUserOverrideAdmin(flagId, userId);
+  const ctx = await requirePermission('feature_flags.manage');
+  // SECURITY FIX (2026-09-12): pass tenantId so removeUserOverrideAdmin
+  // can scope the service-role delete (launch-blocker APP-1). super_admin
+  // passes null for cross-tenant access.
+  const tenantId = ctx.permissions.includes('*') ? null : ctx.tenantId;
+  return featureFlagsService.removeUserOverrideAdmin(flagId, userId, tenantId);
 }
 
 export async function getAllRolesAction(): Promise<{ id: string; name: string; key: string }[]> {
@@ -228,27 +237,45 @@ export async function getJobsAction(
   page: number,
   pageSize: number,
 ): Promise<PaginatedResult<Job>> {
-  await requirePermission(['jobs.manage', 'audit.read', 'settings.write']);
-  return jobsService.getJobs(filters, page, pageSize);
+  const ctx = await requirePermission(['jobs.manage', 'audit.read', 'settings.write']);
+  // SECURITY FIX (2026-09-12): jobs RPCs run via service_role, which makes
+  // `v_is_unrestricted=TRUE` inside admin_get_jobs and returns rows for
+  // every tenant (launch-blocker APP-2). Scope to the caller's own tenant;
+  // super_admin passes undefined to see across tenants.
+  const tenantScope = ctx.permissions.includes('*') ? null : ctx.tenantId;
+  return jobsService.getJobs(filters, page, pageSize, tenantScope);
 }
 
 export async function getJobStatusCountsAction(): Promise<JobStatusCounts> {
-  await requirePermission(['jobs.manage', 'audit.read', 'settings.write']);
-  return jobsService.getJobStatusCounts();
+  const ctx = await requirePermission(['jobs.manage', 'audit.read', 'settings.write']);
+  // SECURITY FIX (2026-09-12): same tenant scoping as getJobsAction above.
+  const tenantScope = ctx.permissions.includes('*') ? null : ctx.tenantId;
+  return jobsService.getJobStatusCounts(tenantScope);
 }
 
 export async function retryJobAction(id: string): Promise<void> {
-  await requirePermission(['jobs.manage', 'audit.read', 'settings.write']);
+  const ctx = await requirePermission(['jobs.manage', 'audit.read', 'settings.write']);
+  // SECURITY FIX (2026-09-12): IDOR/BOLA guard — admin_retry_job runs via
+  // service_role and accepts any job UUID. Block retrying a job outside
+  // the caller's tenant (super_admin exempt — see assertSameTenant).
+  assertSameTenant(ctx, await jobsService.getJobTenantId(id));
   return jobsService.retryJob(id);
 }
 
 export async function cancelJobAction(id: string): Promise<void> {
-  await requirePermission(['jobs.manage', 'audit.read', 'settings.write']);
+  const ctx = await requirePermission(['jobs.manage', 'audit.read', 'settings.write']);
+  // SECURITY FIX (2026-09-12): IDOR/BOLA guard — same as retryJobAction.
+  assertSameTenant(ctx, await jobsService.getJobTenantId(id));
   return jobsService.cancelJob(id);
 }
 
 export async function releaseStaleJobsAction(): Promise<number> {
-  await requirePermission(['jobs.manage', 'audit.read', 'settings.write']);
+  // SECURITY FIX (2026-09-12): release_stale_job_locks is a platform-wide
+  // maintenance operation that releases expired locks across ALL tenants.
+  // It is not a tenant-scoped operation, so it must be gated behind
+  // super_admin only — previously any caller with `audit.read` (which
+  // includes tenant-scoped admins) could trigger it.
+  await requireSuperAdmin();
   return jobsService.releaseStaleJobs();
 }
 

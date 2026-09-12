@@ -1235,6 +1235,17 @@ DECLARE
   v_role text;
   v_old_role text;
 BEGIN
+  -- SECURITY FIX (2026-09-12): body guard — only service_role may invoke.
+  -- Even with the explicit REVOKE in 10_permissions.sql, defense-in-depth
+  -- requires this guard so any future accidental re-GRANT cannot reopen the
+  -- privilege-escalation / demotion-DoS path. See launch-blocker DB-3 in the
+  -- security audit report.
+  IF pg_catalog.current_setting('role', true) IS DISTINCT FROM 'service_role'
+     AND auth.role() IS DISTINCT FROM 'service_role'
+     AND NOT public.is_current_user_super_admin() THEN
+    RAISE EXCEPTION 'PERMISSION_DENIED' USING ERRCODE = '42501';
+  END IF;
+
   -- 1. Optimization: Get current primary_role to avoid redundant updates
   SELECT primary_role INTO v_old_role FROM public.users WHERE id = p_user_id;
 
@@ -1991,14 +2002,37 @@ $$;
 
 CREATE OR REPLACE FUNCTION public.get_user_role_by_id(p_user_id uuid)
 RETURNS text
-LANGUAGE sql
+LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
-  SELECT primary_role
+DECLARE
+  v_role text;
+BEGIN
+  -- SECURITY FIX (2026-09-12): body guard — only service_role (or a caller
+  -- scoped to the same tenant as p_user_id) may read primary_role.
+  -- Previously this was LANGUAGE sql with no guard at all, so any caller
+  -- could enumerate every user's role across every tenant (launch-blocker
+  -- DB-4). Even with the explicit REVOKE in 10_permissions.sql, defense-
+  -- in-depth requires the guard.
+  IF pg_catalog.current_setting('role', true) IS DISTINCT FROM 'service_role'
+     AND auth.role() IS DISTINCT FROM 'service_role'
+     AND NOT public.is_current_user_super_admin()
+     AND NOT EXISTS (
+       SELECT 1 FROM public.users u
+       WHERE u.id = p_user_id
+         AND u.tenant_id = public.get_current_tenant_id()
+     ) THEN
+    RAISE EXCEPTION 'PERMISSION_DENIED' USING ERRCODE = '42501';
+  END IF;
+
+  SELECT primary_role INTO v_role
   FROM public.users
   WHERE id = p_user_id
     AND deleted_at IS NULL;
+
+  RETURN v_role;
+END;
 $$;
 
 CREATE OR REPLACE FUNCTION public.is_enrolled_in_course(p_course_id uuid)
@@ -3759,10 +3793,25 @@ $$;
 
 CREATE OR REPLACE FUNCTION public.check_gdpr_compliance(p_user_id uuid)
 RETURNS jsonb
-LANGUAGE sql
+LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
+DECLARE
+  v_result jsonb;
+BEGIN
+  -- SECURITY FIX (2026-09-12): body guard — only service_role or a super
+  -- admin may invoke. Previously this was LANGUAGE sql with no guard at
+  -- all, so any caller could enumerate orphaned-enrollments/sessions/
+  -- roles counts for ANY user_id across every tenant (launch-blocker
+  -- DB-5, cross-tenant PII leak). Even with the explicit REVOKE in
+  -- 10_permissions.sql, defense-in-depth requires the guard.
+  IF pg_catalog.current_setting('role', true) IS DISTINCT FROM 'service_role'
+     AND auth.role() IS DISTINCT FROM 'service_role'
+     AND NOT public.is_current_user_super_admin() THEN
+    RAISE EXCEPTION 'PERMISSION_DENIED' USING ERRCODE = '42501';
+  END IF;
+
   SELECT pg_catalog.jsonb_build_object(
     'user_deleted', (SELECT deleted_at IS NOT NULL FROM public.users WHERE id = p_user_id),
     'orphaned_enrollments', (SELECT count(*) FROM public.enrollments WHERE user_id = p_user_id AND deleted_at IS NULL),
@@ -3776,7 +3825,10 @@ AS $$
       AND
       (SELECT count(*) FROM public.user_progress WHERE user_id = p_user_id AND deleted_at IS NULL) = 0
     )
-  );
+  ) INTO v_result;
+
+  RETURN v_result;
+END;
 $$;
 
 -- LOW-02: Enrollment tenant match validation
@@ -4123,6 +4175,60 @@ BEGIN
 END;
 $$;
 
+-- SECURITY FIX (2026-09-12) — launch-blocker APP-2 follow-up:
+-- Tenant-scoped variant of admin_get_job_counts. The action boundary
+-- (apps/admin/src/adapters/actions/admin.actions.ts) uses this when the
+-- caller is a tenant-scoped admin (non-super_admin); super_admin falls
+-- back to the unrestricted admin_get_job_counts above.
+--
+-- Why a separate RPC instead of an optional p_tenant_id parameter on
+-- admin_get_job_counts? The existing RPC is already in production with
+-- its current signature (zero args) and jobs.service.ts calls it via
+-- `admin.rpc('admin_get_job_counts').single()` — adding an optional
+-- parameter would silently make the super_admin path pass NULL, which
+-- is fine semantically but breaks the function's `RETURNS jsonb` shape
+-- on a `CREATE OR REPLACE` if the parameter list changes (Postgres
+-- raises "cannot change whether a parameter has a default"). A new RPC
+-- is the lower-risk path and matches the file's existing pattern of
+-- dedicated RPCs per use case (admin_get_job vs admin_get_jobs).
+CREATE OR REPLACE FUNCTION public.admin_get_job_counts_tenant(p_tenant_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+BEGIN
+  IF auth.role() <> 'service_role' AND NOT public.is_admin_with_session_validation() THEN
+    RAISE EXCEPTION 'PERMISSION_DENIED';
+  END IF;
+
+  -- IDOR guard: even though the action boundary already passes
+  -- ctx.tenantId (the caller's own tenant, never client-supplied), an
+  -- authenticated non-super_admin caller cannot ask for another
+  -- tenant's counts. service_role bypasses (used by the action
+  -- boundary via createAdminClient, which always carries the server's
+  -- service role — not the caller's JWT).
+  IF auth.role() <> 'service_role'
+     AND NOT public.is_current_user_super_admin()
+     AND p_tenant_id IS DISTINCT FROM public.get_current_tenant_id() THEN
+    RAISE EXCEPTION 'PERMISSION_DENIED' USING ERRCODE = '42501';
+  END IF;
+
+  RETURN (
+    SELECT jsonb_build_object(
+      'pending',    count(*) FILTER (WHERE status = 'pending'),
+      'processing', count(*) FILTER (WHERE status = 'processing'),
+      'done',       count(*) FILTER (WHERE status = 'done'),
+      'failed',     count(*) FILTER (WHERE status = 'failed'),
+      'dead',       count(*) FILTER (WHERE status = 'dead')
+    )
+    FROM internal.job_queue
+    WHERE tenant_id = p_tenant_id
+       OR tenant_id IS NULL
+  );
+END;
+$$;
+
 CREATE OR REPLACE FUNCTION public.admin_retry_job(p_id uuid)
 RETURNS void
 LANGUAGE plpgsql
@@ -4212,6 +4318,42 @@ BEGIN
     jq.finished_at AS completed_at
   FROM internal.job_queue jq
   WHERE jq.id = p_id;
+END;
+$$;
+
+-- SECURITY FIX (2026-09-12) — launch-blocker APP-2 follow-up:
+-- `admin_retry_job` / `admin_cancel_job` already include an IDOR guard
+-- inside their UPDATE … WHERE clause (tenant_id = get_current_tenant_id()
+-- OR is_current_user_super_admin() OR tenant_id IS NULL), so when called
+-- via a JWT-bearing authenticated client they correctly fail closed.
+--
+-- The gap: jobs.service.ts uses the service-role admin client, so
+-- `auth.role() = 'service_role'` short-circuits `v_is_unrestricted` to
+-- TRUE and the tenant guard is bypassed — a tenant-scoped admin calling
+-- retryJobAction(id) could retry ANY tenant's job. The action boundary
+-- now calls assertSameTenant(ctx, await getJobTenantId(id)) BEFORE the
+-- mutation; this RPC is the read-side helper that makes that possible.
+-- It returns the tenant_id of the job, or NULL if the job doesn't exist
+-- (the boundary's assertSameTenant treats NULL as a mismatch and fails
+-- closed, matching the documented contract in boundary.ts).
+CREATE OR REPLACE FUNCTION public.admin_get_job_tenant_id(p_id uuid)
+RETURNS uuid
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_tenant_id uuid;
+BEGIN
+  IF auth.role() <> 'service_role' AND NOT public.is_admin_with_session_validation() THEN
+    RAISE EXCEPTION 'PERMISSION_DENIED';
+  END IF;
+
+  SELECT jq.tenant_id INTO v_tenant_id
+  FROM internal.job_queue jq
+  WHERE jq.id = p_id;
+
+  RETURN v_tenant_id;
 END;
 $$;
 
@@ -5307,6 +5449,11 @@ END;
 $$;
 
 -- LOW-03 FIX: Dynamic test data seeding with slug-based lookup.
+-- SECURITY FIX (2026-09-12): body guard — only service_role may invoke.
+-- This function has no production caller (verified via grep across apps/
+-- and supabase/functions/), but it is retained for dev/CI use and is
+-- explicitly locked to service_role only in 10_permissions.sql. The
+-- body guard is defense-in-depth against any future accidental GRANT.
 CREATE OR REPLACE FUNCTION public.seed_test_data()
 RETURNS void
 LANGUAGE plpgsql
@@ -5317,6 +5464,11 @@ DECLARE
   v_test_admin_id uuid;
   v_test_course_id uuid;
 BEGIN
+  IF pg_catalog.current_setting('role', true) IS DISTINCT FROM 'service_role'
+     AND auth.role() IS DISTINCT FROM 'service_role' THEN
+    RAISE EXCEPTION 'PERMISSION_DENIED' USING ERRCODE = '42501';
+  END IF;
+
   -- Lookup or create test tenant
   v_test_tenant_id := (SELECT id FROM public.tenants WHERE slug = 'test-tenant-001' LIMIT 1);
   IF v_test_tenant_id IS NULL THEN
@@ -5359,6 +5511,11 @@ END;
 $$;
 
 -- LOW-03 FIX: Cleanup test data using slug-based lookup
+-- SECURITY FIX (2026-09-12): body guard — only service_role may invoke.
+-- Same rationale as seed_test_data above: this function DELETEs production
+-- data (enrollments, user_progress, lessons, courses, user_roles, users,
+-- tenants) and must never be reachable from PostgREST. Locked to
+-- service_role in 10_permissions.sql; body guard is defense-in-depth.
 CREATE OR REPLACE FUNCTION public.cleanup_test_data()
 RETURNS void
 LANGUAGE plpgsql
@@ -5367,6 +5524,11 @@ AS $$
 DECLARE
   v_test_tenant_id uuid;
 BEGIN
+  IF pg_catalog.current_setting('role', true) IS DISTINCT FROM 'service_role'
+     AND auth.role() IS DISTINCT FROM 'service_role' THEN
+    RAISE EXCEPTION 'PERMISSION_DENIED' USING ERRCODE = '42501';
+  END IF;
+
   SELECT id INTO v_test_tenant_id FROM public.tenants WHERE slug = 'test-tenant-001';
   
   IF v_test_tenant_id IS NOT NULL THEN

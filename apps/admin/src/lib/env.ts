@@ -14,16 +14,44 @@ const publicEnvSchema = z.object({
 /**
  * Server-only environment variables and secrets.
  * MUST NEVER be bundled or accessed client-side.
+ *
+ * SECURITY FIX (2026-09-12): `SUPABASE_SERVICE_ROLE_KEY` and `CRON_SECRET`
+ * were previously marked `.optional()` despite their error messages saying
+ * "required". That allowed production to boot healthy and then fail
+ * silently at runtime — the cron endpoint would return 401 forever (Vercel
+ * cron kept hitting /api/cron/routine, never alerting), and the first
+ * admin action that needed `createAdminClient()` would throw a generic 500
+ * with no clear root cause.
+ *
+ * Resolution: split into two schemas.
+ *   - `serverEnvSchemaDev` keeps the lenient `.optional()` semantics for
+ *     development / test / staging (where a missing service role key is a
+ *     real configuration state — e.g. running only the auth-gated UI
+ *     without invoking any admin action).
+ *   - `serverEnvSchemaProd` marks both as required when
+ *     `NEXT_PUBLIC_APP_ENV === 'production'`.
+ * `getServerEnv()` picks the schema based on `NEXT_PUBLIC_APP_ENV`, so
+ * production deployments fail-fast at the first call from
+ * `instrumentation.ts register()` rather than degrading silently.
  */
-const serverEnvSchema = z.object({
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1, 'SUPABASE_SERVICE_ROLE_KEY is required').optional(),
+const serverEnvSchemaDev = z.object({
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
   YOUTUBE_API_KEY: z.string().min(1).optional(),
   CRON_SECRET: z.string().min(1).optional(),
   SENTRY_DSN: z.string().url().optional(),
 });
 
+const serverEnvSchemaProd = z.object({
+  SUPABASE_SERVICE_ROLE_KEY: z
+    .string()
+    .min(1, 'SUPABASE_SERVICE_ROLE_KEY is required in production (NEXT_PUBLIC_APP_ENV=production)'),
+  YOUTUBE_API_KEY: z.string().min(1).optional(),
+  CRON_SECRET: z.string().min(1, 'CRON_SECRET is required in production (NEXT_PUBLIC_APP_ENV=production)'),
+  SENTRY_DSN: z.string().url().optional(),
+});
+
 export type PublicEnv = z.infer<typeof publicEnvSchema>;
-export type ServerEnv = z.infer<typeof serverEnvSchema>;
+export type ServerEnv = z.infer<typeof serverEnvSchemaDev>;
 export type Env = PublicEnv;
 
 function validatePublicEnv(): PublicEnv {
@@ -48,7 +76,15 @@ export function getServerEnv(opts?: { enforceBrowserCheck?: boolean }): ServerEn
     throw new Error('❌ Attempted to access server environment variables in the browser context.');
   }
 
-  const parsed = serverEnvSchema.safeParse({
+  // SECURITY FIX (2026-09-12): pick the strict schema when running in
+  // production. `NEXT_PUBLIC_APP_ENV` is validated by `publicEnvSchema`
+  // (which is parsed at module load — see `env` export below), so by the
+  // time `getServerEnv()` runs the value is either 'development',
+  // 'staging', or 'production'.
+  const appEnv = process.env['NEXT_PUBLIC_APP_ENV'] ?? 'development';
+  const schema = appEnv === 'production' ? serverEnvSchemaProd : serverEnvSchemaDev;
+
+  const parsed = schema.safeParse({
     SUPABASE_SERVICE_ROLE_KEY: process.env['SUPABASE_SERVICE_ROLE_KEY'],
     YOUTUBE_API_KEY: process.env['YOUTUBE_API_KEY'],
     CRON_SECRET: process.env['CRON_SECRET'],
@@ -68,4 +104,3 @@ export function getServerEnv(opts?: { enforceBrowserCheck?: boolean }): ServerEn
  * Safe for both client and server consumption.
  */
 export const env = validatePublicEnv();
-

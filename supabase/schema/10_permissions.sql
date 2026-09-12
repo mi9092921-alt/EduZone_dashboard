@@ -678,3 +678,78 @@ GRANT EXECUTE ON FUNCTION public.is_feature_enabled_for_user(text, uuid)
 TO authenticated, service_role;
 
 GRANT SELECT ON public.feature_flags_admin TO authenticated;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- SECURITY FIX (2026-09-12): Launch-blocking RPC permission gaps.
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Five SECURITY DEFINER functions were defined in 07_functions.sql without an
+-- explicit REVOKE/GRANT pair in this file, AND without a body-level guard.
+-- The ALTER DEFAULT PRIVILEGES REVOKE at line 279 only affects functions
+-- created *after* that statement runs, so every function defined earlier in
+-- 07_functions.sql retains PostgreSQL's default `EXECUTE TO PUBLIC` grant.
+--
+-- That combination (`grant=no` AND `body_guard=no`) made each of these five
+-- functions callable by any anonymous or authenticated user via
+-- POST /rest/v1/rpc/<fn>, bypassing RLS entirely (SECURITY DEFINER runs as
+-- the function owner, which is the postgres superuser).
+--
+-- The five functions:
+--   DB-1: cleanup_test_data()        — deletes production data (CRITICAL)
+--   DB-2: seed_test_data()           — creates tenants/users/courses (CRITICAL)
+--   DB-3: sync_primary_role_for_user(uuid) — mutates users.primary_role (CRITICAL)
+--   DB-4: get_user_role_by_id(uuid)  — cross-tenant role disclosure (HIGH)
+--   DB-5: check_gdpr_compliance(uuid) — cross-tenant PII leak (HIGH)
+--
+-- `seed_test_data` and `cleanup_test_data` have no callers anywhere in
+-- apps/admin/ or supabase/functions/ (verified via grep). They are
+-- explicitly locked to service_role only — they should never be callable
+-- from PostgREST. `sync_primary_role_for_user`, `get_user_role_by_id`,
+-- and `check_gdpr_compliance` also gained a body guard inside
+-- 07_functions.sql as defense-in-depth (see that file).
+REVOKE ALL ON FUNCTION public.cleanup_test_data()
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.cleanup_test_data()
+  TO service_role;
+
+REVOKE ALL ON FUNCTION public.seed_test_data()
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.seed_test_data()
+  TO service_role;
+
+REVOKE ALL ON FUNCTION public.sync_primary_role_for_user(uuid)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.sync_primary_role_for_user(uuid)
+  TO service_role;
+
+REVOKE ALL ON FUNCTION public.get_user_role_by_id(uuid)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.get_user_role_by_id(uuid)
+  TO service_role;
+
+REVOKE ALL ON FUNCTION public.check_gdpr_compliance(uuid)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.check_gdpr_compliance(uuid)
+  TO service_role;
+
+-- SECURITY FIX (2026-09-12) — launch-blocker APP-2 follow-up:
+-- `admin_get_job_tenant_id(uuid)` is the read-side helper used by
+-- jobs.service.ts's getJobTenantId(), which the action boundary calls
+-- via assertSameTenant before retryJobAction/cancelJobAction mutate the
+-- job. Locked to service_role only — the body guard inside 07_functions.sql
+-- also permits is_admin_with_session_validation() as defense-in-depth,
+-- but PostgREST exposure is service_role-only because the action boundary
+-- already authenticates the caller.
+REVOKE ALL ON FUNCTION public.admin_get_job_tenant_id(uuid)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_get_job_tenant_id(uuid)
+  TO service_role;
+
+-- SECURITY FIX (2026-09-12) — launch-blocker APP-2 follow-up:
+-- `admin_get_job_counts_tenant(uuid)` is the tenant-scoped variant of
+-- admin_get_job_counts used by jobs.service.ts's getJobStatusCounts when
+-- the caller is a tenant-scoped admin. Same least-privilege exposure as
+-- admin_get_job_tenant_id above.
+REVOKE ALL ON FUNCTION public.admin_get_job_counts_tenant(uuid)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_get_job_counts_tenant(uuid)
+  TO service_role;

@@ -286,9 +286,24 @@ export async function removeRoleOverride(flagId: string, roleId: string): Promis
 }
 
 /** Server-action variant — uses service_role to bypass RLS. */
-export async function removeRoleOverrideAdmin(flagId: string, roleId: string): Promise<void> {
+export async function removeRoleOverrideAdmin(
+  flagId: string,
+  roleId: string,
+  tenantId: string | null,
+): Promise<void> {
   const admin = createAdminClient();
-  const { error } = await admin.from('feature_flag_roles').delete().eq('flag_id', flagId).eq('role_id', roleId);
+  // SECURITY FIX (2026-09-12): cross-tenant IDOR (launch-blocker APP-1).
+  // The service-role client bypasses RLS, so a delete scoped only by
+  // (flag_id, role_id) wiped overrides in EVERY tenant that happened to
+  // have that pair. The matching RLS policy `feature_flag_roles_manage`
+  // only applies to JWT-bearing connections, not service_role. Scope the
+  // delete by tenant_id — super_admin (caller ctx.permissions includes '*')
+  // passes null here, matching its cross-tenant access everywhere else.
+  let query = admin.from('feature_flag_roles').delete().eq('flag_id', flagId).eq('role_id', roleId);
+  if (tenantId !== null) {
+    query = query.eq('tenant_id', tenantId);
+  }
+  const { error } = await query;
   if (error) throw mapDbError(error, 'feature-flags.service.ts');
 }
 
@@ -352,9 +367,22 @@ export async function removeUserOverride(flagId: string, userId: string): Promis
 }
 
 /** Server-action variant — uses service_role to bypass RLS. */
-export async function removeUserOverrideAdmin(flagId: string, userId: string): Promise<void> {
+export async function removeUserOverrideAdmin(
+  flagId: string,
+  userId: string,
+  tenantId: string | null,
+): Promise<void> {
   const admin = createAdminClient();
-  const { error } = await admin.from('feature_flag_users').delete().eq('flag_id', flagId).eq('user_id', userId);
+  // SECURITY FIX (2026-09-12): cross-tenant IDOR (launch-blocker APP-1).
+  // Same rationale as removeRoleOverrideAdmin above: the service-role
+  // client bypasses RLS, so without a tenant_id filter the delete would
+  // wipe every tenant's `feature_flag_users` row matching that
+  // (flag_id, user_id) pair.
+  let query = admin.from('feature_flag_users').delete().eq('flag_id', flagId).eq('user_id', userId);
+  if (tenantId !== null) {
+    query = query.eq('tenant_id', tenantId);
+  }
+  const { error } = await query;
   if (error) throw mapDbError(error, 'feature-flags.service.ts');
 }
 

@@ -149,6 +149,18 @@ export async function issueWarningAction(
 ): Promise<{ success: boolean; warningId?: string; error?: string }> {
   try {
     const ctx = await requirePermission('warnings.write');
+    // SECURITY FIX (2026-09-12): IDOR/BOLA guard — defense-in-depth parity
+    // with deleteUserAction / controlUserAccountAction /
+    // terminateUserSessionsAction above. The `issue_warning` RPC at
+    // supabase/schema/07_functions.sql enforces tenant_id =
+    // get_current_tenant_id() server-side, so this is not directly
+    // exploitable today — but the boundary's documented contract is
+    // "every privileged user action asserts same-tenant before
+    // mutating", and this action was the lone inconsistency. Becomes a
+    // real vulnerability if the RPC is ever rewritten to use
+    // p_initiator_id instead of auth.uid() (the pattern used by
+    // worker_control_user_account / worker_terminate_user_sessions).
+    assertSameTenant(ctx, await usersService.getUserTenantId(userId));
     return await new IssueWarningUseCase(makeUserAdminRepository(), makeAuditLogger()).execute(
       ctx,
       userId,
