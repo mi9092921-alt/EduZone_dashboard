@@ -153,15 +153,20 @@ jobs:
         # All 8 QA seed accounts share one bcrypt hash (11_seed_reference.sql)
         # whose documented plaintext is Admin@12345 (auth.setup.ts, M15).
         working-directory: apps/admin
-        env:
-          SUPABASE_TEST_URL: ${{ env.NEXT_PUBLIC_SUPABASE_URL }}
-          SUPABASE_TEST_ANON_KEY: ${{ env.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          TEST_TEACHER_EMAIL: teacher@eduzone-test.com
-          TEST_TEACHER_PASSWORD: Admin@12345
-          TEST_ADMIN_EMAIL: admin@eduzone-test.com
-          TEST_ADMIN_PASSWORD: Admin@12345
         run: |
+          SUPABASE_TEST_URL="$NEXT_PUBLIC_SUPABASE_URL" \
+          SUPABASE_TEST_ANON_KEY="$NEXT_PUBLIC_SUPABASE_ANON_KEY" \
+          TEST_TEACHER_EMAIL=teacher@eduzone-test.com \
+          TEST_TEACHER_PASSWORD=Admin@12345 \
+          TEST_ADMIN_EMAIL=admin@eduzone-test.com \
+          TEST_ADMIN_PASSWORD=Admin@12345 \
           NODE_PATH="$PWD/node_modules" node ../../scripts/security/rls-smoke-test.ts
+          SUPABASE_TEST_URL="$NEXT_PUBLIC_SUPABASE_URL" \
+          SUPABASE_TEST_ANON_KEY="$NEXT_PUBLIC_SUPABASE_ANON_KEY" \
+          TEST_TEACHER_EMAIL=teacher@eduzone-test.com \
+          TEST_TEACHER_PASSWORD=Admin@12345 \
+          TEST_ADMIN_EMAIL=admin@eduzone-test.com \
+          TEST_ADMIN_PASSWORD=Admin@12345 \
           NODE_PATH="$PWD/node_modules" node ../../scripts/security/permission-exhaustive-test.ts
 
       - name: Install Playwright browsers
