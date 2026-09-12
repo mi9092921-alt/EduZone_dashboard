@@ -1,6 +1,7 @@
 'use client';
 
 import { createTheme } from '@mui/material/styles';
+
 import { colors } from './tokens/colors';
 import { spacing, borderRadius } from './tokens/spacing';
 
