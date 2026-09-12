@@ -195,14 +195,14 @@ enable_anonymous_sign_ins = false
 # Allow/disallow testing manual linking of accounts
 enable_manual_linking = false
 # Passwords shorter than this value will be rejected as weak. Minimum 6, recommended 8 or more.
-# SECURITY FIX (2026-09-12): bumped from 6 to 12 — admin/teacher accounts
-# hold privileged tenant-scoped access (lock/ban/warn users, export PII,
-# manage feature flags). 6-char passwords are trivially brute-forceable.
+# Set to the Supabase minimum of 6; the create-user edge function independently
+# enforces >= 8 for admin-provisioned accounts, and complexity is enforced via
+# password_requirements below.
 minimum_password_length = 6
 # Passwords that do not meet the following requirements will be rejected as weak. Supported values
 # are: `letters_digits`, `lower_upper_letters_digits`, `lower_upper_letters_digits_symbols`
 # SECURITY FIX (2026-09-12): was empty — now requires mixed case + digits + symbols
-# so administrators cannot pick `password123`-style passwords even at length 12+.
+# so administrators cannot pick `password123`-style passwords.
 password_requirements = "lower_upper_letters_digits_symbols"
 
 
@@ -230,10 +230,16 @@ web3 = 30
 
 [auth.email]
 # Allow/disallow new user signups via email to your project.
-# SECURITY FIX (2026-09-12): inherits the global `enable_signup = false`
-# above — admin dashboard users are provisioned by existing admins via the
-# `create-user` edge function, never via self-signup.
-enable_signup = false
+# NOTE: in the Supabase CLI this key maps to GoTrue's EXTERNAL_EMAIL_ENABLED —
+# the email *provider* switch, not a signup-only toggle. While it is false,
+# GoTrue rejects every email+password SIGN-IN with 422 "Email logins are
+# disabled" (checked before credentials in the token endpoint), which broke
+# the QA seed logins (rls-smoke-test / permission-exhaustive-test /
+# Playwright auth). Self-signup stays blocked by the global
+# `enable_signup = false` under [auth] above; admin-provisioned and seed
+# users authenticate via the email+password grant, so the provider must stay
+# enabled.
+enable_signup = true
 # If enabled, a user will be required to confirm any email change on both the old, and new email
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
