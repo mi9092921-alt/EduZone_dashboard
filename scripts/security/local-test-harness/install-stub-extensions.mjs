@@ -25,7 +25,12 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const platformDir = process.platform === 'darwin' ? '@embedded-postgres/darwin-arm64' : '@embedded-postgres/linux-x64';
+const platformDir =
+  process.platform === 'darwin'
+    ? '@embedded-postgres/darwin-arm64'
+    : process.platform === 'win32'
+      ? '@embedded-postgres/windows-x64'
+      : '@embedded-postgres/linux-x64';
 
 const extensionDir = join(
   __dirname,
@@ -33,8 +38,7 @@ const extensionDir = join(
   platformDir,
   'native',
   'share',
-  'postgresql',
-  'extension',
+  ...(process.platform === 'win32' ? ['extension'] : ['postgresql', 'extension']),
 );
 
 if (!existsSync(extensionDir)) {

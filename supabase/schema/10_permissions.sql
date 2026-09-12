@@ -793,9 +793,9 @@ REVOKE ALL ON FUNCTION public.refresh_all_materialized_views()
 GRANT EXECUTE ON FUNCTION public.refresh_all_materialized_views()
   TO service_role;
 
-REVOKE ALL ON FUNCTION public.check_and_increment_rate_limit(text, uuid, inet, uuid, uuid)
+REVOKE ALL ON FUNCTION public.check_and_increment_rate_limit(text, uuid, uuid, inet, uuid)
   FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.check_and_increment_rate_limit(text, uuid, inet, uuid, uuid)
+GRANT EXECUTE ON FUNCTION public.check_and_increment_rate_limit(text, uuid, uuid, inet, uuid)
   TO service_role;
 
 REVOKE ALL ON FUNCTION public.log_security_alert(text, text, text)
