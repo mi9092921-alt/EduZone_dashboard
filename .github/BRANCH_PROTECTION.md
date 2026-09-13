@@ -1,18 +1,48 @@
 # Branch Protection — Release Policy
 
 **Repository:** `mi9092921-alt/EduZone_dashboard`
-**Reviewed against:** `main` @ `9f1a31659d929fcf5bbcdec58429c146021b777d`
+**Last verified against the live GitHub API:** 2026-09-13
 
-## 1. Important distinction
+## 1. Observed protection state (verified, not inferred)
 
-The current repository metadata inspected during documentation cleanup showed:
+This section records settings read directly from the GitHub API — the only
+source this file treats as evidence (see §4). Repository workflow files alone
+prove nothing about protection.
 
 ```text
-main protected: false
-required status checks: off
+GET /repos/mi9092921-alt/EduZone_dashboard/branches/main/protection
+
+main protected:                 true
+required status checks:         ON — contexts: "build_and_test" (ci.yml),
+                                     "e2e" (e2e.yml)
+strict (up-to-date branch):     true
+enforce_admins:                 true
+allow_force_pushes:             false
+allow_deletions:                false
+
+GET /repos/mi9092921-alt/EduZone_dashboard/actions/variables/E2E_ENABLED
+
+E2E_ENABLED:                    "true"
 ```
 
-Therefore this file is an **expected release policy**, not evidence that GitHub branch protection is currently enabled.
+Interpretation:
+
+- PR merges into `main` are blocked unless `build_and_test` and `e2e` pass on
+  a branch that is up to date with `main` (`strict: true`), and administrators
+  cannot bypass the rules (`enforce_admins: true`).
+- Required status checks gate *merges*, not *pushes*: direct pushes to `main`
+  by an admin are still possible and cannot be pre-blocked. They are
+  re-validated after landing by `deploy.yml`, which mirrors the same gate
+  chain as ci.yml — including the Security / RLS Gate (fast) and the
+  coverage thresholds — so a bypassed gate fails visibly in that run instead
+  of passing silently.
+
+Re-verify at any time with:
+
+```bash
+gh api repos/mi9092921-alt/EduZone_dashboard/branches/main/protection
+gh api repos/mi9092921-alt/EduZone_dashboard/actions/variables/E2E_ENABLED
+```
 
 ## 2. Required release policy for `main`
 

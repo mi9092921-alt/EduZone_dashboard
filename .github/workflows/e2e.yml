@@ -66,12 +66,22 @@ jobs:
           # safe on a reused/self-hosted runner and after an interrupted run.
           supabase stop --no-backup || true
 
-          # Do not remove an unrelated container silently. Fail with enough
-          # information to identify the owner of the fixed Supabase port.
-          port_users="$(docker ps --filter publish=54322 --format '{{.ID}} {{.Names}} {{.Ports}}')"
+          # `supabase stop` can miss a partially-created/leftover container
+          # after an interrupted `supabase start`. Remove only containers
+          # publishing Supabase's fixed database port; on GitHub-hosted
+          # runners this is the disposable local stack for this job.
+          port_users="$(docker ps -a --filter publish=54322 --format '{{.ID}} {{.Names}} {{.Ports}}')"
           if [ -n "$port_users" ]; then
-            echo "Port 54322 is still occupied after Supabase cleanup:"
+            echo "Removing stale container(s) publishing port 54322:"
             echo "$port_users"
+            docker ps -aq --filter publish=54322 | xargs -r docker rm -f
+          fi
+
+          # Fail explicitly if Docker still reports the port as occupied.
+          remaining="$(docker ps --filter publish=54322 --format '{{.ID}} {{.Names}} {{.Ports}}')"
+          if [ -n "$remaining" ]; then
+            echo "Port 54322 is still occupied after stale-container cleanup:"
+            echo "$remaining"
             exit 1
           fi
 

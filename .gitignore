@@ -62,3 +62,12 @@ apps/admin/test-results/
 apps/admin/next-dev-log.txt
 err.html
 apps/admin/err.html
+# Saved browser storage state -- contains live session JWTs by definition
+apps/admin/playwright/.auth/
+# Ad-hoc downloaded/extracted Playwright report archives (full traces with
+# screenshots, network logs and session JWTs -- security review item 06:
+# pw*/report.zip were committed carrying local-stack Bearer tokens)
+pw-report-dl/
+pw2/
+pw3/
+**/report.zip

@@ -36,10 +36,15 @@ name: CI
 # the merge. They are NOT duplicated here because they require a live,
 # seeded Supabase backend, which only e2e.yml provisions.
 #
-# Merge protection (Execution Plan §19): mark the "build_and_test" job as a
-# required status check for main (Settings → Branches → Branch protection) so
-# a failing gate blocks the merge. "build_and_test" is also mirrored on every
-# push to main by deploy.yml, so direct pushes cannot bypass the gates.
+# Merge protection (Execution Plan §19): "build_and_test" and "e2e" are
+# required status checks for main with strict, admin-enforced branch
+# protection (verified against the live GitHub API — see
+# .github/BRANCH_PROTECTION.md), so a failing gate blocks the PR merge.
+# Direct pushes to main are still possible for admins and cannot be
+# pre-blocked by status checks, so deploy.yml re-validates every push
+# with this SAME gate chain — including the Security / RLS Gate (fast)
+# and the coverage thresholds — so a bypassed gate fails visibly right
+# after landing instead of passing silently.
 
 on:
   pull_request:

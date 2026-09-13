@@ -131,7 +131,16 @@ function splitSqlStatements(sql) {
 
 async function runViaPg(sql, file, { continueOnError = false } = {}) {
   const { default: pg } = await import('pg');
-  const client = new pg.Client({ connectionString: dbUrl, ssl: { rejectUnauthorized: false } });
+  const client = new pg.Client({
+    connectionString: dbUrl,
+    // F-01 adjacent hardening: match supabase/deploy.js — never disable TLS
+    // certificate verification for schema deployment. If the project
+    // requires a private CA, provide its PEM via SUPABASE_DB_CA_CERT.
+    ssl: {
+      rejectUnauthorized: true,
+      ...(process.env.SUPABASE_DB_CA_CERT ? { ca: process.env.SUPABASE_DB_CA_CERT } : {}),
+    },
+  });
   await client.connect();
   const stmts = splitSqlStatements(sql);
   let ok = 0;
@@ -196,9 +205,26 @@ async function main() {
   if (!accessToken && !dbUrl) process.exit(1);
 
   const files = filesToRun();
+  // F-01 (P0, review 2026-09-13): 11_seed_reference.sql plants the QA
+  // accounts (*@eduzone-test.com) whose shared bcrypt password
+  // (Admin@12345) is documented in git (.github/workflows/e2e.yml).
+  // Applying it to a real project would create a known-password
+  // super_admin — an open backdoor. The seed is therefore OPT-IN and must
+  // only ever be enabled for a DISPOSABLE local/QA database; the schema
+  // files themselves still apply unconditionally.
+  const allowQaSeed = process.env.ALLOW_QA_SEED_DATA === 'true';
   let seen07 = false;
   for (const file of files) {
     const path = join(SCHEMA_DIR, file);
+
+    if (file === '11_seed_reference.sql' && !allowQaSeed) {
+      console.warn(`\n⏭ SKIPPED ${file} (QA seed).`);
+      console.warn('   It plants @eduzone-test.com accounts whose passwords are documented');
+      console.warn('   in git — NEVER against staging/production. To apply it to a disposable');
+      console.warn('   local/QA database only, re-run with ALLOW_QA_SEED_DATA=true.');
+      continue;
+    }
+
     const sql = readFileSync(path, 'utf8');
     const continueOnError =
       (file === '07_functions.sql' && !seen07) ||

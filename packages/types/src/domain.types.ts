@@ -349,7 +349,10 @@ export interface AccessRule {
   id: string;
   tenant_id: string;
   rule_type: 'time_window' | 'ip_whitelist' | 'geo_location' | 'device_type';
-  rule_value: Record<string, any>;
+  // `unknown`, not `any`: matches the zod schema (z.record(z.unknown())),
+  // forces consumers to narrow before using values, and keeps the domain
+  // type lint-clean under @typescript-eslint/no-explicit-any.
+  rule_value: Record<string, unknown>;
   is_active: boolean;
   created_at: string;
   deleted_at: string | null;

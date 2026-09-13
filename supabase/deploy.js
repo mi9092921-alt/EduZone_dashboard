@@ -84,6 +84,15 @@ async function main() {
       'schema/VALIDATION.sql',
     ];
 
+    // F-01 (P0, review 2026-09-13): 11_seed_reference.sql plants the QA
+    // accounts (*@eduzone-test.com) whose shared bcrypt password
+    // (Admin@12345) is documented in git (.github/workflows/e2e.yml).
+    // Applying it to a real project would create a known-password
+    // super_admin — an open backdoor. The seed is therefore OPT-IN and
+    // must only ever be enabled for a DISPOSABLE local/QA database;
+    // the schema files themselves still apply unconditionally.
+    const allowQaSeed = process.env.ALLOW_QA_SEED_DATA === 'true';
+
     for (const file of files) {
       const filePath = path.join(__dirname, file);
       console.log(`\n--------------------------------------------`);
@@ -93,6 +102,14 @@ async function main() {
       if (!fs.existsSync(filePath)) {
         console.error(`File not found: ${filePath}`);
         process.exit(1);
+      }
+
+      if (file === 'schema/11_seed_reference.sql' && !allowQaSeed) {
+        console.warn('⏭ SKIPPED: QA seed (11_seed_reference.sql).');
+        console.warn('   It plants @eduzone-test.com accounts whose passwords are documented');
+        console.warn('   in git — NEVER against staging/production. To apply it to a disposable');
+        console.warn('   local/QA database only, re-run with ALLOW_QA_SEED_DATA=true.');
+        continue;
       }
 
       const sql = fs.readFileSync(filePath, 'utf8');

@@ -79,7 +79,9 @@ export const config = {
   // modules bundle without hard-failing the build. The warning will
   // remain in `next build` output until supabase-js removes the
   // `process.version` reference upstream (tracked in
-  // https://github.com/supabase/supabase-js/issues/1015).
+  // https://github.com/supabase/supabase-js/issues/1552 — closed via
+  // PR #1998, but the guarded, telemetry-only reference still ships in
+  // supabase-js 2.107.0, so the warning persists on current versions).
   //
   // Ref: https://nextjs.org/docs/app/api-reference/file-conventions/middleware
   unstable_allowDynamic: '/node_modules/@supabase/{supabase-js,ssr}/**',

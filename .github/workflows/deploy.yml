@@ -61,7 +61,22 @@ jobs:
         run: pnpm turbo typecheck
 
       - name: Test (Vitest)
-        run: pnpm turbo test
+        # --coverage matches ci.yml: the vitest.unit.config.ts coverage
+        # thresholds (review item 05) are enforced, so a test deletion or
+        # coverage regression cannot land on main via a direct push.
+        run: pnpm turbo test -- --coverage
+
+      - name: Security / RLS Gate (fast)
+        # REVIEW FIX: this step was missing, making ci.yml's claim that
+        # deploy.yml "mirrors the same gates" false — a direct push to main
+        # could bypass the RLS/permissions regression suite entirely (the
+        # required checks build_and_test/e2e gate PR merges, not pushes).
+        # Same Docker-free harness as ci.yml (see its header): boots the
+        # disposable embedded Postgres 17, applies the real
+        # supabase/schema/*.sql, runs fast-gate-rls.ts +
+        # fast-gate-permissions.ts; any breach exits non-zero and fails
+        # this run.
+        run: bash scripts/security/run-security-gate.sh
 
       - name: Production build
         # Build verification only. These public (non-secret) values are
