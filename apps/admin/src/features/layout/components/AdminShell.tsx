@@ -9,6 +9,7 @@ import { useLayout } from '../hooks/useLayout';
 import { MaintenanceBanner } from './MaintenanceBanner';
 import { NetworkBanner } from './NetworkBanner';
 import { Sidebar } from './Sidebar';
+import { TenantContextBanner } from './TenantContextBanner';
 import { Topbar } from './Topbar';
 
 import { useSetting } from '@/adapters/queries/settings.queries';
@@ -63,6 +64,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         {/* System Health Banners */}
         <NetworkBanner />
         <MaintenanceBanner />
+        <TenantContextBanner />
 
         {/* App Lock Warning Banner */}
         {isAppLocked && (

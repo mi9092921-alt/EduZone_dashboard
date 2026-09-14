@@ -302,6 +302,15 @@ GRANT EXECUTE ON FUNCTION public.check_dashboard_access() TO authenticated, serv
 REVOKE EXECUTE ON FUNCTION public.assert_tenant() FROM anon;
 GRANT EXECUTE ON FUNCTION public.assert_tenant() TO authenticated, service_role;
 
+-- Tenant Switcher: granted broadly (matches assert_tenant() above and the
+-- control_user_account family) because the real authorization is enforced
+-- INSIDE the function (is_current_user_super_admin()), not at the grant
+-- level -- a non-super_admin authenticated caller reaches the function and
+-- gets PERMISSION_DENIED from it, same defense-in-depth pattern used
+-- throughout this file.
+REVOKE EXECUTE ON FUNCTION public.switch_tenant_context(uuid) FROM anon;
+GRANT EXECUTE ON FUNCTION public.switch_tenant_context(uuid) TO authenticated, service_role;
+
 REVOKE EXECUTE ON FUNCTION public.get_auth_user_id() FROM anon;
 GRANT EXECUTE ON FUNCTION public.get_auth_user_id() TO authenticated, service_role;
 

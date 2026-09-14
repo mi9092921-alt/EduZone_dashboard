@@ -5,6 +5,14 @@
     },
     "maintenance": {
       "active": "System is undergoing maintenance. Some features may be restricted."
+    },
+    "tenant_switcher": {
+      "label": "Institution",
+      "home_badge": "Home",
+      "exit_to_home": "Exit to my institution",
+      "no_tenants": "No institutions found",
+      "banner": "You are viewing: {tenantName}",
+      "banner_exit": "Exit"
     }
   },
   "errors": {

@@ -20,8 +20,9 @@ import { useLayout } from '../hooks/useLayout';
 
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { NotificationBell } from './NotificationBell';
+import { TenantSwitcher } from './TenantSwitcher';
 
-import { useAuthUser, useAuthStore } from '@/adapters/stores/auth.store';
+import { useAuthUser, useAuthStore, useIsSuperAdmin } from '@/adapters/stores/auth.store';
 import { useUiStore } from '@/adapters/stores/ui.store';
 import { NAV_ITEMS } from '@/config/nav.config';
 import { useRouter, usePathname } from '@/i18n/routing';
@@ -35,6 +36,7 @@ export function Topbar() {
   const { sidebarOpen, handleToggle, isDesktop } = useLayout();
 
   const user = useAuthUser();
+  const isSuperAdmin = useIsSuperAdmin();
   const logout = useAuthStore((s) => s.logout);
   const pageSubtitle = useUiStore((s) => s.pageSubtitle);
   const router = useRouter();
@@ -121,6 +123,13 @@ export function Topbar() {
       </div>
 
       <div className="flex items-center gap-1 sm:gap-2 px-4 sm:px-6">
+        {/* Tenant Switcher (super_admin only) */}
+        {isSuperAdmin && (
+          <div className="hidden md:block">
+            <TenantSwitcher />
+          </div>
+        )}
+
         {/* Language Switcher */}
         <div className="hidden md:block">
           <LanguageSwitcher />

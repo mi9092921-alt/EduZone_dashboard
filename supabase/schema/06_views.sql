@@ -5,6 +5,8 @@
 -- pass (#3, ownership rules); that file no longer exists in this repo.
 -- CRIT-03: Controlled PII Access View
 -- MEDIUM-04: Active views
+DROP VIEW IF EXISTS public.users_with_pii_access CASCADE;
+DROP VIEW IF EXISTS public.users_active CASCADE;
 CREATE OR REPLACE VIEW public.users_active AS
 SELECT * FROM public.users WHERE deleted_at IS NULL;
 

@@ -642,7 +642,7 @@ VALUES
   ('e0e0e0e0-0000-0000-0000-000000000023', 'cccccccc-0000-0000-0000-000000000012', 'Design scalable UI components with Auto-Layout and design tokens', 0),
   ('e0e0e0e0-0000-0000-0000-000000000024', 'cccccccc-0000-0000-0000-000000000012', 'Build interactive prototypes with fluid animations and transitions', 1)
 
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (course_id, objective) DO NOTHING;
 
 -- ============================================================================
 -- PHASE 9: Sections

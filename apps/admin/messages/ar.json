@@ -5,6 +5,14 @@
     },
     "maintenance": {
       "active": "النظام قيد الصيانة. قد يتم تقييد بعض الميزات."
+    },
+    "tenant_switcher": {
+      "label": "المؤسسة",
+      "home_badge": "الرئيسية",
+      "exit_to_home": "الخروج إلى مؤسستي",
+      "no_tenants": "لا توجد مؤسسات",
+      "banner": "تعمل الآن على: {tenantName}",
+      "banner_exit": "خروج"
     }
   },
   "errors": {

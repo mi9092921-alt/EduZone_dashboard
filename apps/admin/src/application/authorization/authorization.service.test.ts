@@ -10,14 +10,25 @@ import {
 function createMockSupabase(params: {
   user?: { id: string } | null;
   userError?: Error | null;
-  profile?: { primary_role: string; tenant_id: string } | null;
+  profile?: {
+    primary_role: string;
+    tenant_id: string;
+    acting_tenant_id?: string | null;
+  } | null;
   /** Default result for any permission not listed in `rpcResults`. */
   rpcResult?: boolean;
   /** Per-permission override, keyed by the `p_permission` RPC arg. */
   rpcResults?: Record<string, boolean>;
+  /** get_current_tenant_id() RPC result -- distinct from rpcResult/
+   * rpcResults (both for user_has_permission), since the mock now needs
+   * to differentiate by RPC name for the Tenant Switcher branch. */
+  currentTenantIdRpcResult?: string | null;
 }) {
-  const rpc = vi.fn().mockImplementation((_fn: string, args: { p_permission: string }) => {
-    const value = params.rpcResults?.[args.p_permission] ?? params.rpcResult ?? false;
+  const rpc = vi.fn().mockImplementation((fnName: string, args?: { p_permission: string }) => {
+    if (fnName === 'get_current_tenant_id') {
+      return Promise.resolve({ data: params.currentTenantIdRpcResult ?? null, error: null });
+    }
+    const value = (args && params.rpcResults?.[args.p_permission]) ?? params.rpcResult ?? false;
     return Promise.resolve({ data: value, error: null });
   });
 
@@ -233,5 +244,70 @@ describe('AuthorizationService', () => {
       code: 'FORBIDDEN',
       status: 403,
     });
+  });
+
+  // ── Tenant Switcher (Wave 2) ──────────────────────────────────────
+  it('resolves tenantId via get_current_tenant_id() RPC for a switched super_admin, and sets homeTenantId', async () => {
+    const supabase = createMockSupabase({
+      user: { id: 'super-user' },
+      profile: { primary_role: 'super_admin', tenant_id: 'tenant-home', acting_tenant_id: 'tenant-acting' },
+      currentTenantIdRpcResult: 'tenant-acting',
+    });
+
+    const ctx = await authorizeCaller(supabase, 'any.permission');
+    expect(ctx.tenantId).toBe('tenant-acting');
+    expect(ctx.homeTenantId).toBe('tenant-home');
+    expect(supabase.rpc).toHaveBeenCalledWith('get_current_tenant_id');
+  });
+
+  it('does NOT call get_current_tenant_id() RPC for a non-switched super_admin (zero extra cost in the common case)', async () => {
+    const supabase = createMockSupabase({
+      user: { id: 'super-user' },
+      profile: { primary_role: 'super_admin', tenant_id: 'tenant-home', acting_tenant_id: null },
+    });
+
+    const ctx = await authorizeCaller(supabase, 'any.permission');
+    expect(ctx.tenantId).toBe('tenant-home');
+    expect(ctx.homeTenantId).toBe('tenant-home');
+    expect(supabase.rpc).not.toHaveBeenCalledWith('get_current_tenant_id', expect.anything());
+  });
+
+  it('falls back to the home tenant if get_current_tenant_id() RPC returns null (e.g. acting tenant went inactive)', async () => {
+    const supabase = createMockSupabase({
+      user: { id: 'super-user' },
+      profile: { primary_role: 'super_admin', tenant_id: 'tenant-home', acting_tenant_id: 'tenant-stale' },
+      currentTenantIdRpcResult: null,
+    });
+
+    const ctx = await authorizeCaller(supabase, 'any.permission');
+    expect(ctx.tenantId).toBe('tenant-home');
+  });
+
+  it('never sets homeTenantId for a non-super_admin caller', async () => {
+    const supabase = createMockSupabase({
+      user: { id: 'admin-user' },
+      profile: { primary_role: 'admin', tenant_id: 'tenant-1' },
+      // Post-P1-SEC-005: the DB is genuinely consulted now (no more
+      // role-allowlist fast-path), so the permission check must be
+      // told to succeed for this test to reach the assertion it cares
+      // about (homeTenantId), rather than failing on the unrelated
+      // permission check first.
+      rpcResult: true,
+    });
+
+    const ctx = await authorizeCaller(supabase, 'courses.read');
+    expect(ctx.homeTenantId).toBeUndefined();
+  });
+
+  it('authorizeSuperAdmin also resolves the switched tenant via requireSuperAdmin path', async () => {
+    const supabase = createMockSupabase({
+      user: { id: 'super-user' },
+      profile: { primary_role: 'super_admin', tenant_id: 'tenant-home', acting_tenant_id: 'tenant-acting' },
+      currentTenantIdRpcResult: 'tenant-acting',
+    });
+
+    const ctx = await authorizeSuperAdmin(supabase);
+    expect(ctx.tenantId).toBe('tenant-acting');
+    expect(ctx.homeTenantId).toBe('tenant-home');
   });
 });

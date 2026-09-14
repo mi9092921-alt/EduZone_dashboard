@@ -40,7 +40,7 @@ export async function authorizeCaller(
   // 2. Fetch user profile for role and tenant
   const { data: profile, error: profError } = await supabase
     .from('users')
-    .select('primary_role, tenant_id')
+    .select('primary_role, tenant_id, acting_tenant_id')
     .eq('id', userId)
     .is('deleted_at', null)
     .maybeSingle();
@@ -51,6 +51,26 @@ export async function authorizeCaller(
 
   const role = profile.primary_role as PrimaryRole;
   const callerTenantId = profile.tenant_id as string;
+
+  // Tenant Switcher (super_admin only): acting_tenant_id, when set, is the
+  // tenant super_admin is currently viewing/managing -- distinct from
+  // their own home tenant (callerTenantId). Only resolved via an extra
+  // round-trip to get_current_tenant_id() (07_functions.sql) when it's
+  // actually set (the common case -- not switched, or any non-super_admin
+  // caller -- pays zero extra cost). That RPC is the single source of
+  // truth switch_tenant_context() writes through and every RLS policy
+  // already reads from, so resolving tenantId through it here rather than
+  // trusting acting_tenant_id directly guarantees this context can never
+  // diverge from what RLS will actually allow -- e.g. a tenant that went
+  // inactive in the narrow window after a switch but before this request
+  // is caught the same way RLS itself would catch it, instead of this
+  // context silently using a stale/inactive tenant id for a write like
+  // CreateUserUseCase's INSERT (which doesn't itself re-check status).
+  let effectiveTenantId = callerTenantId;
+  if (role === 'super_admin' && profile.acting_tenant_id) {
+    const { data: resolvedTenantId } = await supabase.rpc('get_current_tenant_id');
+    effectiveTenantId = (resolvedTenantId as string | null) ?? callerTenantId;
+  }
 
   // M13: request-scoped correlation id — minted once per authorization and
   // carried by every audit event / log entry emitted during this request.
@@ -64,7 +84,8 @@ export async function authorizeCaller(
 
     return createRequestContext({
       userId,
-      tenantId: callerTenantId,
+      tenantId: effectiveTenantId,
+      homeTenantId: callerTenantId,
       role,
       permissions: ['*'],
       requestId,
@@ -74,7 +95,8 @@ export async function authorizeCaller(
   if (role === 'super_admin') {
     return createRequestContext({
       userId,
-      tenantId: callerTenantId,
+      tenantId: effectiveTenantId,
+      homeTenantId: callerTenantId,
       role,
       permissions: ['*'],
       requestId,

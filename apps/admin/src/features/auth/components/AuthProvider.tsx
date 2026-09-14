@@ -110,7 +110,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Now fetch the minimal user profile fields needed for the store
         const { data: userRecord, error: userError } = await supabase
           .from('users')
-          .select('id, primary_role, tenant_id, token_version')
+          .select('id, primary_role, tenant_id, acting_tenant_id, token_version')
           .eq('id', session.user.id)
           .is('deleted_at', null)
           .maybeSingle();
@@ -135,6 +135,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           id: session.user.id,
           primary_role: accessResult.role,
           tenant_id: accessResult.tenant_id,
+          acting_tenant_id: null,
           token_version: accessResult.token_version ?? 1,
         };
 
@@ -149,6 +150,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             email: session.user.email!,
             primary_role: resolvedUser.primary_role as PrimaryRole,
             tenant_id: resolvedUser.tenant_id,
+            acting_tenant_id: resolvedUser.acting_tenant_id ?? null,
             token_version: resolvedUser.token_version ?? 1,
             permissions,
           });
