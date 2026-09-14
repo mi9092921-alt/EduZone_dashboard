@@ -8,7 +8,9 @@ import {
   Delete,
   PersonAdd,
   GroupAdd,
+  DomainAdd,
   ContentCopy,
+  CalendarToday,
 } from '@mui/icons-material';
 import {
   Box,
@@ -40,12 +42,13 @@ import {
   TableHead,
   TableRow,
   useTheme,
+  ThemeProvider,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
+import { eduZoneTheme, eduZoneDarkTheme } from '@eduzone/ui';
 import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import React, { useState, useCallback } from 'react';
-
 
 import { PermissionGate } from '../../layout/components/PermissionGate';
 
@@ -58,15 +61,23 @@ import {
   useRemoveRoleOverride,
   useAddUserOverride,
   useRemoveUserOverride,
+  useUpsertTenantOverride,
+  useDeleteTenantOverride,
 } from '@/adapters/mutations/settings.mutations';
 import { useFeatureFlags, useFeatureFlagDetail, useRoles } from '@/adapters/queries/settings.queries';
 import { useToastStore } from '@/adapters/stores/toast.store';
 import { toClientMessage } from '@/domain/errors';
-import type { CreateFeatureFlagInput, FeatureFlag } from '@/domain/types/feature-flag.types';
+import type {
+  CreateFeatureFlagInput,
+  FeatureFlag,
+  FeatureFlagStatus,
+} from '@/domain/types/feature-flag.types';
 import { usePathname, useRouter } from '@/i18n/routing';
 
 export function FeatureFlagsPage() {
   const theme = useTheme();
+  const isRtl = theme.direction === 'rtl';
+  const ltrTheme = theme.palette.mode === 'dark' ? eduZoneDarkTheme : eduZoneTheme;
   const t = useTranslations('settings');
   const tCommon = useTranslations('common');
   const router = useRouter();
@@ -129,6 +140,15 @@ export function FeatureFlagsPage() {
     }
   }, [updateMutation, showToast, t]);
 
+  const handleStatusChange = useCallback(async (flagId: string, newStatus: FeatureFlagStatus) => {
+    try {
+      await updateMutation.mutateAsync({ id: flagId, input: { status: newStatus } });
+      showToast(t('settings_saved'), 'success');
+    } catch {
+      showToast(t('error_save'), 'error');
+    }
+  }, [updateMutation, showToast, t]);
+
   const handleDelete = useCallback(async () => {
     if (!deleteTarget) return;
     try {
@@ -182,6 +202,13 @@ export function FeatureFlagsPage() {
               textTransform: 'none', fontWeight: 600, borderRadius: 2,
               backgroundColor: 'primary.main',
               boxShadow: 'none',
+              gap: 1,
+              '& .MuiButton-startIcon': {
+                marginInlineEnd: '8px !important',
+                marginInlineStart: '0 !important',
+                mr: '0 !important',
+                ml: '0 !important',
+              },
               '&:hover': { backgroundColor: 'primary.dark' },
             }}
           >
@@ -197,24 +224,25 @@ export function FeatureFlagsPage() {
                 <TableCell sx={{ width: 40, py: 2 }} />
                 <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary', py: 2 }}>{t('feature_flags.table_key')}</TableCell>
                 <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary', py: 2 }}>{t('feature_flags.table_label')}</TableCell>
-                <TableCell sx={{ width: 100, fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary', py: 2 }}>{t('feature_flags.table_status')}</TableCell>
-                <TableCell sx={{ width: 200, fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary', py: 2 }}>{t('feature_flags.table_rollout')}</TableCell>
+                <TableCell sx={{ width: 120, fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary', py: 2 }}>{t('feature_flags.table_status')}</TableCell>
+                <TableCell sx={{ width: 90, fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary', py: 2 }}>{t('feature_flags.table_enabled')}</TableCell>
+                <TableCell sx={{ width: 180, fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary', py: 2 }}>{t('feature_flags.table_rollout')}</TableCell>
                 <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary', py: 2 }}>{t('feature_flags.table_period')}</TableCell>
-                <TableCell align="right" sx={{ width: 80, fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary', py: 2 }}>{t('feature_flags.table_actions')}</TableCell>
+                <TableCell align={isRtl ? 'left' : 'right'} sx={{ width: 80, fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary', py: 2 }}>{t('feature_flags.table_actions')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {isLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
-                    <TableCell colSpan={7}>
+                    <TableCell colSpan={8}>
                       <LinearProgress sx={{ borderRadius: 1 }} />
                     </TableCell>
                   </TableRow>
                 ))
               ) : (flags ?? []).length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} align="center" sx={{ py: 8 }}>
+                  <TableCell colSpan={8} align="center" sx={{ py: 8 }}>
                     <Typography variant="body2" color="text.secondary">
                       {t('feature_flags.no_flags')}
                     </Typography>
@@ -247,65 +275,144 @@ export function FeatureFlagsPage() {
                             {row.label || '—'}
                           </Typography>
                           {row.description && (
-                            <Typography
-                              sx={{
-                                fontSize: '0.75rem', color: 'text.secondary', mt: 0.25,
-                                maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
-                              }}
-                            >
-                              {row.description}
-                            </Typography>
+                            <Tooltip title={row.description} placement="top" arrow>
+                              <Typography
+                                dir="auto"
+                                sx={{
+                                  fontSize: '0.75rem',
+                                  color: 'text.secondary',
+                                  mt: 0.25,
+                                  maxWidth: 280,
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  unicodeBidi: 'plaintext',
+                                  textAlign: isRtl ? 'right' : 'left',
+                                  cursor: 'default',
+                                }}
+                              >
+                                {row.description}
+                              </Typography>
+                            </Tooltip>
                           )}
                         </Box>
                       </TableCell>
-                      <TableCell>
-                        <Switch
-                          checked={row.is_enabled}
-                          onChange={() => handleToggle(row)}
-                          color="success"
+                      <TableCell sx={{ minWidth: 140 }}>
+                        <Select
                           size="small"
-                        />
+                          value={row.status || 'active'}
+                          onChange={(e) => handleStatusChange(row.id, e.target.value as FeatureFlagStatus)}
+                          sx={{
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            borderRadius: 1.5,
+                            width: '100%',
+                            minWidth: 120,
+                            '& .MuiSelect-select': {
+                              py: 0.5,
+                              display: 'flex',
+                              alignItems: 'center',
+                              paddingInlineStart: '12px !important',
+                              paddingInlineEnd: '32px !important',
+                            },
+                            '& .MuiSelect-icon': {
+                              insetInlineEnd: '8px',
+                              insetInlineStart: 'auto',
+                            },
+                          }}
+                        >
+                          <MenuItem value="active">{t('feature_flags.status_active')}</MenuItem>
+                          <MenuItem value="deprecated">{t('feature_flags.status_deprecated')}</MenuItem>
+                          <MenuItem value="archived">{t('feature_flags.status_archived')}</MenuItem>
+                        </Select>
                       </TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                          <Slider
-                            value={row.rollout_pct}
-                            onChangeCommitted={(_, v) => handleRolloutChange(row.id, v as number)}
-                            min={0}
-                            max={100}
-                            size="small"
-                            sx={{
-                              width: 100,
-                              color: row.rollout_pct === 100 ? 'success.main' : 'primary.main',
-                              '& .MuiSlider-thumb': { width: 14, height: 14 },
-                            }}
-                          />
-                          <Chip
-                            label={`${row.rollout_pct}%`}
-                            size="small"
-                            sx={{
-                              height: 22, fontSize: '0.7rem', fontWeight: 700, fontFamily: 'monospace',
-                              backgroundColor: row.rollout_pct === 100 ? alpha(theme.palette.success.main, 0.1) : alpha(theme.palette.primary.main, 0.1),
-                              color: row.rollout_pct === 100 ? 'success.main' : 'primary.main',
-                            }}
-                          />
+                      <TableCell sx={{ minWidth: 90 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <ThemeProvider theme={ltrTheme}>
+                            <Box dir="ltr" sx={{ display: 'inline-flex' }}>
+                              <Switch
+                                checked={row.is_enabled}
+                                onChange={() => handleToggle(row)}
+                                color="success"
+                                size="small"
+                              />
+                            </Box>
+                          </ThemeProvider>
                         </Box>
                       </TableCell>
-                      <TableCell>
+                      <TableCell sx={{ minWidth: 200 }}>
+                        <ThemeProvider theme={ltrTheme}>
+                          <Box
+                            dir="ltr"
+                            sx={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 1.5,
+                              direction: 'ltr',
+                            }}
+                          >
+                            <Slider
+                              value={row.rollout_pct}
+                              onChangeCommitted={(_, v) => handleRolloutChange(row.id, v as number)}
+                              min={0}
+                              max={100}
+                              size="small"
+                              sx={{
+                                width: 110,
+                                color: row.rollout_pct === 100 ? 'success.main' : 'primary.main',
+                                '& .MuiSlider-thumb': { width: 14, height: 14 },
+                              }}
+                            />
+                            <Chip
+                              label={`${row.rollout_pct}%`}
+                              size="small"
+                              sx={{
+                                height: 22,
+                                fontSize: '0.7rem',
+                                fontWeight: 700,
+                                fontFamily: 'monospace',
+                                backgroundColor: row.rollout_pct === 100 ? alpha(theme.palette.success.main, 0.1) : alpha(theme.palette.primary.main, 0.1),
+                                color: row.rollout_pct === 100 ? 'success.main' : 'primary.main',
+                              }}
+                            />
+                          </Box>
+                        </ThemeProvider>
+                      </TableCell>
+                      <TableCell sx={{ minWidth: 160 }}>
                         {(() => {
+                          if (!row.starts_at && !row.ends_at) {
+                            return (
+                              <Chip
+                                label={t('feature_flags.period_permanent')}
+                                size="small"
+                                variant="outlined"
+                                sx={{
+                                  height: 22,
+                                  fontSize: '0.75rem',
+                                  fontWeight: 500,
+                                  color: 'text.secondary',
+                                  borderColor: 'divider',
+                                  backgroundColor: alpha(theme.palette.action.hover, 0.5),
+                                }}
+                              />
+                            );
+                          }
                           const formatDate = (d: string | null | undefined) => {
                             if (!d) return '—';
                             const dateVal = new Date(d);
-                            return dateVal.toLocaleDateString('ar-SA', { year: 'numeric', month: 'short', day: 'numeric' });
+                            return dateVal.toLocaleDateString(isRtl ? 'ar-SA' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric' });
                           };
                           return (
-                            <Typography sx={{ fontSize: '0.8125rem', color: 'text.secondary' }}>
-                              {formatDate(row.starts_at)} → {formatDate(row.ends_at)}
-                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                              <CalendarToday sx={{ fontSize: 14, color: 'text.secondary' }} />
+                              <Typography sx={{ fontSize: '0.8125rem', color: 'text.secondary', whiteSpace: 'nowrap' }}>
+                                {formatDate(row.starts_at)} {row.ends_at ? `← ${formatDate(row.ends_at)}` : ''}
+                              </Typography>
+                            </Box>
                           );
                         })()}
                       </TableCell>
-                      <TableCell align="right">
+                      <TableCell align={isRtl ? 'left' : 'right'}>
                         <Tooltip title={t('btn_delete')}>
                           <IconButton
                             size="small"
@@ -319,7 +426,7 @@ export function FeatureFlagsPage() {
                       </TableCell>
                     </TableRow>
                     <TableRow>
-                      <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={7}>
+                      <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={8}>
                         <Collapse in={expandedId === row.id} timeout="auto" unmountOnExit>
                           <FlagOverridesPanel flagId={row.id} />
                         </Collapse>
@@ -385,6 +492,8 @@ export function FeatureFlagsPage() {
 
 function FlagOverridesPanel({ flagId }: { flagId: string }) {
   const theme = useTheme();
+  const isRtl = theme.direction === 'rtl';
+  const ltrTheme = theme.palette.mode === 'dark' ? eduZoneDarkTheme : eduZoneTheme;
   const t = useTranslations('settings');
   const tCommon = useTranslations('common');
   const { data: detail, isLoading } = useFeatureFlagDetail(flagId);
@@ -393,12 +502,21 @@ function FlagOverridesPanel({ flagId }: { flagId: string }) {
   const removeRoleMutation = useRemoveRoleOverride();
   const addUserMutation = useAddUserOverride();
   const removeUserMutation = useRemoveUserOverride();
+  const upsertTenantMutation = useUpsertTenantOverride();
+  const deleteTenantMutation = useDeleteTenantOverride();
 
   const [addRoleOpen, setAddRoleOpen] = useState(false);
   const [addUserOpen, setAddUserOpen] = useState(false);
+  const [addTenantOpen, setAddTenantOpen] = useState(false);
+
   const [selectedRoleId, setSelectedRoleId] = useState('');
   const [selectedIsExclude, setSelectedIsExclude] = useState(false);
   const [userId, setUserId] = useState('');
+
+  // Tenant override state
+  const [tenantId, setTenantId] = useState('');
+  const [tenantEnabled, setTenantEnabled] = useState<boolean>(true);
+  const [tenantRollout, setTenantRollout] = useState<number>(100);
 
   if (isLoading) {
     return (
@@ -411,7 +529,7 @@ function FlagOverridesPanel({ flagId }: { flagId: string }) {
   return (
     <>
       <Box sx={{ py: 2, px: 2 }}>
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 4, mb: 3 }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr 1fr' }, gap: 3, mb: 3 }}>
           {/* Role Overrides */}
           <Box>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
@@ -422,16 +540,38 @@ function FlagOverridesPanel({ flagId }: { flagId: string }) {
                 size="small"
                 startIcon={<GroupAdd sx={{ fontSize: 16 }} />}
                 onClick={() => setAddRoleOpen(true)}
-                sx={{ textTransform: 'none', fontWeight: 600, fontSize: '0.8rem' }}
+                sx={{
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  fontSize: '0.8rem',
+                  gap: 1,
+                  '& .MuiButton-startIcon': {
+                    marginInlineEnd: '8px !important',
+                    marginInlineStart: '0 !important',
+                    mr: '0 !important',
+                    ml: '0 !important',
+                  },
+                }}
               >
                 {t('feature_flags.overrides.btn_add_role')}
               </Button>
             </Box>
 
             {(detail?.role_overrides ?? []).length === 0 ? (
-              <Typography sx={{ fontSize: '0.8rem', color: 'text.disabled', py: 1 }}>
-                {t('feature_flags.overrides.no_role_overrides')}
-              </Typography>
+              <Box
+                sx={{
+                  py: 1.5,
+                  px: 2,
+                  borderRadius: 2,
+                  border: '1px dashed',
+                  borderColor: 'divider',
+                  backgroundColor: alpha(theme.palette.action.hover, 0.4),
+                }}
+              >
+                <Typography sx={{ fontSize: '0.8125rem', color: 'text.secondary', fontWeight: 500 }}>
+                  {t('feature_flags.overrides.no_role_overrides')}
+                </Typography>
+              </Box>
             ) : (
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                 {(detail?.role_overrides ?? []).map((ro) => (
@@ -461,16 +601,38 @@ function FlagOverridesPanel({ flagId }: { flagId: string }) {
                 size="small"
                 startIcon={<PersonAdd sx={{ fontSize: 16 }} />}
                 onClick={() => setAddUserOpen(true)}
-                sx={{ textTransform: 'none', fontWeight: 600, fontSize: '0.8rem' }}
+                sx={{
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  fontSize: '0.8rem',
+                  gap: 1,
+                  '& .MuiButton-startIcon': {
+                    marginInlineEnd: '8px !important',
+                    marginInlineStart: '0 !important',
+                    mr: '0 !important',
+                    ml: '0 !important',
+                  },
+                }}
               >
                 {t('feature_flags.overrides.btn_add_user')}
               </Button>
             </Box>
 
             {(detail?.user_overrides ?? []).length === 0 ? (
-              <Typography sx={{ fontSize: '0.8rem', color: 'text.disabled', py: 1 }}>
-                {t('feature_flags.overrides.no_user_overrides')}
-              </Typography>
+              <Box
+                sx={{
+                  py: 1.5,
+                  px: 2,
+                  borderRadius: 2,
+                  border: '1px dashed',
+                  borderColor: 'divider',
+                  backgroundColor: alpha(theme.palette.action.hover, 0.4),
+                }}
+              >
+                <Typography sx={{ fontSize: '0.8125rem', color: 'text.secondary', fontWeight: 500 }}>
+                  {t('feature_flags.overrides.no_user_overrides')}
+                </Typography>
+              </Box>
             ) : (
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                 {(detail?.user_overrides ?? []).map((uo) => (
@@ -483,6 +645,67 @@ function FlagOverridesPanel({ flagId }: { flagId: string }) {
                       fontWeight: 600, fontSize: '0.75rem',
                       backgroundColor: uo.is_exclude ? alpha(theme.palette.error.main, 0.1) : alpha(theme.palette.success.main, 0.1),
                       color: uo.is_exclude ? 'error.main' : 'success.main',
+                    }}
+                  />
+                ))}
+              </Box>
+            )}
+          </Box>
+
+          {/* Tenant Overrides */}
+          <Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+              <Typography variant="h3">
+                {t('feature_flags.overrides.title_tenants')}
+              </Typography>
+              <Button
+                size="small"
+                startIcon={<DomainAdd sx={{ fontSize: 16 }} />}
+                onClick={() => setAddTenantOpen(true)}
+                sx={{
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  fontSize: '0.8rem',
+                  gap: 1,
+                  '& .MuiButton-startIcon': {
+                    marginInlineEnd: '8px !important',
+                    marginInlineStart: '0 !important',
+                    mr: '0 !important',
+                    ml: '0 !important',
+                  },
+                }}
+              >
+                {t('feature_flags.overrides.btn_add_tenant')}
+              </Button>
+            </Box>
+
+            {(detail?.tenant_overrides ?? []).length === 0 ? (
+              <Box
+                sx={{
+                  py: 1.5,
+                  px: 2,
+                  borderRadius: 2,
+                  border: '1px dashed',
+                  borderColor: 'divider',
+                  backgroundColor: alpha(theme.palette.action.hover, 0.4),
+                }}
+              >
+                <Typography sx={{ fontSize: '0.8125rem', color: 'text.secondary', fontWeight: 500 }}>
+                  {t('feature_flags.overrides.no_tenant_overrides')}
+                </Typography>
+              </Box>
+            ) : (
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                {(detail?.tenant_overrides ?? []).map((to) => (
+                  <Chip
+                    key={to.tenant_id}
+                    label={`${to.tenant_name || to.tenant_id.slice(0, 8) + '...'} — ${to.is_enabled === false ? t('disabled') : t('enabled')} (${to.rollout_pct ?? 100}%)`}
+                    size="small"
+                    onDelete={() => deleteTenantMutation.mutate({ flagId, tenantId: to.tenant_id })}
+                    sx={{
+                      fontWeight: 600, fontSize: '0.75rem',
+                      backgroundColor: to.is_enabled === false ? alpha(theme.palette.error.main, 0.1) : alpha(theme.palette.info.main, 0.1),
+                      color: to.is_enabled === false ? 'error.main' : 'info.main',
                     }}
                   />
                 ))}
@@ -530,6 +753,18 @@ function FlagOverridesPanel({ flagId }: { flagId: string }) {
                 value={selectedIsExclude ? 'exclude' : 'include'}
                 onChange={(e) => setSelectedIsExclude(e.target.value === 'exclude')}
                 label={t('feature_flags.label_type')}
+                sx={{
+                  '& .MuiSelect-select': {
+                    display: 'flex',
+                    alignItems: 'center',
+                    paddingInlineStart: '12px !important',
+                    paddingInlineEnd: '32px !important',
+                  },
+                  '& .MuiSelect-icon': {
+                    insetInlineEnd: '8px',
+                    insetInlineStart: 'auto',
+                  },
+                }}
               >
                 <MenuItem value="include">{t('feature_flags.btn_include')}</MenuItem>
                 <MenuItem value="exclude">{t('feature_flags.btn_exclude')}</MenuItem>
@@ -583,6 +818,18 @@ function FlagOverridesPanel({ flagId }: { flagId: string }) {
                 value={selectedIsExclude ? 'exclude' : 'include'}
                 onChange={(e) => setSelectedIsExclude(e.target.value === 'exclude')}
                 label={t('feature_flags.label_type')}
+                sx={{
+                  '& .MuiSelect-select': {
+                    display: 'flex',
+                    alignItems: 'center',
+                    paddingInlineStart: '12px !important',
+                    paddingInlineEnd: '32px !important',
+                  },
+                  '& .MuiSelect-icon': {
+                    insetInlineEnd: '8px',
+                    insetInlineStart: 'auto',
+                  },
+                }}
               >
                 <MenuItem value="include">{t('feature_flags.type_include')}</MenuItem>
                 <MenuItem value="exclude">{t('feature_flags.type_exclude')}</MenuItem>
@@ -597,12 +844,90 @@ function FlagOverridesPanel({ flagId }: { flagId: string }) {
             disabled={!userId || addUserMutation.isPending}
             onClick={async () => {
               await addUserMutation.mutateAsync({
-                flagId: flagId,
+                flagId,
                 userId,
                 isExclude: selectedIsExclude,
               });
               setAddUserOpen(false);
               setUserId('');
+            }}
+          >
+            {tCommon('add')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Add Tenant Dialog */}
+      <Dialog
+        open={addTenantOpen}
+        onClose={() => setAddTenantOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 700 }}>{t('feature_flags.overrides.btn_add_tenant')}</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+            <TextField
+              size="small"
+              label={t('feature_flags.overrides.label_tenant_id')}
+              value={tenantId}
+              onChange={(e) => setTenantId(e.target.value)}
+              placeholder="e.g. 11111111-0000-0000-0000-000000000001"
+            />
+            <FormControl size="small">
+              <InputLabel>{t('feature_flags.table_enabled')}</InputLabel>
+              <Select
+                value={tenantEnabled ? 'enabled' : 'disabled'}
+                onChange={(e) => setTenantEnabled(e.target.value === 'enabled')}
+                label={t('feature_flags.table_enabled')}
+                sx={{
+                  '& .MuiSelect-select': {
+                    display: 'flex',
+                    alignItems: 'center',
+                    paddingInlineStart: '12px !important',
+                    paddingInlineEnd: '32px !important',
+                  },
+                  '& .MuiSelect-icon': {
+                    insetInlineEnd: '8px',
+                    insetInlineStart: 'auto',
+                  },
+                }}
+              >
+                <MenuItem value="enabled">{t('feature_flags.enabled')}</MenuItem>
+                <MenuItem value="disabled">{t('feature_flags.disabled')}</MenuItem>
+              </Select>
+            </FormControl>
+            <Box dir="ltr" sx={{ direction: 'ltr', mt: 1 }}>
+              <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary', mb: 0.5, direction: isRtl ? 'rtl' : 'ltr', textAlign: isRtl ? 'right' : 'left' }}>
+                {t('feature_flags.table_rollout')}: {tenantRollout}%
+              </Typography>
+              <ThemeProvider theme={ltrTheme}>
+                <Slider
+                  value={tenantRollout}
+                  onChange={(_, v) => setTenantRollout(v as number)}
+                  min={0}
+                  max={100}
+                  size="small"
+                />
+              </ThemeProvider>
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAddTenantOpen(false)}>{tCommon('cancel')}</Button>
+          <Button
+            variant="contained"
+            disabled={!tenantId || upsertTenantMutation.isPending}
+            onClick={async () => {
+              await upsertTenantMutation.mutateAsync({
+                flagId,
+                tenantId,
+                isEnabled: tenantEnabled,
+                rolloutPct: tenantRollout,
+              });
+              setAddTenantOpen(false);
+              setTenantId('');
             }}
           >
             {tCommon('add')}
@@ -629,6 +954,7 @@ function CreateFlagDialog({ open, onClose, onSuccess }: CreateFlagDialogProps) {
   const [key, setKey] = useState('');
   const [label, setLabel] = useState('');
   const [description, setDescription] = useState('');
+  const [status, setStatus] = useState<FeatureFlagStatus>('active');
   const [startsAt, setStartsAt] = useState('');
   const [endsAt, setEndsAt] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -649,7 +975,8 @@ function CreateFlagDialog({ open, onClose, onSuccess }: CreateFlagDialogProps) {
       const input: CreateFeatureFlagInput = {
         key,
         is_enabled: false,
-        rollout_pct: 100,
+        rollout_pct: 100, // 100% (converted to 10000 basis points in prepareFeatureFlagPayload)
+        status,
         ...(label ? { label } : {}),
         ...(description ? { description } : {}),
         ...(startsAt ? { starts_at: new Date(startsAt).toISOString() } : {}),
@@ -660,6 +987,7 @@ function CreateFlagDialog({ open, onClose, onSuccess }: CreateFlagDialogProps) {
       setKey('');
       setLabel('');
       setDescription('');
+      setStatus('active');
       setStartsAt('');
       setEndsAt('');
       setError('');
@@ -706,6 +1034,30 @@ function CreateFlagDialog({ open, onClose, onSuccess }: CreateFlagDialogProps) {
             onChange={(e) => setLabel(e.target.value)}
             placeholder={t('feature_flags.table_label')}
           />
+          <FormControl size="small">
+            <InputLabel>{t('feature_flags.label_status')}</InputLabel>
+            <Select
+              value={status}
+              onChange={(e) => setStatus(e.target.value as FeatureFlagStatus)}
+              label={t('feature_flags.label_status')}
+              sx={{
+                '& .MuiSelect-select': {
+                  display: 'flex',
+                  alignItems: 'center',
+                  paddingInlineStart: '12px !important',
+                  paddingInlineEnd: '32px !important',
+                },
+                '& .MuiSelect-icon': {
+                  insetInlineEnd: '8px',
+                  insetInlineStart: 'auto',
+                },
+              }}
+            >
+              <MenuItem value="active">{t('feature_flags.status_active')}</MenuItem>
+              <MenuItem value="deprecated">{t('feature_flags.status_deprecated')}</MenuItem>
+              <MenuItem value="archived">{t('feature_flags.status_archived')}</MenuItem>
+            </Select>
+          </FormControl>
           <TextField
             label={t('feature_flags.dialog_create.label_desc')}
             value={description}
@@ -751,4 +1103,3 @@ function CreateFlagDialog({ open, onClose, onSuccess }: CreateFlagDialogProps) {
     </Dialog>
   );
 }
-

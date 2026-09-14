@@ -194,10 +194,10 @@ export async function toggleFeatureFlagAction(id: string, enabled: boolean): Pro
 export async function addRoleOverrideAction(
   flagId: string,
   roleId: string,
-  _isExclude = false,
+  isExclude = false,
 ): Promise<void> {
   const { tenantId } = await requirePermission('feature_flags.manage');
-  return featureFlagsService.addRoleOverrideAdmin(flagId, roleId, tenantId);
+  return featureFlagsService.addRoleOverrideAdmin(flagId, roleId, tenantId, isExclude);
 }
 
 export async function removeRoleOverrideAction(flagId: string, roleId: string): Promise<void> {
@@ -212,10 +212,10 @@ export async function removeRoleOverrideAction(flagId: string, roleId: string): 
 export async function addUserOverrideAction(
   flagId: string,
   userId: string,
-  _isExclude = false,
+  isExclude = false,
 ): Promise<void> {
   const { tenantId } = await requirePermission('feature_flags.manage');
-  return featureFlagsService.addUserOverrideAdmin(flagId, userId, tenantId);
+  return featureFlagsService.addUserOverrideAdmin(flagId, userId, tenantId, isExclude);
 }
 
 export async function removeUserOverrideAction(flagId: string, userId: string): Promise<void> {
@@ -227,10 +227,28 @@ export async function removeUserOverrideAction(flagId: string, userId: string): 
   return featureFlagsService.removeUserOverrideAdmin(flagId, userId, tenantId);
 }
 
+export async function upsertTenantOverrideAction(
+  flagId: string,
+  tenantId: string,
+  isEnabled: boolean | null,
+  rolloutPct?: number | null,
+): Promise<void> {
+  const ctx = await requirePermission('feature_flags.manage');
+  const targetTenantId = ctx.permissions.includes('*') ? tenantId : (ctx.tenantId ?? tenantId);
+  return featureFlagsService.upsertTenantOverrideAdmin(flagId, targetTenantId, isEnabled, rolloutPct);
+}
+
+export async function deleteTenantOverrideAction(flagId: string, tenantId: string): Promise<void> {
+  const ctx = await requirePermission('feature_flags.manage');
+  const targetTenantId = ctx.permissions.includes('*') ? tenantId : (ctx.tenantId ?? tenantId);
+  return featureFlagsService.deleteTenantOverrideAdmin(flagId, targetTenantId);
+}
+
 export async function getAllRolesAction(): Promise<{ id: string; name: string; key: string }[]> {
   await requirePermission('feature_flags.manage');
   return featureFlagsService.getAllRolesAdmin();
 }
+
 
 export async function getJobsAction(
   filters: JobFilters,

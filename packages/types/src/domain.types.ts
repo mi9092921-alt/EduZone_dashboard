@@ -18,6 +18,8 @@ export type JobStatus = 'pending' | 'processing' | 'done' | 'failed' | 'dead';
 /** Audit risk levels */
 export type RiskLevel = 'low' | 'medium' | 'high' | 'critical';
 
+export type FeatureFlagStatus = 'active' | 'deprecated' | 'archived';
+
 /** Feature flag entity */
 export interface FeatureFlag {
   id: string;
@@ -26,12 +28,29 @@ export interface FeatureFlag {
   description: string | null;
   is_enabled: boolean;
   rollout_pct: number;
+  status?: FeatureFlagStatus | undefined;
+  enabled_from?: string | null | undefined;
+  enabled_until?: string | null | undefined;
   starts_at: string | null;
   ends_at: string | null;
   metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 }
+
+
+/** Tenant feature flag override */
+export interface TenantFeatureFlagOverride {
+  tenant_id: string;
+  flag_id: string;
+  is_enabled: boolean | null;
+  rollout_pct: number | null;
+  created_at?: string | undefined;
+  updated_at?: string | undefined;
+  tenant_name?: string | undefined;
+}
+
+
 
 /** Core user type — v13: added email_hash, search_vector, avatar_url, timezone, locale, locked_at, locked_by */
 export interface User {

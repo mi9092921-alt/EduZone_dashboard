@@ -73,17 +73,17 @@ export function CoursesTable({
   const t = useTranslations('common');
 
   const TABLE_HEADERS = [
-    { label: '', className: 'w-12 px-4' },
-    { label: t('course_header'), className: 'text-start w-[40%]' },
-    { label: t('status_header'), className: 'text-start w-32' },
-    { label: t('level_header'), className: 'text-start w-28' },
-    { label: t('dashboard_lessons'), className: 'text-center w-24' },
-    { label: t('price_header'), className: 'text-end w-24' },
-    { label: t('teacher_date_header'), className: 'text-start w-52' },
+    { label: '', className: 'px-4 text-center' },
+    { label: t('course_header'), className: 'text-start px-6' },
+    { label: t('status_header'), className: 'text-start px-6' },
+    { label: t('level_header'), className: 'text-start px-6' },
+    { label: t('dashboard_lessons'), className: 'text-center px-6' },
+    { label: t('price_header'), className: 'text-end px-6' },
+    { label: t('teacher_date_header'), className: 'text-start px-6' },
     {
       label: '',
       className:
-        'sticky end-0 z-20 bg-muted border-b border-border/60 text-end w-20 ltr:shadow-[-12px_0_12px_-10px_rgba(0,0,0,0.05)] rtl:shadow-[12px_0_12px_-10px_rgba(0,0,0,0.05)] overflow-visible',
+        'sticky end-0 z-20 bg-muted/30 text-end px-6 ltr:shadow-[-12px_0_12px_-10px_rgba(0,0,0,0.05)] rtl:shadow-[12px_0_12px_-10px_rgba(0,0,0,0.05)]',
     },
   ];
 
@@ -115,7 +115,18 @@ export function CoursesTable({
   return (
     <div className="w-full bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden flex flex-col min-h-0 min-w-0">
       <div className="overflow-x-auto min-w-0 flex-1 no-scrollbar">
-        <table className="w-full text-start border-separate border-spacing-0 min-w-[900px]">
+        <table className="w-full text-start border-separate border-spacing-0 min-w-[900px] table-fixed">
+          {/* ── Column widths — single source of truth ── */}
+          <colgroup>
+            <col className="w-12" />
+            <col className="w-[38%]" />
+            <col className="w-32" />
+            <col className="w-28" />
+            <col className="w-24" />
+            <col className="w-24" />
+            <col className="w-52" />
+            <col className="w-20" />
+          </colgroup>
           <thead>
             <tr className="bg-muted/30 border-b border-border/60">
               {TABLE_HEADERS.map((h, i) => (
@@ -149,33 +160,44 @@ export function CoursesTable({
             {isLoading
               ? Array.from({ length: pageSize }).map((_, i) => (
                   <tr key={i} className="animate-pulse">
+                    {/* Checkbox skeleton */}
+                    <td className="px-4 py-4">
+                      <div className="w-4 h-4 bg-muted rounded mx-auto" />
+                    </td>
+                    {/* Course skeleton */}
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-xl bg-muted" />
+                        <div className="w-14 h-14 rounded-2xl bg-muted shrink-0" />
                         <div className="space-y-2">
                           <div className="h-4 w-32 bg-muted rounded" />
                           <div className="h-3 w-20 bg-muted rounded" />
                         </div>
                       </div>
                     </td>
+                    {/* Status skeleton */}
                     <td className="px-6 py-4">
                       <div className="h-6 w-16 bg-muted rounded-full" />
                     </td>
+                    {/* Level skeleton */}
                     <td className="px-6 py-4">
                       <div className="h-6 w-16 bg-muted rounded-full" />
                     </td>
+                    {/* Lessons skeleton */}
                     <td className="px-6 py-4">
                       <div className="h-6 w-12 bg-muted rounded-full mx-auto" />
                     </td>
+                    {/* Price skeleton */}
                     <td className="px-6 py-4">
-                      <div className="h-4 w-12 bg-muted rounded ms-auto text-end" />
+                      <div className="h-4 w-12 bg-muted rounded ms-auto" />
                     </td>
+                    {/* Teacher skeleton */}
                     <td className="px-6 py-4">
                       <div className="space-y-2">
                         <div className="h-4 w-32 bg-muted rounded" />
                         <div className="h-3 w-20 bg-muted rounded" />
                       </div>
                     </td>
+                    {/* Actions skeleton */}
                     <td className="sticky end-0 px-6 py-4 bg-card">
                       <div className="h-8 w-8 bg-muted rounded-xl ms-auto" />
                     </td>
@@ -221,10 +243,19 @@ export function CoursesTable({
                                 src={course.thumbnail_url}
                                 alt=""
                                 className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                  const fallback = e.currentTarget.nextElementSibling as HTMLElement | null;
+                                  if (fallback) fallback.style.display = 'flex';
+                                }}
                               />
-                            ) : (
+                            ) : null}
+                            <div
+                              className="w-full h-full items-center justify-center"
+                              style={{ display: course.thumbnail_url ? 'none' : 'flex' }}
+                            >
                               <School className="text-primary/60 text-2xl" />
-                            )}
+                            </div>
                           </div>
                           <div className="space-y-0.5 max-w-[320px]">
                             <p className="text-[15px] font-bold text-foreground group-hover:text-primary transition-faang leading-tight line-clamp-2">

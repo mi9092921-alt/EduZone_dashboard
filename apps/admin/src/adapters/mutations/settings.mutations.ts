@@ -9,6 +9,8 @@ import {
   removeRoleOverrideAction,
   addUserOverrideAction,
   removeUserOverrideAction,
+  upsertTenantOverrideAction,
+  deleteTenantOverrideAction,
 } from '@/adapters/actions/admin.actions';
 import { queryKeys } from '@/adapters/queries/keys';
 import type {
@@ -198,3 +200,33 @@ export function useRemoveUserOverride() {
     },
   });
 }
+
+export function useUpsertTenantOverride() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: {
+      flagId: string;
+      tenantId: string;
+      isEnabled: boolean | null;
+      rolloutPct?: number | null;
+    }) =>
+      upsertTenantOverrideAction(vars.flagId, vars.tenantId, vars.isEnabled, vars.rolloutPct),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: queryKeys.featureFlags.all });
+      qc.invalidateQueries({ queryKey: [...queryKeys.featureFlags.all, 'detail', vars.flagId] });
+    },
+  });
+}
+
+export function useDeleteTenantOverride() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { flagId: string; tenantId: string }) =>
+      deleteTenantOverrideAction(vars.flagId, vars.tenantId),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: queryKeys.featureFlags.all });
+      qc.invalidateQueries({ queryKey: [...queryKeys.featureFlags.all, 'detail', vars.flagId] });
+    },
+  });
+}
+

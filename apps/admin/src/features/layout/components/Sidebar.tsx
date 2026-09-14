@@ -41,33 +41,80 @@ function SidebarInnerContent({
 
   return (
     <div
-      style={{ width: isCollapsed ? COLLAPSED_WIDTH : SIDEBAR_WIDTH }}
-      className="flex flex-col h-[100dvh] bg-popover border-e border-border/40 transition-[width] duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] overflow-hidden"
+      className="flex flex-col h-[100dvh] w-full bg-popover transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] overflow-hidden"
     >
-      {/* BRANDING & CLOSE AREA */}
-      <div className={cn("h-16 flex items-center shrink-0 px-4", isCollapsed ? "justify-center" : "justify-between")}>
-        <div className="flex items-center gap-3 overflow-hidden">
-          <div className={cn("w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 text-primary ring-1 ring-primary/20 transition-all duration-300",
-            "hover:-translate-y-[2px] hover:shadow-lg hover:shadow-primary/20", // Glassmorphism & Depth
-          )}>
-            <AdminPanelSettings fontSize="small" />
-          </div>
-          {!isCollapsed && (
-            <span className="font-semibold tracking-tight text-foreground text-base whitespace-nowrap">EduZone</span>
-          )}
-        </div>
-
-        {/* Close Button (Hamburger Style) */}
-        {!isCollapsed && (
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="p-1.5 rounded-md text-muted-foreground hover:bg-muted/60 transition-colors"
-            aria-label={t('close_sidebar')}
+      {/* BRANDING & TOGGLE AREA */}
+      {isCollapsed ? (
+        /* COLLAPSED: Logo shows normally; on hover, Logo disappears and Hamburger appears in its place */
+        <div className="h-16 flex items-center justify-center shrink-0 border-b border-border/40">
+          <Tooltip
+            title={t('expand_sidebar')}
+            placement={isRtl ? "left" : "right"}
+            arrow
           >
-            <MenuIcon fontSize="small" />
-          </button>
-        )}
-      </div>
+            <button
+              id="sidebar-expand-button"
+              onClick={() => setSidebarOpen(true)}
+              className="group relative w-10 h-10 rounded-lg flex items-center justify-center transition-colors hover:bg-muted/60 outline-none focus-visible:ring-2 focus-visible:ring-primary active:scale-95"
+              aria-label={t('expand_sidebar')}
+            >
+              {/* Normal State: Logo Icon (disappears on hover) */}
+              <div
+                className={cn(
+                  "w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary ring-1 ring-primary/20 transition-all duration-200",
+                  "group-hover:opacity-0 group-hover:scale-75 group-hover:pointer-events-none",
+                )}
+              >
+                <AdminPanelSettings fontSize="small" />
+              </div>
+
+              {/* Hover State: Hamburger Menu Icon (appears on hover) */}
+              <div
+                className={cn(
+                  "absolute inset-0 flex items-center justify-center text-muted-foreground group-hover:text-foreground transition-all duration-200",
+                  "opacity-0 scale-75 pointer-events-none group-hover:opacity-100 group-hover:scale-100",
+                )}
+              >
+                <MenuIcon fontSize="small" />
+              </div>
+            </button>
+          </Tooltip>
+        </div>
+      ) : (
+        /* EXPANDED: Logo+Name on the start, Hamburger collapse button at the far end */
+        <div className="h-16 flex items-center justify-between px-3.5 shrink-0 border-b border-border/40">
+          {/* Brand: Logo + Name */}
+          <div className="flex items-center gap-2.5 overflow-hidden">
+            <div
+              className={cn(
+                "w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 text-primary ring-1 ring-primary/20 transition-all duration-300",
+                "hover:-translate-y-[1px] hover:shadow-md hover:shadow-primary/20",
+              )}
+            >
+              <AdminPanelSettings fontSize="small" />
+            </div>
+            <span className="font-semibold tracking-tight text-foreground text-base whitespace-nowrap">
+              EduZone
+            </span>
+          </div>
+
+          {/* Hamburger at the far end */}
+          <Tooltip
+            title={isMobile ? t('close_sidebar') : t('collapse_sidebar')}
+            placement={isRtl ? "right" : "left"}
+            arrow
+          >
+            <button
+              id="sidebar-collapse-button"
+              onClick={() => setSidebarOpen(false)}
+              className="w-9 h-9 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 flex items-center justify-center transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary shrink-0 active:scale-95"
+              aria-label={isMobile ? t('close_sidebar') : t('collapse_sidebar')}
+            >
+              <MenuIcon fontSize="small" />
+            </button>
+          </Tooltip>
+        </div>
+      )}
 
       {/* MAIN NAVIGATION */}
       <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto no-scrollbar [--scrollbar-color:transparent] hover:[--scrollbar-color:theme(colors.border/50)] [&::-webkit-scrollbar]:w-[4px] [&::-webkit-scrollbar-thumb]:bg-[var(--scrollbar-color)] [&::-webkit-scrollbar-thumb]:rounded-full transition-colors duration-300">
@@ -182,7 +229,7 @@ export function Sidebar() {
             sidebarOpen ? "w-[220px]" : "w-[80px]"
           )}
         >
-          <div className="w-[220px] h-full"> 
+          <div className="w-full h-full"> 
             <SidebarInnerContent {...contentProps} />
           </div>
         </aside>
