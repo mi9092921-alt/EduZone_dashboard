@@ -9,6 +9,7 @@ import {
   useIsSuperAdmin,
   useIsTeacher,
   useAuthLoading,
+  useActingTenantId,
 } from './auth.store';
 import type { AuthUser } from './auth.store';
 
@@ -146,5 +147,45 @@ describe('auth.store', () => {
     useAuthStore.getState().setUser(user);
     rerender();
     expect(result.current?.primary_role).toBe('student');
+  });
+
+  // ── Tenant Switcher (Wave 3) ────────────────────────────────────
+  it('setActingTenantId — updates acting_tenant_id on the current user', () => {
+    useAuthStore.getState().setUser(makeUser({ primary_role: 'super_admin' }));
+    useAuthStore.getState().setActingTenantId('tenant-2');
+    expect(useAuthStore.getState().user?.acting_tenant_id).toBe('tenant-2');
+  });
+
+  it('setActingTenantId(null) — clears acting_tenant_id', () => {
+    useAuthStore.getState().setUser(makeUser({ primary_role: 'super_admin', acting_tenant_id: 'tenant-2' }));
+    useAuthStore.getState().setActingTenantId(null);
+    expect(useAuthStore.getState().user?.acting_tenant_id).toBeNull();
+  });
+
+  it('setActingTenantId — no-op (stays null) when there is no current user', () => {
+    useAuthStore.getState().setActingTenantId('tenant-2');
+    expect(useAuthStore.getState().user).toBeNull();
+  });
+
+  it('useActingTenantId — null when acting_tenant_id is unset', () => {
+    useAuthStore.getState().setUser(makeUser({ primary_role: 'super_admin' }));
+    const { result } = renderHook(() => useActingTenantId());
+    expect(result.current).toBeNull();
+  });
+
+  it('useActingTenantId — null when acting_tenant_id equals the home tenant_id (not actually switched)', () => {
+    useAuthStore.getState().setUser(
+      makeUser({ primary_role: 'super_admin', tenant_id: 'tenant-1', acting_tenant_id: 'tenant-1' }),
+    );
+    const { result } = renderHook(() => useActingTenantId());
+    expect(result.current).toBeNull();
+  });
+
+  it('useActingTenantId — returns the acting tenant when genuinely switched', () => {
+    useAuthStore.getState().setUser(
+      makeUser({ primary_role: 'super_admin', tenant_id: 'tenant-1', acting_tenant_id: 'tenant-2' }),
+    );
+    const { result } = renderHook(() => useActingTenantId());
+    expect(result.current).toBe('tenant-2');
   });
 });

@@ -9,11 +9,10 @@ import {
   Tabs,
   Chip,
   Skeleton,
-  Breadcrumbs,
-  Link as MuiLink,
 } from '@mui/material';
 import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+import { useEffect } from 'react';
 
 import { CourseEnrollmentsTab } from './CourseEnrollmentsTab';
 import { CourseInfoForm } from './CourseInfoForm';
@@ -21,6 +20,7 @@ import { CourseSettingsTab } from './CourseSettingsTab';
 import { CurriculumBuilder } from './CurriculumBuilder';
 
 import { useCourseById } from '@/adapters/queries/courses.queries';
+import { useUiStore } from '@/adapters/stores/ui.store';
 import { usePathname, useRouter } from '@/i18n/routing';
 
 const COURSE_TAB_KEYS = ['details', 'curriculum', 'enrollments', 'settings'] as const;
@@ -54,6 +54,13 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
   };
 
   const { data: course, isLoading } = useCourseById(courseId);
+
+  // ── Sync course title → Topbar breadcrumb ─────────────────────
+  const setPageSubtitle = useUiStore((s) => s.setPageSubtitle);
+  useEffect(() => {
+    if (course?.title) setPageSubtitle(course.title);
+    return () => setPageSubtitle(null);        // reset on unmount
+  }, [course?.title, setPageSubtitle]);
 
   if (isLoading) {
     return (
@@ -95,24 +102,6 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
 
   return (
     <Box>
-      {/* Breadcrumbs */}
-      <Breadcrumbs sx={{ mb: 1.5, '& .MuiBreadcrumbs-separator': { color: '#CBD5E1' } }}>
-        <MuiLink
-          underline="hover"
-          color="#64748B"
-          href="/courses"
-          onClick={(e) => {
-            e.preventDefault();
-            router.push('/courses');
-          }}
-          sx={{ fontSize: '0.8125rem', fontWeight: 500 }}
-        >
-          {t('courses_breadcrumb')}
-        </MuiLink>
-        <Typography sx={{ fontSize: '0.8125rem', fontWeight: 600, color: '#0F172A' }}>
-          {course.title}
-        </Typography>
-      </Breadcrumbs>
 
       {/* Header */}
       <Box

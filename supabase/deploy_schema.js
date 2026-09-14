@@ -4,7 +4,7 @@ const path = require('path');
 const { Client } = require('pg');
 
 async function main() {
-  const configFileName = process.argv[2] || 'db_url.test.txt';
+  const configFileName = process.argv[2] || 'db_url.txt';
   let dbUrl;
 
   const urlFilePath = path.isAbsolute(configFileName)

@@ -5,6 +5,7 @@ import type {
   FeatureFlagDetail,
   FeatureFlagRole,
   FeatureFlagUser,
+  TenantFeatureFlagOverride,
   CreateFeatureFlagInput,
   UpdateFeatureFlagInput,
 } from '@/domain/types/feature-flag.types';
@@ -28,7 +29,6 @@ export async function getAllFeatureFlags(): Promise<FeatureFlag[]> {
   const { supabase } = container;
   const { data, error } = await supabase.from('feature_flags').select('*').order('key');
   if (error) throw mapDbError(error, 'feature-flags.service.ts');
-  // M9: mapper may return null only for a null row; list rows are never null.
   return (data ?? []).flatMap((row) => mapDbRowToFeatureFlag(row as FeatureFlagDbRow) ?? []);
 }
 
@@ -62,15 +62,19 @@ export async function getFeatureFlagById(id: string): Promise<FeatureFlagDetail>
     .eq('flag_id', id);
   if (userErr) throw userErr;
 
-  const mappedRoles = mapRoleOverrides(roleOverrides ?? []);
-  const mappedUsers = mapUserOverrides(userOverrides ?? []);
+  const { data: tenantOverrides, error: tenantErr } = await supabase
+    .from('tenant_feature_flags')
+    .select('*')
+    .eq('flag_id', id);
+  if (tenantErr) throw tenantErr;
 
   const mappedFlag = mapDbRowToFeatureFlag(flag as FeatureFlagDbRow);
   if (!mappedFlag) throw new NotFoundError('Feature flag');
   return {
     ...mappedFlag,
-    role_overrides: mappedRoles,
-    user_overrides: mappedUsers,
+    role_overrides: mapRoleOverrides(roleOverrides ?? []),
+    user_overrides: mapUserOverrides(userOverrides ?? []),
+    tenant_overrides: mapTenantOverrides(tenantOverrides ?? []),
   };
 }
 
@@ -93,12 +97,19 @@ export async function getFeatureFlagByIdAdmin(id: string): Promise<FeatureFlagDe
     .eq('flag_id', id);
   if (userErr) throw userErr;
 
+  const { data: tenantOverrides, error: tenantErr } = await admin
+    .from('tenant_feature_flags')
+    .select('*')
+    .eq('flag_id', id);
+  if (tenantErr) throw tenantErr;
+
   const mappedFlag = mapDbRowToFeatureFlag(flag as FeatureFlagDbRow);
   if (!mappedFlag) throw new NotFoundError('Feature flag');
   return {
     ...mappedFlag,
     role_overrides: mapRoleOverrides(roleOverrides ?? []),
     user_overrides: mapUserOverrides(userOverrides ?? []),
+    tenant_overrides: mapTenantOverrides(tenantOverrides ?? []),
   };
 }
 
@@ -106,10 +117,11 @@ export async function getFeatureFlagByIdAdmin(id: string): Promise<FeatureFlagDe
 function mapRoleOverrides(roleOverrides: Record<string, unknown>[]): FeatureFlagRole[] {
   return roleOverrides.map((r: Record<string, unknown>) => {
     const role = r.roles as Record<string, string> | null;
+    const isEnabled = r.is_enabled !== undefined && r.is_enabled !== null ? Boolean(r.is_enabled) : true;
     const mapped: FeatureFlagRole = {
       flag_id: r.flag_id as string,
       role_id: r.role_id as string,
-      is_exclude: false,
+      is_exclude: !isEnabled,
     };
     const labelToUse = role?.label || role?.name;
     if (labelToUse) mapped.role_name = labelToUse;
@@ -121,15 +133,33 @@ function mapRoleOverrides(roleOverrides: Record<string, unknown>[]): FeatureFlag
 function mapUserOverrides(userOverrides: Record<string, unknown>[]): FeatureFlagUser[] {
   return userOverrides.map((u: Record<string, unknown>) => {
     const user = u.users as Record<string, string> | null;
+    const isEnabled = u.is_enabled !== undefined && u.is_enabled !== null ? Boolean(u.is_enabled) : true;
     const mapped: FeatureFlagUser = {
       flag_id: u.flag_id as string,
       user_id: u.user_id as string,
-      is_exclude: false,
+      is_exclude: !isEnabled,
     };
     if (user?.email) mapped.user_email = user.email;
     const name = user ? [user.first_name, user.last_name].filter(Boolean).join(' ') : undefined;
     if (name) mapped.user_name = name;
     return mapped;
+  });
+}
+
+function mapTenantOverrides(tenantOverrides: Record<string, unknown>[]): TenantFeatureFlagOverride[] {
+  return tenantOverrides.map((t: Record<string, unknown>) => {
+    const rawRollout = t.rollout_pct as number | null;
+    const uiRollout = rawRollout !== null && rawRollout !== undefined
+      ? (rawRollout > 100 ? Math.round(rawRollout / 100) : rawRollout)
+      : null;
+    return {
+      tenant_id: t.tenant_id as string,
+      flag_id: t.flag_id as string,
+      is_enabled: t.is_enabled !== undefined && t.is_enabled !== null ? Boolean(t.is_enabled) : null,
+      rollout_pct: uiRollout,
+      created_at: t.created_at as string | undefined,
+      updated_at: t.updated_at as string | undefined,
+    };
   });
 }
 
@@ -238,7 +268,7 @@ export async function toggleFeatureFlagAdmin(id: string, enabled: boolean): Prom
 export async function addRoleOverride(
   flagId: string,
   roleId: string,
-  _isExclude: boolean = false,
+  isExclude: boolean = false,
 ): Promise<void> {
   const { supabase } = container;
 
@@ -256,7 +286,12 @@ export async function addRoleOverride(
 
   const { error } = await supabase
     .from('feature_flag_roles')
-    .upsert({ tenant_id: tenantId, flag_id: flagId, role_id: roleId }, { onConflict: 'tenant_id,flag_id,role_id' });
+    .upsert({
+      tenant_id: tenantId,
+      flag_id: flagId,
+      role_id: roleId,
+      is_enabled: !isExclude,
+    }, { onConflict: 'tenant_id,flag_id,role_id' });
   if (error) throw mapDbError(error, 'feature-flags.service.ts');
 }
 
@@ -265,6 +300,7 @@ export async function addRoleOverrideAdmin(
   flagId: string,
   roleId: string,
   tenantId: string | null,
+  isExclude: boolean = false,
 ): Promise<void> {
   const admin = createAdminClient();
   let resolvedTenantId = tenantId;
@@ -275,7 +311,12 @@ export async function addRoleOverrideAdmin(
   if (!resolvedTenantId) throw new ForbiddenError('No tenant context: cannot resolve feature flag overrides');
   const { error } = await admin
     .from('feature_flag_roles')
-    .upsert({ tenant_id: resolvedTenantId, flag_id: flagId, role_id: roleId }, { onConflict: 'tenant_id,flag_id,role_id' });
+    .upsert({
+      tenant_id: resolvedTenantId,
+      flag_id: flagId,
+      role_id: roleId,
+      is_enabled: !isExclude,
+    }, { onConflict: 'tenant_id,flag_id,role_id' });
   if (error) throw mapDbError(error, 'feature-flags.service.ts');
 }
 
@@ -292,13 +333,6 @@ export async function removeRoleOverrideAdmin(
   tenantId: string | null,
 ): Promise<void> {
   const admin = createAdminClient();
-  // SECURITY FIX (2026-09-12): cross-tenant IDOR (launch-blocker APP-1).
-  // The service-role client bypasses RLS, so a delete scoped only by
-  // (flag_id, role_id) wiped overrides in EVERY tenant that happened to
-  // have that pair. The matching RLS policy `feature_flag_roles_manage`
-  // only applies to JWT-bearing connections, not service_role. Scope the
-  // delete by tenant_id — super_admin (caller ctx.permissions includes '*')
-  // passes null here, matching its cross-tenant access everywhere else.
   let query = admin.from('feature_flag_roles').delete().eq('flag_id', flagId).eq('role_id', roleId);
   if (tenantId !== null) {
     query = query.eq('tenant_id', tenantId);
@@ -310,7 +344,7 @@ export async function removeRoleOverrideAdmin(
 export async function addUserOverride(
   flagId: string,
   userId: string,
-  _isExclude: boolean = false,
+  isExclude: boolean = false,
 ): Promise<void> {
   const { supabase } = container;
 
@@ -333,7 +367,12 @@ export async function addUserOverride(
 
   const { error } = await supabase
     .from('feature_flag_users')
-    .upsert({ tenant_id: tenantId, flag_id: flagId, user_id: userId }, { onConflict: 'tenant_id,flag_id,user_id' });
+    .upsert({
+      tenant_id: tenantId,
+      flag_id: flagId,
+      user_id: userId,
+      is_enabled: !isExclude,
+    }, { onConflict: 'tenant_id,flag_id,user_id' });
   if (error) throw mapDbError(error, 'feature-flags.service.ts');
 }
 
@@ -342,6 +381,7 @@ export async function addUserOverrideAdmin(
   flagId: string,
   userId: string,
   tenantId: string | null,
+  isExclude: boolean = false,
 ): Promise<void> {
   const admin = createAdminClient();
   let resolvedTenantId = tenantId;
@@ -356,7 +396,12 @@ export async function addUserOverrideAdmin(
   if (!resolvedTenantId) throw new ForbiddenError('No tenant context: cannot resolve feature flag overrides');
   const { error } = await admin
     .from('feature_flag_users')
-    .upsert({ tenant_id: resolvedTenantId, flag_id: flagId, user_id: userId }, { onConflict: 'tenant_id,flag_id,user_id' });
+    .upsert({
+      tenant_id: resolvedTenantId,
+      flag_id: flagId,
+      user_id: userId,
+      is_enabled: !isExclude,
+    }, { onConflict: 'tenant_id,flag_id,user_id' });
   if (error) throw mapDbError(error, 'feature-flags.service.ts');
 }
 
@@ -373,16 +418,51 @@ export async function removeUserOverrideAdmin(
   tenantId: string | null,
 ): Promise<void> {
   const admin = createAdminClient();
-  // SECURITY FIX (2026-09-12): cross-tenant IDOR (launch-blocker APP-1).
-  // Same rationale as removeRoleOverrideAdmin above: the service-role
-  // client bypasses RLS, so without a tenant_id filter the delete would
-  // wipe every tenant's `feature_flag_users` row matching that
-  // (flag_id, user_id) pair.
   let query = admin.from('feature_flag_users').delete().eq('flag_id', flagId).eq('user_id', userId);
   if (tenantId !== null) {
     query = query.eq('tenant_id', tenantId);
   }
   const { error } = await query;
+  if (error) throw mapDbError(error, 'feature-flags.service.ts');
+}
+
+// ══════════════════════════════════════════════════
+// TENANT OVERRIDES
+// ══════════════════════════════════════════════════
+
+export async function upsertTenantOverrideAdmin(
+  flagId: string,
+  tenantId: string,
+  isEnabled: boolean | null,
+  rolloutPct?: number | null,
+): Promise<void> {
+  const admin = createAdminClient();
+  const dbRolloutPct = rolloutPct !== null && rolloutPct !== undefined
+    ? Math.round(Math.max(0, Math.min(100, rolloutPct)) * 100)
+    : null;
+
+  const { error } = await admin
+    .from('tenant_feature_flags')
+    .upsert(
+      {
+        tenant_id: tenantId,
+        flag_id: flagId,
+        is_enabled: isEnabled,
+        rollout_pct: dbRolloutPct,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'tenant_id,flag_id' },
+    );
+  if (error) throw mapDbError(error, 'feature-flags.service.ts');
+}
+
+export async function deleteTenantOverrideAdmin(flagId: string, tenantId: string): Promise<void> {
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from('tenant_feature_flags')
+    .delete()
+    .eq('flag_id', flagId)
+    .eq('tenant_id', tenantId);
   if (error) throw mapDbError(error, 'feature-flags.service.ts');
 }
 

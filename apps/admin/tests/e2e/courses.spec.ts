@@ -130,21 +130,24 @@ test.describe('Course Creation', () => {
   // RPC enroll endpoints as alternatives -- then asserted a success
   // banner its own mocks never rendered.
   //
-  // Tracing the REAL flow required correcting two wrong turns:
-  //  - The rendered detail page is TeacherCourseDetailPage (the
-  //    [id]/page.tsx route mounts it), NOT features/courses'
-  //    CourseDetailPage. Its tabs are Students(=default) / Curriculum /
-  //    Analytics / Course Details -- there is no Enrollments tab to
-  //    click. (CourseDetailPage + CourseEnrollmentsTab, with the only
-  //    UI revoke button in the codebase, are unmounted dead code: no
-  //    route or importer references them. Worth a cleanup ticket --
-  //    and it means no reachable UI can revoke an enrollment.)
-  //  - The reachable enroll UI is StudentProgressPage (Students tab):
-  //    'Enroll Student' button -> the same EnrollStudentDialog (MUI
-  //    Autocomplete over the real student list) -> enroll_student RPC.
-  //    Its rows carry no actions, so restore happens by deleting the
-  //    course created inside the test (soft-delete hides it and its
-  //    enrollments from every UI query).
+  // Tracing the REAL flow (updated for the role-conditional [id] route,
+  // commit 49eb9b4): only teachers get TeacherCourseDetailPage; the
+  // global auth here is the seed ADMIN, so the route renders
+  // features/courses' CourseDetailPage instead. Its tabs are General
+  // Info(=default) / Curriculum / Enrollments / Settings, and the
+  // admin-side enroll UI lives in the Enrollments tab:
+  // CourseEnrollmentsTab's 'Enroll Student' button (PersonAdd) ->
+  // the same EnrollStudentDialog (MUI Autocomplete over the real
+  // student list) -> enroll_student RPC. Admins can read the tab:
+  // enrollments_select_policy allows is_admin_with_session_validation
+  // within the current tenant (09_rls.sql).
+  //
+  // Post-enroll, useEnrollStudent invalidates enrollments.byCourse, so
+  // the tab refetches the new row itself; its status chip renders the
+  // raw uppercase status ('ACTIVE'), not the teacher Students tab's
+  // progress chip. Its rows carry actions (Extend/Revoke), but restore
+  // still happens by deleting the course created inside the test
+  // (soft-delete hides it and its enrollments from every UI query).
   test.describe('Student enrollment (Cloud Safe -- self-restoring)', () => {
     async function gotoCourseDetail(page: Page, title: string) {
       // Courses list -> detail. The title cell carries no interactive
@@ -158,9 +161,11 @@ test.describe('Course Creation', () => {
       await expect(courseRow).toBeVisible();
       await courseRow.getByRole('cell').nth(1).click();
 
-      // Detail confirms by its own heading. The Students tab (with the
-      // enroll action) is the default -- no tab clicking involved.
+      // Detail confirms by its own heading. The admin detail page
+      // defaults to General Info -- the enroll action lives in the
+      // Enrollments tab, so switch to it before asserting the button.
       await expect(page.getByRole('heading', { name: title })).toBeVisible();
+      await page.getByRole('tab', { name: 'Enrollments' }).click();
       await expect(page.getByRole('button', { name: 'Enroll Student', exact: true })).toBeVisible();
     }
 
@@ -168,8 +173,9 @@ test.describe('Course Creation', () => {
       // Zero-mutation: a seeded course, dialog opened then cancelled.
       await gotoCourseDetail(page, 'Database Design Principles');
 
-      // Opener and dialog submit share 'Enroll Student'
-      // (common.btn_enroll_student) -- submit is dialog-scoped below.
+      // Opener (CourseEnrollmentsTab, common.enroll_student_btn) and
+      // dialog submit share 'Enroll Student' -- submit is dialog-scoped
+      // below.
       await page.getByRole('button', { name: 'Enroll Student', exact: true }).click();
 
       const dialog = page.getByRole('dialog');
@@ -245,12 +251,14 @@ test.describe('Course Creation', () => {
       await expect(dialog).toBeHidden();
 
       // The dialog toasts nothing on success (EnrollStudentDialog.tsx
-      // just closes) -- the new progress row is the real result. The
-      // Students tab shows progress rows (status chip 'In Progress',
-      // email masked) rather than enrollment rows.
+      // just closes) -- the new enrollment row is the real result.
+      // useEnrollStudent invalidates enrollments.byCourse, so the
+      // Enrollments tab refetches itself. Its status chip renders the
+      // uppercase raw status ('ACTIVE'), not the teacher Students tab's
+      // 'In Progress' progress chip.
       const row = page.getByRole('row', { name: /Lina Khalid/i });
       await expect(row).toBeVisible();
-      await expect(row.getByText('In Progress')).toBeVisible();
+      await expect(row.getByText('ACTIVE')).toBeVisible();
 
       // ── Restore: delete the course created above ────────────────
       // Soft-delete (deleteCourse use case) hides the course and, with

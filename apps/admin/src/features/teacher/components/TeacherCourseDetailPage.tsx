@@ -7,8 +7,6 @@ import {
   Tabs,
   Tab,
   Button,
-  Breadcrumbs,
-  Link,
   Skeleton,
   Fade,
   Divider,
@@ -21,6 +19,7 @@ import { CourseAnalyticsPage } from './CourseAnalyticsPage';
 import { StudentProgressPage } from './StudentProgressPage';
 
 import { useCourseById } from '@/adapters/queries/courses.queries';
+import { useUiStore } from '@/adapters/stores/ui.store';
 import { CourseInfoForm } from '@/features/courses/components/CourseInfoForm';
 import { CurriculumBuilder } from '@/features/courses/components/CurriculumBuilder';
 import { useRouter } from '@/i18n/routing';
@@ -47,6 +46,13 @@ export function TeacherCourseDetailPage() {
   }, [searchParams]);
 
   const { data: course, isLoading, isError } = useCourseById(courseId);
+
+  // ── Sync course title → Topbar breadcrumb ─────────────────────
+  const setPageSubtitle = useUiStore((s) => s.setPageSubtitle);
+  useEffect(() => {
+    if (course?.title) setPageSubtitle(course.title);
+    return () => setPageSubtitle(null); // reset on unmount
+  }, [course?.title, setPageSubtitle]);
 
   if (isLoading) {
     return (
@@ -80,22 +86,8 @@ export function TeacherCourseDetailPage() {
 
   return (
     <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: 1400, mx: 'auto' }}>
-      {/* Header & Breadcrumbs */}
+      {/* Header */}
       <Box sx={{ mb: 4 }}>
-        <Breadcrumbs sx={{ mb: 2, color: 'text.secondary' }}>
-          <Link
-            underline="hover"
-            color="inherit"
-            sx={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 0.5 }}
-            onClick={() => router.push('/courses')}
-          >
-            <MenuBook sx={{ fontSize: 16 }} />
-            {t('course_breadcrumb')}
-          </Link>
-          <Typography color="text.primary" sx={{ fontWeight: 600 }}>
-            {course.title}
-          </Typography>
-        </Breadcrumbs>
 
         <Box
           sx={{

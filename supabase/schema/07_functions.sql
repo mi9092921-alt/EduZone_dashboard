@@ -603,19 +603,48 @@ AS $$
 DECLARE
   v_uid uuid := auth.uid();
   v_tenant_id uuid;
+  v_role text;
+  v_acting_tenant_id uuid;
 BEGIN
   IF auth.role() <> 'service_role' AND NOT public.validate_user_session() THEN
     RETURN NULL;
   END IF;
 
   IF v_uid IS NOT NULL THEN
-    SELECT u.tenant_id
-      INTO v_tenant_id
+    SELECT u.tenant_id, u.primary_role, u.acting_tenant_id
+      INTO v_tenant_id, v_role, v_acting_tenant_id
       FROM public.users u
      WHERE u.id = v_uid
        AND u.deleted_at IS NULL
        AND u.account_status = 'active'
      LIMIT 1;
+
+    -- Tenant Switcher: super_admin viewing a different tenant than their
+    -- own. This status check is scoped to ONLY the super_admin-with-an-
+    -- active-switch branch (rare -- a handful of users, most of the
+    -- time not switched at all), not the hot path every other caller in
+    -- the system takes, so its extra single-row lookup costs nothing at
+    -- scale. It exists because tenants in this schema are always
+    -- soft-deleted (deleted_at/status, enforced by a trigger that blocks
+    -- physical DELETE -- see 07_functions.sql's generic soft-delete-only
+    -- trigger), so the acting_tenant_id column's ON DELETE SET NULL FK
+    -- (03_tables.sql) would in practice almost never fire; without this
+    -- check a super_admin could stay "inside" a since-suspended tenant
+    -- indefinitely. Deliberately does NOT write here (this function is
+    -- STABLE and used inside RLS policies -- a self-healing UPDATE
+    -- inside it would be unsafe/unreliable); the stale acting_tenant_id
+    -- value is simply bypassed on every read until the next real
+    -- switch_tenant_context() call overwrites or clears it.
+    IF v_role = 'super_admin' AND v_acting_tenant_id IS NOT NULL THEN
+      IF EXISTS (
+        SELECT 1 FROM public.tenants t
+        WHERE t.id = v_acting_tenant_id AND t.status = 'active' AND t.deleted_at IS NULL
+      ) THEN
+        RETURN v_acting_tenant_id;
+      END IF;
+      -- Falls through to RETURN v_tenant_id below: acting tenant is gone
+      -- or inactive, revert to home tenant for this read.
+    END IF;
 
     RETURN v_tenant_id;
   END IF;
@@ -648,11 +677,14 @@ BEGIN
         DETAIL = 'The tenant context is derived from public.users, never from an untrusted JWT tenant claim.';
   END IF;
 
+  -- Tenant Switcher: v_tenant (from get_current_tenant_id()) may be a
+  -- super_admin's acting_tenant_id rather than their own tenant_id --
+  -- both are valid, matching get_current_tenant_id()'s own logic above.
   IF v_uid IS NOT NULL AND NOT EXISTS (
     SELECT 1
       FROM public.users u
      WHERE u.id = v_uid
-       AND u.tenant_id = v_tenant
+       AND (u.tenant_id = v_tenant OR (u.primary_role = 'super_admin' AND u.acting_tenant_id = v_tenant))
        AND u.deleted_at IS NULL
        AND u.account_status = 'active'
   ) THEN
@@ -670,6 +702,80 @@ BEGIN
   END IF;
 
   RETURN v_tenant;
+END;
+$$;
+
+-- Tenant Switcher (super_admin only). Sets/clears acting_tenant_id so
+-- get_current_tenant_id() (above) returns the target tenant for every
+-- subsequent RLS-gated query and RPC on this session -- server actions,
+-- direct client Supabase calls, everything -- with no per-callsite
+-- changes needed elsewhere in the schema.
+-- p_tenant_id = NULL exits back to the caller's own home tenant.
+CREATE OR REPLACE FUNCTION public.switch_tenant_context(p_tenant_id uuid)
+RETURNS TABLE(tenant_id uuid, tenant_name text)
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_uid uuid := auth.uid();
+  v_home_tenant_id uuid;
+  v_target_name text;
+BEGIN
+  -- Defense in depth: re-validated here even though every real caller
+  -- (Next.js boundary.ts::requireSuperAdmin) already checked this --
+  -- this RPC must never trust a caller that reached it any other way.
+  IF NOT public.is_current_user_super_admin() THEN
+    RAISE EXCEPTION 'PERMISSION_DENIED';
+  END IF;
+
+  SELECT u.tenant_id INTO v_home_tenant_id FROM public.users u WHERE u.id = v_uid;
+
+  IF p_tenant_id IS NULL THEN
+    UPDATE public.users SET acting_tenant_id = NULL, updated_at = now() WHERE id = v_uid;
+
+    SELECT t.name INTO v_target_name FROM public.tenants t WHERE t.id = v_home_tenant_id;
+
+    -- No explicit p_tenant_id arg: log_activity_async/log_activity_internal
+    -- restrict that override to service_role and otherwise auto-derive from
+    -- the caller's own public.users.tenant_id (v_home_tenant_id, exactly
+    -- what we want -- confirmed while writing tenant-switcher-probe.mjs,
+    -- the first real caller of this RPC).
+    PERFORM public.log_activity_async(
+      v_uid, 'tenant_context_switched',
+      jsonb_build_object(
+        'action', 'exit', 'home_tenant_id', v_home_tenant_id, 'target_tenant_id', NULL
+      ),
+      NULL, NULL, 'medium'
+    );
+
+    RETURN QUERY SELECT v_home_tenant_id, v_target_name;
+    RETURN;
+  END IF;
+
+  -- Validated here, at switch time, not on every get_current_tenant_id()
+  -- read (see comment there) -- deliberately excludes an already-suspended
+  -- or deleted tenant, same bar as assert_tenant()'s own tenant check.
+  SELECT t.name INTO v_target_name
+    FROM public.tenants t
+   WHERE t.id = p_tenant_id
+     AND t.status = 'active'
+     AND t.deleted_at IS NULL;
+
+  IF v_target_name IS NULL THEN
+    RAISE EXCEPTION 'TENANT_NOT_FOUND_OR_INACTIVE';
+  END IF;
+
+  UPDATE public.users SET acting_tenant_id = p_tenant_id, updated_at = now() WHERE id = v_uid;
+
+  PERFORM public.log_activity_async(
+    v_uid, 'tenant_context_switched',
+    jsonb_build_object(
+      'action', 'switch', 'home_tenant_id', v_home_tenant_id, 'target_tenant_id', p_tenant_id
+    ),
+    NULL, NULL, 'medium'
+  );
+
+  RETURN QUERY SELECT p_tenant_id, v_target_name;
 END;
 $$;
 
@@ -4082,6 +4188,7 @@ $$;
 -- before re-running this file. Not needed on a fresh bootstrap.
 -- ============================================================================
 
+DROP FUNCTION IF EXISTS public.admin_get_jobs(int, int, text, text, timestamptz);
 CREATE OR REPLACE FUNCTION public.admin_get_jobs(
   p_page      int DEFAULT 1,
   p_page_size int DEFAULT 10,
@@ -4305,6 +4412,7 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS public.admin_get_job(uuid);
 CREATE OR REPLACE FUNCTION public.admin_get_job(p_id uuid)
 RETURNS TABLE (
   id              uuid,

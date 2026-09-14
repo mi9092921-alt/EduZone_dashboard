@@ -10,6 +10,13 @@ export interface AuthUser {
   email: string;
   primary_role: PrimaryRole;
   tenant_id: string;
+  /**
+   * Tenant Switcher (super_admin only): the tenant currently being
+   * viewed/managed, when different from the home tenant (tenant_id).
+   * Mirrors public.users.acting_tenant_id. Null/undefined = acting as
+   * home tenant, the state for every non-super_admin user too.
+   */
+  acting_tenant_id?: string | null;
   token_version: number;
   /** Cached permissions for the user in the current tenant */
   permissions: PermissionName[];
@@ -31,6 +38,9 @@ interface AuthState {
   setLoading: (loading: boolean) => void;
   /** Update current user's permissions */
   setPermissions: (permissions: PermissionName[]) => void;
+  /** Tenant Switcher: update the locally-known acting tenant after a
+   * successful switchTenantAction call, without a full re-hydration. */
+  setActingTenantId: (tenantId: string | null) => void;
   /** Clear auth state (logout) */
   logout: () => void;
 }
@@ -47,6 +57,10 @@ export const useAuthStore = create<AuthState>((set) => ({
     set((state) => ({
       user: state.user ? { ...state.user, permissions } : null,
     })),
+  setActingTenantId: (tenantId) =>
+    set((state) => ({
+      user: state.user ? { ...state.user, acting_tenant_id: tenantId } : null,
+    })),
   logout: () => set({ user: null, isLoading: false }),
 }));
 
@@ -59,3 +73,9 @@ export const useIsSuperAdmin = () => useAuthStore((s) => s.user?.primary_role ==
 export const useIsTeacher = () => useAuthStore((s) => s.user?.primary_role === 'teacher');
 export const useAuthPermissions = () => useAuthStore((s) => s.user?.permissions || []);
 export const useAuthLoading = () => useAuthStore((s) => s.isLoading || !s.isInitialized);
+/** Tenant Switcher: the tenant currently being viewed, if a super_admin
+ * has switched away from their own home tenant; null otherwise. */
+export const useActingTenantId = () =>
+  useAuthStore((s) => (s.user?.acting_tenant_id && s.user.acting_tenant_id !== s.user.tenant_id
+    ? s.user.acting_tenant_id
+    : null));

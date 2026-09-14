@@ -8,6 +8,13 @@ import type { PrimaryRole } from '@/domain/types/user.types';
 export interface RequestContext {
   userId: string;
   tenantId: string;
+  /**
+   * Set only for a super_admin who has switched tenant context (Tenant
+   * Switcher) -- their real home tenant, distinct from `tenantId` (the
+   * tenant currently being viewed/managed). Absent for every other
+   * caller, where it would just equal `tenantId`.
+   */
+  homeTenantId?: string;
   role: PrimaryRole;
   permissions: readonly string[];
   requestId?: string;
@@ -22,6 +29,7 @@ export function createRequestContext(params: RequestContext): Readonly<RequestCo
     tenantId: params.tenantId,
     role: params.role,
     permissions: Object.freeze([...params.permissions]),
+    ...(params.homeTenantId !== undefined ? { homeTenantId: params.homeTenantId } : {}),
     ...(params.requestId !== undefined ? { requestId: params.requestId } : {}),
   };
   return Object.freeze(ctx);

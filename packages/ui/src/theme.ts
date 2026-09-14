@@ -103,6 +103,14 @@ export const eduZoneTheme = createTheme({
           fontWeight: 600,
           textTransform: 'none',
           boxShadow: 'none',
+          '[dir="rtl"] & .MuiButton-startIcon': {
+            marginLeft: '8px',
+            marginRight: '-2px',
+          },
+          '[dir="rtl"] & .MuiButton-endIcon': {
+            marginRight: '8px',
+            marginLeft: '-2px',
+          },
           '&:hover': {
             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
           },

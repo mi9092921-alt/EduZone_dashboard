@@ -27,6 +27,13 @@ interface UiState {
   isOnline: boolean;
   /** Update network status */
   setOnline: (online: boolean) => void;
+
+  /**
+   * Sub-page title shown in the Topbar breadcrumb.
+   * Set by detail pages (e.g. CourseDetailPage) on mount; reset to null on unmount.
+   */
+  pageSubtitle: string | null;
+  setPageSubtitle: (title: string | null) => void;
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -43,6 +50,9 @@ export const useUiStore = create<UiState>((set) => ({
 
   isOnline: true,
   setOnline: (isOnline) => set({ isOnline }),
+
+  pageSubtitle: null,
+  setPageSubtitle: (pageSubtitle) => set({ pageSubtitle }),
 }));
 
 // ── Derived selectors ──────────────────────────────────────────

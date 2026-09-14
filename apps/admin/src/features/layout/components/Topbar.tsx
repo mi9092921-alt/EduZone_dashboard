@@ -5,6 +5,7 @@ import {
   Logout,
   Person,
   DarkMode,
+  ChevronRight,
 } from '@mui/icons-material';
 import {
   Menu,
@@ -19,8 +20,10 @@ import { useLayout } from '../hooks/useLayout';
 
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { NotificationBell } from './NotificationBell';
+import { TenantSwitcher } from './TenantSwitcher';
 
-import { useAuthUser, useAuthStore } from '@/adapters/stores/auth.store';
+import { useAuthUser, useAuthStore, useIsSuperAdmin } from '@/adapters/stores/auth.store';
+import { useUiStore } from '@/adapters/stores/ui.store';
 import { NAV_ITEMS } from '@/config/nav.config';
 import { useRouter, usePathname } from '@/i18n/routing';
 import { clearBrowserSessionId } from '@/infrastructure/auth/browserSession';
@@ -30,17 +33,23 @@ import { cn } from '@/lib/utils';
 
 export function Topbar() {
   const t = useTranslations('common');
-  const { sidebarOpen, handleToggle } = useLayout();
+  const { sidebarOpen, handleToggle, isDesktop } = useLayout();
 
   const user = useAuthUser();
+  const isSuperAdmin = useIsSuperAdmin();
   const logout = useAuthStore((s) => s.logout);
+  const pageSubtitle = useUiStore((s) => s.pageSubtitle);
   const router = useRouter();
   const pathname = usePathname();
 
   const activeItem = NAV_ITEMS.find((item) =>
     pathname === item.path || (item.path !== '/' && pathname.startsWith(item.path + '/'))
   );
-  const pageTitle = activeItem ? t(activeItem.label) : t('dashboard');
+  const pageTitle = activeItem ? t(activeItem.label as Parameters<typeof t>[0]) : t('dashboard');
+
+  // Detect sub-page depth: e.g. /courses/abc-123 → show breadcrumb
+  const isSubPage = activeItem && pathname !== activeItem.path;
+  const parentLabel = activeItem ? t(activeItem.label as Parameters<typeof t>[0]) : '';
 
   const locale = useLocale();
   const isRtl = locale === 'ar';
@@ -76,32 +85,51 @@ export function Topbar() {
         paddingTop: 'env(safe-area-inset-top)'
       }}
     >
-      <div className={cn(
-        "flex items-center h-full transition-all duration-300",
-        // When sidebar is closed, align normally (px-6).
-        // When open, align strictly with the "EduZone" text or Sidebar inner content (ps-6 or matching)
-        sidebarOpen ? "ps-6 sm:ps-8" : "ps-4 sm:ps-6",
-        "gap-3"
-      )}>
-        {/* Hamburger toggle visible ONLY when sidebar is closed (ChatGPT style) */}
-        {!sidebarOpen && (
+      <div className="flex items-center h-full px-4 sm:px-6 gap-3">
+        {/* Mobile/Tablet Hamburger: Placed at the extreme start (right in RTL) */}
+        {!isDesktop && (
           <button
             id="toggle-sidebar"
             onClick={handleToggle}
-            aria-label={t('open_sidebar')}
-            className="w-8 h-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all flex items-center justify-center shrink-0"
+            aria-label={sidebarOpen ? t('close_sidebar') : t('open_sidebar')}
+            className="w-9 h-9 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all flex items-center justify-center shrink-0"
           >
             <MenuIcon fontSize="small" />
           </button>
         )}
 
-        {/* Dynamic Page Title aligned horizontally with the Sidebar Logo vertically */}
-        <h1 className="text-base font-medium text-foreground tracking-wide hidden sm:block">
-          {pageTitle}
-        </h1>
+        {/* Breadcrumb / Page Title */}
+        {isSubPage && pageSubtitle ? (
+          <nav aria-label="breadcrumb" className="flex items-center gap-1.5 min-w-0">
+            <button
+              onClick={() => activeItem && router.push(activeItem.path as Parameters<typeof router.push>[0])}
+              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors shrink-0 whitespace-nowrap"
+            >
+              {parentLabel}
+            </button>
+            <ChevronRight
+              className="text-border/70 shrink-0"
+              style={{ fontSize: '0.9rem' }}
+            />
+            <span className="text-sm font-semibold text-foreground truncate max-w-[280px] sm:max-w-[480px] md:max-w-[600px]">
+              {pageSubtitle}
+            </span>
+          </nav>
+        ) : (
+          <h1 className="text-base font-semibold text-foreground tracking-wide">
+            {pageTitle}
+          </h1>
+        )}
       </div>
 
       <div className="flex items-center gap-1 sm:gap-2 px-4 sm:px-6">
+        {/* Tenant Switcher (super_admin only) */}
+        {isSuperAdmin && (
+          <div className="hidden md:block">
+            <TenantSwitcher />
+          </div>
+        )}
+
         {/* Language Switcher */}
         <div className="hidden md:block">
           <LanguageSwitcher />

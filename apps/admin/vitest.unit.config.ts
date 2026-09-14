@@ -52,13 +52,13 @@ export default defineConfig({
         // bulk-action route, and the jobs RPC service). Their weight is
         // too small to move the global aggregate, so a targeted drop
         // (e.g. tests deleted) would hide inside the ratchet margin —
-        // these per-file floors freeze each of them at ~2 points below
-        // its measured baseline.
+        // these per-file floors freeze each of them just below their
+        // measured baseline.
         'src/adapters/actions/admin.actions.ts': {
-          lines: 22,
-          statements: 22,
-          functions: 15,
-          branches: 46,
+          lines: 95,
+          statements: 95,
+          functions: 95,
+          branches: 95,
         },
         'src/app/api/bulk-action/route.ts': {
           lines: 25,

@@ -73,6 +73,45 @@ describe('CreateUserUseCase', () => {
     });
   });
 
+  // ── Tenant Switcher (Wave 4): the original motivating gap this whole
+  // feature closes -- a super_admin who has switched acting tenant
+  // (ctx.tenantId resolved via get_current_tenant_id(), Wave 2) must
+  // have the new user land in the SWITCHED tenant, not their own home
+  // tenant, with zero code changes needed in this use case itself
+  // (it was already correctly deriving tenant_id from ctx.tenantId --
+  // the gap was entirely that ctx.tenantId could never BE anything
+  // other than the caller's own tenant before Waves 1-2).
+  it('Tenant Switcher: a switched super_admin creates the user in the ACTING tenant, not their home tenant', async () => {
+    const repo = makeRepo();
+    const switchedSuperAdminCtx = createRequestContext({
+      userId: 'super-1',
+      tenantId: 'tenant-acting', // the tenant they switched to
+      homeTenantId: 'tenant-home', // their own, real tenant
+      role: 'super_admin',
+      permissions: ['*'],
+      requestId: 'req_test_switched_create',
+    });
+
+    const result = await new CreateUserUseCase(repo, audit).execute(switchedSuperAdminCtx, input);
+
+    expect(result).toEqual({ success: true, userId: 'new-user-1' });
+    const profileArg = (repo.upsertProfile as ReturnType<typeof vi.fn>).mock
+      .calls[0]?.[0] as UpsertProfileInput;
+    // The key assertion: tenant_id follows the ACTING tenant (ctx.tenantId),
+    // never the home tenant (ctx.homeTenantId) and never anything the
+    // caller could have passed in `input` (CreateUserInput has no
+    // tenant_id field at all -- it can only ever come from ctx, by
+    // design, matching this use case's own "never from client input" rule).
+    expect(profileArg).toMatchObject({ id: 'new-user-1', tenant_id: 'tenant-acting' });
+    expect(profileArg.tenant_id).not.toBe('tenant-home');
+    expect(repo.assignRole).toHaveBeenCalledWith({
+      user_id: 'new-user-1',
+      role_id: 'role-1',
+      tenant_id: 'tenant-acting',
+      granted_by: 'super-1',
+    });
+  });
+
   it('compensates by deleting the auth user when profile sync fails', async () => {
     const repo = makeRepo({
       upsertProfile: vi.fn().mockResolvedValue({ ok: false, message: 'upsert broke' }),
