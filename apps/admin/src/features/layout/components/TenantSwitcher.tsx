@@ -103,21 +103,20 @@ export function TenantSwitcher() {
           },
         }}
       >
-        {actingTenantId && (
-          <>
-            <MenuItem
-              onClick={() => handleSwitch(null)}
-              className="rounded-lg text-sm px-3 py-2.5 hover:bg-muted focus:bg-muted transition-all duration-200"
-              sx={{ margin: '2px 6px' }}
-            >
-              <div className="flex items-center gap-3 w-full">
-                <ExitToApp fontSize="small" className="text-muted-foreground shrink-0" />
-                <span className="text-sm font-medium text-foreground">{t('tenant_switcher.exit_to_home')}</span>
-              </div>
-            </MenuItem>
-            <Divider className="my-1.5 border-border/40 mx-2" />
-          </>
-        )}
+        {actingTenantId ? (
+          <MenuItem
+            key="exit-to-home"
+            onClick={() => handleSwitch(null)}
+            className="rounded-lg text-sm px-3 py-2.5 hover:bg-muted focus:bg-muted transition-all duration-200"
+            sx={{ margin: '2px 6px' }}
+          >
+            <div className="flex items-center gap-3 w-full">
+              <ExitToApp fontSize="small" className="text-muted-foreground shrink-0" />
+              <span className="text-sm font-medium text-foreground">{t('tenant_switcher.exit_to_home')}</span>
+            </div>
+          </MenuItem>
+        ) : null}
+        {actingTenantId ? <Divider key="exit-divider" className="my-1.5 border-border/40 mx-2" /> : null}
 
         {!tenantsPage && (
           <div className="px-3 py-4 flex justify-center">
