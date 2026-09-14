@@ -1,7 +1,7 @@
 'use client';
 
-import { Suspense } from 'react';
 import { useParams } from 'next/navigation';
+import { Suspense } from 'react';
 
 import { useAuthUser } from '@/adapters/stores/auth.store';
 import { CourseDetailPage } from '@/features/courses';

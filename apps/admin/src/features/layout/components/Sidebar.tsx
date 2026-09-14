@@ -15,8 +15,6 @@ import { NAV_ITEMS } from '@/config/nav.config';
 import { usePathname, Link } from '@/i18n/routing';
 import { cn } from '@/lib/utils';
 
-const SIDEBAR_WIDTH = '220px';
-const COLLAPSED_WIDTH = '80px';
 
 interface SidebarContentProps {
   isMobile: boolean;

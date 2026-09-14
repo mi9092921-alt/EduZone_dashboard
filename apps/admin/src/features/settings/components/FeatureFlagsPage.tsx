@@ -1,5 +1,6 @@
 'use client';
 
+import { eduZoneTheme, eduZoneDarkTheme } from '@eduzone/ui';
 import {
   Flag,
   Add,
@@ -45,7 +46,6 @@ import {
   ThemeProvider,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import { eduZoneTheme, eduZoneDarkTheme } from '@eduzone/ui';
 import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import React, { useState, useCallback } from 'react';
