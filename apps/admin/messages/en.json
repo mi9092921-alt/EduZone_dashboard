@@ -1171,6 +1171,8 @@
     "header_map": "Map",
     "label_high_precision": "High-Precision Logs",
     "label_session_history": "Session History",
+    "label_load_more": "Load More",
+    "label_loading_more": "Loading...",
     "label_lat": "Lat",
     "label_lng": "Lng",
     "label_meters": "m",

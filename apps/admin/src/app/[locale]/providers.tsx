@@ -21,7 +21,13 @@ import { getDir } from '@/lib/direction';
  * - Dynamic ThemeProvider (next-themes + MUI)
  * - AuthProvider (hydrates Zustand state)
  */
-export function Providers({ children }: { children: React.ReactNode }) {
+export function Providers({
+  children,
+  nonce,
+}: {
+  children: React.ReactNode;
+  nonce?: string | undefined;
+}) {
   const queryClient = getQueryClient();
   const locale = useLocale();
   const isRtl = getDir(locale) === 'rtl';
@@ -41,7 +47,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
             : { key: 'mui', enableCssLayer: true }
         }
       >
-        <EduZoneThemeProvider>
+        <EduZoneThemeProvider {...(nonce ? { nonce } : {})}>
           <AuthProvider>
             {children}
             <Toast />

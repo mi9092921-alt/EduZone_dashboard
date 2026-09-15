@@ -1748,7 +1748,9 @@ SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_id uuid := gen_random_uuid();
+  v_user_id uuid := p_user_id;
   v_tenant_id uuid;
+  v_details jsonb := coalesce(p_details, '{}');
 BEGIN
   -- Only service_role may supply an explicit tenant_id
   IF p_tenant_id IS NOT NULL AND auth.role() <> 'service_role' THEN
@@ -1761,12 +1763,42 @@ BEGIN
     public.system_tenant_id()
   );
 
+  -- FK PAIR GUARD (2026-09-15): activity_logs enforces the composite
+  -- activity_logs_user_tenant_fkey (user_id, tenant_id) -> users(id, tenant_id)
+  -- while this queue table only carries simple FKs. An override naming a
+  -- tenant the actor is not a member of (e.g. a switched super_admin's
+  -- *acting* tenant, formerly sent by SupabaseAuditLogger as ctx.tenantId)
+  -- was accepted here, then detonated inside flush_activity_logs() with
+  -- 23503 -- and because the flush is a single transaction, every batch
+  -- aborted on the first poisoned row and the whole audit pipeline wedged.
+  -- Validate the pair now and self-heal instead; the hash chain is computed
+  -- at flush time from the final row values, so healing here keeps the
+  -- chain intact.
+  IF NOT EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = v_user_id AND u.tenant_id = v_tenant_id
+  ) THEN
+    IF p_tenant_id IS NOT NULL THEN
+      v_details := v_details || jsonb_build_object('tenant_override_dropped', v_tenant_id);
+    END IF;
+
+    SELECT u.tenant_id INTO v_tenant_id FROM public.users u WHERE u.id = v_user_id;
+    IF v_tenant_id IS NULL THEN
+      -- Actor row unknown/deleted: drop attribution entirely -- the same
+      -- (NULL user_id, system tenant) shape that ON DELETE SET NULL +
+      -- MATCH SIMPLE already accepts for deleted users.
+      v_details := v_details || jsonb_build_object('audit_actor_unresolved', v_user_id);
+      v_user_id := NULL;
+      v_tenant_id := public.system_tenant_id();
+    END IF;
+  END IF;
+
   INSERT INTO public.activity_log_queue (
     id, user_id, tenant_id, activity_type, details,
     ip_address, device_id, risk_level
   )
   VALUES (
-    v_id, p_user_id, v_tenant_id, p_type, coalesce(p_details, '{}'),
+    v_id, v_user_id, v_tenant_id, p_type, v_details,
     p_ip, p_device_id, p_risk_level
   );
 
@@ -6299,6 +6331,14 @@ DECLARE
   v_prev_hash text;
   v_entry_data text;
 BEGIN
+  -- flush_activity_logs() is the canonical writer for activity_logs. It
+  -- computes a single global chain from audit_chain_state and supplies both
+  -- hashes explicitly. Recomputing them here with the legacy per-tenant
+  -- formula breaks the global chain at the very first inserted row.
+  IF NEW.prev_hash IS NOT NULL AND NEW.entry_hash IS NOT NULL THEN
+    RETURN NEW;
+  END IF;
+
   -- Ensure pgcrypto extension is available
   PERFORM 1 FROM pg_extension WHERE extname = 'pgcrypto';
   -- Get previous hash from last entry for this tenant
@@ -7514,6 +7554,112 @@ BEGIN
 EXCEPTION
   WHEN unique_violation THEN
     RAISE EXCEPTION 'DEVICE_ALREADY_BOUND';
+END;
+$$;
+
+-- Client-safe session recorder for a genuinely fresh login. The student
+-- app's AuthRemoteDataSource.recordSession() calls this instead of a
+-- direct public.sessions insert: it is the only way a session row can
+-- carry a trustworthy ip_address, because the client cannot know its own
+-- public IP and any client-supplied value would be trivially spoofable.
+-- The address is read server-side from the request headers injected by
+-- PostgREST/Supabase edge. SECURITY DEFINER with strict self-service
+-- scoping: the row is always created for auth.uid() in the caller's own
+-- tenant, with the caller's own active device and the authoritative
+-- users.region_id -- mirroring the sessions_insert_own RLS policy, which
+-- stays in place (VALIDATION.sql Check 34) as defense in depth.
+CREATE OR REPLACE FUNCTION public.record_current_session(
+  p_device_fingerprint text DEFAULT NULL,
+  p_user_agent text DEFAULT NULL
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_uid uuid := auth.uid();
+  v_tenant_id uuid := public.get_current_tenant_id();
+  v_session_id uuid;
+  v_device_id uuid;
+  v_region_id text;
+  v_headers jsonb;
+  v_ip_raw text;
+  v_ip inet;
+BEGIN
+  IF v_uid IS NULL OR v_tenant_id IS NULL THEN
+    RAISE EXCEPTION 'AUTH_REQUIRED';
+  END IF;
+
+  IF NOT public.validate_user_session() THEN
+    RAISE EXCEPTION 'AUTH_REQUIRED';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.users
+    WHERE id = v_uid
+      AND tenant_id = v_tenant_id
+      AND deleted_at IS NULL
+      AND account_status = 'active'
+  ) THEN
+    RAISE EXCEPTION 'TENANT_MISMATCH';
+  END IF;
+
+  -- Region comes from the authoritative users row, never from the client.
+  SELECT region_id
+    INTO v_region_id
+    FROM public.users
+   WHERE id = v_uid;
+
+  IF btrim(coalesce(p_device_fingerprint, '')) <> '' THEN
+    SELECT d.id
+      INTO v_device_id
+      FROM public.devices d
+     WHERE d.user_id = v_uid
+       AND d.tenant_id = v_tenant_id
+       AND d.device_id = btrim(p_device_fingerprint)
+       AND d.is_active = true
+     LIMIT 1;
+  END IF;
+
+  -- Server-side IP extraction: never trusted from the client. PostgREST
+  -- exposes request headers with lowercase keys; direct psql connections
+  -- have no request.headers GUC (current_setting returns NULL) and no
+  -- forwarded header, so the session is recorded with a NULL ip_address.
+  BEGIN
+    v_headers := nullif(btrim(current_setting('request.headers', true)), '')::jsonb;
+    v_ip_raw := coalesce(
+      v_headers ->> 'x-forwarded-for',
+      v_headers ->> 'x-real-ip'
+    );
+    v_ip := split_part(btrim(coalesce(v_ip_raw, '')), ',', 1)::inet;
+  EXCEPTION
+    WHEN others THEN
+      -- Malformed or absent header: record the session anyway.
+      v_ip := NULL;
+  END;
+
+  INSERT INTO public.sessions (
+    user_id,
+    tenant_id,
+    device_id,
+    region_id,
+    ip_address,
+    user_agent,
+    is_active
+  )
+  VALUES (
+    v_uid,
+    v_tenant_id,
+    v_device_id,
+    v_region_id,
+    v_ip,
+    nullif(btrim(coalesce(p_user_agent, '')), ''),
+    true
+  )
+  RETURNING id INTO v_session_id;
+
+  RETURN v_session_id;
 END;
 $$;
 

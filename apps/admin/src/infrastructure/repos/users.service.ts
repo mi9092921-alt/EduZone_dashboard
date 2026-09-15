@@ -1,3 +1,5 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
+
 import { container } from '@/container';
 import { mapDbError } from '@/domain/errors';
 import type {
@@ -245,12 +247,16 @@ function emptyUserStats(): UserStats {
   } as UserStats;
 }
 
-export async function getUserStats(tenantId?: string): Promise<UserStats | null> {
-  const { supabase } = container;
-
+export async function getUserStatsWithClient(
+  supabase: SupabaseClient,
+  tenantId?: string,
+): Promise<UserStats | null> {
   // v13: Use RPC for atomic and efficient aggregation
   const { data, error } = await supabase.rpc('get_user_stats_summary', {
-    p_tenant_id: tenantId,
+    // Keep the optional argument in the JSON body. PostgREST can otherwise
+    // omit an undefined property and fail to resolve older cached function
+    // signatures in the schema cache.
+    p_tenant_id: tenantId ?? null,
   });
 
   if (!error && data) {
@@ -287,6 +293,10 @@ export async function getUserStats(tenantId?: string): Promise<UserStats | null>
     mau: users?.filter((u) => isAfter(u.last_login, 30 * 24 * 60 * 60 * 1000)).length ?? 0,
     last_updated: new Date().toISOString(),
   } as UserStats;
+}
+
+export async function getUserStats(tenantId?: string): Promise<UserStats | null> {
+  return getUserStatsWithClient(container.supabase, tenantId);
 }
 
 // ── Get all unique permissions ──────────────────────────────────

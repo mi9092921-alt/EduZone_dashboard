@@ -381,6 +381,15 @@ GRANT EXECUTE ON FUNCTION public.logout_current_user() TO authenticated, service
 REVOKE ALL ON FUNCTION public.bind_device_for_current_user(text, jsonb, text, text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.bind_device_for_current_user(text, jsonb, text, text) TO authenticated, service_role;
 
+-- record_current_session() is the student app's only write path into
+-- public.sessions on a fresh login (AuthRemoteDataSource.recordSession()).
+-- SECURITY DEFINER derives the caller's real request IP server-side; a
+-- client-supplied IP would be trivially spoofable. Same least-privilege
+-- pattern as bind_device_for_current_user above: authenticated can call
+-- it, anon and PUBLIC cannot.
+REVOKE ALL ON FUNCTION public.record_current_session(text, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.record_current_session(text, text) TO authenticated, service_role;
+
 REVOKE ALL ON FUNCTION public.register_push_token(text, text, text, jsonb, text)
   FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.register_push_token(text, text, text, jsonb, text)
@@ -879,3 +888,24 @@ GRANT EXECUTE ON FUNCTION public.find_user_by_email(text)
 -- removes everywhere else. Narrow to SELECT-only.
 REVOKE INSERT, UPDATE, DELETE ON public.audit_chain_state FROM authenticated;
 GRANT SELECT ON public.audit_chain_state TO authenticated;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- ACCESS RULES GRANTS FIX (2026-09-15) — resolves PostgREST 403 on
+-- GET /rest/v1/access_rules from the admin dashboard browser client.
+-- ─────────────────────────────────────────────────────────────────────────────
+-- The blanket REVOKE ("REVOKE ALL ON ALL TABLES IN SCHEMA public FROM
+-- PUBLIC, anon, authenticated") removed every table grant in `public` from
+-- `authenticated`, but per-table grants were never re-added for
+-- access_rules / user_access_rules. PostgREST therefore rejects the
+-- browser client's SELECT with 403 permission-denied BEFORE RLS is even
+-- evaluated (an RLS denial would surface as a 200 with an empty array,
+-- not a 403).
+--
+-- The access_rules_admin / user_access_rules_admin policies in 09_rls.sql
+-- remain the authorization boundary (admin-only, tenant-scoped via
+-- is_admin_with_session_validation() + get_current_tenant_id()) — the same
+-- pattern already used for the feature_flags tables above. service_role
+-- keeps full access via the blanket GRANT ALL ON ALL TABLES earlier in
+-- this file; anon stays revoked.
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.access_rules      TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_access_rules TO authenticated;

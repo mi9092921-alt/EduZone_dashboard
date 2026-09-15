@@ -26,6 +26,18 @@ export class SupabaseAuditLogger implements IAuditLogger {
       outcome: event.outcome ?? 'success',
       ...(event.summary !== undefined && { summary: event.summary }),
       ...(event.targetUserId !== undefined && { target_user_id: event.targetUserId }),
+      // Tenant Switcher: a switched super_admin's ctx.tenantId is the
+      // *acting* tenant. It must NOT be sent as the log_activity_async
+      // tenant override -- the actor has no (user_id, tenant_id) membership
+      // row there, so the override poisoned activity_log_queue and wedged
+      // flush_activity_logs with a 23503 FK violation
+      // (activity_logs_user_tenant_fkey). The RPC derives the actor's home
+      // tenant from public.users instead; the acting tenant is preserved
+      // here for traceability.
+      ...(ctx.homeTenantId !== undefined &&
+        ctx.homeTenantId !== ctx.tenantId && {
+          acting_tenant_id: ctx.tenantId,
+        }),
       ...(event.details ?? {}),
     };
 
@@ -35,7 +47,9 @@ export class SupabaseAuditLogger implements IAuditLogger {
         type: event.type,
         details,
         riskLevel: event.riskLevel ?? 'low',
-        tenantId: ctx.tenantId || null,
+        // Null override: let log_activity_internal derive the tenant from
+        // the actor's own public.users row -- always FK-valid by construct.
+        tenantId: null,
       });
     } catch (error) {
       console.error('[audit-logger] log_activity_async failed:', {

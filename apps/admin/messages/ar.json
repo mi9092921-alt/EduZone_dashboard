@@ -1171,6 +1171,8 @@
     "header_map": "الخريطة",
     "label_high_precision": "سجلات دقيقة (GPS)",
     "label_session_history": "سجل الجلسات",
+    "label_load_more": "تحميل المزيد",
+    "label_loading_more": "جارٍ التحميل...",
     "label_lat": "خط العرض",
     "label_lng": "خط الطول",
     "label_meters": "م",

@@ -29,7 +29,7 @@ export async function getUserStats(tenantId?: string): Promise<UserStatsDto> {
   const { supabase } = container;
 
   const { data, error } = await supabase.rpc('get_user_stats_summary', {
-    p_tenant_id: tenantId,
+    p_tenant_id: tenantId ?? null,
   });
 
   if (error || !data) {

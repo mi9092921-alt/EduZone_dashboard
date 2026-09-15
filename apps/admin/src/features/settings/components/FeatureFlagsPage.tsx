@@ -1,6 +1,5 @@
 'use client';
 
-import { eduZoneTheme, eduZoneDarkTheme } from '@eduzone/ui';
 import {
   Flag,
   Add,
@@ -43,7 +42,6 @@ import {
   TableHead,
   TableRow,
   useTheme,
-  ThemeProvider,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import { useSearchParams } from 'next/navigation';
@@ -66,6 +64,7 @@ import {
 } from '@/adapters/mutations/settings.mutations';
 import { useFeatureFlags, useFeatureFlagDetail, useRoles } from '@/adapters/queries/settings.queries';
 import { useToastStore } from '@/adapters/stores/toast.store';
+import { LtrIsland } from '@/components/ui/LtrIsland';
 import { toClientMessage } from '@/domain/errors';
 import type {
   CreateFeatureFlagInput,
@@ -77,7 +76,6 @@ import { usePathname, useRouter } from '@/i18n/routing';
 export function FeatureFlagsPage() {
   const theme = useTheme();
   const isRtl = theme.direction === 'rtl';
-  const ltrTheme = theme.palette.mode === 'dark' ? eduZoneDarkTheme : eduZoneTheme;
   const t = useTranslations('settings');
   const tCommon = useTranslations('common');
   const router = useRouter();
@@ -328,27 +326,29 @@ export function FeatureFlagsPage() {
                       </TableCell>
                       <TableCell sx={{ minWidth: 90 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <ThemeProvider theme={ltrTheme}>
-                            <Box dir="ltr" sx={{ display: 'inline-flex' }}>
-                              <Switch
-                                checked={row.is_enabled}
-                                onChange={() => handleToggle(row)}
-                                color="success"
-                                size="small"
-                              />
-                            </Box>
-                          </ThemeProvider>
+                          {/* LTR island: a plain `dir="ltr"` wrapper cannot stop the
+                              global stylis-rtl plugin from mirroring the switch's
+                              `translateX`/`left` (the mirror is CSS-text-level).
+                              LtrIsland swaps in a plugin-free emotion cache so MUI's
+                              LTR baseline ships verbatim and the thumb stays on the
+                              track. */}
+                          <LtrIsland>
+                            <Switch
+                              checked={row.is_enabled}
+                              onChange={() => handleToggle(row)}
+                              color="success"
+                              size="small"
+                            />
+                          </LtrIsland>
                         </Box>
                       </TableCell>
                       <TableCell sx={{ minWidth: 200 }}>
-                        <ThemeProvider theme={ltrTheme}>
+                        <LtrIsland>
                           <Box
-                            dir="ltr"
                             sx={{
                               display: 'flex',
                               alignItems: 'center',
                               gap: 1.5,
-                              direction: 'ltr',
                             }}
                           >
                             <Slider
@@ -376,7 +376,7 @@ export function FeatureFlagsPage() {
                               }}
                             />
                           </Box>
-                        </ThemeProvider>
+                        </LtrIsland>
                       </TableCell>
                       <TableCell sx={{ minWidth: 160 }}>
                         {(() => {
@@ -392,7 +392,7 @@ export function FeatureFlagsPage() {
                                   fontWeight: 500,
                                   color: 'text.secondary',
                                   borderColor: 'divider',
-                                  backgroundColor: alpha(theme.palette.action.hover, 0.5),
+                                  backgroundColor: 'action.hover',
                                 }}
                               />
                             );
@@ -492,8 +492,6 @@ export function FeatureFlagsPage() {
 
 function FlagOverridesPanel({ flagId }: { flagId: string }) {
   const theme = useTheme();
-  const isRtl = theme.direction === 'rtl';
-  const ltrTheme = theme.palette.mode === 'dark' ? eduZoneDarkTheme : eduZoneTheme;
   const t = useTranslations('settings');
   const tCommon = useTranslations('common');
   const { data: detail, isLoading } = useFeatureFlagDetail(flagId);
@@ -565,7 +563,7 @@ function FlagOverridesPanel({ flagId }: { flagId: string }) {
                   borderRadius: 2,
                   border: '1px dashed',
                   borderColor: 'divider',
-                  backgroundColor: alpha(theme.palette.action.hover, 0.4),
+                  backgroundColor: 'action.hover',
                 }}
               >
                 <Typography sx={{ fontSize: '0.8125rem', color: 'text.secondary', fontWeight: 500 }}>
@@ -626,7 +624,7 @@ function FlagOverridesPanel({ flagId }: { flagId: string }) {
                   borderRadius: 2,
                   border: '1px dashed',
                   borderColor: 'divider',
-                  backgroundColor: alpha(theme.palette.action.hover, 0.4),
+                  backgroundColor: 'action.hover',
                 }}
               >
                 <Typography sx={{ fontSize: '0.8125rem', color: 'text.secondary', fontWeight: 500 }}>
@@ -687,7 +685,7 @@ function FlagOverridesPanel({ flagId }: { flagId: string }) {
                   borderRadius: 2,
                   border: '1px dashed',
                   borderColor: 'divider',
-                  backgroundColor: alpha(theme.palette.action.hover, 0.4),
+                  backgroundColor: 'action.hover',
                 }}
               >
                 <Typography sx={{ fontSize: '0.8125rem', color: 'text.secondary', fontWeight: 500 }}>
@@ -898,11 +896,11 @@ function FlagOverridesPanel({ flagId }: { flagId: string }) {
                 <MenuItem value="disabled">{t('feature_flags.disabled')}</MenuItem>
               </Select>
             </FormControl>
-            <Box dir="ltr" sx={{ direction: 'ltr', mt: 1 }}>
-              <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary', mb: 0.5, direction: isRtl ? 'rtl' : 'ltr', textAlign: isRtl ? 'right' : 'left' }}>
+            <Box sx={{ mt: 1 }}>
+              <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary', mb: 0.5, textAlign: 'start' }}>
                 {t('feature_flags.table_rollout')}: {tenantRollout}%
               </Typography>
-              <ThemeProvider theme={ltrTheme}>
+              <LtrIsland>
                 <Slider
                   value={tenantRollout}
                   onChange={(_, v) => setTenantRollout(v as number)}
@@ -910,7 +908,7 @@ function FlagOverridesPanel({ flagId }: { flagId: string }) {
                   max={100}
                   size="small"
                 />
-              </ThemeProvider>
+              </LtrIsland>
             </Box>
           </Box>
         </DialogContent>
