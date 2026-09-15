@@ -114,7 +114,7 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/10 via-background to-background p-6">
+    <div className="min-h-[100dvh] w-full flex items-center justify-center bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/10 via-background to-background p-6">
       <Card className="w-full max-w-[440px] shadow-2xl border-border/50 animate-in fade-in zoom-in-95 duration-500">
         <CardHeader className="text-center space-y-1 pb-8">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-primary shadow-lg shadow-primary/20 mb-4 transition-faang hover:scale-105">

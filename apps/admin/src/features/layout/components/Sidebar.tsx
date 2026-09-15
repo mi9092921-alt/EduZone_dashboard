@@ -9,8 +9,10 @@ import React, { useMemo } from 'react';
 
 import { useLayout } from '../hooks/useLayout';
 
+import { TenantSwitcher } from './TenantSwitcher';
+
 import type { PrimaryRole } from '@/adapters/stores/auth.store';
-import { useAuthUser } from '@/adapters/stores/auth.store';
+import { useAuthUser, useIsSuperAdmin } from '@/adapters/stores/auth.store';
 import { NAV_ITEMS } from '@/config/nav.config';
 import { usePathname, Link } from '@/i18n/routing';
 import { cn } from '@/lib/utils';
@@ -36,6 +38,7 @@ function SidebarInnerContent({
   const t = useTranslations('common');
   const theme = useTheme();
   const isRtl = theme.direction === 'rtl';
+  const isSuperAdmin = useIsSuperAdmin();
 
   return (
     <div
@@ -111,6 +114,14 @@ function SidebarInnerContent({
               <MenuIcon fontSize="small" />
             </button>
           </Tooltip>
+        </div>
+      )}
+
+      {/* WORKSPACE SWITCHER — super_admin only. Big-app pattern (Notion/Slack/Linear):
+          the institution picker lives at the top of the sidebar/drawer, not the topbar. */}
+      {isSuperAdmin && (
+        <div className={cn('shrink-0 pt-3 pb-1 px-3', isCollapsed && 'flex justify-center px-0')}>
+          <TenantSwitcher collapsed={isCollapsed} />
         </div>
       )}
 

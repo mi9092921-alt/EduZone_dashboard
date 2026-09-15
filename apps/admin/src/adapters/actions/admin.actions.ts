@@ -53,7 +53,6 @@ import * as featureFlagsService from '@/infrastructure/repos/feature-flags.servi
 import * as jobsService from '@/infrastructure/repos/jobs.service';
 import { makeNotificationAdminRepository } from '@/infrastructure/repos/notifications.repository';
 import * as rateLimitsService from '@/infrastructure/repos/rate-limits.service';
-import { createServerClient } from '@/infrastructure/supabase/server';
 
 /**
  * Thin Server-Action boundary — every exported action follows the contract:
@@ -449,10 +448,10 @@ export async function getAnalyticsCourseStatsAction(tenantId?: string): Promise<
   // id (or omit it) to see top-course/enrollment analytics across every tenant.
   const scopedTenantId = ctx.permissions.includes('*') ? tenantId : ctx.tenantId;
   // vw_course_stats is security_invoker, so the query must run under the
-  // caller's own JWT: pass the cookie-bound server client (the browser client
-  // in container.supabase carries no session server-side → anon → zero rows).
-  const supabase = await createServerClient();
-  return analyticsService.getCourseStats(scopedTenantId, supabase);
+  // caller's own JWT: reuse the cookie-bound client the boundary authenticated
+  // with (the browser client in container.supabase carries no session
+  // server-side → PostgREST sees anon → zero rows).
+  return analyticsService.getCourseStats(scopedTenantId, ctx.supabase);
 }
 
 export async function getCourseStatsAction(courseId: string): Promise<CourseStats | null> {

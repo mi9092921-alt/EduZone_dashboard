@@ -1,3 +1,5 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
+
 import {
   authorizeCaller,
   authorizeSuperAdmin,
@@ -20,12 +22,22 @@ import { createServerClient } from '@/infrastructure/supabase/server';
  * never from client-supplied arguments.
  */
 
+/**
+ * Permission gate result: the authorization context plus the cookie-bound
+ * server client that produced it. Actions that query Supabase under the
+ * caller's own JWT (security_invoker views, RLS-scoped reads) MUST reuse
+ * this client — the browser client in container.supabase carries no session
+ * server-side, so PostgREST would see anon.
+ */
+export type PermissionContext = Readonly<RequestContext> & { supabase: SupabaseClient };
+
 /** Authenticates the caller and requires one of the given permissions. */
 export async function requirePermission(
   permission: string | string[],
-): Promise<Readonly<RequestContext>> {
+): Promise<PermissionContext> {
   const supabase = await createServerClient();
-  return authorizeCaller(supabase, permission);
+  const ctx = await authorizeCaller(supabase, permission);
+  return { ...ctx, supabase };
 }
 
 /** Authenticates the caller only (no permission required). */
