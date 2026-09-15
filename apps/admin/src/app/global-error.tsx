@@ -15,13 +15,13 @@ export default function GlobalError({
   }, [error]);
 
   return (
-    <html lang="ar" dir="rtl">
+    <html lang="en" dir="auto">
       <body>
         <main style={{ fontFamily: 'sans-serif', padding: '3rem', textAlign: 'center' }}>
-          <h1>حدث خطأ غير متوقع</h1>
-          <p>نعتذر، يرجى المحاولة مرة أخرى.</p>
+          <h1>Unexpected error / حدث خطأ غير متوقع</h1>
+          <p>Sorry, please try again. / نعتذر، يرجى المحاولة مرة أخرى.</p>
           <button onClick={() => reset()} type="button">
-            إعادة المحاولة
+            Try again / إعادة المحاولة
           </button>
         </main>
       </body>

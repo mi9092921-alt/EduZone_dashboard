@@ -6946,6 +6946,11 @@ BEGIN
     EXCEPTION WHEN OTHERS THEN
       UPDATE internal.job_queue
       SET status              = CASE WHEN attempts >= max_attempts THEN 'failed' ELSE 'pending' END,
+          next_retry_at       = CASE WHEN attempts >= max_attempts THEN NULL
+                                      ELSE now() + least(interval '15 minutes',
+                                           greatest(interval '30 seconds',
+                                             make_interval(secs => power(2, greatest(attempts - 1, 0))::integer * 30)))
+                                 END,
           error_message       = SQLERRM,
           locked_by_worker_id = NULL,
           locked_at           = NULL,
@@ -7210,6 +7215,84 @@ $$;
 
 COMMENT ON FUNCTION internal.process_course_notify_jobs(integer, text) IS
   'Processes lesson-published and enrollment notification jobs in batches. Lesson jobs are grouped by course and explicit recipients are fanned out inline.';
+
+-- ============================================================================
+-- Cron routine public RPC wrappers (launch audit B2, 2026-09-15)
+-- ============================================================================
+-- GET /api/cron/routine resolves RPCs through PostgREST, which can only reach
+-- functions in the EXPOSED schemas (config.toml: public, graphql_public). The
+-- four maintenance routines below were defined in internal/maintenance/private
+-- schemas, so every cron tick failed with a schema-cache error before any
+-- notification work ran. These thin public wrappers are the only
+-- PostgREST-reachable entry points; each forwards to its canonical
+-- implementation and EXECUTE is granted to service_role ONLY in
+-- 10_permissions.sql. No logic lives here — the internal/maintenance/private
+-- functions remain the single source of truth.
+
+CREATE OR REPLACE FUNCTION public.manage_partitions()
+RETURNS void
+LANGUAGE sql
+SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+  SELECT maintenance.manage_partitions();
+$$;
+
+CREATE OR REPLACE FUNCTION public.prune_expired_access_cache()
+RETURNS integer
+LANGUAGE sql
+SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+  SELECT private.prune_expired_access_cache();
+$$;
+
+CREATE OR REPLACE FUNCTION public.process_cache_purges(
+  p_limit     integer DEFAULT 1000,
+  p_worker_id text    DEFAULT gen_random_uuid()::text
+)
+RETURNS integer
+LANGUAGE sql
+SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+  SELECT internal.process_cache_purges(p_limit, p_worker_id);
+$$;
+
+CREATE OR REPLACE FUNCTION public.process_update_enrollment_totals_jobs(
+  p_limit integer DEFAULT 100
+)
+RETURNS integer
+LANGUAGE sql
+SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+  SELECT internal.process_update_enrollment_totals_jobs(p_limit);
+$$;
+
+-- Queue health snapshot for the cron route (launch audit B11): lets the daily
+-- tick surface failed-job counts and backlog age to monitoring instead of
+-- dying silently. Read-only over internal.job_queue; service_role only.
+CREATE OR REPLACE FUNCTION public.cron_queue_health()
+RETURNS jsonb
+LANGUAGE sql
+SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+  SELECT jsonb_build_object(
+    'pending',
+      (SELECT count(*) FROM internal.job_queue WHERE status = 'pending'),
+    'processing',
+      (SELECT count(*) FROM internal.job_queue WHERE status = 'processing'),
+    'failed',
+      (SELECT count(*) FROM internal.job_queue WHERE status = 'failed'),
+    'failed_last_24h',
+      (SELECT count(*) FROM internal.job_queue
+       WHERE status = 'failed'
+         AND updated_at > pg_catalog.now() - interval '24 hours'),
+    'oldest_pending_age_seconds',
+      (SELECT coalesce(extract(epoch FROM pg_catalog.now() - min(run_at)), 0)::double precision
+       FROM internal.job_queue WHERE status = 'pending')
+  );
+$$;
+
+COMMENT ON FUNCTION public.cron_queue_health() IS
+  'Read-only job-queue health snapshot (pending/processing/failed counts + oldest pending age) consumed by GET /api/cron/routine for monitoring. service_role only.';
 
 -- One-time decommission of the pre-feature backlog. The old
 -- trg_lessons_publish_notify enqueued NOTIFY_LESSON_PUBLISHED jobs without

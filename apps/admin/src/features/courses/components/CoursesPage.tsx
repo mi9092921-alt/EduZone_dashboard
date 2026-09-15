@@ -144,20 +144,25 @@ export function CoursesPage() {
     setIsBulkPending(true);
 
     try {
+      const failedIds: string[] = [];
       if (action === 'delete') {
         for (const id of selectedIds) {
-          await deleteMutation.mutateAsync(id);
+          try {
+            await deleteMutation.mutateAsync(id);
+          } catch {
+            failedIds.push(id);
+          }
         }
-        showToast(t('bulk_action_success'), 'success');
-        setSelectedIds([]);
       } else if (action === 'publish' || action === 'draft' || action === 'archive') {
         const newStatus: CourseStatus =
           action === 'publish' ? 'published' : action === 'draft' ? 'draft' : 'archived';
         for (const id of selectedIds) {
-          await updateMutation.mutateAsync({ id, data: { status: newStatus } });
+          try {
+            await updateMutation.mutateAsync({ id, data: { status: newStatus } });
+          } catch {
+            failedIds.push(id);
+          }
         }
-        showToast(t('bulk_action_success'), 'success');
-        setSelectedIds([]);
       } else if (action === 'export_json' || action === 'export_csv') {
         for (const id of selectedIds) {
           const courseDetail = await getCourseById(id);
@@ -228,6 +233,15 @@ export function CoursesPage() {
           await new Promise((r) => setTimeout(r, 300));
         }
         showToast(t('export_started'), 'info');
+      }
+      if (action === 'delete' || action === 'publish' || action === 'draft' || action === 'archive') {
+        if (failedIds.length > 0) {
+          showToast(t('bulk_partial_failure', { failed: failedIds.length, total: selectedIds.length }), 'warning');
+          setSelectedIds(failedIds);
+        } else {
+          showToast(t('bulk_action_success'), 'success');
+          setSelectedIds([]);
+        }
       }
     } catch {
       showToast(t('bulk_action_failed'), 'error');

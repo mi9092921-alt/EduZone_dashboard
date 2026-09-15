@@ -183,6 +183,9 @@ jobs:
         run: pnpm --filter @eduzone/admin exec playwright install --with-deps chromium
 
       - name: Run Playwright (chromium)
+        env:
+          E2E_EMAIL: admin@eduzone-test.com
+          E2E_PASSWORD: Admin@12345
         run: pnpm --filter @eduzone/admin exec playwright test --project=chromium
 
       - name: Stop local Supabase

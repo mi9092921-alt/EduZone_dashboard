@@ -426,6 +426,45 @@ REVOKE ALL ON FUNCTION public.process_course_notify_jobs(integer, text)
 GRANT EXECUTE ON FUNCTION public.process_course_notify_jobs(integer, text)
   TO service_role;
 
+-- Launch audit B2 (2026-09-15): thin public wrappers for GET /api/cron/routine
+-- so PostgREST can resolve the four maintenance RPCs (their implementations
+-- live in internal/maintenance/private schemas that PostgREST cannot reach).
+-- service_role is the ONLY caller of both the wrappers and the originals.
+REVOKE ALL ON FUNCTION public.manage_partitions()
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.manage_partitions() TO service_role;
+REVOKE ALL ON FUNCTION public.prune_expired_access_cache()
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.prune_expired_access_cache() TO service_role;
+REVOKE ALL ON FUNCTION public.process_cache_purges(integer, text)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.process_cache_purges(integer, text) TO service_role;
+REVOKE ALL ON FUNCTION public.process_update_enrollment_totals_jobs(integer)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.process_update_enrollment_totals_jobs(integer)
+  TO service_role;
+REVOKE ALL ON FUNCTION public.cron_queue_health()
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.cron_queue_health() TO service_role;
+
+-- Hardening for the same audit finding: strip the implicit PUBLIC EXECUTE
+-- default from the underlying routines so the only path in is the public
+-- wrapper above (notably internal.process_update_enrollment_totals_jobs,
+-- which has no in-function permission guard).
+REVOKE ALL ON FUNCTION maintenance.manage_partitions()
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION maintenance.manage_partitions() TO service_role;
+REVOKE ALL ON FUNCTION private.prune_expired_access_cache()
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION private.prune_expired_access_cache() TO service_role;
+REVOKE ALL ON FUNCTION internal.process_cache_purges(integer, text)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION internal.process_cache_purges(integer, text) TO service_role;
+REVOKE ALL ON FUNCTION internal.process_update_enrollment_totals_jobs(integer, text)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION internal.process_update_enrollment_totals_jobs(integer, text)
+  TO service_role;
+
 REVOKE ALL ON FUNCTION internal.send_system_notification(uuid, text, text, uuid[])
   FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION internal.send_system_notification(uuid, text, text, uuid[])

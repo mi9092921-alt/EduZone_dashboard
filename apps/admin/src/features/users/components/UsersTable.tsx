@@ -102,6 +102,14 @@ const UserRow = memo(({
   return (
     <tr
       onClick={() => onViewProfile(user)}
+      tabIndex={0}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onViewProfile(user);
+        }
+      }}
+      aria-label={t('open_user_profile', { name: displayName })}
       className="group hover:bg-muted/30 transition-all duration-200 cursor-pointer"
     >
       <td className="px-5 py-4 sticky start-0 bg-card group-hover:bg-muted/30 z-10 border-b border-border/40" onClick={(e) => e.stopPropagation()}>

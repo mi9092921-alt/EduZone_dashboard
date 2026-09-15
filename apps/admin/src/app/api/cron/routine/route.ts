@@ -1,4 +1,4 @@
-import { timingSafeEqual } from 'node:crypto';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
 
 import { NextResponse } from 'next/server';
 
@@ -10,6 +10,7 @@ import {
   processNotificationFanoutJobs,
   processUpdateEnrollmentTotalsJobs,
   pruneExpiredAccessCache,
+  getCronQueueHealth,
 } from '@/infrastructure/repos/jobs-rpc.service';
 import { getServerEnv } from '@/lib/env';
 
@@ -37,67 +38,42 @@ export async function GET(request: Request) {
   const results: Record<string, unknown> = {};
 
   try {
-    // 1. Manage Partitions
-    await managePartitions(supabaseAdmin);
-    results['manage_partitions'] = 'Success';
+    const failures: string[] = [];
+    const runStep = async <T>(name: string, work: () => Promise<T>) => {
+      try {
+        results[name] = await work();
+      } catch (err) {
+        failures.push(name);
+        results[name] = 'Worker error';
+        console.error(`[CRON_ROUTINE_${name.toUpperCase()}_ERROR]`, err);
+      }
+    };
 
-    // 2. Prune Expired Cache
-    const prunedData = await pruneExpiredAccessCache(supabaseAdmin);
-    results['pruned_count'] = prunedData;
+    // Each step is isolated so a maintenance failure cannot prevent
+    // notification fan-out from running on the same tick.
+    await runStep('manage_partitions', () => managePartitions(supabaseAdmin));
+    await runStep('pruned_count', () => pruneExpiredAccessCache(supabaseAdmin));
+    await runStep('enrollment_totals_jobs_processed', () =>
+      processUpdateEnrollmentTotalsJobs(supabaseAdmin, 100),
+    );
+    await runStep('jobs_processed', () => processCachePurges(supabaseAdmin, randomUUID(), 1000));
+    await runStep('notification_fanout_jobs_processed', () =>
+      processNotificationFanoutJobs(supabaseAdmin, randomUUID(), 500),
+    );
+    await runStep('course_notify_jobs_processed', () =>
+      processCourseNotifyJobs(supabaseAdmin, randomUUID(), 500),
+    );
+    await runStep('queue_health', () => getCronQueueHealth(supabaseAdmin));
 
-    // 3. Process Course Enrollment Totals
-    // P1-SEC-003 FIX: don't put the raw RPC/Postgres error message in the
-    // response body (this is the one place in this route that did -- every
-    // other RPC error is thrown and caught below, which already logs
-    // server-side via console.error and returns a generic client response).
-    try {
-      const enrollmentTotalsJobs = await processUpdateEnrollmentTotalsJobs(supabaseAdmin, 100);
-      results['enrollment_totals_jobs_processed'] = enrollmentTotalsJobs;
-    } catch (err) {
-      console.error('[CRON_ROUTINE_ENROLLMENT_TOTALS_ERROR]', err);
-      results['enrollment_totals_jobs_processed'] = 'Skipped: worker error';
-    }
-
-    // 4. Process Cache Purges from Job Queue
-    // Generate a unique worker ID to maintain lease ownership and avoid race conditions
-    const workerId = crypto.randomUUID();
-    const processedJobs = await processCachePurges(supabaseAdmin, workerId, 1000);
-    results['jobs_processed'] = processedJobs;
-
-    // 5. Fan-out pending Notification jobs to user_notifications + push_deliveries rows.
-    //
-    // BUG-NOTIF-01: delegate to the canonical SQL worker, which fans out user_notifications
-    // *and* push_deliveries/notification_push rows atomically per job, and is
-    // granted to service_role (see BUG-NOTIF-01 in 10_permissions.sql).
-    const fanoutWorkerId = crypto.randomUUID();
-    try {
-      const fanoutCount = await processNotificationFanoutJobs(supabaseAdmin, fanoutWorkerId, 500);
-      results['notification_fanout_jobs_processed'] = fanoutCount;
-    } catch (err) {
-      console.error('[CRON_ROUTINE_FANOUT_ERROR]', err);
-      results['notification_fanout_jobs_processed'] = 'Worker error';
-    }
-
-    // 6. Automatic lesson/enrollment notifications. This is intentionally
-    // skip-and-log so a notification worker outage cannot block maintenance.
-    const courseNotifyWorkerId = crypto.randomUUID();
-    try {
-      const courseNotifyCount = await processCourseNotifyJobs(
-        supabaseAdmin,
-        courseNotifyWorkerId,
-        500,
-      );
-      results['course_notify_jobs_processed'] = courseNotifyCount;
-    } catch (err) {
-      console.error('[CRON_ROUTINE_COURSE_NOTIFY_ERROR]', err);
-      results['course_notify_jobs_processed'] = 'Skipped: worker error';
-    }
-
-    return NextResponse.json({
-      success: true,
-      timestamp: new Date().toISOString(),
-      results,
-    });
+    return NextResponse.json(
+      {
+        success: failures.length === 0,
+        timestamp: new Date().toISOString(),
+        results,
+        ...(failures.length > 0 ? { failed_steps: failures } : {}),
+      },
+      { status: failures.length > 0 ? 500 : 200 },
+    );
   } catch (err: unknown) {
     console.error('[CRON_ROUTINE_ERROR]', err);
     // Return 500 to signal a cron failure out to Next.js Error Monitoring (e.g. Sentry)

@@ -9,6 +9,7 @@ import { useState, useTransition } from 'react';
 import { switchTenantAction } from '@/adapters/actions/tenants.actions';
 import { queryKeys } from '@/adapters/queries/keys';
 import { useAuthUser, useAuthStore, useIsSuperAdmin } from '@/adapters/stores/auth.store';
+import { useToast } from '@/adapters/stores/toast.store';
 import { Button } from '@/components/ui/Button';
 import { useRouter } from '@/i18n/routing';
 import { getTenants } from '@/infrastructure/repos/tenants.service';
@@ -27,6 +28,7 @@ export function TenantSwitcher() {
   const setActingTenantId = useAuthStore((s) => s.setActingTenantId);
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { showToast } = useToast();
 
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -60,10 +62,14 @@ export function TenantSwitcher() {
   function handleSwitch(tenantId: string | null) {
     setAnchorEl(null);
     startTransition(async () => {
-      const result = await switchTenantAction(tenantId);
-      setActingTenantId(result.tenantId === homeTenantId ? null : result.tenantId);
-      await queryClient.invalidateQueries();
-      router.refresh();
+      try {
+        const result = await switchTenantAction(tenantId);
+        setActingTenantId(result.tenantId === homeTenantId ? null : result.tenantId);
+        await queryClient.invalidateQueries();
+        router.refresh();
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : t('tenant_switcher.error'), 'error');
+      }
     });
   }
 

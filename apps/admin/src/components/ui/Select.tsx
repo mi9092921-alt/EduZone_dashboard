@@ -6,8 +6,10 @@ import {
   SelectProps as MuiSelectProps,
   SelectChangeEvent,
 } from '@mui/material';
+import { useLocale } from 'next-intl';
 import * as React from 'react';
 
+import { getDir } from '@/lib/direction';
 import { cn } from '@/lib/utils';
 
 export interface SelectProps extends Omit<MuiSelectProps, 'onChange'> {
@@ -18,6 +20,8 @@ export interface SelectProps extends Omit<MuiSelectProps, 'onChange'> {
 const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
   ({ className, children, onValueChange, value, ...props }, ref) => {
     const [isOpen, setIsOpen] = React.useState(false);
+    const isRtl = getDir(useLocale()) === 'rtl';
+    const horizontal = isRtl ? 'right' : 'left';
 
     const handleChange = (event: SelectChangeEvent<unknown>) => {
       onValueChange?.(event.target.value as string);
@@ -71,8 +75,8 @@ const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
         className={cn('transition-faang text-sm bg-background', className)}
         MenuProps={{
           elevation: 0,
-          anchorOrigin: { vertical: 'bottom', horizontal: 'left' },
-          transformOrigin: { vertical: 'top', horizontal: 'left' },
+          anchorOrigin: { vertical: 'bottom', horizontal },
+          transformOrigin: { vertical: 'top', horizontal },
           PaperProps: {
             className: 'border border-border/50 shadow-2xl overflow-hidden rounded-xl mt-2',
             sx: {

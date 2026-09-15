@@ -155,7 +155,7 @@ export function UserFiltersBar({
               onClick={onExport}
             >
               <Download className="text-sm scale-90" />
-              {tCommon('export_csv')}
+              {tCommon('export_current_page_csv')}
             </Button>
             {activeFilterCount > 0 && (
               <Button

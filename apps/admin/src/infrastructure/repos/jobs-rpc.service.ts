@@ -200,6 +200,12 @@ export async function processCourseNotifyJobs(
   return data;
 }
 
+export async function getCronQueueHealth(admin: SupabaseClient): Promise<Record<string, unknown>> {
+  const { data, error } = await admin.rpc('cron_queue_health');
+  if (error) throw mapDbError(error, 'cron-rpc.service.ts:cron_queue_health');
+  return (data ?? {}) as Record<string, unknown>;
+}
+
 /**
  * Creates the default admin client for this service (exported so route
  * handlers keep a single construction site).
