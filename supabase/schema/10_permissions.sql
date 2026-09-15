@@ -63,7 +63,11 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA audit REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC
 ALTER DEFAULT PRIVILEGES IN SCHEMA internal REVOKE ALL ON TABLES FROM PUBLIC, anon, authenticated;
 ALTER DEFAULT PRIVILEGES IN SCHEMA internal REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon, authenticated;
 
-GRANT SELECT ON public.vw_course_stats TO authenticated, anon, service_role;
+-- NOTE: grants for public.* relations belong BELOW the blanket
+-- "REVOKE ALL ON ALL TABLES IN SCHEMA public" sweep — a grant placed above it
+-- is dead on arrival (the sweep runs after it and wipes it). vw_course_stats
+-- sat here for releases, so authenticated browsers got permission-denied and
+-- the System Analytics course section rendered empty despite data existing.
 
 -- ============================================================================
 -- Table & View DML Grants
@@ -72,6 +76,11 @@ GRANT SELECT ON public.vw_course_stats TO authenticated, anon, service_role;
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON ALL TABLES IN SCHEMA audit FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON ALL TABLES IN SCHEMA internal FROM PUBLIC, anon, authenticated;
+
+-- Analytics reads (security_invoker view over private.mv_course_stats — the
+-- matching SELECT on that MV is granted further below). PostgREST can only
+-- reach the MV through this tenant-filtered view.
+GRANT SELECT ON public.vw_course_stats TO authenticated, anon, service_role;
 
 -- Core read access
 GRANT SELECT ON public.regions                  TO authenticated;
@@ -112,6 +121,12 @@ GRANT SELECT ON public.user_permission_cache    TO authenticated, service_role;
 GRANT SELECT ON public.constants TO authenticated;
 GRANT SELECT ON public.user_validity_cache TO authenticated, service_role;
 GRANT SELECT ON public.mv_course_stats TO authenticated, service_role, anon;
+-- public.vw_course_stats is security_invoker, so its invoker also needs SELECT
+-- on the underlying MV or every read fails with "permission denied for
+-- materialized view mv_course_stats" (System Analytics course section rendered
+-- empty despite data). private.* is not API-exposed, so the filtered view
+-- remains the only reachable path.
+GRANT SELECT ON private.mv_course_stats TO authenticated, anon;
 
 -- Mutation grants (RLS still controls who can do what)
 GRANT INSERT, DELETE ON public.users                             TO authenticated;
@@ -381,6 +396,15 @@ GRANT EXECUTE ON FUNCTION public.logout_current_user() TO authenticated, service
 REVOKE ALL ON FUNCTION public.bind_device_for_current_user(text, jsonb, text, text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.bind_device_for_current_user(text, jsonb, text, text) TO authenticated, service_role;
 
+-- record_current_session() is the student app's only write path into
+-- public.sessions on a fresh login (AuthRemoteDataSource.recordSession()).
+-- SECURITY DEFINER derives the caller's real request IP server-side; a
+-- client-supplied IP would be trivially spoofable. Same least-privilege
+-- pattern as bind_device_for_current_user above: authenticated can call
+-- it, anon and PUBLIC cannot.
+REVOKE ALL ON FUNCTION public.record_current_session(text, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.record_current_session(text, text) TO authenticated, service_role;
+
 REVOKE ALL ON FUNCTION public.register_push_token(text, text, text, jsonb, text)
   FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.register_push_token(text, text, text, jsonb, text)
@@ -419,6 +443,55 @@ GRANT EXECUTE ON FUNCTION internal.invoke_notification_push_worker() TO service_
 REVOKE ALL ON FUNCTION public.process_notification_fanout_jobs(integer, text)
   FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.process_notification_fanout_jobs(integer, text)
+  TO service_role;
+
+REVOKE ALL ON FUNCTION public.process_course_notify_jobs(integer, text)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.process_course_notify_jobs(integer, text)
+  TO service_role;
+
+-- Launch audit B2 (2026-09-15): thin public wrappers for GET /api/cron/routine
+-- so PostgREST can resolve the four maintenance RPCs (their implementations
+-- live in internal/maintenance/private schemas that PostgREST cannot reach).
+-- service_role is the ONLY caller of both the wrappers and the originals.
+REVOKE ALL ON FUNCTION public.manage_partitions()
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.manage_partitions() TO service_role;
+REVOKE ALL ON FUNCTION public.prune_expired_access_cache()
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.prune_expired_access_cache() TO service_role;
+REVOKE ALL ON FUNCTION public.process_cache_purges(integer, text)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.process_cache_purges(integer, text) TO service_role;
+REVOKE ALL ON FUNCTION public.process_update_enrollment_totals_jobs(integer)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.process_update_enrollment_totals_jobs(integer)
+  TO service_role;
+REVOKE ALL ON FUNCTION public.cron_queue_health()
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.cron_queue_health() TO service_role;
+
+-- Hardening for the same audit finding: strip the implicit PUBLIC EXECUTE
+-- default from the underlying routines so the only path in is the public
+-- wrapper above (notably internal.process_update_enrollment_totals_jobs,
+-- which has no in-function permission guard).
+REVOKE ALL ON FUNCTION maintenance.manage_partitions()
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION maintenance.manage_partitions() TO service_role;
+REVOKE ALL ON FUNCTION private.prune_expired_access_cache()
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION private.prune_expired_access_cache() TO service_role;
+REVOKE ALL ON FUNCTION internal.process_cache_purges(integer, text)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION internal.process_cache_purges(integer, text) TO service_role;
+REVOKE ALL ON FUNCTION internal.process_update_enrollment_totals_jobs(integer, text)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION internal.process_update_enrollment_totals_jobs(integer, text)
+  TO service_role;
+
+REVOKE ALL ON FUNCTION internal.send_system_notification(uuid, text, text, uuid[])
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION internal.send_system_notification(uuid, text, text, uuid[])
   TO service_role;
 
 REVOKE ALL ON FUNCTION public.record_current_user_activity(boolean, text) FROM PUBLIC, anon;
@@ -513,9 +586,9 @@ REVOKE EXECUTE ON FUNCTION public.encrypt_pii(text, text) FROM anon;
 REVOKE EXECUTE ON FUNCTION public.encrypt_pii(text, text) FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.encrypt_pii(text, text) TO service_role;
 
-REVOKE EXECUTE ON FUNCTION public.dequeue_job(text, text[], integer) FROM anon;
-REVOKE EXECUTE ON FUNCTION public.dequeue_job(text, text[], integer) FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.dequeue_job(text, text[], integer) TO service_role;
+REVOKE EXECUTE ON FUNCTION public.dequeue_job(text, text[], integer, integer) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.dequeue_job(text, text[], integer, integer) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.dequeue_job(text, text[], integer, integer) TO service_role;
 
 REVOKE EXECUTE ON FUNCTION public.sync_primary_role() FROM anon;
 REVOKE EXECUTE ON FUNCTION public.sync_primary_role() FROM authenticated;
@@ -830,3 +903,24 @@ GRANT EXECUTE ON FUNCTION public.find_user_by_email(text)
 -- removes everywhere else. Narrow to SELECT-only.
 REVOKE INSERT, UPDATE, DELETE ON public.audit_chain_state FROM authenticated;
 GRANT SELECT ON public.audit_chain_state TO authenticated;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- ACCESS RULES GRANTS FIX (2026-09-15) — resolves PostgREST 403 on
+-- GET /rest/v1/access_rules from the admin dashboard browser client.
+-- ─────────────────────────────────────────────────────────────────────────────
+-- The blanket REVOKE ("REVOKE ALL ON ALL TABLES IN SCHEMA public FROM
+-- PUBLIC, anon, authenticated") removed every table grant in `public` from
+-- `authenticated`, but per-table grants were never re-added for
+-- access_rules / user_access_rules. PostgREST therefore rejects the
+-- browser client's SELECT with 403 permission-denied BEFORE RLS is even
+-- evaluated (an RLS denial would surface as a 200 with an empty array,
+-- not a 403).
+--
+-- The access_rules_admin / user_access_rules_admin policies in 09_rls.sql
+-- remain the authorization boundary (admin-only, tenant-scoped via
+-- is_admin_with_session_validation() + get_current_tenant_id()) — the same
+-- pattern already used for the feature_flags tables above. service_role
+-- keeps full access via the blanket GRANT ALL ON ALL TABLES earlier in
+-- this file; anon stays revoked.
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.access_rules      TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_access_rules TO authenticated;

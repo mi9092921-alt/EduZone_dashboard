@@ -17,6 +17,7 @@ export interface Notification {
   title: string;
   body: string;
   target_audience: TargetAudience;
+  targeting_mode?: 'audience' | 'users';
   target_permission: string | null;
   target_user_ids: string[] | null;
   is_deleted: boolean;

@@ -26,9 +26,9 @@ import { useMutateUserAccount } from '@/adapters/mutations/users.mutations';
 import { useUsers, useUserById } from '@/adapters/queries/users.queries';
 import { Button } from '@/components/ui/Button';
 import type { BulkAction } from '@/domain/types/bulk.types';
-import type { User, UserFilters, AccountAction } from '@/domain/types/user.types';
+import { getUserDisplayName, type User, type UserFilters, type AccountAction } from '@/domain/types/user.types';
 import { usePathname, useRouter } from '@/i18n/routing';
-import { downloadJson } from '@/lib/utils';
+import { downloadCsv } from '@/lib/utils';
 
 type DialogType =
   | 'lock'
@@ -43,6 +43,7 @@ type DialogType =
 export function UsersPage() {
   const t = useTranslations('users');
   const tCommon = useTranslations('common');
+  const tErrors = useTranslations('errors');
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -89,7 +90,7 @@ export function UsersPage() {
   const [bulkAction, setBulkAction] = useState<BulkAction | null>(null);
 
   // ── Query ────────────────────────────────────────────────────
-  const { data, isLoading, isFetching } = useUsers(filters, page, pageSize);
+  const { data, isLoading, isFetching, isError, refetch } = useUsers(filters, page, pageSize);
   const users = data?.data ?? [];
   const totalCount = data?.count ?? 0;
 
@@ -187,7 +188,18 @@ export function UsersPage() {
 
   const handleExport = useCallback(() => {
     if (users.length === 0) return;
-    downloadJson(users, `users-export-${new Date().toISOString().split('T')[0]}`);
+    downloadCsv(
+      users.map((user) => ({
+        id: user.id,
+        name: getUserDisplayName(user),
+        email: user.email ?? '',
+        phone: user.phone ?? '',
+        role: user.primary_role,
+        status: user.account_status,
+        last_login: user.last_login ?? '',
+      })),
+      `users-page-${new Date().toISOString().split('T')[0]}`,
+    );
   }, [users]);
 
   const closeDialog = useCallback(() => {
@@ -233,6 +245,18 @@ export function UsersPage() {
         totalCount={totalCount}
         onExport={handleExport}
       />
+
+      {isError && (
+        <div role="alert" className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+          <div>
+            <p className="font-semibold">{tErrors('title')}</p>
+            <p className="mt-1 opacity-80">{tErrors('desc')}</p>
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={() => void refetch()}>
+            {tErrors('retry')}
+          </Button>
+        </div>
+      )}
 
       {/* Bulk Actions */}
       {selectedIds.size > 0 && !bulkJobId && (

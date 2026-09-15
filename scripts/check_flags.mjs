@@ -1,7 +1,8 @@
+import { resolveDatabaseUrl } from "./lib/db.mjs";
 import pg from 'pg';
 
 async function run() {
-  const dbUrl = "postgresql://postgres.xpvljdyyjxxrlcqmfisl:fpimmo5-boop's%20Project@aws-0-eu-west-1.pooler.supabase.com:5432/postgres";
+  const dbUrl = resolveDatabaseUrl();
   const client = new pg.Client({ connectionString: dbUrl });
   await client.connect();
   console.log('Connected!');

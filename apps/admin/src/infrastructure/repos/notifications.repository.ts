@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type {
@@ -32,7 +34,18 @@ export function makeNotificationAdminRepository(
       input: ResolveNotificationTargetsInput,
       tenantId: string,
     ): Promise<string[]> {
-      if (input.target_user_ids?.length) return input.target_user_ids;
+      if (input.target_user_ids?.length) {
+        // Explicit ids are still resolved through the tenant boundary. Never
+        // let service-role writes trust caller-provided ids across tenants.
+        const { data, error } = await admin
+          .from('users')
+          .select('id')
+          .eq('tenant_id', tenantId)
+          .is('deleted_at', null)
+          .in('id', input.target_user_ids);
+        if (error) throw mapDbError(error, 'notifications.repository.ts');
+        return Array.from(new Set((data ?? []).map((row) => row.id as string)));
+      }
 
       if (input.target_permission) {
         // Get role IDs that possess this permission
@@ -85,6 +98,7 @@ export function makeNotificationAdminRepository(
           title: input.title.trim(),
           body: input.body.trim(),
           target_audience: input.target_audience ?? 'all',
+          targeting_mode: input.target_user_ids?.length ? 'users' : 'audience',
           target_permission: input.target_permission || null,
           created_by: createdBy,
         })
@@ -100,12 +114,10 @@ export function makeNotificationAdminRepository(
         notification_id: notificationId,
         user_id: targetUserId,
       }));
-      const { error: targetError } = await admin
-        .from('notification_targets')
-        .upsert(targetRows, {
-          onConflict: 'notification_id,user_id',
-          ignoreDuplicates: true,
-        });
+      const { error: targetError } = await admin.from('notification_targets').upsert(targetRows, {
+        onConflict: 'notification_id,user_id',
+        ignoreDuplicates: true,
+      });
       if (targetError) throw targetError;
     },
 
@@ -132,12 +144,12 @@ export function makeNotificationAdminRepository(
       // BUG-PUSH-INSTANT: Immediately process notification fanout and trigger
       // FCM push worker so student devices receive notifications in real-time
       // without waiting for periodic cron.
-      const workerId = crypto.randomUUID();
-      await admin.rpc('process_notification_fanout_jobs', {
+      const workerId = randomUUID();
+      const { error } = await admin.rpc('process_notification_fanout_jobs', {
         p_limit: 500,
         p_worker_id: workerId,
       });
-      await admin.rpc('invoke_notification_push_worker');
+      if (error) throw mapDbError(error, 'notifications.repository.ts:process_notification_fanout_jobs');
     },
 
     async listForAdmin(
@@ -149,7 +161,10 @@ export function makeNotificationAdminRepository(
       const from = (page - 1) * pageSize;
       const to = from + pageSize - 1;
 
-      let query = admin.from('notifications').select('*', { count: 'exact' }).is('deleted_at', null);
+      let query = admin
+        .from('notifications')
+        .select('*', { count: 'exact' })
+        .is('deleted_at', null);
 
       if (tenantId) {
         query = query.eq('tenant_id', tenantId);
@@ -164,24 +179,29 @@ export function makeNotificationAdminRepository(
         .range(from, to);
       if (error) throw mapDbError(error, 'notifications.repository.ts');
 
-      // Fetch total stats for stats cards (unpaginated counts) scoped to tenant
-      let statsQuery = admin
-        .from('notifications')
-        .select('target_audience')
-        .is('deleted_at', null);
+      // Count on the database instead of loading the entire notification
+      // history into Node. This remains O(1) in memory as the tenant grows.
+      const countAudience = async (targetAudience?: TargetAudience) => {
+        let statsQuery = admin.from('notifications').select('id', { count: 'exact', head: true }).is('deleted_at', null);
+        if (tenantId) statsQuery = statsQuery.eq('tenant_id', tenantId);
+        if (targetAudience) statsQuery = statsQuery.eq('target_audience', targetAudience);
+        const { count: audienceCount, error: statsError } = await statsQuery;
+        if (statsError) throw mapDbError(statsError, 'notifications.repository.ts:stats');
+        return audienceCount ?? 0;
+      };
 
-      if (tenantId) {
-        statsQuery = statsQuery.eq('tenant_id', tenantId);
-      }
-
-      const { data: allAudienceData, error: statsError } = await statsQuery;
-      if (statsError) throw statsError;
+      const [all, students, teachers, admins] = await Promise.all([
+        countAudience(),
+        countAudience('students'),
+        countAudience('teachers'),
+        countAudience('admins'),
+      ]);
 
       const stats = {
-        all: (allAudienceData ?? []).length,
-        students: (allAudienceData ?? []).filter((n) => n.target_audience === 'students').length,
-        teachers: (allAudienceData ?? []).filter((n) => n.target_audience === 'teachers').length,
-        admins: (allAudienceData ?? []).filter((n) => n.target_audience === 'admins').length,
+        all,
+        students,
+        teachers,
+        admins,
       };
 
       return {

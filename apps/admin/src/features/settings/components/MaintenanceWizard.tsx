@@ -261,7 +261,7 @@ export function MaintenanceWizard({ settings }: MaintenanceWizardProps) {
               value={endsAt}
               onChange={(e) => setEndsAt(e.target.value)}
               InputLabelProps={{ shrink: true }}
-              sx={{ width: 300 }}
+              sx={{ width: 300, maxWidth: '100%' }}
             />
             <Typography variant="body2" sx={{ color: '#64748B' }}>
               {t('deadline_desc')}

@@ -76,7 +76,14 @@ export async function getActivityLogsForVerification(
     .select('*')
     .gte('created_at', dateFrom)
     .lte('created_at', dateTo)
+    // The audit chain is ordered by seq/prev_hash, not by the event's
+    // client-supplied created_at.  Queue rows can be flushed in a different
+    // order from their timestamps; ordering by created_at can therefore make
+    // the verifier start in the middle of the chain and report a false
+    // tamper alert.
+    .order('seq', { ascending: true })
     .order('created_at', { ascending: true })
+    .order('id', { ascending: true })
     .limit(5000);
 
   if (error) throw mapDbError(error, 'audit.service.ts');

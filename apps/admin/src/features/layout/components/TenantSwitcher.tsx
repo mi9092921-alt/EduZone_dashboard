@@ -3,15 +3,22 @@
 import { CorporateFare, Check, ExitToApp } from '@mui/icons-material';
 import { Menu, MenuItem, Divider, CircularProgress } from '@mui/material';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import { useState, useTransition } from 'react';
 
 import { switchTenantAction } from '@/adapters/actions/tenants.actions';
 import { queryKeys } from '@/adapters/queries/keys';
 import { useAuthUser, useAuthStore, useIsSuperAdmin } from '@/adapters/stores/auth.store';
+import { useToast } from '@/adapters/stores/toast.store';
 import { Button } from '@/components/ui/Button';
 import { useRouter } from '@/i18n/routing';
 import { getTenants } from '@/infrastructure/repos/tenants.service';
+import { cn } from '@/lib/utils';
+
+interface TenantSwitcherProps {
+  /** Collapsed desktop rail: icon-only trigger */
+  collapsed?: boolean;
+}
 
 /**
  * Tenant Switcher (super_admin only). Lets super_admin view/manage any
@@ -20,13 +27,16 @@ import { getTenants } from '@/infrastructure/repos/tenants.service';
  * switch_tenant_context RPC) is what actually enforces this; this
  * component is purely the entry point into that already-secured flow.
  */
-export function TenantSwitcher() {
+export function TenantSwitcher({ collapsed = false }: TenantSwitcherProps) {
   const t = useTranslations('layout');
+  const locale = useLocale();
+  const isRtl = locale === 'ar';
   const isSuperAdmin = useIsSuperAdmin();
   const user = useAuthUser();
   const setActingTenantId = useAuthStore((s) => s.setActingTenantId);
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { showToast } = useToast();
 
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -60,10 +70,14 @@ export function TenantSwitcher() {
   function handleSwitch(tenantId: string | null) {
     setAnchorEl(null);
     startTransition(async () => {
-      const result = await switchTenantAction(tenantId);
-      setActingTenantId(result.tenantId === homeTenantId ? null : result.tenantId);
-      await queryClient.invalidateQueries();
-      router.refresh();
+      try {
+        const result = await switchTenantAction(tenantId);
+        setActingTenantId(result.tenantId === homeTenantId ? null : result.tenantId);
+        await queryClient.invalidateQueries();
+        router.refresh();
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : t('tenant_switcher.error'), 'error');
+      }
     });
   }
 
@@ -76,18 +90,25 @@ export function TenantSwitcher() {
         disabled={isPending}
         aria-haspopup="true"
         aria-expanded={menuOpen}
-        className="flex items-center gap-2 px-3 transition-faang max-w-[200px]"
+        aria-label={collapsed ? label ?? t('tenant_switcher.label') : undefined}
+        title={collapsed ? label ?? t('tenant_switcher.label') : undefined}
+        className={cn(
+          'flex items-center gap-2 transition-faang',
+          collapsed ? 'w-10 justify-center' : 'w-full justify-start px-3',
+        )}
       >
         {isPending ? <CircularProgress size={14} /> : <CorporateFare className="text-sm shrink-0" />}
-        <span className="font-medium truncate">{label ?? t('tenant_switcher.label')}</span>
+        {!collapsed && (
+          <span className="font-medium truncate">{label ?? t('tenant_switcher.label')}</span>
+        )}
       </Button>
 
       <Menu
         anchorEl={anchorEl}
         open={menuOpen}
         onClose={() => setAnchorEl(null)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+        anchorOrigin={{ vertical: 'bottom', horizontal: isRtl ? 'right' : 'left' }}
+        transformOrigin={{ vertical: 'top', horizontal: isRtl ? 'right' : 'left' }}
         slotProps={{
           paper: {
             className: 'mt-3 min-w-[260px] max-h-[400px] rounded-xl border border-border/50 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150',

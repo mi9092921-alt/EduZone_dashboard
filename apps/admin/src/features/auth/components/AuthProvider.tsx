@@ -195,7 +195,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (typeof window !== 'undefined') {
           // Attempting clean localized redirect. If it feels sluggish,
           // we use window.location.href for a full state reset.
-          console.log('[AuthProvider] SIGNED_OUT detected, redirecting...');
           router.replace('/login');
 
           // Safety fallback: if URL doesn't change after 1.5s, force it.

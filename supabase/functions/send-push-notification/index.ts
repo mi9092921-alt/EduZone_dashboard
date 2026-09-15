@@ -3,6 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
 const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 const workerAuthToken = Deno.env.get('PUSH_WORKER_AUTH_TOKEN') ?? '';
+const EXTERNAL_REQUEST_TIMEOUT_MS = 10_000;
 const projectId = Deno.env.get('FCM_PROJECT_ID') ?? '';
 const clientEmail = Deno.env.get('FCM_CLIENT_EMAIL') ?? '';
 const privateKey = Deno.env.get('FCM_PRIVATE_KEY') ?? '';
@@ -85,6 +86,7 @@ async function accessToken(): Promise<string> {
       grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
       assertion,
     }),
+    signal: AbortSignal.timeout(EXTERNAL_REQUEST_TIMEOUT_MS),
   });
   if (!response.ok) throw new Error(`FCM_OAUTH_${response.status}`);
   const payload = await response.json();
@@ -113,6 +115,7 @@ async function sendToFcm(delivery: Record<string, unknown>, token: string) {
           apns: { payload: { aps: { sound: 'default' } } },
         },
       }),
+      signal: AbortSignal.timeout(EXTERNAL_REQUEST_TIMEOUT_MS),
     },
   );
   const body = await response.json().catch(() => ({}));
@@ -190,6 +193,7 @@ Deno.serve(async (req: Request) => {
       p_worker_id: 'notification-push-worker',
       p_job_types: ['notification_push'],
       p_lock_ttl_seconds: 300,
+      p_batch_size: 20,
     });
     if (error) return json({ error: 'DEQUEUE_FAILED', message: error.message }, 500);
 

@@ -86,9 +86,9 @@ export function buildCspHeader(nonce: string): string {
     // The *.supabase.co allow-list is for the Supabase Auth SDK which
     // may inject its own script tags during OAuth flows.
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' *.supabase.co`,
-    "style-src 'self' 'unsafe-inline'",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     `connect-src 'self' *.supabase.co wss://*.supabase.co *.sentry.io${connectExtra}`,
-    "font-src 'self' data:",
+    "font-src 'self' data: https://fonts.gstatic.com",
     `img-src 'self' data: https:${imgExtra}`,
     "object-src 'none'",
     "base-uri 'self'",

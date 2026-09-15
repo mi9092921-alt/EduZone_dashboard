@@ -392,15 +392,12 @@ export async function createLesson(sectionId: string, data: CreateLessonInput): 
   if (data.video_url && !data.duration_sec) {
     const parsed = parseVideoUrl(data.video_url);
     if (parsed.provider === 'youtube') {
-      console.log('[createLesson] Fetching YouTube metadata for:', data.video_url);
       const metadata = await getYoutubeVideoDetails(data.video_url);
-      console.log('[createLesson] Metadata result:', metadata);
       if (metadata) {
         duration = metadata.duration_sec;
       }
     }
   } else {
-    console.log('[createLesson] Using provided duration:', duration);
   }
 
   // 1. Create Lesson Metadata
@@ -527,7 +524,6 @@ export async function createLessons(
       if (parsed.provider === 'youtube') {
         if (metadataByInput.has(item.video_url)) {
           duration = metadataByInput.get(item.video_url)!;
-          console.log('[createLessons] Metadata resolved for:', item.video_url);
         } else {
           // Isolated failure — record it and fall back to duration 0.
           const reason = failureByInput.get(item.video_url) ?? 'youtube_metadata_unavailable';

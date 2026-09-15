@@ -476,7 +476,7 @@ Login UI with error handling and post-login routing.
   - If `allowed: true` → redirect to `/(dashboard)`
 - Query param `?reason=session_invalidated` → shows banner: "Your session was ended by an administrator."
 - Query param `?reason=maintenance` → shows maintenance message from `get_setting('maintenance_message')`
-- Forgot password link → `app/(auth)/forgot-password/page.tsx` (calls `supabase.auth.resetPasswordForEmail`)
+- Password recovery is intentionally excluded; administrators must handle credential changes through the controlled account-management process.
 - RTL support: Arabic labels when `lang=ar`
 - Loading state on submit button; no double-submit
 

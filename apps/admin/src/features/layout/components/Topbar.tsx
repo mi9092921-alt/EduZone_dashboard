@@ -20,9 +20,8 @@ import { useLayout } from '../hooks/useLayout';
 
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { NotificationBell } from './NotificationBell';
-import { TenantSwitcher } from './TenantSwitcher';
 
-import { useAuthUser, useAuthStore, useIsSuperAdmin } from '@/adapters/stores/auth.store';
+import { useAuthUser, useAuthStore } from '@/adapters/stores/auth.store';
 import { useUiStore } from '@/adapters/stores/ui.store';
 import { NAV_ITEMS } from '@/config/nav.config';
 import { useRouter, usePathname } from '@/i18n/routing';
@@ -36,7 +35,6 @@ export function Topbar() {
   const { sidebarOpen, handleToggle, isDesktop } = useLayout();
 
   const user = useAuthUser();
-  const isSuperAdmin = useIsSuperAdmin();
   const logout = useAuthStore((s) => s.logout);
   const pageSubtitle = useUiStore((s) => s.pageSubtitle);
   const router = useRouter();
@@ -85,7 +83,7 @@ export function Topbar() {
         paddingTop: 'env(safe-area-inset-top)'
       }}
     >
-      <div className="flex items-center h-full px-4 sm:px-6 gap-3">
+      <div className="flex items-center h-full px-3 sm:px-6 gap-3 min-w-0 flex-1">
         {/* Mobile/Tablet Hamburger: Placed at the extreme start (right in RTL) */}
         {!isDesktop && (
           <button
@@ -116,29 +114,20 @@ export function Topbar() {
             </span>
           </nav>
         ) : (
-          <h1 className="text-base font-semibold text-foreground tracking-wide">
+          <h1 className="text-base font-semibold text-foreground tracking-wide min-w-0 truncate">
             {pageTitle}
           </h1>
         )}
       </div>
 
-      <div className="flex items-center gap-1 sm:gap-2 px-4 sm:px-6">
-        {/* Tenant Switcher (super_admin only) */}
-        {isSuperAdmin && (
-          <div className="hidden md:block">
-            <TenantSwitcher />
-          </div>
-        )}
-
+      <div className="flex items-center gap-1 sm:gap-2 px-3 sm:px-6 shrink-0">
         {/* Language Switcher */}
-        <div className="hidden md:block">
-          <LanguageSwitcher />
-        </div>
+        <LanguageSwitcher />
 
         {/* Notification Bell */}
         <NotificationBell />
 
-        <div className="h-5 w-px bg-border/40 mx-1" />
+        <div className="hidden sm:block h-5 w-px bg-border/40 mx-1" />
 
         {/* User avatar + menu */}
         <button

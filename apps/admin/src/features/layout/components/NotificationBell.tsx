@@ -32,13 +32,13 @@ import {
   CircularProgress,
   Divider,
   IconButton,
-  Paper,
+  Popover,
   Skeleton,
   Tooltip,
   Typography,
 } from '@mui/material';
 import { useTranslations, useLocale } from 'next-intl';
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useCallback } from 'react';
 
 import {
   useMarkNotificationRead,
@@ -237,7 +237,7 @@ export function NotificationBell() {
 
   const [open, setOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
+  const isRtl = locale === 'ar';
 
   // Data
   const { data, isLoading } = useMyNotifications(20, false);
@@ -251,33 +251,6 @@ export function NotificationBell() {
 
   // Realtime subscription (mounted once here, syncs the cache globally)
   useRealtimeNotifications();
-
-  // Close on outside click
-  useEffect(() => {
-    if (!open) return;
-    function handleClick(e: MouseEvent) {
-      if (
-        panelRef.current &&
-        !panelRef.current.contains(e.target as Node) &&
-        buttonRef.current &&
-        !buttonRef.current.contains(e.target as Node)
-      ) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [open]);
-
-  // Close on Escape
-  useEffect(() => {
-    if (!open) return;
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
-    document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
-  }, [open]);
 
   const handleNotifClick = useCallback(
     (id: string, linkTo: string | null) => {
@@ -338,36 +311,38 @@ export function NotificationBell() {
         </IconButton>
       </Tooltip>
 
-      {/* ── Dropdown Panel ── */}
-      {open && (
-        <Paper
-          ref={panelRef}
-          elevation={0}
-          sx={{
-            position: 'absolute',
-            top: 'calc(100% + 8px)',
-            insetInlineEnd: 0,
-            width: 360,
-            maxHeight: 480,
-            display: 'flex',
-            flexDirection: 'column',
-            border: '1px solid',
-            borderColor: 'divider',
-            borderRadius: 3,
-            overflow: 'hidden',
-            bgcolor: 'background.paper',
-            backgroundImage: 'none',
-            boxShadow: '0 20px 60px -10px rgba(0,0,0,0.25)',
-            zIndex: 9999,
-            animation: 'fadeSlideDown 0.15s ease',
-            '@keyframes fadeSlideDown': {
-              from: { opacity: 0, transform: 'translateY(-6px)' },
-              to: { opacity: 1, transform: 'translateY(0)' },
+      {/* ── Dropdown Panel — Popover anchors to the bell and clamps inside the
+          viewport on narrow screens (the old absolute panel overflowed phones) ── */}
+      <Popover
+        open={open}
+        anchorEl={buttonRef.current}
+        onClose={() => setOpen(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: isRtl ? 'left' : 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: isRtl ? 'left' : 'right' }}
+        slotProps={{
+          paper: {
+            elevation: 0,
+            role: 'dialog',
+            'aria-label': t('notifications'),
+            className: 'mt-2',
+            sx: {
+              width: 360,
+              maxWidth: 'calc(100vw - 32px)',
+              maxHeight: 480,
+              display: 'flex',
+              flexDirection: 'column',
+              border: '1px solid',
+              borderColor: 'divider',
+              borderRadius: 3,
+              overflow: 'hidden',
+              bgcolor: 'background.paper',
+              backgroundImage: 'none',
+              boxShadow: '0 20px 60px -10px rgba(0,0,0,0.25)',
             },
-          }}
-          role="dialog"
-          aria-label={t('notifications')}
-        >
+          },
+        }}
+        sx={{ zIndex: 9999 }}
+      >
           {/* ── Header ── */}
           <Box
             sx={{
@@ -520,8 +495,7 @@ export function NotificationBell() {
               {t('view_all_notifications')}
             </Button>
           </Box>
-        </Paper>
-      )}
+      </Popover>
     </Box>
   );
 }

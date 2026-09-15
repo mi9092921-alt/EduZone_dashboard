@@ -44,9 +44,16 @@ function MuiThemeBridge({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function EduZoneThemeProvider({ children }: { children: React.ReactNode }) {
+export function EduZoneThemeProvider({
+  children,
+  nonce,
+}: {
+  children: React.ReactNode;
+  nonce?: string | undefined;
+}) {
   return (
     <NextThemesProvider
+      {...(nonce ? { nonce } : {})}
       attribute="data-theme"
       defaultTheme="system"
       enableSystem

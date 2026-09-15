@@ -53,11 +53,45 @@ describe('SupabaseAuditLogger (M13 — §17)', () => {
     expect(payload.userId).toBe('admin-1');
     expect(payload.type).toBe('user_deleted');
     expect(payload.riskLevel).toBe('high');
-    expect(payload.tenantId).toBe('tenant-1');
+    // No explicit tenant override: log_activity_internal derives the
+    // actor's home tenant server-side (FK-safe by construct).
+    expect(payload.tenantId).toBeNull();
     // Correlation id: operation → audit entry → correlation id
     expect(payload.details.request_id).toBe('req_abc123');
     expect(payload.details.target_user_id).toBe('user-9');
     expect(payload.details.outcome).toBe('success');
+    // Non-switched ctx: no acting-tenant stamp
+    expect(payload.details.acting_tenant_id).toBeUndefined();
+  });
+
+  it('records the acting tenant in details (not as override) for a switched super_admin', async () => {
+    const logger = new SupabaseAuditLogger();
+
+    const switchedCtx: RequestContext = {
+      userId: 'super-1',
+      tenantId: 'tenant-acting', // the tenant they switched to
+      homeTenantId: 'tenant-home', // their real home tenant
+      role: 'super_admin',
+      permissions: ['*'],
+      requestId: 'req_switched',
+    };
+
+    await logger.record(switchedCtx, { type: 'user_suspended' });
+
+    const [, payload] = mockLogActivityAsync.mock.calls[0] as [
+      unknown,
+      {
+        userId: string;
+        details: Record<string, unknown>;
+        tenantId: string | null;
+      },
+    ];
+    // The acting tenant must never become the log_activity_async override:
+    // the (actor, acting tenant) pair does not exist in users(id, tenant_id),
+    // so flushing it would violate activity_logs_user_tenant_fkey (23503).
+    expect(payload.tenantId).toBeNull();
+    expect(payload.details.acting_tenant_id).toBe('tenant-acting');
+    expect(payload.details.request_id).toBe('req_switched');
   });
 
   it('defaults riskLevel to low and outcome to success', async () => {

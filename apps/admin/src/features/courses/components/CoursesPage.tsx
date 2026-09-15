@@ -17,6 +17,7 @@ import { useUpdateCourse, useDeleteCourse } from '@/adapters/mutations/courses.m
 import { useCourses } from '@/adapters/queries/courses.queries';
 import { useToast } from '@/adapters/stores/toast.store';
 import { Button } from '@/components/ui/Button';
+import { QueryErrorBanner } from '@/components/ui/QueryErrorBanner';
 import type { Course, CourseFilters, CourseStatus } from '@/domain/types/course.types';
 import { formatVideoUrl } from '@/domain/video.utils';
 import { usePathname, useRouter } from '@/i18n/routing';
@@ -86,7 +87,7 @@ export function CoursesPage() {
   const deleteMutation = useDeleteCourse();
 
   // ── Query ───────────────────────────────────────────────────────
-  const { data, isLoading, isFetching } = useCourses(filters, page, pageSize);
+  const { data, isLoading, isFetching, isError, refetch } = useCourses(filters, page, pageSize);
   const courses = data?.data ?? [];
   const totalCount = data?.count ?? 0;
 
@@ -144,20 +145,25 @@ export function CoursesPage() {
     setIsBulkPending(true);
 
     try {
+      const failedIds: string[] = [];
       if (action === 'delete') {
         for (const id of selectedIds) {
-          await deleteMutation.mutateAsync(id);
+          try {
+            await deleteMutation.mutateAsync(id);
+          } catch {
+            failedIds.push(id);
+          }
         }
-        showToast(t('bulk_action_success'), 'success');
-        setSelectedIds([]);
       } else if (action === 'publish' || action === 'draft' || action === 'archive') {
         const newStatus: CourseStatus =
           action === 'publish' ? 'published' : action === 'draft' ? 'draft' : 'archived';
         for (const id of selectedIds) {
-          await updateMutation.mutateAsync({ id, data: { status: newStatus } });
+          try {
+            await updateMutation.mutateAsync({ id, data: { status: newStatus } });
+          } catch {
+            failedIds.push(id);
+          }
         }
-        showToast(t('bulk_action_success'), 'success');
-        setSelectedIds([]);
       } else if (action === 'export_json' || action === 'export_csv') {
         for (const id of selectedIds) {
           const courseDetail = await getCourseById(id);
@@ -229,6 +235,15 @@ export function CoursesPage() {
         }
         showToast(t('export_started'), 'info');
       }
+      if (action === 'delete' || action === 'publish' || action === 'draft' || action === 'archive') {
+        if (failedIds.length > 0) {
+          showToast(t('bulk_partial_failure', { failed: failedIds.length, total: selectedIds.length }), 'warning');
+          setSelectedIds(failedIds);
+        } else {
+          showToast(t('bulk_action_success'), 'success');
+          setSelectedIds([]);
+        }
+      }
     } catch {
       showToast(t('bulk_action_failed'), 'error');
     } finally {
@@ -282,6 +297,7 @@ export function CoursesPage() {
             />
           </div>
         )}
+        <QueryErrorBanner isError={isError} refetch={refetch} />
         <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
           <CoursesTable
             courses={courses}

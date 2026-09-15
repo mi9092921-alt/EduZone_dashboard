@@ -111,12 +111,17 @@ import {
   getQueuedActivitiesAction,
 } from './admin.actions';
 
+// requirePermission now returns the cookie-bound server client alongside the
+// context (actions reuse it for security_invoker reads under the caller's JWT).
+const mockSupabaseClient = { from: vi.fn() };
+
 function ctxFor(overrides: Partial<{ tenantId: string; permissions: string[] }> = {}) {
   return {
     userId: 'user-1',
     tenantId: overrides.tenantId ?? 'tenant-a',
     role: 'admin',
     permissions: overrides.permissions ?? ['settings.manage', 'audit.read', 'settings.write'],
+    supabase: mockSupabaseClient,
   };
 }
 
@@ -214,7 +219,7 @@ describe('admin.actions.ts — tenant-scoping IDOR guards', () => {
 
       await getAnalyticsCourseStatsAction('tenant-B');
 
-      expect(mockGetCourseStatsAnalytics).toHaveBeenCalledWith('tenant-a');
+      expect(mockGetCourseStatsAnalytics).toHaveBeenCalledWith('tenant-a', mockSupabaseClient);
     });
 
     it('lets super_admin see across all tenants (undefined tenantId)', async () => {
@@ -222,7 +227,7 @@ describe('admin.actions.ts — tenant-scoping IDOR guards', () => {
 
       await getAnalyticsCourseStatsAction(undefined);
 
-      expect(mockGetCourseStatsAnalytics).toHaveBeenCalledWith(undefined);
+      expect(mockGetCourseStatsAnalytics).toHaveBeenCalledWith(undefined, mockSupabaseClient);
     });
   });
 

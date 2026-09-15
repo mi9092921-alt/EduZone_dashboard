@@ -68,9 +68,15 @@ export function Modal({
         className={cn(
           'relative w-full bg-card border border-border shadow-2xl flex flex-col animate-in zoom-in-95 duration-200 outline-none',
           fullScreen
-            ? 'fixed inset-0 h-screen max-h-screen rounded-none border-none'
-            : 'rounded-2xl max-h-[90vh] ' + maxWidthClasses[maxWidth],
-          'xs:fixed xs:inset-0 xs:h-screen xs:max-h-screen xs:rounded-none md:relative md:rounded-2xl md:max-h-[90vh]',
+            ? 'fixed inset-0 h-[100dvh] max-h-[100dvh] rounded-none border-none'
+            : cn(
+                'rounded-2xl max-h-[90vh]',
+                // Full-screen sheet below md (Material compact-width pattern), centered card at md+.
+                // max-md, not xs — Tailwind ships no xs breakpoint.
+                'max-md:fixed max-md:inset-0 max-md:h-[100dvh] max-md:max-h-[100dvh] max-md:rounded-none max-md:border-none',
+                'md:relative md:rounded-2xl md:max-h-[90vh]',
+                maxWidthClasses[maxWidth],
+              ),
           className,
         )}
       >

@@ -829,7 +829,29 @@ BEGIN
     NULL;
   END IF;
 
-  -- notifications: chk_target_audience - corrected enum (removed invalid 'specific')
+  -- notifications: target mode is additive to the public audience enum.
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'notifications')
+     AND NOT EXISTS (
+       SELECT 1 FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = 'notifications'
+         AND column_name = 'targeting_mode'
+     ) THEN
+    ALTER TABLE public.notifications
+      ADD COLUMN targeting_mode text NOT NULL DEFAULT 'audience';
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'notifications')
+     AND NOT EXISTS (
+       SELECT 1 FROM pg_constraint
+       WHERE conname = 'chk_notification_targeting_mode'
+         AND conrelid = 'public.notifications'::regclass
+     ) THEN
+    ALTER TABLE public.notifications
+      ADD CONSTRAINT chk_notification_targeting_mode
+      CHECK (targeting_mode IN ('audience', 'users'));
+  END IF;
+
+  -- notifications: chk_target_audience remains the public audience enum.
   IF NOT EXISTS (
     SELECT 1 FROM pg_constraint
     WHERE conname = 'chk_target_audience'
@@ -1022,7 +1044,29 @@ BEGIN
     NULL;
   END IF;
 
-  -- notifications: chk_target_audience - corrected enum (removed invalid 'specific')
+  -- notifications: target mode is additive to the public audience enum.
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'notifications')
+     AND NOT EXISTS (
+       SELECT 1 FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = 'notifications'
+         AND column_name = 'targeting_mode'
+     ) THEN
+    ALTER TABLE public.notifications
+      ADD COLUMN targeting_mode text NOT NULL DEFAULT 'audience';
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'notifications')
+     AND NOT EXISTS (
+       SELECT 1 FROM pg_constraint
+       WHERE conname = 'chk_notification_targeting_mode'
+         AND conrelid = 'public.notifications'::regclass
+     ) THEN
+    ALTER TABLE public.notifications
+      ADD CONSTRAINT chk_notification_targeting_mode
+      CHECK (targeting_mode IN ('audience', 'users'));
+  END IF;
+
+  -- notifications: chk_target_audience remains the public audience enum.
   IF NOT EXISTS (
     SELECT 1 FROM pg_constraint
     WHERE conname = 'chk_target_audience'

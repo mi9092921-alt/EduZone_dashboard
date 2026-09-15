@@ -35,12 +35,18 @@ export class SendNotificationUseCase {
     const tenantId = ctx.tenantId;
     if (!tenantId) throw new ValidationError('Tenant context is missing');
 
+    // An explicit users-mode send must never fall through to an audience
+    // default when the selected list is empty.
+    const hasExplicitUserSelection = input.target_user_ids !== undefined;
+    if (hasExplicitUserSelection && !input.target_user_ids?.length) {
+      throw new ValidationError('At least one target user is required');
+    }
+
     const targetUserIds = await this.notifications.resolveTargetUserIds(input, tenantId);
-    const notificationId = await this.notifications.insertNotification(
-      input,
-      tenantId,
-      ctx.userId,
-    );
+    if (hasExplicitUserSelection && targetUserIds.length === 0) {
+      throw new ValidationError('No valid target users were found in this tenant');
+    }
+    const notificationId = await this.notifications.insertNotification(input, tenantId, ctx.userId);
 
     if (targetUserIds.length) {
       try {

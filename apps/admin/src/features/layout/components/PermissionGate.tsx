@@ -1,10 +1,9 @@
 'use client';
 
+import type { PermissionName } from '@eduzone/types';
 import type { ReactNode } from 'react';
 
 import { useAuthUser } from '@/adapters/stores/auth.store';
-
-type PermissionName = string;
 
 interface PermissionGateProps {
   /** Required permission to render children */
@@ -23,7 +22,7 @@ interface PermissionGateProps {
  * When denied, renders fallback (default: null — no DOM node).
  */
 export function PermissionGate({
-  permission: _permission,
+  permission,
   roles,
   fallback = null,
   children,
@@ -41,8 +40,9 @@ export function PermissionGate({
     return <>{fallback}</>;
   }
 
-  // TODO: Permission-level check via user_permission_cache
-  // For now, role-based gating is sufficient
+  if (permission && !user.permissions.includes(permission as PermissionName)) {
+    return <>{fallback}</>;
+  }
 
   return <>{children}</>;
 }

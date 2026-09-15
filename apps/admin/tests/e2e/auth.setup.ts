@@ -18,6 +18,12 @@ const MAX_LOGIN_ATTEMPTS = 3;
 const RETRY_DELAYS_MS = [2000, 4000];
 
 setup('authenticate', async ({ page }) => {
+  const email = process.env['E2E_EMAIL'];
+  const password = process.env['E2E_PASSWORD'];
+  if (!email || !password) {
+    throw new Error('E2E_EMAIL and E2E_PASSWORD must be provided by the staging/CI environment.');
+  }
+
   for (let attempt = 1; attempt <= MAX_LOGIN_ATTEMPTS; attempt++) {
     // Go to login page
     await page.goto('/login');
@@ -27,8 +33,8 @@ setup('authenticate', async ({ page }) => {
     // admin@eduzone-test.com / Admin@12345 (see supabase/AGENTS.md QA accounts
     // table). The previous value ("Test1234!", referenced from a v9-era seed)
     // no longer matches the canonical seed hash and would fail login.
-    await page.getByLabel(/email/i).fill('admin@eduzone-test.com');
-    await page.getByLabel(/password/i).fill('Admin@12345');
+    await page.getByLabel(/email/i).fill(email);
+    await page.getByLabel(/password/i).fill(password);
 
     // Capture the check_dashboard_access RPC response (if it fires) so a
     // failure here reports *why* access was denied instead of just timing

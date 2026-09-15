@@ -151,6 +151,14 @@ jobs:
           echo "NEXT_PUBLIC_SUPABASE_URL=${API_URL//\"/}" >> "$GITHUB_ENV"
           echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=${ANON_KEY//\"/}" >> "$GITHUB_ENV"
           echo "SUPABASE_SERVICE_ROLE_KEY=${SERVICE_ROLE_KEY//\"/}" >> "$GITHUB_ENV"
+          # The Playwright webServer runs `next start` (NODE_ENV=production),
+          # so the app's strict production env schema (apps/admin/src/lib/env.ts)
+          # requires CRON_SECRET at boot via the instrumentation fail-fast
+          # gate -- without it the server never becomes ready and Playwright
+          # times out. The stack here is a disposable local Supabase, so a
+          # fixed dummy value is safe; it only guards /api/cron/routine's
+          # Bearer check.
+          echo "CRON_SECRET=e2e-local-cron-secret" >> "$GITHUB_ENV"
 
       - name: Production build
         run: pnpm --filter @eduzone/admin build
@@ -183,6 +191,9 @@ jobs:
         run: pnpm --filter @eduzone/admin exec playwright install --with-deps chromium
 
       - name: Run Playwright (chromium)
+        env:
+          E2E_EMAIL: admin@eduzone-test.com
+          E2E_PASSWORD: Admin@12345
         run: pnpm --filter @eduzone/admin exec playwright test --project=chromium
 
       - name: Stop local Supabase

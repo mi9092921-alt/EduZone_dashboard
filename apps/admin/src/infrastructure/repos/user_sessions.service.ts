@@ -6,7 +6,11 @@ import type { Session } from '@/domain/types/user.types';
  * Read-only. Row access is enforced by RLS (`sessions_select_policy`):
  * self or admin with a valid session.
  */
-export async function getUserSessions(userId: string, limit = 20): Promise<Session[]> {
+export async function getUserSessions(
+  userId: string,
+  limit = 20,
+  offset = 0,
+): Promise<Session[]> {
   const { supabase } = container;
 
   const { data, error } = await supabase
@@ -15,7 +19,7 @@ export async function getUserSessions(userId: string, limit = 20): Promise<Sessi
     .eq('user_id', userId)
     .is('deleted_at', null)
     .order('started_at', { ascending: false })
-    .limit(limit);
+    .range(offset, offset + limit - 1);
 
   if (error) {
     return [];

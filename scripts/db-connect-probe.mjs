@@ -2,7 +2,11 @@
 import pg from 'pg';
 
 const ref = process.env.SUPABASE_PROJECT_REF || 'xpvljdyyjxxrlcqmfisl';
-const pwd = process.env.DB_PASSWORD || "fpimmo5-boop's Project";
+const pwd = process.env.DB_PASSWORD;
+if (!pwd) {
+  console.error("DB_PASSWORD is required (never hardcode credentials — see lib/db.mjs).");
+  process.exit(1);
+}
 
 const regions = [
   'eu-central-1',
@@ -37,8 +41,9 @@ for (const region of regions) {
       await client.connect();
       const res = await client.query('SELECT 1 AS ok');
       console.log('OK', { region, port, ...res.rows[0] });
-      const url = `postgresql://postgres.${ref}:${encodeURIComponent(pwd)}@aws-0-${region}.pooler.supabase.com:${port}/postgres`;
-      console.log('DATABASE_URL=' + url);
+      console.log(
+        `DATABASE_URL=postgresql://postgres.${ref}:[REDACTED]@aws-0-${region}.pooler.supabase.com:${port}/postgres`,
+      );
       await client.end();
       process.exit(0);
     } catch (e) {

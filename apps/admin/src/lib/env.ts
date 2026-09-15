@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+const defaultAppEnv = process.env['NODE_ENV'] === 'production' ? 'production' : 'development';
+
 /**
  * Public client-safe environment variables.
  * Safe to be bundled and exposed in the browser.
@@ -7,7 +9,7 @@ import { z } from 'zod';
 const publicEnvSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.string().url('NEXT_PUBLIC_SUPABASE_URL must be a valid URL'),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1, 'NEXT_PUBLIC_SUPABASE_ANON_KEY is required'),
-  NEXT_PUBLIC_APP_ENV: z.enum(['development', 'staging', 'production']).default('development'),
+  NEXT_PUBLIC_APP_ENV: z.enum(['development', 'staging', 'production']).default(defaultAppEnv),
   NEXT_PUBLIC_SENTRY_DSN: z.string().url().optional(),
 });
 
@@ -81,7 +83,7 @@ export function getServerEnv(opts?: { enforceBrowserCheck?: boolean }): ServerEn
   // (which is parsed at module load — see `env` export below), so by the
   // time `getServerEnv()` runs the value is either 'development',
   // 'staging', or 'production'.
-  const appEnv = process.env['NEXT_PUBLIC_APP_ENV'] ?? 'development';
+  const appEnv = process.env['NEXT_PUBLIC_APP_ENV'] ?? defaultAppEnv;
   const schema = appEnv === 'production' ? serverEnvSchemaProd : serverEnvSchemaDev;
 
   const parsed = schema.safeParse({

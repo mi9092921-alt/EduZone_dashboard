@@ -10,8 +10,9 @@ import type {
 import { createRequestContext } from '@/domain/types/context.types';
 import type { SendNotificationInput } from '@/domain/types/notification.types';
 
-
-function makeRepo(overrides: Partial<INotificationAdminRepository> = {}): INotificationAdminRepository {
+function makeRepo(
+  overrides: Partial<INotificationAdminRepository> = {},
+): INotificationAdminRepository {
   return {
     resolveTargetUserIds: vi.fn().mockResolvedValue([]),
     insertNotification: vi.fn().mockResolvedValue('notif-1'),
@@ -112,6 +113,20 @@ describe('SendNotificationUseCase', () => {
     await new SendNotificationUseCase(repo, audit).execute(ctx, explicitInput);
 
     expect(repo.resolveTargetUserIds).toHaveBeenCalledWith(explicitInput, 'tenant-1');
+  });
+
+  it('rejects an empty explicit users selection instead of defaulting to all', async () => {
+    const repo = makeRepo();
+    const explicitEmptyInput: SendNotificationInput = {
+      ...input,
+      target_user_ids: [],
+    };
+
+    await expect(
+      new SendNotificationUseCase(repo, audit).execute(ctx, explicitEmptyInput),
+    ).rejects.toThrow('At least one target user is required');
+    expect(repo.resolveTargetUserIds).not.toHaveBeenCalled();
+    expect(repo.insertNotification).not.toHaveBeenCalled();
   });
 
   it('M16 (F16-4): compensates by soft-deleting the notification when the fanout fails', async () => {

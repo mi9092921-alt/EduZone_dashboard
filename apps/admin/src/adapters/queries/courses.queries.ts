@@ -1,4 +1,4 @@
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery, keepPreviousData } from '@tanstack/react-query';
 
 import { queryKeys } from './keys';
 
@@ -89,10 +89,14 @@ export function useCoursesOverviewStats(tenantId?: string) {
   });
 }
 
-export function useVideoViews(userId: string, page: number, pageSize: number) {
-  return useQuery({
-    queryKey: ['video_views', userId, page, pageSize],
-    queryFn: () => getVideoViewsByUser(userId, page, pageSize),
+/** Paginated activity views hook — 20 rows per page, "load more" driven. */
+export function useVideoViewsInfinite(userId: string) {
+  return useInfiniteQuery({
+    queryKey: ['video_views', userId, 'infinite'],
+    queryFn: ({ pageParam }) => getVideoViewsByUser(userId, pageParam, 20),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) =>
+      lastPage.page < lastPage.totalPages ? lastPage.page + 1 : undefined,
     enabled: !!userId,
   });
 }
