@@ -2075,7 +2075,57 @@ BEGIN
   );
 END $$;
 
--- Display Results (includes Checks 27-40 above)
+-- Check 41 (launch audit B2, 2026-09-15): the cron routine must have
+-- PostgREST-resolvable public wrappers for its four maintenance RPCs, each
+-- granted to service_role ONLY, and the queue-health snapshot must exist.
+DO $$
+DECLARE
+  v_wrapper_grants int;
+  v_public_grants int;
+  v_health_grant boolean;
+  v_health_grants_other int;
+BEGIN
+  -- Every wrapper must be executable by service_role.
+  SELECT count(*) INTO v_wrapper_grants
+  FROM (VALUES
+    ('public.manage_partitions()'),
+    ('public.prune_expired_access_cache()'),
+    ('public.process_cache_purges(integer,text)'),
+    ('public.process_update_enrollment_totals_jobs(integer)')
+  ) AS f(sig)
+  WHERE has_function_privilege('service_role', f.sig, 'EXECUTE')
+    AND to_regprocedure(f.sig) IS NOT NULL;
+
+  -- None of the wrappers may leak to anon.
+  SELECT count(*) INTO v_public_grants
+  FROM (VALUES
+    ('public.manage_partitions()'),
+    ('public.prune_expired_access_cache()'),
+    ('public.process_cache_purges(integer,text)'),
+    ('public.process_update_enrollment_totals_jobs(integer)')
+  ) AS f(sig)
+  WHERE has_function_privilege('anon', f.sig, 'EXECUTE');
+
+  SELECT has_function_privilege('service_role', 'public.cron_queue_health()', 'EXECUTE')
+    INTO v_health_grant;
+  SELECT count(*) INTO v_health_grants_other
+  FROM unnest(ARRAY['anon','authenticated']) AS r(role)
+  WHERE to_regprocedure('public.cron_queue_health()') IS NOT NULL
+    AND has_function_privilege(r.role, 'public.cron_queue_health()', 'EXECUTE');
+
+  INSERT INTO validation_results VALUES (
+    'Cron Routine Public RPC Wrappers',
+    CASE WHEN v_wrapper_grants = 4 AND v_public_grants = 0
+       AND v_health_grant AND v_health_grants_other = 0
+      THEN 'PASS' ELSE 'FAIL' END,
+    format(
+      'service-grants=%s/4, anon-leaks=%s, queue-health service grant=%s, queue-health other grants=%s',
+      v_wrapper_grants, v_public_grants, v_health_grant, v_health_grants_other
+    )
+  );
+END $$;
+
+-- Display Results (includes Checks 27-41 above)
 SELECT * FROM validation_results ORDER BY check_name;
 
 -- Summary

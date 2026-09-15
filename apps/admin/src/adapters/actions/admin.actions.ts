@@ -53,6 +53,7 @@ import * as featureFlagsService from '@/infrastructure/repos/feature-flags.servi
 import * as jobsService from '@/infrastructure/repos/jobs.service';
 import { makeNotificationAdminRepository } from '@/infrastructure/repos/notifications.repository';
 import * as rateLimitsService from '@/infrastructure/repos/rate-limits.service';
+import { createServerClient } from '@/infrastructure/supabase/server';
 
 /**
  * Thin Server-Action boundary — every exported action follows the contract:
@@ -443,12 +444,15 @@ export async function getTopOffendersAction(): Promise<TopOffender[]> {
 
 export async function getAnalyticsCourseStatsAction(tenantId?: string): Promise<CourseWithStats[]> {
   const ctx = await requirePermission(['reports.read', 'courses.read', 'audit.read']);
-  // IDOR guard: getCourseStats reads via the service-role client. The
-  // `tenantId` argument was previously passed through unchecked — a
-  // non-super_admin caller could pass another tenant's id (or omit it)
-  // to see top-course/enrollment analytics across every tenant.
+  // IDOR guard: the `tenantId` argument passes through unchecked for
+  // super_admins only — a non-super_admin caller could pass another tenant's
+  // id (or omit it) to see top-course/enrollment analytics across every tenant.
   const scopedTenantId = ctx.permissions.includes('*') ? tenantId : ctx.tenantId;
-  return analyticsService.getCourseStats(scopedTenantId);
+  // vw_course_stats is security_invoker, so the query must run under the
+  // caller's own JWT: pass the cookie-bound server client (the browser client
+  // in container.supabase carries no session server-side → anon → zero rows).
+  const supabase = await createServerClient();
+  return analyticsService.getCourseStats(scopedTenantId, supabase);
 }
 
 export async function getCourseStatsAction(courseId: string): Promise<CourseStats | null> {

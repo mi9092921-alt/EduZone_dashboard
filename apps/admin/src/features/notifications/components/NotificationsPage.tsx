@@ -65,6 +65,7 @@ import { useAuthUser } from '@/adapters/stores/auth.store';
 import { useToastStore } from '@/adapters/stores/toast.store';
 import { StatsCard, StatsCardContent, StatsCardIcon } from '@/components/ui/Card';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { QueryErrorBanner } from '@/components/ui/QueryErrorBanner';
 import { TablePagination } from '@/components/ui/TablePagination';
 import { PermissionGate } from '@/features/layout/components/PermissionGate';
 import { getAllPermissions, searchUsers } from '@/infrastructure/repos/users.service';
@@ -644,7 +645,7 @@ export default function NotificationsPage() {
   };
 
   const activeAudience = getAudienceFromTab(tabValue);
-  const { data, isLoading, isFetching } = useNotifications(page, pageSize, activeAudience);
+  const { data, isLoading, isFetching, isError, refetch } = useNotifications(page, pageSize, activeAudience);
 
   const notifications = data?.data ?? [];
   const totalCount = data?.count ?? 0;
@@ -659,6 +660,7 @@ export default function NotificationsPage() {
 
   return (
     <div className="space-y-6">
+      <QueryErrorBanner isError={isError} refetch={refetch} />
       {/* Page header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-3">

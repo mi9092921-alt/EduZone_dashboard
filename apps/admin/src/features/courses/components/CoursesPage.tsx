@@ -17,6 +17,7 @@ import { useUpdateCourse, useDeleteCourse } from '@/adapters/mutations/courses.m
 import { useCourses } from '@/adapters/queries/courses.queries';
 import { useToast } from '@/adapters/stores/toast.store';
 import { Button } from '@/components/ui/Button';
+import { QueryErrorBanner } from '@/components/ui/QueryErrorBanner';
 import type { Course, CourseFilters, CourseStatus } from '@/domain/types/course.types';
 import { formatVideoUrl } from '@/domain/video.utils';
 import { usePathname, useRouter } from '@/i18n/routing';
@@ -86,7 +87,7 @@ export function CoursesPage() {
   const deleteMutation = useDeleteCourse();
 
   // ── Query ───────────────────────────────────────────────────────
-  const { data, isLoading, isFetching } = useCourses(filters, page, pageSize);
+  const { data, isLoading, isFetching, isError, refetch } = useCourses(filters, page, pageSize);
   const courses = data?.data ?? [];
   const totalCount = data?.count ?? 0;
 
@@ -296,6 +297,7 @@ export function CoursesPage() {
             />
           </div>
         )}
+        <QueryErrorBanner isError={isError} refetch={refetch} />
         <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
           <CoursesTable
             courses={courses}

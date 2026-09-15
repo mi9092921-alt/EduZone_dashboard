@@ -85,7 +85,7 @@ export function Topbar() {
         paddingTop: 'env(safe-area-inset-top)'
       }}
     >
-      <div className="flex items-center h-full px-4 sm:px-6 gap-3">
+      <div className="flex items-center h-full px-3 sm:px-6 gap-3 min-w-0 flex-1">
         {/* Mobile/Tablet Hamburger: Placed at the extreme start (right in RTL) */}
         {!isDesktop && (
           <button
@@ -116,29 +116,23 @@ export function Topbar() {
             </span>
           </nav>
         ) : (
-          <h1 className="text-base font-semibold text-foreground tracking-wide">
+          <h1 className="text-base font-semibold text-foreground tracking-wide min-w-0 truncate">
             {pageTitle}
           </h1>
         )}
       </div>
 
-      <div className="flex items-center gap-1 sm:gap-2 px-4 sm:px-6">
+      <div className="flex items-center gap-1 sm:gap-2 px-3 sm:px-6 shrink-0">
         {/* Tenant Switcher (super_admin only) */}
-        {isSuperAdmin && (
-          <div className="hidden md:block">
-            <TenantSwitcher />
-          </div>
-        )}
+        {isSuperAdmin && <TenantSwitcher />}
 
         {/* Language Switcher */}
-        <div className="hidden md:block">
-          <LanguageSwitcher />
-        </div>
+        <LanguageSwitcher />
 
         {/* Notification Bell */}
         <NotificationBell />
 
-        <div className="h-5 w-px bg-border/40 mx-1" />
+        <div className="hidden sm:block h-5 w-px bg-border/40 mx-1" />
 
         {/* User avatar + menu */}
         <button

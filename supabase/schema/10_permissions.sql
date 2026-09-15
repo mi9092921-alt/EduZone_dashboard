@@ -63,7 +63,11 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA audit REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC
 ALTER DEFAULT PRIVILEGES IN SCHEMA internal REVOKE ALL ON TABLES FROM PUBLIC, anon, authenticated;
 ALTER DEFAULT PRIVILEGES IN SCHEMA internal REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon, authenticated;
 
-GRANT SELECT ON public.vw_course_stats TO authenticated, anon, service_role;
+-- NOTE: grants for public.* relations belong BELOW the blanket
+-- "REVOKE ALL ON ALL TABLES IN SCHEMA public" sweep — a grant placed above it
+-- is dead on arrival (the sweep runs after it and wipes it). vw_course_stats
+-- sat here for releases, so authenticated browsers got permission-denied and
+-- the System Analytics course section rendered empty despite data existing.
 
 -- ============================================================================
 -- Table & View DML Grants
@@ -72,6 +76,11 @@ GRANT SELECT ON public.vw_course_stats TO authenticated, anon, service_role;
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON ALL TABLES IN SCHEMA audit FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON ALL TABLES IN SCHEMA internal FROM PUBLIC, anon, authenticated;
+
+-- Analytics reads (security_invoker view over private.mv_course_stats — the
+-- matching SELECT on that MV is granted further below). PostgREST can only
+-- reach the MV through this tenant-filtered view.
+GRANT SELECT ON public.vw_course_stats TO authenticated, anon, service_role;
 
 -- Core read access
 GRANT SELECT ON public.regions                  TO authenticated;
@@ -112,6 +121,12 @@ GRANT SELECT ON public.user_permission_cache    TO authenticated, service_role;
 GRANT SELECT ON public.constants TO authenticated;
 GRANT SELECT ON public.user_validity_cache TO authenticated, service_role;
 GRANT SELECT ON public.mv_course_stats TO authenticated, service_role, anon;
+-- public.vw_course_stats is security_invoker, so its invoker also needs SELECT
+-- on the underlying MV or every read fails with "permission denied for
+-- materialized view mv_course_stats" (System Analytics course section rendered
+-- empty despite data). private.* is not API-exposed, so the filtered view
+-- remains the only reachable path.
+GRANT SELECT ON private.mv_course_stats TO authenticated, anon;
 
 -- Mutation grants (RLS still controls who can do what)
 GRANT INSERT, DELETE ON public.users                             TO authenticated;

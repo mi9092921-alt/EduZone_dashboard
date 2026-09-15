@@ -330,29 +330,52 @@ export const RPC_CATALOG: readonly RpcDefinition[] = [
   {
     name: 'invoke_notification_push_worker',
     classification: 'service-role',
-    owner: 'infrastructure/repos/notifications.repository.ts (admin client)',
-    notes: 'internal schema function wrapper; service_role only (10_permissions.sql:389-391).',
+    owner: 'infrastructure/repos/notifications.repository.ts (admin client) — historical owner; no current .rpc() call site since 2026-09-15',
+    notes:
+      'internal-schema function (unresolvable via PostgREST). The fanout worker ' +
+      'invokes it internally after every processed batch and a pg_cron job ' +
+      '(notification_push_worker, * * * * *) fires it every minute, so no direct ' +
+      'call site is needed. service_role only (10_permissions.sql).',
   },
   {
     name: 'manage_partitions',
     classification: 'service-role',
     owner: 'infrastructure/repos/jobs-rpc.service.ts (cron route)',
-    notes: 'maintenance schema routine invoked by the cron route with CRON_SECRET.',
+    notes:
+      'Launch-audit B2: thin public wrapper forwards to maintenance.manage_partitions(); ' +
+      'EXECUTE granted to service_role only.',
   },
   {
     name: 'prune_expired_access_cache',
     classification: 'service-role',
     owner: 'infrastructure/repos/jobs-rpc.service.ts (cron route)',
+    notes:
+      'Launch-audit B2: thin public wrapper forwards to private.prune_expired_access_cache(); ' +
+      'service_role only.',
   },
   {
     name: 'process_update_enrollment_totals_jobs',
     classification: 'service-role',
     owner: 'infrastructure/repos/jobs-rpc.service.ts (cron route)',
+    notes:
+      'Launch-audit B2: thin public wrapper (p_limit) forwards to the internal-schema worker; ' +
+      'service_role only.',
   },
   {
     name: 'process_cache_purges',
     classification: 'service-role',
     owner: 'infrastructure/repos/jobs-rpc.service.ts (cron route)',
+    notes:
+      'Launch-audit B2: thin public wrapper forwards to internal.process_cache_purges(); ' +
+      'service_role only.',
+  },
+  {
+    name: 'cron_queue_health',
+    classification: 'service-role',
+    owner: 'infrastructure/repos/jobs-rpc.service.ts (cron route)',
+    notes:
+      'Launch-audit B11: read-only job-queue health snapshot (pending/processing/failed counts, ' +
+      'oldest pending age) surfaced by the cron route for monitoring. service_role only.',
   },
 ] as const;
 

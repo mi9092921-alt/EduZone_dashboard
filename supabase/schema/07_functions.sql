@@ -1270,9 +1270,9 @@ LANGUAGE plpgsql
 SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
 BEGIN
-  REFRESH MATERIALIZED VIEW CONCURRENTLY private.mv_course_stats;
-  REFRESH MATERIALIZED VIEW CONCURRENTLY public.vw_student_progress_timeline;
-  REFRESH MATERIALIZED VIEW CONCURRENTLY public.vw_daily_revenue;
+  PERFORM private.refresh_mv_resilient('private', 'mv_course_stats');
+  PERFORM private.refresh_mv_resilient('public', 'vw_student_progress_timeline');
+  PERFORM private.refresh_mv_resilient('public', 'vw_daily_revenue');
 END;
 $$;
 
@@ -5889,26 +5889,83 @@ BEGIN
 END;
 $$;
 
+-- MVs are created WITH NO DATA; REFRESH ... CONCURRENTLY fails with
+-- "cannot be used when the materialized view is not populated" until the
+-- first populate. Check pg_matviews.ispopulated and choose the refresh mode
+-- accordingly, so analytics MVs can never stay permanently empty.
+CREATE OR REPLACE FUNCTION private.refresh_mv_resilient(p_schema text, p_name text)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_populated boolean;
+BEGIN
+  SELECT ispopulated INTO v_populated
+  FROM pg_catalog.pg_matviews
+  WHERE schemaname = p_schema AND matviewname = p_name;
+
+  IF v_populated IS NULL THEN
+    RAISE EXCEPTION 'MATERIALIZED_VIEW_NOT_FOUND: %.%', p_schema, p_name;
+  END IF;
+
+  IF v_populated THEN
+    EXECUTE pg_catalog.format('REFRESH MATERIALIZED VIEW CONCURRENTLY %I.%I', p_schema, p_name);
+  ELSE
+    EXECUTE pg_catalog.format('REFRESH MATERIALIZED VIEW %I.%I', p_schema, p_name);
+  END IF;
+END;
+$$;
+
 CREATE OR REPLACE FUNCTION private.refresh_all_materialized_views()
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
 BEGIN
-  IF auth.role() <> 'service_role' AND NOT public.is_admin_with_session_validation() THEN
+  -- Cron-safe guard: pg_cron runs as `postgres` with NO JWT context —
+  -- coalesce(auth.role(), current_user) lets cron/service_role through
+  -- while still accepting session-validated admins (PERF-01 pattern).
+  IF coalesce(auth.role(), current_user) NOT IN ('service_role', 'postgres', 'supabase_admin')
+     AND NOT public.is_admin_with_session_validation() THEN
     RAISE EXCEPTION 'PERMISSION_DENIED';
   END IF;
 
   DELETE FROM private.user_access_cache
   WHERE valid_until < pg_catalog.now();
 
-  REFRESH MATERIALIZED VIEW CONCURRENTLY private.mv_user_stats;
-  REFRESH MATERIALIZED VIEW CONCURRENTLY private.mv_course_stats;
-  REFRESH MATERIALIZED VIEW CONCURRENTLY private.mv_course_stats_tenant;
-  REFRESH MATERIALIZED VIEW CONCURRENTLY private.mv_hourly_activity_48h;
-  REFRESH MATERIALIZED VIEW CONCURRENTLY private.mv_daily_activity_30d;
+  PERFORM private.refresh_mv_resilient('private', 'mv_user_stats');
+  PERFORM private.refresh_mv_resilient('private', 'mv_course_stats');
+  PERFORM private.refresh_mv_resilient('private', 'mv_course_stats_tenant');
+  PERFORM private.refresh_mv_resilient('private', 'mv_hourly_activity_48h');
+  PERFORM private.refresh_mv_resilient('private', 'mv_daily_activity_30d');
 END;
 $$;
+
+-- ============================================================================
+-- MV refresh scheduling: private.refresh_all_materialized_views() previously
+-- had NO caller — no pg_cron registration and no worker call site — so every
+-- analytics MV created WITH NO DATA stayed empty forever (root cause of the
+-- System Analytics "Course Performance" section showing no data despite data
+-- existing). Refresh every 5 minutes, idempotent re-registration.
+-- ============================================================================
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron')
+     AND EXISTS (
+       SELECT 1 FROM pg_tables WHERE schemaname = 'cron' AND tablename = 'job'
+     ) THEN
+    PERFORM cron.unschedule(jobid)
+    FROM cron.job
+    WHERE jobname = 'refresh-materialized-views';
+
+    PERFORM cron.schedule(
+      'refresh-materialized-views',
+      '*/5 * * * *',
+      'SELECT private.refresh_all_materialized_views();'
+    );
+  END IF;
+END $$;
 
 -- ============================================================================
 -- 010_auth_hook.sql
@@ -7163,6 +7220,11 @@ BEGIN
     EXCEPTION WHEN OTHERS THEN
       UPDATE internal.job_queue
       SET status = CASE WHEN attempts >= max_attempts THEN 'failed' ELSE 'pending' END,
+          next_retry_at = CASE WHEN attempts >= max_attempts THEN NULL
+                               ELSE now() + least(interval '15 minutes',
+                                    greatest(interval '30 seconds',
+                                      make_interval(secs => power(2, greatest(attempts - 1, 0))::integer * 30)))
+                          END,
           error_message = left(SQLERRM, 1000),
           locked_by_worker_id = NULL,
           locked_at = NULL,
@@ -7229,6 +7291,11 @@ BEGIN
     EXCEPTION WHEN OTHERS THEN
       UPDATE internal.job_queue
       SET status = CASE WHEN attempts >= max_attempts THEN 'failed' ELSE 'pending' END,
+          next_retry_at = CASE WHEN attempts >= max_attempts THEN NULL
+                               ELSE now() + least(interval '15 minutes',
+                                    greatest(interval '30 seconds',
+                                      make_interval(secs => power(2, greatest(attempts - 1, 0))::integer * 30)))
+                          END,
           error_message = left(SQLERRM, 1000),
           locked_by_worker_id = NULL,
           locked_at = NULL,

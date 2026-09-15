@@ -82,7 +82,7 @@ export function TenantSwitcher() {
         disabled={isPending}
         aria-haspopup="true"
         aria-expanded={menuOpen}
-        className="flex items-center gap-2 px-3 transition-faang max-w-[200px]"
+        className="flex items-center gap-2 px-3 transition-faang max-w-[110px] sm:max-w-[200px]"
       >
         {isPending ? <CircularProgress size={14} /> : <CorporateFare className="text-sm shrink-0" />}
         <span className="font-medium truncate">{label ?? t('tenant_switcher.label')}</span>

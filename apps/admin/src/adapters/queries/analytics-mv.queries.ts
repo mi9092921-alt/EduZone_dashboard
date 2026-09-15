@@ -27,18 +27,18 @@ export function useUserStats(tenantId?: string) {
 export function useCourseStats(tenantId?: string) {
   return useQuery({
     queryKey: queryKeys.analytics.courseStats(tenantId),
-    // M-CLIENT-ADMIN: getCourseStats() reads via the service-role client
-    // (bypasses RLS) and must never be called from browser code — route
-    // through the tenant-scoped server action instead.
+    // Course stats must be read through the tenant-scoped server action:
+    // the boundary checks reports.read/courses.read and scopes tenantId
+    // (vw_course_stats itself is security_invoker + tenant-filtered).
     queryFn: () => getAnalyticsCourseStatsAction(tenantId),
     staleTime: 60_000,
   });
 }
 
-export function useDailyActivity(tenantId?: string) {
+export function useDailyActivity(tenantId?: string, days = 30) {
   return useQuery({
-    queryKey: queryKeys.analytics.dailyActivity(tenantId),
-    queryFn: () => getDailyActivity(tenantId),
+    queryKey: queryKeys.analytics.dailyActivity(tenantId, days),
+    queryFn: () => getDailyActivity(tenantId, days),
     staleTime: 60_000,
   });
 }

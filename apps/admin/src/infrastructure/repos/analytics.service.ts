@@ -1,4 +1,5 @@
 import type { UserStats } from '@eduzone/types';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { container } from '@/container';
 import type {
@@ -8,7 +9,6 @@ import type {
   MvCourseStats,
   GeoPoint,
 } from '@/domain/types/analytics.types';
-import { createAdminClient } from '@/infrastructure/supabase/admin';
 
 /**
  * Analytics service — Supabase queries for materialized views
@@ -109,35 +109,46 @@ export async function getSystemHealth(): Promise<SystemHealthDto> {
   };
 }
 
-// ── Course stats from vw_course_stats (admin read — bypasses RLS) ───────────
-export async function getCourseStats(tenantId?: string): Promise<CourseWithStats[]> {
-  try {
-    const admin = createAdminClient();
+// ── Course stats from vw_course_stats (invoker-scoped read) ─────────────────
+// When called from the getAnalyticsCourseStatsAction server action, pass the
+// cookie-bound server client (createServerClient from infrastructure/supabase/
+// server): container.supabase is the BROWSER client — on the server it carries
+// no session, PostgREST sees anon, and the security_invoker view (which filters
+// on get_current_tenant_id()/is_current_user_super_admin()) yields zero rows.
+export async function getCourseStats(
+  tenantId?: string,
+  supabaseOverride?: SupabaseClient,
+): Promise<CourseWithStats[]> {
+  const supabase = supabaseOverride ?? container.supabase;
 
-    let query = admin.from('vw_course_stats').select('*');
-    if (tenantId) query = query.eq('tenant_id', tenantId);
+  // v13 made public.vw_course_stats security_invoker and tenant-scoped
+  // (WHERE tenant_id = get_current_tenant_id() OR is_current_user_super_admin()).
+  // Reading it through the service-role admin client therefore yields ZERO
+  // rows — no user JWT means no tenant context and both WHERE branches are
+  // false. Admin reads must use the caller's own authenticated client; the
+  // view itself scopes tenants, and the action boundary re-checks permission
+  // + tenant scoping before calling this.
+  let query = supabase.from('vw_course_stats').select('*');
+  if (tenantId) query = query.eq('tenant_id', tenantId);
 
-    const { data, error } = await query.order('enrolled', { ascending: false }).limit(20);
-    if (error || !data) return [];
+  const { data, error } = await query.order('enrolled', { ascending: false }).limit(20);
+  if (error || !data) return [];
 
-    const courseIds = data.map((d: MvCourseStats) => d.course_id);
-    const { data: courses } = await admin
-      .from('courses')
-      .select('id, title')
-      .in('id', courseIds)
-      .is('deleted_at', null);
+  const courseIds = data.map((d: MvCourseStats) => d.course_id);
+  const { data: courses } = await supabase
+    .from('courses')
+    .select('id, title')
+    .in('id', courseIds)
+    .is('deleted_at', null);
 
-    const titleMap = new Map(
-      (courses ?? []).map((c: { id: string; title: string }) => [c.id, c.title]),
-    );
+  const titleMap = new Map(
+    (courses ?? []).map((c: { id: string; title: string }) => [c.id, c.title]),
+  );
 
-    return data.map((d: MvCourseStats) => ({
-      ...d,
-      title: titleMap.get(d.course_id) ?? 'Unknown',
-    }));
-  } catch {
-    return [];
-  }
+  return data.map((d: MvCourseStats) => ({
+    ...d,
+    title: titleMap.get(d.course_id) ?? 'Unknown',
+  }));
 }
 
 // ── Daily activity from RPC ──────────────────────────────────────
@@ -202,7 +213,9 @@ export async function getUserRegistrationTrend(
   return result;
 }
 
-// ── Geographic distribution (from users region_id) ───────────────
+// ── Geographic distribution (from users region_id → regions.label) ───────
+// users.region_id is a data-residency region id (e.g. "me-south-1"), not a
+// country code — resolve it to a human-readable label from public.regions.
 export async function getGeographicDistribution(tenantId?: string): Promise<GeoPoint[]> {
   const { supabase } = container;
 
@@ -215,8 +228,8 @@ export async function getGeographicDistribution(tenantId?: string): Promise<GeoP
 
   if (tenantId) q = q.eq('tenant_id', tenantId);
 
-  const { data } = await q;
-  if (!data || data.length === 0) return [];
+  const { data, error } = await q;
+  if (error || !data || data.length === 0) return [];
 
   const countMap = new Map<string, number>();
   for (const u of data) {
@@ -224,7 +237,21 @@ export async function getGeographicDistribution(tenantId?: string): Promise<GeoP
     countMap.set(region, (countMap.get(region) ?? 0) + 1);
   }
 
+  // Resolve region ids to display labels (best effort — fall back to the id).
+  const regionIds = Array.from(countMap.keys());
+  const { data: regions } = await supabase
+    .from('regions')
+    .select('id, label')
+    .in('id', regionIds);
+  const labelMap = new Map(
+    (regions ?? []).map((r: { id: string; label: string }) => [r.id, r.label]),
+  );
+
   return Array.from(countMap.entries())
-    .map(([country_code, user_count]) => ({ country_code, user_count }))
+    .map(([region_id, user_count]) => ({
+      country_code: region_id,
+      label: labelMap.get(region_id) ?? region_id,
+      user_count,
+    }))
     .sort((a, b) => b.user_count - a.user_count);
 }

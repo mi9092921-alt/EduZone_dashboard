@@ -22,6 +22,7 @@ import { useTenants } from '@/adapters/queries/tenants.queries';
 import { useToast } from '@/adapters/stores/toast.store';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
+import { QueryErrorBanner } from '@/components/ui/QueryErrorBanner';
 import { TablePagination } from '@/components/ui/TablePagination';
 import type { Tenant, TenantFilters, TenantPlan, TenantStatus, CreateTenantInput } from '@/domain/types/tenant.types';
 import { usePathname, useRouter } from '@/i18n/routing';
@@ -111,7 +112,7 @@ export function TenantsPage() {
   const [newPlan, setNewPlan] = useState<TenantPlan>('free');
   const [formError, setFormError] = useState<string | null>(null);
 
-  const { data, isLoading } = useTenants(filters, page, pageSize);
+  const { data, isLoading, isError, refetch } = useTenants(filters, page, pageSize);
   const tenants = data?.data ?? [];
   const totalCount = data?.count ?? 0;
 
@@ -226,6 +227,7 @@ export function TenantsPage() {
       </div>
 
       {/* Tenants Table */}
+      <QueryErrorBanner isError={isError} refetch={refetch} />
       <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-start border-collapse">
