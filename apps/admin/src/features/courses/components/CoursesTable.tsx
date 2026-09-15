@@ -122,12 +122,16 @@ export function CoursesTable({
     <div className="w-full bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden flex flex-col min-h-0 min-w-0">
       {/* DESKTOP TABLE (≥md) — full columns with sticky edges */}
       <div className="overflow-x-auto min-w-0 flex-1 no-scrollbar hidden md:block">
-        <div className="min-w-[960px]">
+        {/* ARIA table semantics: the grid is div-based, so the tabular roles
+            are restored explicitly (e2e locates rows/cells by role, and
+            screen readers keep table navigation). */}
+        <div role="table" aria-label={t('courses')} className="min-w-[960px]">
           {/* ── Header — same grid template as data rows, so columns can't drift ── */}
-          <div className={cn(DESKTOP_ROW_GRID, 'bg-muted/30 border-b border-border/60')}>
+          <div role="row" className={cn(DESKTOP_ROW_GRID, 'bg-muted/30 border-b border-border/60')}>
             {TABLE_HEADERS.map((h, i) => (
               <div
                 key={h.label || i}
+                role="columnheader"
                 className={cn(
                   'py-4 text-[12px] font-extrabold text-foreground/70 uppercase tracking-widest min-w-0',
                   h.className,
@@ -151,7 +155,13 @@ export function CoursesTable({
               </div>
             ))}
           </div>
-          <div className="divide-y divide-border/40">
+          {/* Skeletons are decorative: hidden from the a11y tree so the
+              table exposes real rows only once data has loaded. */}
+          <div
+            role="rowgroup"
+            aria-hidden={isLoading || undefined}
+            className="divide-y divide-border/40"
+          >
             {isLoading
               ? Array.from({ length: pageSize }).map((_, i) => (
                   <div key={i} className={cn(DESKTOP_ROW_GRID, 'py-4 animate-pulse')}>
@@ -197,6 +207,7 @@ export function CoursesTable({
                   return (
                     <div
                       key={course.id}
+                      role="row"
                       onClick={() => onViewCourse(course)}
                       className={cn(
                         DESKTOP_ROW_GRID,
@@ -206,12 +217,14 @@ export function CoursesTable({
                     >
                       {/* Checkbox */}
                       <div
+                        role="cell"
                         className="px-4 py-5 text-center"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <div className="flex items-center justify-center">
                           <input
                             type="checkbox"
+                            aria-label={course.title}
                             checked={selectedIds.includes(course.id)}
                             onChange={(e) => handleToggleRow(e, course.id)}
                             className="w-4 h-4 rounded border-border bg-background text-primary focus:ring-primary/30 transition-all cursor-pointer"
@@ -219,7 +232,7 @@ export function CoursesTable({
                         </div>
                       </div>
                       {/* Course Title + Thumbnail */}
-                      <div className="px-6 py-5 min-w-0">
+                      <div role="cell" className="px-6 py-5 min-w-0">
                         <div className="flex items-center gap-4 min-w-0">
                           <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center overflow-hidden border border-primary/10 shadow-sm shrink-0">
                             {course.thumbnail_url ? (
@@ -259,7 +272,7 @@ export function CoursesTable({
                       </div>
 
                       {/* Status */}
-                      <div className="px-6 py-5 text-start min-w-0">
+                      <div role="cell" className="px-6 py-5 text-start min-w-0">
                         <div
                           className={cn(
                             'inline-flex max-w-full items-center gap-2 px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-tight border transition-faang',
@@ -273,7 +286,7 @@ export function CoursesTable({
                       </div>
 
                       {/* Level */}
-                      <div className="px-6 py-5 text-start min-w-0">
+                      <div role="cell" className="px-6 py-5 text-start min-w-0">
                         <div
                           className={cn(
                             'inline-flex max-w-full items-center gap-2 text-[10px] font-extrabold uppercase tracking-widest transition-faang',
@@ -286,14 +299,14 @@ export function CoursesTable({
                       </div>
 
                       {/* Lessons Count */}
-                      <div className="px-6 py-5 text-center">
+                      <div role="cell" className="px-6 py-5 text-center">
                         <div className="inline-flex items-center justify-center min-w-[2.5rem] h-8 px-3 rounded-full bg-primary/10 text-primary font-bold text-sm">
                           {course.lesson_count || 0}
                         </div>
                       </div>
 
                       {/* Price */}
-                      <div className="px-6 py-5 text-end">
+                      <div role="cell" className="px-6 py-5 text-end">
                         {course.is_free || course.price === 0 ? (
                           <span className="text-emerald-600 dark:text-emerald-400 font-extrabold text-[15px]">
                             {t('free')}
@@ -309,7 +322,7 @@ export function CoursesTable({
                       </div>
 
                       {/* Teacher & Date Combined */}
-                      <div className="px-6 py-5 min-w-0">
+                      <div role="cell" className="px-6 py-5 min-w-0">
                         <div className="flex flex-col gap-0.5">
                           <span
                             title={course.teacher_name || undefined}
@@ -329,6 +342,7 @@ export function CoursesTable({
 
                       {/* Actions */}
                       <div
+                        role="cell"
                         className="sticky end-0 z-10 px-6 py-5 bg-card group-hover:bg-card hover:!bg-muted/30 transition-colors text-end ltr:shadow-[-12px_0_12px_-10px_rgba(0,0,0,0.05)] rtl:shadow-[12px_0_12px_-10px_rgba(0,0,0,0.05)]"
                         onClick={(e) => e.stopPropagation()}
                       >
