@@ -322,6 +322,12 @@ export const RPC_CATALOG: readonly RpcDefinition[] = [
     notes: 'Granted to service_role ONLY (10_permissions.sql:402-405).',
   },
   {
+    name: 'process_course_notify_jobs',
+    classification: 'service-role',
+    owner: 'infrastructure/repos/jobs-rpc.service.ts + cron route',
+    notes: 'Batched lesson/enrollment notification worker; granted to service_role only.',
+  },
+  {
     name: 'invoke_notification_push_worker',
     classification: 'service-role',
     owner: 'infrastructure/repos/notifications.repository.ts (admin client)',

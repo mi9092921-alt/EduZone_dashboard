@@ -421,6 +421,16 @@ REVOKE ALL ON FUNCTION public.process_notification_fanout_jobs(integer, text)
 GRANT EXECUTE ON FUNCTION public.process_notification_fanout_jobs(integer, text)
   TO service_role;
 
+REVOKE ALL ON FUNCTION public.process_course_notify_jobs(integer, text)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.process_course_notify_jobs(integer, text)
+  TO service_role;
+
+REVOKE ALL ON FUNCTION internal.send_system_notification(uuid, text, text, uuid[])
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION internal.send_system_notification(uuid, text, text, uuid[])
+  TO service_role;
+
 REVOKE ALL ON FUNCTION public.record_current_user_activity(boolean, text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.record_current_user_activity(boolean, text) TO authenticated, service_role;
 
@@ -513,9 +523,9 @@ REVOKE EXECUTE ON FUNCTION public.encrypt_pii(text, text) FROM anon;
 REVOKE EXECUTE ON FUNCTION public.encrypt_pii(text, text) FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.encrypt_pii(text, text) TO service_role;
 
-REVOKE EXECUTE ON FUNCTION public.dequeue_job(text, text[], integer) FROM anon;
-REVOKE EXECUTE ON FUNCTION public.dequeue_job(text, text[], integer) FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.dequeue_job(text, text[], integer) TO service_role;
+REVOKE EXECUTE ON FUNCTION public.dequeue_job(text, text[], integer, integer) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.dequeue_job(text, text[], integer, integer) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.dequeue_job(text, text[], integer, integer) TO service_role;
 
 REVOKE EXECUTE ON FUNCTION public.sync_primary_role() FROM anon;
 REVOKE EXECUTE ON FUNCTION public.sync_primary_role() FROM authenticated;

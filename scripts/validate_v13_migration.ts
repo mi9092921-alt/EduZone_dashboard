@@ -207,8 +207,29 @@ async function validateNotificationRPCs(client: SupabaseClient) {
   }
 }
 
+async function validateCourseNotifyRPCs(client: SupabaseClient) {
+  console.log('\n🔍 8. Automatic Course Notification Worker');
+
+  // A zero limit is explicitly a no-op in the worker, so this validates the
+  // deployed wrapper and its service-role grant without consuming real jobs.
+  const { data, error } = await client.rpc('process_course_notify_jobs', {
+    p_limit: 0,
+    p_worker_id: 'v13-course-notify-validator',
+  });
+
+  if (error?.message?.includes('does not exist')) {
+    fail('process_course_notify_jobs', 'RPC does not exist in schema');
+  } else if (error) {
+    fail('process_course_notify_jobs', error.message.slice(0, 120));
+  } else if (data !== 0) {
+    fail('process_course_notify_jobs zero-limit guard', `Expected 0, got ${String(data)}`);
+  } else {
+    pass('process_course_notify_jobs RPC and zero-limit guard');
+  }
+}
+
 async function validateSeedData(client: SupabaseClient) {
-  console.log('\n🔍 8. QA Seed Data Integrity');
+  console.log('\n🔍 9. QA Seed Data Integrity');
 
   const checks = [
     {
@@ -258,6 +279,7 @@ async function main() {
   await validateRLSPolicies(serviceClient);
   await validatePreventPhysicalDelete(serviceClient);
   await validateNotificationRPCs(serviceClient);
+  await validateCourseNotifyRPCs(serviceClient);
   await validateSeedData(serviceClient);
 
   console.log('\n═══════════════════════════════════════════════════');

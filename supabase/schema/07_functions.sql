@@ -1981,10 +1981,13 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS internal.dequeue_job(text, text[], integer);
+
 CREATE OR REPLACE FUNCTION internal.dequeue_job(
   p_worker_id text,
   p_job_types text[] DEFAULT NULL,
-  p_lock_ttl_seconds integer DEFAULT 300
+  p_lock_ttl_seconds integer DEFAULT 300,
+  p_batch_size integer DEFAULT 1
 )
 RETURNS SETOF internal.job_queue
 LANGUAGE plpgsql
@@ -2009,7 +2012,7 @@ BEGIN
       AND (next_retry_at IS NULL OR next_retry_at <= pg_catalog.now())
       AND (p_job_types IS NULL OR job_type = ANY(p_job_types))
     ORDER BY priority DESC, run_at ASC
-    LIMIT 1
+    LIMIT greatest(1, least(coalesce(p_batch_size, 1), 500))
     FOR UPDATE SKIP LOCKED
   )
   UPDATE internal.job_queue
@@ -2615,6 +2618,27 @@ BEGIN
       'release-stale-job-locks',
       '* * * * *',
       'SELECT public.release_stale_job_locks();'
+    );
+  END IF;
+END $$;
+
+-- Automatic course notifications are SQL-only and must run every minute. Keep
+-- this independent from the HTTP push-worker schedule; the Vercel cron route
+-- remains a fallback for environments without pg_cron.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron')
+     AND EXISTS (
+       SELECT 1 FROM pg_tables WHERE schemaname = 'cron' AND tablename = 'job'
+     ) THEN
+    PERFORM cron.unschedule(jobid)
+    FROM cron.job
+    WHERE jobname = 'course-notification-worker';
+
+    PERFORM cron.schedule(
+      'course-notification-worker',
+      '* * * * *',
+      'SELECT internal.process_course_notify_jobs();'
     );
   END IF;
 END $$;
@@ -4013,6 +4037,13 @@ LANGUAGE plpgsql
 SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
 BEGIN
+  -- System notifications fan out inline so the course-notification worker
+  -- can complete the whole delivery transaction without a second audience
+  -- based job re-processing the notification.
+  IF coalesce(current_setting('eduzone.skip_async_fanout', true), 'off') = 'on' THEN
+    RETURN NEW;
+  END IF;
+
   -- Async fanout: enqueue a single job instead of per-user inserts.
   -- The job worker (service_role) handles the actual user_notifications inserts.
   INSERT INTO internal.job_queue (job_type, payload, priority)
@@ -4028,6 +4059,102 @@ BEGIN
   )
   ON CONFLICT (job_type, payload_hash) WHERE (status IN ('pending', 'processing')) DO NOTHING;
   RETURN NEW;
+END;
+$$;
+
+-- Internal, service-role-only notification primitive used by automatic course
+-- notifications. It intentionally accepts only an explicit recipient list:
+-- NULL/empty input is a no-op and can never fall through to an audience send.
+CREATE OR REPLACE FUNCTION internal.send_system_notification(
+  p_tenant_id uuid,
+  p_title text,
+  p_body text,
+  p_user_ids uuid[]
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = public, internal, pg_temp
+AS $$
+DECLARE
+  v_id uuid;
+BEGIN
+  IF coalesce(auth.role(), current_user) NOT IN
+      ('service_role', 'postgres', 'supabase_admin') THEN
+    RAISE EXCEPTION 'PERMISSION_DENIED';
+  END IF;
+
+  IF p_user_ids IS NULL OR cardinality(p_user_ids) = 0 THEN
+    RETURN NULL;
+  END IF;
+
+  PERFORM set_config('eduzone.skip_async_fanout', 'on', true);
+
+  INSERT INTO public.notifications (
+    tenant_id, title, body, target_audience, targeting_mode, created_by
+  )
+  VALUES (
+    p_tenant_id,
+    left(btrim(p_title), 100),
+    left(btrim(p_body), 500),
+    'all',
+    'users',
+    NULL
+  )
+  RETURNING id INTO v_id;
+
+  INSERT INTO public.notification_targets (notification_id, user_id)
+  SELECT v_id, u.id
+  FROM public.users u
+  WHERE u.id = ANY(p_user_ids)
+    AND u.tenant_id = p_tenant_id
+    AND u.deleted_at IS NULL
+    AND u.account_status = 'active'
+  ON CONFLICT DO NOTHING;
+
+  INSERT INTO public.user_notifications (user_id, notification_id, tenant_id, is_read)
+  SELECT u.id, v_id, p_tenant_id, false
+  FROM public.users u
+  WHERE u.id = ANY(p_user_ids)
+    AND u.tenant_id = p_tenant_id
+    AND u.deleted_at IS NULL
+    AND u.account_status = 'active'
+  ON CONFLICT (user_id, notification_id) DO NOTHING;
+
+  INSERT INTO public.push_deliveries (
+    notification_id, user_notification_id, user_id, tenant_id, push_token_id
+  )
+  SELECT un.notification_id, un.id, un.user_id, un.tenant_id, pt.id
+  FROM public.user_notifications un
+  JOIN public.push_tokens pt
+    ON pt.user_id = un.user_id
+   AND pt.tenant_id = un.tenant_id
+   AND pt.is_active
+  WHERE un.notification_id = v_id
+    AND un.tenant_id = p_tenant_id
+  ON CONFLICT (notification_id, push_token_id) DO NOTHING;
+
+  INSERT INTO internal.job_queue (tenant_id, job_type, payload, priority)
+  SELECT pd.tenant_id, 'notification_push',
+         jsonb_build_object(
+           'push_delivery_id', pd.id,
+           'notification_id', pd.notification_id,
+           'user_notification_id', pd.user_notification_id,
+           'push_token_id', pd.push_token_id
+         ), 10
+  FROM public.push_deliveries pd
+  WHERE pd.notification_id = v_id
+    AND pd.status = 'pending'
+    AND pd.attempt_count = 0
+  ON CONFLICT (job_type, payload_hash)
+    WHERE status IN ('pending', 'processing') DO NOTHING;
+
+  BEGIN
+    PERFORM internal.invoke_notification_push_worker();
+  EXCEPTION WHEN OTHERS THEN
+    NULL;
+  END;
+
+  RETURN v_id;
 END;
 $$;
 
@@ -5110,10 +5237,13 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS public.dequeue_job(text, text[], integer);
+
 CREATE OR REPLACE FUNCTION public.dequeue_job(
   p_worker_id text,
   p_job_types text[] DEFAULT NULL,
-  p_lock_ttl_seconds integer DEFAULT 300
+  p_lock_ttl_seconds integer DEFAULT 300,
+  p_batch_size integer DEFAULT 1
 )
 RETURNS SETOF internal.job_queue
 LANGUAGE plpgsql
@@ -5125,7 +5255,7 @@ BEGIN
   END IF;
 
   RETURN QUERY
-  SELECT * FROM internal.dequeue_job(p_worker_id, p_job_types, p_lock_ttl_seconds);
+  SELECT * FROM internal.dequeue_job(p_worker_id, p_job_types, p_lock_ttl_seconds, p_batch_size);
 END;
 $$;
 
@@ -5206,18 +5336,69 @@ RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
+DECLARE
+  v_should_notify boolean := false;
 BEGIN
-  IF TG_OP = 'UPDATE'
-     AND NEW.is_published = true
-     AND OLD.is_published IS DISTINCT FROM NEW.is_published THEN
-    INSERT INTO internal.job_queue (job_type, payload, priority)
+  IF TG_OP = 'INSERT' THEN
+    v_should_notify := NEW.is_published = true;
+  ELSIF TG_OP = 'UPDATE' THEN
+    v_should_notify := NEW.is_published = true
+      AND OLD.is_published IS DISTINCT FROM NEW.is_published;
+  END IF;
+
+  IF v_should_notify THEN
+    INSERT INTO internal.job_queue (tenant_id, job_type, payload, priority)
     VALUES (
-      'NOTIFY_LESSON_PUBLISHED',
-      jsonb_build_object('course_id', NEW.course_id, 'lesson_title', NEW.title),
-      10
+       NEW.tenant_id,
+       'NOTIFY_LESSON_PUBLISHED',
+       jsonb_build_object(
+         'lesson_id', NEW.id,
+         'course_id', NEW.course_id,
+         'tenant_id', NEW.tenant_id,
+         'lesson_title', NEW.title
+       ),
+       10
     )
     ON CONFLICT (job_type, payload_hash) WHERE (status IN ('pending', 'processing')) DO NOTHING;
   END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.trg_enrollment_notify()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = public, internal, pg_temp
+AS $$
+DECLARE
+  v_is_reactivation boolean := false;
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    IF NEW.status <> 'active' THEN
+      RETURN NEW;
+    END IF;
+  ELSIF TG_OP = 'UPDATE'
+        AND OLD.status <> 'active'
+        AND NEW.status = 'active' THEN
+    v_is_reactivation := true;
+  ELSE
+    RETURN NEW;
+  END IF;
+
+  INSERT INTO internal.job_queue (tenant_id, job_type, payload, priority)
+  VALUES (
+    NEW.tenant_id,
+    'NOTIFY_STUDENT_ENROLLED',
+    jsonb_build_object(
+      'user_id', NEW.user_id,
+      'course_id', NEW.course_id,
+      'tenant_id', NEW.tenant_id,
+      'is_reactivation', v_is_reactivation
+    ),
+    10
+  )
+  ON CONFLICT (job_type, payload_hash) WHERE (status IN ('pending', 'processing')) DO NOTHING;
+
   RETURN NEW;
 END;
 $$;
@@ -6660,12 +6841,27 @@ BEGIN
   END IF;
 
   FOR v_job IN
-    SELECT * FROM internal.dequeue_job(p_worker_id, ARRAY['notification_fanout'], 300)
-    LIMIT greatest(1, least(coalesce(p_limit, 50), 500))
+    SELECT * FROM internal.dequeue_job(
+      p_worker_id,
+      ARRAY['notification_fanout'],
+      300,
+      greatest(1, least(coalesce(p_limit, 50), 500))
+    )
   LOOP
     v_notif_id  := (v_job.payload ->> 'notification_id')::uuid;
     v_tenant_id := (v_job.payload ->> 'tenant_id')::uuid;
-    v_audience  := v_job.payload ->> 'target_audience';
+
+    -- Read the source row, not only the job payload. This supports already
+    -- queued jobs created before this hardening and makes users-mode
+    -- authoritative during the insert/target-attachment race.
+    SELECT n.tenant_id, n.target_audience, n.targeting_mode
+      INTO v_tenant_id, v_audience, v_targeting_mode
+    FROM public.notifications n
+    WHERE n.id = v_notif_id;
+
+    IF v_tenant_id IS NULL THEN
+      RAISE EXCEPTION 'NOTIFICATION_NOT_FOUND';
+    END IF;
 
     BEGIN
       INSERT INTO public.user_notifications (user_id, notification_id, tenant_id, is_read)
@@ -6788,6 +6984,249 @@ SECURITY DEFINER SET search_path = public, internal, pg_temp
 AS $$
   SELECT internal.process_notification_fanout_jobs(p_limit, p_worker_id);
 $$;
+
+-- ============================================================================
+-- Automatic course notification worker
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION internal.process_course_notify_jobs(
+  p_limit     integer DEFAULT 50,
+  p_worker_id text    DEFAULT gen_random_uuid()::text
+)
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = public, internal, pg_temp
+AS $$
+DECLARE
+  v_group record;
+  v_job record;
+  v_course_title text;
+  v_lesson_names text;
+  v_count_label text;
+  v_body text;
+  v_notification_id uuid;
+  v_recipient_ids uuid[];
+  v_result jsonb;
+  v_processed integer := 0;
+BEGIN
+  IF coalesce(auth.role(), current_user) NOT IN
+      ('service_role', 'postgres', 'supabase_admin') THEN
+    RAISE EXCEPTION 'PERMISSION_DENIED';
+  END IF;
+
+  IF coalesce(p_limit, 50) <= 0 THEN
+    RETURN 0;
+  END IF;
+
+  DROP TABLE IF EXISTS pg_temp.eduzone_course_notify_batch;
+  CREATE TEMP TABLE eduzone_course_notify_batch (
+    job_id uuid PRIMARY KEY,
+    tenant_id uuid,
+    job_type text NOT NULL,
+    payload jsonb NOT NULL
+  ) ON COMMIT DROP;
+
+  INSERT INTO eduzone_course_notify_batch (job_id, tenant_id, job_type, payload)
+  SELECT id, tenant_id, job_type, payload
+  FROM internal.dequeue_job(
+    p_worker_id,
+    ARRAY['NOTIFY_LESSON_PUBLISHED', 'NOTIFY_STUDENT_ENROLLED'],
+    300,
+    greatest(1, least(coalesce(p_limit, 50), 500))
+  );
+
+  -- Lesson jobs are grouped by course so a batch of published videos creates
+  -- one inbox/push notification per student instead of one per lesson.
+  FOR v_group IN
+    SELECT tenant_id,
+           (payload ->> 'course_id')::uuid AS course_id,
+           count(*)::integer AS lesson_count,
+           array_agg(job_id) AS job_ids,
+           string_agg(
+             '«' || left(btrim(payload ->> 'lesson_title'), 120) || '»',
+             '، ' ORDER BY job_id
+           ) AS lesson_names
+    FROM eduzone_course_notify_batch
+    WHERE job_type = 'NOTIFY_LESSON_PUBLISHED'
+    GROUP BY tenant_id, (payload ->> 'course_id')::uuid
+  LOOP
+    BEGIN
+      SELECT left(c.title, 120)
+        INTO v_course_title
+      FROM public.courses c
+      WHERE c.id = v_group.course_id
+        AND c.tenant_id = v_group.tenant_id
+        AND c.deleted_at IS NULL;
+
+      IF v_course_title IS NULL THEN
+        RAISE EXCEPTION 'COURSE_NOT_FOUND';
+      END IF;
+
+      SELECT array_agg(DISTINCT e.user_id ORDER BY e.user_id)
+        INTO v_recipient_ids
+      FROM public.enrollments e
+      WHERE e.course_id = v_group.course_id
+        AND e.tenant_id = v_group.tenant_id
+        AND e.status IN ('active', 'completed')
+        AND e.deleted_at IS NULL;
+
+      IF v_recipient_ids IS NULL OR cardinality(v_recipient_ids) = 0 THEN
+        v_result := jsonb_build_object('skipped', 'no_recipients');
+      ELSE
+        v_lesson_names := left(v_group.lesson_names, 360);
+        IF v_group.lesson_count = 1 THEN
+          v_body := format(
+            'أضيف الدرس %s إلى كورس «%s».',
+            v_lesson_names,
+            v_course_title
+          );
+        ELSE
+          v_count_label := CASE
+            WHEN v_group.lesson_count = 2 THEN 'درسين جديدين'
+            WHEN v_group.lesson_count BETWEEN 3 AND 10
+              THEN v_group.lesson_count::text || ' دروس جديدة'
+            ELSE v_group.lesson_count::text || ' درساً جديداً'
+          END;
+          v_body := format(
+            'أضيف %s إلى كورس «%s»: %s.',
+            v_count_label,
+            v_course_title,
+            v_lesson_names
+          );
+        END IF;
+
+        v_notification_id := internal.send_system_notification(
+          v_group.tenant_id,
+          'درس جديد',
+          left(v_body, 500),
+          v_recipient_ids
+        );
+        v_result := jsonb_build_object('notification_id', v_notification_id);
+      END IF;
+
+      UPDATE internal.job_queue
+      SET status = 'done',
+          result = v_result,
+          error_message = NULL,
+          locked_by_worker_id = NULL,
+          locked_at = NULL,
+          lock_expires_at = NULL,
+          finished_at = now(),
+          updated_at = now()
+      WHERE id = ANY(v_group.job_ids);
+      v_processed := v_processed + cardinality(v_group.job_ids);
+    EXCEPTION WHEN OTHERS THEN
+      UPDATE internal.job_queue
+      SET status = CASE WHEN attempts >= max_attempts THEN 'failed' ELSE 'pending' END,
+          error_message = left(SQLERRM, 1000),
+          locked_by_worker_id = NULL,
+          locked_at = NULL,
+          lock_expires_at = NULL,
+          updated_at = now()
+      WHERE id = ANY(v_group.job_ids);
+    END;
+  END LOOP;
+
+  -- Enrollment and reactivation notifications remain one-to-one.
+  FOR v_job IN
+    SELECT *
+    FROM eduzone_course_notify_batch
+    WHERE job_type = 'NOTIFY_STUDENT_ENROLLED'
+  LOOP
+    BEGIN
+      SELECT left(c.title, 120)
+        INTO v_course_title
+      FROM public.courses c
+      WHERE c.id = (v_job.payload ->> 'course_id')::uuid
+        AND c.tenant_id = v_job.tenant_id
+        AND c.deleted_at IS NULL;
+
+      IF v_course_title IS NULL THEN
+        RAISE EXCEPTION 'COURSE_NOT_FOUND';
+      END IF;
+
+      SELECT array_agg(u.id)
+        INTO v_recipient_ids
+      FROM public.users u
+      WHERE u.id = (v_job.payload ->> 'user_id')::uuid
+        AND u.tenant_id = v_job.tenant_id
+        AND u.deleted_at IS NULL
+        AND u.account_status = 'active';
+
+      IF v_recipient_ids IS NULL OR cardinality(v_recipient_ids) = 0 THEN
+        v_result := jsonb_build_object('skipped', 'no_recipients');
+      ELSE
+        IF coalesce((v_job.payload ->> 'is_reactivation')::boolean, false) THEN
+          v_body := format('تمت إعادة تفعيل اشتراكك في كورس «%s».', v_course_title);
+          v_notification_id := internal.send_system_notification(
+            v_job.tenant_id, '♻️ تم إعادة تفعيل اشتراكك', left(v_body, 500), v_recipient_ids
+          );
+        ELSE
+          v_body := format('تمت إضافتك إلى كورس «%s».', v_course_title);
+          v_notification_id := internal.send_system_notification(
+            v_job.tenant_id, '📚 كورس جديد', left(v_body, 500), v_recipient_ids
+          );
+        END IF;
+        v_result := jsonb_build_object('notification_id', v_notification_id);
+      END IF;
+
+      UPDATE internal.job_queue
+      SET status = 'done',
+          result = v_result,
+          error_message = NULL,
+          locked_by_worker_id = NULL,
+          locked_at = NULL,
+          lock_expires_at = NULL,
+          finished_at = now(),
+          updated_at = now()
+      WHERE id = v_job.job_id;
+      v_processed := v_processed + 1;
+    EXCEPTION WHEN OTHERS THEN
+      UPDATE internal.job_queue
+      SET status = CASE WHEN attempts >= max_attempts THEN 'failed' ELSE 'pending' END,
+          error_message = left(SQLERRM, 1000),
+          locked_by_worker_id = NULL,
+          locked_at = NULL,
+          lock_expires_at = NULL,
+          updated_at = now()
+      WHERE id = v_job.job_id;
+    END;
+  END LOOP;
+
+  RETURN v_processed;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.process_course_notify_jobs(
+  p_limit     integer DEFAULT 50,
+  p_worker_id text    DEFAULT gen_random_uuid()::text
+)
+RETURNS integer
+LANGUAGE sql
+SECURITY DEFINER SET search_path = public, internal, pg_temp
+AS $$
+  SELECT internal.process_course_notify_jobs(p_limit, p_worker_id);
+$$;
+
+COMMENT ON FUNCTION internal.process_course_notify_jobs(integer, text) IS
+  'Processes lesson-published and enrollment notification jobs in batches. Lesson jobs are grouped by course and explicit recipients are fanned out inline.';
+
+-- One-time decommission of the pre-feature backlog. The old
+-- trg_lessons_publish_notify enqueued NOTIFY_LESSON_PUBLISHED jobs without
+-- tenant_id and without lesson_id; no worker ever consumed them, so existing
+-- environments can hold a long pending queue. The new worker resolves the
+-- tenant from the job row and would fail these with a misleading
+-- COURSE_NOT_FOUND after five retries. Fail them once with a clear message
+-- instead. Idempotent: matches only the legacy payload shape, and rows already
+-- done/failed are never re-examined.
+UPDATE internal.job_queue
+SET status = 'failed',
+    error_message = 'legacy pre-feature backlog (payload lacks lesson_id/tenant_id)',
+    finished_at = pg_catalog.now(),
+    updated_at = pg_catalog.now()
+WHERE job_type = 'NOTIFY_LESSON_PUBLISHED'
+  AND status IN ('pending', 'processing')
+  AND NOT (payload ? 'lesson_id');
 
 -- =============================================================================
 -- AUTHENTICATION / AUTHORIZATION RELEASE HARDENING

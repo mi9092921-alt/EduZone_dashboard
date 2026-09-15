@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 
 import {
   jobsAdminClient,
+  processCourseNotifyJobs,
   managePartitions,
   processCachePurges,
   processNotificationFanoutJobs,
@@ -75,6 +76,21 @@ export async function GET(request: Request) {
     } catch (err) {
       console.error('[CRON_ROUTINE_FANOUT_ERROR]', err);
       results['notification_fanout_jobs_processed'] = 'Worker error';
+    }
+
+    // 6. Automatic lesson/enrollment notifications. This is intentionally
+    // skip-and-log so a notification worker outage cannot block maintenance.
+    const courseNotifyWorkerId = crypto.randomUUID();
+    try {
+      const courseNotifyCount = await processCourseNotifyJobs(
+        supabaseAdmin,
+        courseNotifyWorkerId,
+        500,
+      );
+      results['course_notify_jobs_processed'] = courseNotifyCount;
+    } catch (err) {
+      console.error('[CRON_ROUTINE_COURSE_NOTIFY_ERROR]', err);
+      results['course_notify_jobs_processed'] = 'Skipped: worker error';
     }
 
     return NextResponse.json({

@@ -190,6 +190,7 @@ Deno.serve(async (req: Request) => {
       p_worker_id: 'notification-push-worker',
       p_job_types: ['notification_push'],
       p_lock_ttl_seconds: 300,
+      p_batch_size: 20,
     });
     if (error) return json({ error: 'DEQUEUE_FAILED', message: error.message }, 500);
 

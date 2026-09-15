@@ -187,6 +187,19 @@ export async function processNotificationFanoutJobs(
   return data;
 }
 
+export async function processCourseNotifyJobs(
+  admin: SupabaseClient,
+  workerId: string,
+  limit: number,
+): Promise<unknown> {
+  const { data, error } = await admin.rpc('process_course_notify_jobs', {
+    p_worker_id: workerId,
+    p_limit: limit,
+  });
+  if (error) throw mapDbError(error, 'cron-rpc.service.ts:process_course_notify_jobs');
+  return data;
+}
+
 /**
  * Creates the default admin client for this service (exported so route
  * handlers keep a single construction site).

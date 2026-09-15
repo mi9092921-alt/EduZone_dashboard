@@ -1971,7 +1971,111 @@ BEGIN
   );
 END $$;
 
--- Display Results (includes Checks 27-38 above)
+-- Check 39: explicit-user notification fanout must be represented in the
+-- source row and treated as an exclusive allow-list by the worker. This is a
+-- regression guard for the P1 production incident where target_audience='all'
+-- was combined with notification_targets.
+DO $$
+DECLARE
+  v_column boolean;
+  v_constraint boolean;
+  v_worker text;
+  v_worker_hardened boolean;
+BEGIN
+  SELECT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'notifications'
+      AND column_name = 'targeting_mode'
+  ) INTO v_column;
+
+  SELECT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.notifications'::regclass
+      AND conname = 'chk_notification_targeting_mode'
+  ) INTO v_constraint;
+
+  SELECT pg_get_functiondef(to_regprocedure('internal.process_notification_fanout_jobs(integer,text)'))
+    INTO v_worker;
+  v_worker_hardened := v_worker IS NOT NULL
+    AND v_worker ILIKE '%notification_targets%'
+    AND v_worker ILIKE '%targeting_mode%'
+    AND v_worker ILIKE '%NOT EXISTS%';
+
+  INSERT INTO validation_results VALUES (
+    'Explicit Notification Targets Are Exclusive',
+    CASE WHEN v_column AND v_constraint AND v_worker_hardened THEN 'PASS' ELSE 'FAIL' END,
+    format(
+      'targeting_mode column=%s, constraint=%s, worker exclusive-target guard=%s',
+      v_column, v_constraint, v_worker_hardened
+    )
+  );
+END $$;
+
+-- Check 40: automatic course notifications must have the complete guarded
+-- pipeline: source triggers, service-only workers, explicit-recipient no-op
+-- guard, and inline fanout GUC protection.
+DO $$
+DECLARE
+  v_course_worker text;
+  v_system_notification text;
+  v_fanout text;
+  v_dequeue text;
+  v_lesson_trigger boolean;
+  v_enrollment_trigger boolean;
+  v_permissions boolean;
+BEGIN
+  SELECT pg_get_functiondef(to_regprocedure('internal.process_course_notify_jobs(integer,text)'))
+    INTO v_course_worker;
+  SELECT pg_get_functiondef(to_regprocedure('internal.send_system_notification(uuid,text,text,uuid[])'))
+    INTO v_system_notification;
+  SELECT pg_get_functiondef(to_regprocedure('public.fanout_notification()'))
+    INTO v_fanout;
+  SELECT pg_get_functiondef(
+    to_regprocedure('internal.dequeue_job(text,text[],integer,integer)')
+  ) INTO v_dequeue;
+
+  SELECT EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgname = 'trg_lesson_notify_ins'
+      AND tgrelid = 'public.lessons'::regclass
+  ) INTO v_lesson_trigger;
+  SELECT EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgname = 'trg_enrollment_notify_ins'
+      AND tgrelid = 'public.enrollments'::regclass
+  ) INTO v_enrollment_trigger;
+  SELECT has_function_privilege(
+    'service_role',
+    'public.process_course_notify_jobs(integer,text)',
+    'EXECUTE'
+  ) INTO v_permissions;
+
+  INSERT INTO validation_results VALUES (
+    'Automatic Course Notification Pipeline',
+    CASE WHEN v_course_worker IS NOT NULL
+       AND v_system_notification ILIKE '%cardinality(p_user_ids)%'
+       AND v_system_notification ILIKE '%RETURN NULL%'
+       AND v_fanout ILIKE '%eduzone.skip_async_fanout%'
+       AND v_dequeue ILIKE '%p_batch_size%'
+       AND v_lesson_trigger
+       AND v_enrollment_trigger
+       AND v_permissions
+      THEN 'PASS' ELSE 'FAIL' END,
+    format(
+      'worker=%s, explicit-empty guard=%s, fanout GUC guard=%s, batch dequeue=%s, lesson trigger=%s, enrollment trigger=%s, service grant=%s',
+      v_course_worker IS NOT NULL,
+      v_system_notification IS NOT NULL
+        AND v_system_notification ILIKE '%cardinality(p_user_ids)%'
+        AND v_system_notification ILIKE '%RETURN NULL%',
+      v_fanout IS NOT NULL AND v_fanout ILIKE '%eduzone.skip_async_fanout%',
+      v_dequeue IS NOT NULL AND v_dequeue ILIKE '%p_batch_size%',
+      v_lesson_trigger, v_enrollment_trigger, v_permissions
+    )
+  );
+END $$;
+
+-- Display Results (includes Checks 27-40 above)
 SELECT * FROM validation_results ORDER BY check_name;
 
 -- Summary
