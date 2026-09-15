@@ -1269,6 +1269,11 @@ CREATE TABLE IF NOT EXISTS public.notifications (
   region_id text REFERENCES public.regions(id) ON DELETE SET NULL,
   target_audience text NOT NULL DEFAULT 'all'
     CHECK (target_audience IN ('all', 'students', 'teachers', 'admins')),
+  -- Explicit user targeting is separate from the audience value so a queued
+  -- fanout cannot fall back to a tenant-wide audience while target rows are
+  -- being attached by the caller.
+  targeting_mode text NOT NULL DEFAULT 'audience'
+    CHECK (targeting_mode IN ('audience', 'users')),
   target_permission text REFERENCES public.permissions(name) ON DELETE RESTRICT,
   deleted_at timestamptz,
   created_by uuid REFERENCES public.users(id) ON DELETE SET NULL,
@@ -1280,6 +1285,22 @@ CREATE TABLE IF NOT EXISTS public.notifications (
 COMMENT ON TABLE public.notifications IS 
 'In-app notifications for users. region_id allows targeting by data residency region.
 Soft-delete via deleted_at.';
+
+-- Existing production databases use CREATE TABLE IF NOT EXISTS, so ensure the
+-- hardening column exists before 07_functions.sql is applied on an upgrade.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'notifications'
+      AND column_name = 'targeting_mode'
+  ) THEN
+    ALTER TABLE public.notifications
+      ADD COLUMN targeting_mode text NOT NULL DEFAULT 'audience'
+      CHECK (targeting_mode IN ('audience', 'users'));
+  END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS public.notification_targets (
   notification_id uuid NOT NULL REFERENCES public.notifications(id) ON DELETE CASCADE,

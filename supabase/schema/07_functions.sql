@@ -1826,6 +1826,10 @@ DECLARE
   v_tenant_id uuid;
   v_id uuid;
   v_final_user_ids uuid[] := p_target_user_ids;
+  v_targeting_mode text := CASE
+    WHEN cardinality(coalesce(p_target_user_ids, ARRAY[]::uuid[])) > 0 THEN 'users'
+    ELSE 'audience'
+  END;
 BEGIN
   v_tenant_id := public.get_current_tenant_id();
 
@@ -1854,11 +1858,11 @@ BEGIN
 
   -- 1. Insert notification master record
   INSERT INTO public.notifications (
-    tenant_id, title, body, target_audience, created_by
+    tenant_id, title, body, target_audience, targeting_mode, created_by
   )
   VALUES (
     v_tenant_id, btrim(p_title), btrim(p_body),
-    coalesce(p_target_audience, 'all'), v_uid
+    coalesce(p_target_audience, 'all'), v_targeting_mode, v_uid
   )
   RETURNING id INTO v_id;
 
@@ -4017,7 +4021,8 @@ BEGIN
     jsonb_build_object(
       'notification_id', NEW.id,
       'tenant_id',        NEW.tenant_id,
-      'target_audience',  NEW.target_audience
+      'target_audience',  NEW.target_audience,
+      'targeting_mode',   NEW.targeting_mode
     ),
     5  -- medium priority
   )
@@ -6647,6 +6652,7 @@ DECLARE
   v_notif_id  uuid;
   v_tenant_id uuid;
   v_audience  text;
+  v_targeting_mode text;
 BEGIN
   -- Only service_role / postgres / supabase_admin may execute
   IF coalesce(auth.role(), current_user) NOT IN ('service_role','postgres','supabase_admin') THEN
@@ -6669,14 +6675,24 @@ BEGIN
         AND u.deleted_at      IS NULL
         AND u.account_status  = 'active'
         AND (
-              v_audience = 'all'
-          OR (v_audience = 'students'  AND u.primary_role = 'student')
-          OR (v_audience = 'teachers'  AND u.primary_role = 'teacher')
-          OR (v_audience = 'admins'    AND u.primary_role IN ('admin','super_admin'))
-          OR EXISTS (
-               SELECT 1 FROM public.notification_targets nt
-               WHERE nt.notification_id = v_notif_id AND nt.user_id = u.id
-             )
+          -- Explicit targets are an allow-list, never an additive audience.
+          EXISTS (
+            SELECT 1 FROM public.notification_targets nt
+            WHERE nt.notification_id = v_notif_id AND nt.user_id = u.id
+          )
+          OR (
+            coalesce(v_targeting_mode, 'audience') <> 'users'
+            AND NOT EXISTS (
+              SELECT 1 FROM public.notification_targets nt
+              WHERE nt.notification_id = v_notif_id
+            )
+            AND (
+                  v_audience = 'all'
+              OR (v_audience = 'students'  AND u.primary_role = 'student')
+              OR (v_audience = 'teachers'  AND u.primary_role = 'teacher')
+              OR (v_audience = 'admins'    AND u.primary_role IN ('admin','super_admin'))
+            )
+          )
         )
         AND NOT EXISTS (
           SELECT 1 FROM public.user_notifications un2
@@ -6758,7 +6774,8 @@ $$;
 
 COMMENT ON FUNCTION internal.process_notification_fanout_jobs(integer, text) IS
   'Dequeues notification_fanout jobs from internal.job_queue and fans them out as
-   user_notifications rows filtered by target_audience (all/students/teachers/admins).
+   user_notifications rows. Explicit notification_targets are an exclusive
+   allow-list; audience fallback is used only when no explicit targets exist.
    Called by GET /api/cron/routine on every cron tick. Requires service_role.';
 
 CREATE OR REPLACE FUNCTION public.process_notification_fanout_jobs(
