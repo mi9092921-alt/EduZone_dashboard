@@ -553,6 +553,48 @@ CREATE POLICY course_learning_objectives_all ON public.course_learning_objective
     )
   );
 
+-- Student read-only access to course metadata (prerequisites/objectives).
+-- The _all policies above only match teacher-owner/admin, so PostgREST joins
+-- in getCourseOutline returned [] for students and the About tab hid both
+-- sections. These FOR SELECT-only policies mirror courses_select_merged
+-- visibility (same tenant + parent visible/published or enrolled).
+-- Writes stay teacher/admin-only via the _all WITH CHECK above.
+
+DROP POLICY IF EXISTS course_prerequisites_student_select ON public.course_prerequisites;
+
+CREATE POLICY course_prerequisites_student_select ON public.course_prerequisites
+  FOR SELECT TO authenticated
+  USING (
+    tenant_id = public.get_current_tenant_id()
+    AND EXISTS (
+      SELECT 1 FROM public.courses c
+      WHERE c.id = course_prerequisites.course_id
+        AND c.tenant_id = public.get_current_tenant_id()
+        AND c.deleted_at IS NULL
+        AND (
+          c.status = 'published'
+          OR public.has_course_access(c.id)
+        )
+    )
+  );
+
+DROP POLICY IF EXISTS course_learning_objectives_student_select ON public.course_learning_objectives;
+
+CREATE POLICY course_learning_objectives_student_select ON public.course_learning_objectives
+  FOR SELECT TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.courses c
+      WHERE c.id = course_learning_objectives.course_id
+        AND c.tenant_id = public.get_current_tenant_id()
+        AND c.deleted_at IS NULL
+        AND (
+          c.status = 'published'
+          OR public.has_course_access(c.id)
+        )
+    )
+  );
+
 DROP POLICY IF EXISTS sections_select ON public.sections;
 
 CREATE POLICY sections_select ON public.sections
