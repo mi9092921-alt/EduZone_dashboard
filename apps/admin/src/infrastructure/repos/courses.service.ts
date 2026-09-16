@@ -30,7 +30,20 @@ import {
 /**
  * Courses service — all Supabase queries for the courses domain.
  * No UI, no React — pure async functions.
+ *
+ * NOTE on YouTube lookups: `youtube.service` reads YOUTUBE_API_KEY via
+ * `getServerEnv()`, which throws when executed in the browser. The client
+ * mutation hooks (`adapters/mutations/courses.mutations.ts`) therefore
+ * resolve durations through the `video.actions` server boundary BEFORE
+ * calling these functions. The `try/catch` + browser guards below are
+ * defense-in-depth so a direct browser call degrades to duration 0 (and a
+ * recorded partial failure) instead of crashing the UI with the
+ * "server environment variables in the browser" error.
  */
+
+function isBrowserContextGuardError(err: unknown): boolean {
+  return err instanceof Error && err.message.includes('browser context');
+}
 
 // ══════════════════════════════════════════════════
 // COURSES
@@ -387,14 +400,29 @@ export async function createLesson(sectionId: string, data: CreateLessonInput): 
   const courseId = sectionData.course_id;
   const tenantId = sectionData.tenant_id;
 
-  // v13: duration fetch from YouTube
+  // v13: duration fetch from YouTube (server-side only — the client
+  // mutations pre-resolve this via the video.actions server boundary).
+  // NOTE: no `typeof window` pre-check here on purpose — `getServerEnv()`
+  // only throws outside `NODE_ENV=test`, so a window check would wrongly
+  // skip the lookup under jsdom/happy-dom unit tests (which mock the env
+  // and the YouTube API). The catch below handles the real-browser guard.
   let duration = data.duration_sec ?? 0;
   if (data.video_url && !data.duration_sec) {
     const parsed = parseVideoUrl(data.video_url);
     if (parsed.provider === 'youtube') {
-      const metadata = await getYoutubeVideoDetails(data.video_url);
-      if (metadata) {
-        duration = metadata.duration_sec;
+      try {
+        const metadata = await getYoutubeVideoDetails(data.video_url);
+        if (metadata) {
+          duration = metadata.duration_sec;
+        }
+      } catch (err) {
+        if (isBrowserContextGuardError(err)) {
+          console.warn(
+            '[createLesson] YouTube lookup called in browser context — resolve duration via getYoutubeMetadataAction first. Using duration 0.',
+          );
+        } else {
+          console.warn('[createLesson] YouTube lookup failed. Using duration 0:', err);
+        }
       }
     }
   } else {
@@ -499,21 +527,42 @@ export async function createLessons(
   const failureByInput = new Map<string, string>(); // input video_url -> reason
 
   if (youtubeTargets.length > 0) {
-    const batch = await getYoutubeVideoDetailsBatch(
-      youtubeTargets.map(({ item }) => item.video_url as string),
-    );
+    // NOTE: no `typeof window` pre-check here on purpose — see createLesson
+    // above. The catch handles the real-browser `getServerEnv()` guard while
+    // unit tests (NODE_ENV=test, mocked env + API) still exercise the batch
+    // path. Reasons are seeded into `failureByInput` only; the enrichedData
+    // mapping below emits each per-lesson partial failure exactly once.
+    try {
+      const batch = await getYoutubeVideoDetailsBatch(
+        youtubeTargets.map(({ item }) => item.video_url as string),
+      );
 
-    for (const metadata of batch.results.values()) {
-      // Metadata is keyed by video ID; re-attach it to every input URL that
-      // resolves to that ID (dedupe-safe).
-      for (const { item } of youtubeTargets) {
-        if (extractYoutubeId(item.video_url as string) === metadata.id) {
-          metadataByInput.set(item.video_url as string, metadata.duration_sec);
+      for (const metadata of batch.results.values()) {
+        // Metadata is keyed by video ID; re-attach it to every input URL that
+        // resolves to that ID (dedupe-safe).
+        for (const { item } of youtubeTargets) {
+          if (extractYoutubeId(item.video_url as string) === metadata.id) {
+            metadataByInput.set(item.video_url as string, metadata.duration_sec);
+          }
         }
       }
-    }
-    for (const failure of batch.partial_failures) {
-      failureByInput.set(failure.url_or_id, failure.reason);
+      for (const failure of batch.partial_failures) {
+        failureByInput.set(failure.url_or_id, failure.reason);
+      }
+    } catch (err) {
+      if (isBrowserContextGuardError(err)) {
+        console.warn(
+          '[createLessons] YouTube batch lookup called in browser context — resolve durations via getYoutubeMetadataBatchAction first. Using duration 0.',
+        );
+      } else {
+        console.warn('[createLessons] YouTube batch lookup failed. Using duration 0:', err);
+      }
+      for (const { item } of youtubeTargets) {
+        const key = item.video_url as string;
+        if (!failureByInput.has(key)) {
+          failureByInput.set(key, 'youtube_metadata_unavailable');
+        }
+      }
     }
   }
 
@@ -600,14 +649,25 @@ export async function createLessons(
 export async function updateLesson(id: string, data: Partial<CreateLessonInput>): Promise<Lesson> {
   const { supabase } = container;
 
-  // v13: duration fetch from YouTube on update
+  // v13: duration fetch from YouTube on update (server-side only — see
+  // the note in createLesson above).
   let duration = data.duration_sec;
   if (data.video_url && !duration) {
     const parsed = parseVideoUrl(data.video_url);
     if (parsed.provider === 'youtube') {
-      const metadata = await getYoutubeVideoDetails(data.video_url);
-      if (metadata) {
-        duration = metadata.duration_sec;
+      try {
+        const metadata = await getYoutubeVideoDetails(data.video_url);
+        if (metadata) {
+          duration = metadata.duration_sec;
+        }
+      } catch (err) {
+        if (isBrowserContextGuardError(err)) {
+          console.warn(
+            '[updateLesson] YouTube lookup called in browser context — resolve duration via getYoutubeMetadataAction first. Keeping existing duration.',
+          );
+        } else {
+          console.warn('[updateLesson] YouTube lookup failed. Keeping existing duration:', err);
+        }
       }
     }
   }

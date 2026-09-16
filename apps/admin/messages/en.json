@@ -146,6 +146,8 @@
     "difficulty_level": "Difficulty Level",
     "free_course_label": "Free Course",
     "free_course_desc": "This course will be available to all students for free.",
+    "discoverable_label": "Discoverable",
+    "discoverable_desc": "Show this course in the catalog and search results.",
     "price_usd": "Price ($)",
     "failed_to_delete": "Failed to delete course.",
     "delete_success_msg": "Course \"{title}\" has been deleted successfully.",

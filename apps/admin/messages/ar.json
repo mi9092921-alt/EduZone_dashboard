@@ -146,6 +146,8 @@
     "difficulty_level": "مستوى الصعوبة",
     "free_course_label": "دورة مجانية",
     "free_course_desc": "ستكون هذه الدورة متاحة لجميع الطلاب مجانًا.",
+    "discoverable_label": "ظاهرة في الكتالوج",
+    "discoverable_desc": "إظهار هذه الدورة في الكتالوج ونتائج البحث.",
     "price_usd": "السعر (بالدولار)",
     "failed_to_delete": "فشل في حذف الدورة.",
     "delete_success_msg": "تم حذف الدورة \"{title}\" بنجاح.",

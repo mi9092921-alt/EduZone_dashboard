@@ -106,6 +106,7 @@ export function CourseInfoForm({
       category: course.category ?? '',
       level: (course.level as 'beginner' | 'intermediate' | 'advanced') ?? 'beginner',
       is_free: course.is_free,
+      is_discoverable: course.is_discoverable ?? true,
       price: course.price,
       slug: course.slug ?? '',
       thumbnail_url: course.thumbnail_url ?? '',
@@ -122,6 +123,7 @@ export function CourseInfoForm({
       category: course.category ?? '',
       level: (course.level as 'beginner' | 'intermediate' | 'advanced') ?? 'beginner',
       is_free: course.is_free,
+      is_discoverable: course.is_discoverable ?? true,
       price: course.price,
       slug: course.slug ?? '',
       thumbnail_url: course.thumbnail_url ?? '',
@@ -144,6 +146,7 @@ export function CourseInfoForm({
     if (data.description !== undefined) payload.description = data.description || null;
     if (data.category !== undefined) payload.category = data.category || null;
     if (data.level !== undefined) payload.level = data.level;
+    if (data.is_discoverable !== undefined) payload.is_discoverable = data.is_discoverable;
     if (data.price !== undefined) {
       payload.price = data.is_free ? 0 : data.price;
     }
@@ -271,6 +274,22 @@ export function CourseInfoForm({
                   {t('url_slug_helper')}
                 </p>
               </div>
+            </div>
+
+            <div className="flex items-center justify-between p-4 rounded-2xl bg-muted/30 border border-border/50">
+              <div className="space-y-1">
+                <Label className="text-base font-bold">{t('discoverable_label')}</Label>
+                <p className="text-xs text-muted-foreground font-medium">
+                  {t('discoverable_desc')}
+                </p>
+              </div>
+              <Controller
+                name="is_discoverable"
+                control={control}
+                render={({ field }) => (
+                  <Switch checked={!!field.value} onCheckedChange={field.onChange} />
+                )}
+              />
             </div>
 
             <div className="flex items-center justify-between p-4 rounded-2xl bg-muted/30 border border-border/50">

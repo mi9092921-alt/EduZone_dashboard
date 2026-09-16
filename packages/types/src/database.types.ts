@@ -149,6 +149,7 @@ export interface Database {
           status: string;
           total_lessons: number;
           is_featured: boolean;
+          is_discoverable: boolean;
           thumbnail_url: string | null;
           slug: string | null;
           teacher_id: string | null;
@@ -172,6 +173,7 @@ export interface Database {
           status?: string;
           total_lessons?: number;
           is_featured?: boolean;
+          is_discoverable?: boolean;
           thumbnail_url?: string | null;
           slug?: string | null;
           teacher_id?: string | null;
@@ -194,6 +196,7 @@ export interface Database {
           status?: string;
           total_lessons?: number;
           is_featured?: boolean;
+          is_discoverable?: boolean;
           thumbnail_url?: string | null;
           slug?: string | null;
           teacher_id?: string | null;

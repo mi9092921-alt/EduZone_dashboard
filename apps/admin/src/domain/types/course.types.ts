@@ -133,6 +133,7 @@ export interface CreateCourseInput {
   teacher_id?: string;
   thumbnail_url?: string;
   status?: CourseStatus;
+  is_discoverable?: boolean;
 }
 
 export interface UpdateCourseInput extends Omit<
