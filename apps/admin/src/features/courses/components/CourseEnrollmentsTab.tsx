@@ -106,9 +106,18 @@ export function CourseEnrollmentsTab({ courseId }: CourseEnrollmentsTabProps) {
   };
 
   return (
-    <Box>
+    <Box sx={{ minWidth: 0 }}>
       {/* Header */}
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: { xs: 'column', md: 'row' },
+          alignItems: { xs: 'stretch', md: 'center' },
+          justifyContent: 'space-between',
+          gap: 2,
+          mb: 3,
+        }}
+      >
         <Box>
           <Typography sx={{ fontWeight: 700, fontSize: '1.125rem', color: 'text.primary' }}>
             {t('enrollments_title')}
@@ -117,12 +126,20 @@ export function CourseEnrollmentsTab({ courseId }: CourseEnrollmentsTabProps) {
             {t('student_count', { count: totalCount })}
           </Typography>
         </Box>
-        <Box sx={{ display: 'flex', gap: 1.5 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: { xs: 'column', sm: 'row' },
+            alignItems: { xs: 'stretch', sm: 'center' },
+            gap: 1.5,
+          }}
+        >
           <TextField
             size="small"
             placeholder={t('search_students_placeholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            fullWidth={false}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -131,7 +148,8 @@ export function CourseEnrollmentsTab({ courseId }: CourseEnrollmentsTabProps) {
               ),
             }}
             sx={{
-              width: 220,
+              width: { xs: '100%', sm: 220 },
+              flexShrink: 0,
               '& .MuiOutlinedInput-root': {
                 borderRadius: 2,
                 fontSize: '0.8125rem',
@@ -152,6 +170,8 @@ export function CourseEnrollmentsTab({ courseId }: CourseEnrollmentsTabProps) {
               borderRadius: 2,
               borderColor: 'divider',
               color: 'text.primary',
+              whiteSpace: 'nowrap',
+              width: { xs: '100%', sm: 'auto' },
               '&:hover': { backgroundColor: 'action.hover', borderColor: 'divider' },
             }}
           >
@@ -169,6 +189,8 @@ export function CourseEnrollmentsTab({ courseId }: CourseEnrollmentsTabProps) {
               backgroundColor: 'primary.main',
               '&:hover': { backgroundColor: 'primary.dark' },
               boxShadow: 'none',
+              whiteSpace: 'nowrap',
+              width: { xs: '100%', sm: 'auto' },
             }}
           >
             {t('enroll_student_btn')}
@@ -177,7 +199,7 @@ export function CourseEnrollmentsTab({ courseId }: CourseEnrollmentsTabProps) {
       </Box>
 
       {/* Table */}
-      <TableContainer>
+      <TableContainer sx={{ overflowX: 'auto', mx: { xs: -1, sm: 0 }, width: { xs: 'calc(100% + 8px)', sm: '100%' } }}>
         <Table sx={{ minWidth: 800 }}>
           <TableHead>
             <TableRow sx={{ backgroundColor: 'background.default' }}>

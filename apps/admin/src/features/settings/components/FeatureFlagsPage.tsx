@@ -46,7 +46,7 @@ import {
 import { alpha } from '@mui/material/styles';
 import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import React, { useState, useCallback } from 'react';
+import React, { memo, useState, useCallback, useEffect } from 'react';
 
 import { PermissionGate } from '../../layout/components/PermissionGate';
 
@@ -82,6 +82,10 @@ export function FeatureFlagsPage() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  // Action selector (not the whole store) — subscribing with no selector would
+  // re-render the page (and every row) on every toast open/close.
+  const showToast = useToastStore((s) => s.showToast);
+
   const setSearchParam = useCallback(
     (key: string, value: string | null) => {
       const params = new URLSearchParams(searchParams.toString());
@@ -114,38 +118,9 @@ export function FeatureFlagsPage() {
   }, [setSearchParam]);
 
   const [deleteTarget, setDeleteTarget] = useState<FeatureFlag | null>(null);
-  const { showToast } = useToastStore();
 
   const { data: flags, isLoading, isFetching } = useFeatureFlags();
-  const toggleMutation = useToggleFeatureFlag();
-  const updateMutation = useUpdateFeatureFlag();
   const deleteMutation = useDeleteFeatureFlag();
-
-  const handleToggle = useCallback(async (flag: FeatureFlag) => {
-    try {
-      await toggleMutation.mutateAsync({ id: flag.id, enabled: !flag.is_enabled });
-      showToast(`${flag.key}: ${!flag.is_enabled ? t('status_enabled_msg') : t('status_disabled_msg')}`, 'success');
-    } catch {
-      showToast(t('error_toggle'), 'error');
-    }
-  }, [toggleMutation, showToast, t]);
-
-  const handleRolloutChange = useCallback(async (flagId: string, pct: number) => {
-    try {
-      await updateMutation.mutateAsync({ id: flagId, input: { rollout_pct: pct } });
-    } catch {
-      showToast(t('error_rollout'), 'error');
-    }
-  }, [updateMutation, showToast, t]);
-
-  const handleStatusChange = useCallback(async (flagId: string, newStatus: FeatureFlagStatus) => {
-    try {
-      await updateMutation.mutateAsync({ id: flagId, input: { status: newStatus } });
-      showToast(t('settings_saved'), 'success');
-    } catch {
-      showToast(t('error_save'), 'error');
-    }
-  }, [updateMutation, showToast, t]);
 
   const handleDelete = useCallback(async () => {
     if (!deleteTarget) return;
@@ -158,10 +133,14 @@ export function FeatureFlagsPage() {
     }
   }, [deleteTarget, deleteMutation, showToast, t]);
 
-  const handleCopyKey = useCallback((key: string) => {
-    navigator.clipboard.writeText(key);
-    showToast(t('copy_success', { key }), 'success');
-  }, [showToast, t]);
+  // Stable callbacks so memoized rows bail out of unrelated page re-renders.
+  const handleToggleExpand = useCallback((id: string) => {
+    setExpandedId((prev) => (prev === id ? null : id));
+  }, []);
+
+  const handleDeleteClick = useCallback((flag: FeatureFlag) => {
+    setDeleteTarget(flag);
+  }, []);
 
   if (isLoading) {
     return (
@@ -177,11 +156,11 @@ export function FeatureFlagsPage() {
         {t('admin_only_error')}
       </Alert>
     }>
-      <Box>
+      <Box sx={{ minWidth: 0, overflowX: 'clip' }}>
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-          <div className="flex items-center gap-3">
-            <h1 className="text-title">{t('feature_flags.page_title')}</h1>
+          <div className="flex items-center flex-wrap gap-3 min-w-0">
+            <h1 className="text-title break-words min-w-0">{t('feature_flags.page_title')}</h1>
             <div className="px-2 py-0.5 rounded-full bg-muted text-muted-foreground text-[11px] font-bold uppercase tracking-wider border border-border">
               {(flags ?? []).length.toLocaleString()} {tCommon('total')}
             </div>
@@ -201,6 +180,8 @@ export function FeatureFlagsPage() {
               backgroundColor: 'primary.main',
               boxShadow: 'none',
               gap: 1,
+              width: { xs: '100%', md: 'auto' },
+              whiteSpace: 'nowrap',
               '& .MuiButton-startIcon': {
                 marginInlineEnd: '8px !important',
                 marginInlineStart: '0 !important',
@@ -215,18 +196,20 @@ export function FeatureFlagsPage() {
         </div>
 
         {/* Flags Table */}
-        <TableContainer>
-          <Table sx={{ minWidth: 1000 }}>
+        <TableContainer sx={{ overflowX: 'auto', border: '1px solid', borderColor: 'divider', borderRadius: 3, maxWidth: '100%' }}>
+          {/* Fixed layout: column widths are locked to the header row, so data
+              updates (toggle/rollout/refetch) can never reflow the columns. */}
+          <Table size="small" sx={{ minWidth: 1150, tableLayout: 'fixed' }}>
             <TableHead>
               <TableRow sx={{ backgroundColor: 'action.hover' }}>
-                <TableCell sx={{ width: 40, py: 2 }} />
-                <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary', py: 2 }}>{t('feature_flags.table_key')}</TableCell>
-                <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary', py: 2 }}>{t('feature_flags.table_label')}</TableCell>
-                <TableCell sx={{ width: 120, fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary', py: 2 }}>{t('feature_flags.table_status')}</TableCell>
-                <TableCell sx={{ width: 90, fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary', py: 2 }}>{t('feature_flags.table_enabled')}</TableCell>
-                <TableCell sx={{ width: 180, fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary', py: 2 }}>{t('feature_flags.table_rollout')}</TableCell>
-                <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary', py: 2 }}>{t('feature_flags.table_period')}</TableCell>
-                <TableCell align={isRtl ? 'left' : 'right'} sx={{ width: 80, fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary', py: 2 }}>{t('feature_flags.table_actions')}</TableCell>
+                <TableCell sx={{ width: 64, py: 1.25 }} />
+                <TableCell sx={{ width: 200, fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary', py: 1.25 }}>{t('feature_flags.table_key')}</TableCell>
+                <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary', py: 1.25 }}>{t('feature_flags.table_label')}</TableCell>
+                <TableCell sx={{ width: 150, fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary', py: 1.25 }}>{t('feature_flags.table_status')}</TableCell>
+                <TableCell sx={{ width: 90, fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary', py: 1.25 }}>{t('feature_flags.table_enabled')}</TableCell>
+                <TableCell sx={{ width: 200, fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary', py: 1.25 }}>{t('feature_flags.table_rollout')}</TableCell>
+                <TableCell sx={{ width: 190, fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary', py: 1.25 }}>{t('feature_flags.table_period')}</TableCell>
+                <TableCell align={isRtl ? 'left' : 'right'} sx={{ width: 80, fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary', py: 1.25 }}>{t('feature_flags.table_actions')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -248,191 +231,13 @@ export function FeatureFlagsPage() {
                 </TableRow>
               ) : (
                 (flags ?? []).map((row) => (
-                  <React.Fragment key={row.id}>
-                    <TableRow hover sx={{ '& > *': { borderBottom: expandedId === row.id ? 'none' : undefined } }}>
-                      <TableCell>
-                        <IconButton size="small" onClick={() => setExpandedId(expandedId === row.id ? null : row.id)} aria-label={expandedId === row.id ? tCommon('collapse') : tCommon('expand')}>
-                          {expandedId === row.id ? <ExpandLess sx={{ fontSize: 18 }} /> : <ExpandMore sx={{ fontSize: 18 }} />}
-                        </IconButton>
-                      </TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.8rem', color: 'text.primary', backgroundColor: 'action.selected', px: 1, py: 0.25, borderRadius: 1 }}>
-                            {row.key}
-                          </Typography>
-                          <Tooltip title={t('tooltip_copy')}>
-                            <IconButton size="small" onClick={() => handleCopyKey(row.key)} aria-label={t('tooltip_copy')}>
-                              <ContentCopy sx={{ fontSize: 14, color: 'text.disabled' }} />
-                            </IconButton>
-                          </Tooltip>
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Box>
-                          <Typography sx={{ fontSize: '0.875rem', color: 'text.primary', fontWeight: 500 }}>
-                            {row.label || '—'}
-                          </Typography>
-                          {row.description && (
-                            <Tooltip title={row.description} placement="top" arrow>
-                              <Typography
-                                dir="auto"
-                                sx={{
-                                  fontSize: '0.75rem',
-                                  color: 'text.secondary',
-                                  mt: 0.25,
-                                  maxWidth: 280,
-                                  whiteSpace: 'nowrap',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  unicodeBidi: 'plaintext',
-                                  textAlign: isRtl ? 'right' : 'left',
-                                  cursor: 'default',
-                                }}
-                              >
-                                {row.description}
-                              </Typography>
-                            </Tooltip>
-                          )}
-                        </Box>
-                      </TableCell>
-                      <TableCell sx={{ minWidth: 140 }}>
-                        <Select
-                          size="small"
-                          value={row.status || 'active'}
-                          onChange={(e) => handleStatusChange(row.id, e.target.value as FeatureFlagStatus)}
-                          sx={{
-                            fontSize: '0.75rem',
-                            fontWeight: 600,
-                            borderRadius: 1.5,
-                            width: '100%',
-                            minWidth: 120,
-                            '& .MuiSelect-select': {
-                              py: 0.5,
-                              display: 'flex',
-                              alignItems: 'center',
-                              paddingInlineStart: '12px !important',
-                              paddingInlineEnd: '32px !important',
-                            },
-                            '& .MuiSelect-icon': {
-                              insetInlineEnd: '8px',
-                              insetInlineStart: 'auto',
-                            },
-                          }}
-                        >
-                          <MenuItem value="active">{t('feature_flags.status_active')}</MenuItem>
-                          <MenuItem value="deprecated">{t('feature_flags.status_deprecated')}</MenuItem>
-                          <MenuItem value="archived">{t('feature_flags.status_archived')}</MenuItem>
-                        </Select>
-                      </TableCell>
-                      <TableCell sx={{ minWidth: 90 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          {/* LTR island: a plain `dir="ltr"` wrapper cannot stop the
-                              global stylis-rtl plugin from mirroring the switch's
-                              `translateX`/`left` (the mirror is CSS-text-level).
-                              LtrIsland swaps in a plugin-free emotion cache so MUI's
-                              LTR baseline ships verbatim and the thumb stays on the
-                              track. */}
-                          <LtrIsland>
-                            <Switch
-                              checked={row.is_enabled}
-                              onChange={() => handleToggle(row)}
-                              color="success"
-                              size="small"
-                            />
-                          </LtrIsland>
-                        </Box>
-                      </TableCell>
-                      <TableCell sx={{ minWidth: 200 }}>
-                        <LtrIsland>
-                          <Box
-                            sx={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 1.5,
-                            }}
-                          >
-                            <Slider
-                              value={row.rollout_pct}
-                              onChangeCommitted={(_, v) => handleRolloutChange(row.id, v as number)}
-                              min={0}
-                              max={100}
-                              size="small"
-                              sx={{
-                                width: 110,
-                                color: row.rollout_pct === 100 ? 'success.main' : 'primary.main',
-                                '& .MuiSlider-thumb': { width: 14, height: 14 },
-                              }}
-                            />
-                            <Chip
-                              label={`${row.rollout_pct}%`}
-                              size="small"
-                              sx={{
-                                height: 22,
-                                fontSize: '0.7rem',
-                                fontWeight: 700,
-                                fontFamily: 'monospace',
-                                backgroundColor: row.rollout_pct === 100 ? alpha(theme.palette.success.main, 0.1) : alpha(theme.palette.primary.main, 0.1),
-                                color: row.rollout_pct === 100 ? 'success.main' : 'primary.main',
-                              }}
-                            />
-                          </Box>
-                        </LtrIsland>
-                      </TableCell>
-                      <TableCell sx={{ minWidth: 160 }}>
-                        {(() => {
-                          if (!row.starts_at && !row.ends_at) {
-                            return (
-                              <Chip
-                                label={t('feature_flags.period_permanent')}
-                                size="small"
-                                variant="outlined"
-                                sx={{
-                                  height: 22,
-                                  fontSize: '0.75rem',
-                                  fontWeight: 500,
-                                  color: 'text.secondary',
-                                  borderColor: 'divider',
-                                  backgroundColor: 'action.hover',
-                                }}
-                              />
-                            );
-                          }
-                          const formatDate = (d: string | null | undefined) => {
-                            if (!d) return '—';
-                            const dateVal = new Date(d);
-                            return dateVal.toLocaleDateString(isRtl ? 'ar-SA' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-                          };
-                          return (
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                              <CalendarToday sx={{ fontSize: 14, color: 'text.secondary' }} />
-                              <Typography sx={{ fontSize: '0.8125rem', color: 'text.secondary', whiteSpace: 'nowrap' }}>
-                                {formatDate(row.starts_at)} {row.ends_at ? `← ${formatDate(row.ends_at)}` : ''}
-                              </Typography>
-                            </Box>
-                          );
-                        })()}
-                      </TableCell>
-                      <TableCell align={isRtl ? 'left' : 'right'}>
-                        <Tooltip title={t('btn_delete')}>
-                          <IconButton
-                            size="small"
-                            onClick={() => setDeleteTarget(row)}
-                            aria-label={t('btn_delete')}
-                            sx={{ color: 'error.main', '&:hover': { backgroundColor: alpha(theme.palette.error.main, 0.1) } }}
-                          >
-                            <Delete sx={{ fontSize: 18 }} />
-                          </IconButton>
-                        </Tooltip>
-                      </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={8}>
-                        <Collapse in={expandedId === row.id} timeout="auto" unmountOnExit>
-                          <FlagOverridesPanel flagId={row.id} />
-                        </Collapse>
-                      </TableCell>
-                    </TableRow>
-                  </React.Fragment>
+                  <FeatureFlagRow
+                    key={row.id}
+                    row={row}
+                    expanded={expandedId === row.id}
+                    onToggleExpand={handleToggleExpand}
+                    onDeleteClick={handleDeleteClick}
+                  />
                 ))
               )}
             </TableBody>
@@ -465,7 +270,7 @@ export function FeatureFlagsPage() {
               {t('feature_flags.confirm_delete_msg', { key: deleteTarget?.key ?? '' })}
             </Typography>
           </DialogContent>
-          <DialogActions sx={{ px: 3, pb: 2 }}>
+          <DialogActions sx={{ px: 3, pb: 2, flexDirection: { xs: 'column-reverse', sm: 'row' }, alignItems: { xs: 'stretch', sm: 'center' }, '& > *': { width: { xs: '100%', sm: 'auto' } } }}>
             <Button onClick={() => setDeleteTarget(null)} sx={{ textTransform: 'none' }}>
               {t('btn_cancel')}
             </Button>
@@ -485,6 +290,309 @@ export function FeatureFlagsPage() {
     </PermissionGate>
   );
 }
+
+// ══════════════════════════════════════════════════
+// FLAG ROW — memoized, with row-local optimistic state
+// ══════════════════════════════════════════════════
+
+interface FeatureFlagRowProps {
+  row: FeatureFlag;
+  expanded: boolean;
+  onToggleExpand: (id: string) => void;
+  onDeleteClick: (flag: FeatureFlag) => void;
+}
+
+/**
+ * A single flag row. All interaction state (enabled/rollout/status drafts and
+ * their mutations) lives HERE instead of on the page, so toggling a switch or
+ * dragging a slider re-renders only this row — not the whole table.
+ *
+ * memo() also keeps unrelated page re-renders (expansion, fetch indicator,
+ * toasts) from touching rows whose data didn't change: react-query structural
+ * sharing preserves row object identity across refetches, and the callbacks
+ * passed from the page are stable.
+ */
+const FeatureFlagRow = memo(function FeatureFlagRow({
+  row,
+  expanded,
+  onToggleExpand,
+  onDeleteClick,
+}: FeatureFlagRowProps) {
+  const theme = useTheme();
+  const isRtl = theme.direction === 'rtl';
+  const t = useTranslations('settings');
+  const tCommon = useTranslations('common');
+  // Action selector only — avoids re-rendering this row whenever a toast opens.
+  const showToast = useToastStore((s) => s.showToast);
+
+  const toggleMutation = useToggleFeatureFlag();
+  const updateMutation = useUpdateFeatureFlag();
+
+  // ── Row-local drafts: paint instantly in the same tick as the interaction.
+  // Displayed value = draft ?? server value. Drafts are pruned as soon as the
+  // (optimistically patched) cache catches up; on failure the mutation rolls
+  // the cache back and the draft is dropped, restoring the server value.
+  const [enabledDraft, setEnabledDraft] = useState<boolean | null>(null);
+  const [rolloutDraft, setRolloutDraft] = useState<number | null>(null);
+  const [statusDraft, setStatusDraft] = useState<FeatureFlagStatus | null>(null);
+
+  useEffect(() => {
+    if (enabledDraft !== null && row.is_enabled === enabledDraft) setEnabledDraft(null);
+  }, [row.is_enabled, enabledDraft]);
+
+  useEffect(() => {
+    if (rolloutDraft !== null && row.rollout_pct === rolloutDraft) setRolloutDraft(null);
+  }, [row.rollout_pct, rolloutDraft]);
+
+  useEffect(() => {
+    if (statusDraft !== null && (row.status || 'active') === statusDraft) setStatusDraft(null);
+  }, [row.status, statusDraft]);
+
+  const displayedEnabled = enabledDraft ?? row.is_enabled;
+  const displayedRollout = rolloutDraft ?? row.rollout_pct;
+  const displayedStatus = statusDraft ?? (row.status || 'active');
+
+  const handleToggle = () => {
+    const next = !displayedEnabled;
+    // Synchronous local paint — never waits for the server roundtrip.
+    setEnabledDraft(next);
+    toggleMutation.mutate(
+      { id: row.id, enabled: next },
+      {
+        onSuccess: () => {
+          showToast(`${row.key}: ${next ? t('status_enabled_msg') : t('status_disabled_msg')}`, 'success');
+        },
+        onError: () => {
+          setEnabledDraft(null);
+          showToast(t('error_toggle'), 'error');
+        },
+      },
+    );
+  };
+
+  const handleRolloutCommit = (pct: number) => {
+    setRolloutDraft(pct);
+    updateMutation.mutate(
+      { id: row.id, input: { rollout_pct: pct } },
+      {
+        onError: () => {
+          setRolloutDraft(null);
+          showToast(t('error_rollout'), 'error');
+        },
+      },
+    );
+  };
+
+  const handleStatusChange = (newStatus: FeatureFlagStatus) => {
+    setStatusDraft(newStatus);
+    updateMutation.mutate(
+      { id: row.id, input: { status: newStatus } },
+      {
+        onSuccess: () => {
+          showToast(t('settings_saved'), 'success');
+        },
+        onError: () => {
+          setStatusDraft(null);
+          showToast(t('error_save'), 'error');
+        },
+      },
+    );
+  };
+
+  const handleCopyKey = (key: string) => {
+    navigator.clipboard.writeText(key);
+    showToast(t('copy_success', { key }), 'success');
+  };
+
+  return (
+    <React.Fragment>
+      <TableRow hover sx={{ '& > *': { borderBottom: expanded ? 'none' : undefined } }}>
+        <TableCell>
+          <IconButton size="small" onClick={() => onToggleExpand(row.id)} aria-label={expanded ? tCommon('collapse') : tCommon('expand')}>
+            {expanded ? <ExpandLess sx={{ fontSize: 18 }} /> : <ExpandMore sx={{ fontSize: 18 }} />}
+          </IconButton>
+        </TableCell>
+        <TableCell>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
+            {/* Fixed layout + nowrap/ellipsis: the key never reflows the
+                column; a truncated key reveals its full value on hover. */}
+            <Typography title={row.key} sx={{ fontFamily: 'monospace', fontSize: '0.8rem', color: 'text.primary', backgroundColor: 'action.selected', px: 1, py: 0.25, borderRadius: 1, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {row.key}
+            </Typography>
+            <Tooltip title={t('tooltip_copy')}>
+              <IconButton size="small" onClick={() => handleCopyKey(row.key)} aria-label={t('tooltip_copy')}>
+                <ContentCopy sx={{ fontSize: 14, color: 'text.disabled' }} />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        </TableCell>
+        <TableCell>
+          <Box>
+            <Typography sx={{ fontSize: '0.875rem', color: 'text.primary', fontWeight: 500 }}>
+              {row.label || '—'}
+            </Typography>
+            {row.description && (
+              <Tooltip title={row.description} placement="top" arrow>
+                <Typography
+                  dir="auto"
+                  sx={{
+                    fontSize: '0.75rem',
+                    color: 'text.secondary',
+                    mt: 0.25,
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    unicodeBidi: 'plaintext',
+                    textAlign: isRtl ? 'right' : 'left',
+                    cursor: 'default',
+                  }}
+                >
+                  {row.description}
+                </Typography>
+              </Tooltip>
+            )}
+          </Box>
+        </TableCell>
+        <TableCell>
+          <Select
+            size="small"
+            value={displayedStatus}
+            onChange={(e) => handleStatusChange(e.target.value as FeatureFlagStatus)}
+            sx={{
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              borderRadius: 1.5,
+              width: '100%',
+              '& .MuiSelect-select': {
+                py: 0.5,
+                display: 'flex',
+                alignItems: 'center',
+                paddingInlineStart: '12px !important',
+                paddingInlineEnd: '32px !important',
+              },
+              '& .MuiSelect-icon': {
+                insetInlineEnd: '8px',
+                insetInlineStart: 'auto',
+              },
+            }}
+          >
+            <MenuItem value="active">{t('feature_flags.status_active')}</MenuItem>
+            <MenuItem value="deprecated">{t('feature_flags.status_deprecated')}</MenuItem>
+            <MenuItem value="archived">{t('feature_flags.status_archived')}</MenuItem>
+          </Select>
+        </TableCell>
+        <TableCell>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {/* LTR island: a plain `dir="ltr"` wrapper cannot stop the
+                global stylis-rtl plugin from mirroring the switch's
+                `translateX`/`left` (the mirror is CSS-text-level).
+                LtrIsland swaps in a plugin-free emotion cache so MUI's
+                LTR baseline ships verbatim and the thumb stays on the
+                track. */}
+            <LtrIsland>
+              <Switch
+                checked={displayedEnabled}
+                onChange={handleToggle}
+                color="success"
+                size="small"
+              />
+            </LtrIsland>
+          </Box>
+        </TableCell>
+        <TableCell>
+          <LtrIsland>
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+              }}
+            >
+              <Slider
+                value={displayedRollout}
+                onChange={(_, v) => setRolloutDraft(v as number)}
+                onChangeCommitted={(_, v) => handleRolloutCommit(v as number)}
+                min={0}
+                max={100}
+                size="small"
+                sx={{
+                  width: 110,
+                  color: displayedRollout === 100 ? 'success.main' : 'primary.main',
+                  '& .MuiSlider-thumb': { width: 14, height: 14 },
+                }}
+              />
+              <Chip
+                label={`${displayedRollout}%`}
+                size="small"
+                sx={{
+                  height: 22,
+                  fontSize: '0.7rem',
+                  fontWeight: 700,
+                  fontFamily: 'monospace',
+                  backgroundColor: displayedRollout === 100 ? alpha(theme.palette.success.main, 0.1) : alpha(theme.palette.primary.main, 0.1),
+                  color: displayedRollout === 100 ? 'success.main' : 'primary.main',
+                }}
+              />
+            </Box>
+          </LtrIsland>
+        </TableCell>
+        <TableCell>
+          {(() => {
+            if (!row.starts_at && !row.ends_at) {
+              return (
+                <Chip
+                  label={t('feature_flags.period_permanent')}
+                  size="small"
+                  variant="outlined"
+                  sx={{
+                    height: 22,
+                    fontSize: '0.75rem',
+                    fontWeight: 500,
+                    color: 'text.secondary',
+                    borderColor: 'divider',
+                    backgroundColor: 'action.hover',
+                  }}
+                />
+              );
+            }
+            const formatDate = (d: string | null | undefined) => {
+              if (!d) return '—';
+              const dateVal = new Date(d);
+              return dateVal.toLocaleDateString(isRtl ? 'ar-SA' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+            };
+            return (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0 }}>
+                <CalendarToday sx={{ fontSize: 14, color: 'text.secondary', flexShrink: 0 }} />
+                <Typography sx={{ fontSize: '0.8125rem', color: 'text.secondary', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {formatDate(row.starts_at)} {row.ends_at ? `← ${formatDate(row.ends_at)}` : ''}
+                </Typography>
+              </Box>
+            );
+          })()}
+        </TableCell>
+        <TableCell align={isRtl ? 'left' : 'right'}>
+          <Tooltip title={t('btn_delete')}>
+            <IconButton
+              size="small"
+              onClick={() => onDeleteClick(row)}
+              aria-label={t('btn_delete')}
+              sx={{ color: 'error.main', '&:hover': { backgroundColor: alpha(theme.palette.error.main, 0.1) } }}
+            >
+              <Delete sx={{ fontSize: 18 }} />
+            </IconButton>
+          </Tooltip>
+        </TableCell>
+      </TableRow>
+      <TableRow>
+        <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={8}>
+          <Collapse in={expanded} timeout="auto" unmountOnExit>
+            <FlagOverridesPanel flagId={row.id} />
+          </Collapse>
+        </TableCell>
+      </TableRow>
+    </React.Fragment>
+  );
+});
 
 // ══════════════════════════════════════════════════
 // OVERRIDES PANEL
@@ -526,11 +634,11 @@ function FlagOverridesPanel({ flagId }: { flagId: string }) {
 
   return (
     <>
-      <Box sx={{ py: 2, px: 2 }}>
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr 1fr' }, gap: 3, mb: 3 }}>
+      <Box sx={{ py: 2, px: { xs: 1, sm: 2 }, minWidth: 0 }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr', xl: '1fr 1fr 1fr' }, gap: 3, mb: 3 }}>
           {/* Role Overrides */}
-          <Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+          <Box sx={{ minWidth: 0 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1, mb: 1.5 }}>
               <Typography variant="h3">
                 {t('feature_flags.overrides.title_roles')}
               </Typography>
@@ -582,6 +690,8 @@ function FlagOverridesPanel({ flagId }: { flagId: string }) {
                       fontWeight: 600, fontSize: '0.75rem',
                       backgroundColor: ro.is_exclude ? alpha(theme.palette.error.main, 0.1) : alpha(theme.palette.success.main, 0.1),
                       color: ro.is_exclude ? 'error.main' : 'success.main',
+                      maxWidth: '100%',
+                      '& .MuiChip-label': { overflow: 'hidden', textOverflow: 'ellipsis' },
                     }}
                   />
                 ))}
@@ -590,8 +700,8 @@ function FlagOverridesPanel({ flagId }: { flagId: string }) {
           </Box>
 
           {/* User Overrides */}
-          <Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+          <Box sx={{ minWidth: 0 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1, mb: 1.5 }}>
               <Typography variant="h3">
                 {t('feature_flags.overrides.title_users')}
               </Typography>
@@ -643,6 +753,8 @@ function FlagOverridesPanel({ flagId }: { flagId: string }) {
                       fontWeight: 600, fontSize: '0.75rem',
                       backgroundColor: uo.is_exclude ? alpha(theme.palette.error.main, 0.1) : alpha(theme.palette.success.main, 0.1),
                       color: uo.is_exclude ? 'error.main' : 'success.main',
+                      maxWidth: '100%',
+                      '& .MuiChip-label': { overflow: 'hidden', textOverflow: 'ellipsis' },
                     }}
                   />
                 ))}
@@ -651,8 +763,8 @@ function FlagOverridesPanel({ flagId }: { flagId: string }) {
           </Box>
 
           {/* Tenant Overrides */}
-          <Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+          <Box sx={{ minWidth: 0, gridColumn: { md: '1 / -1', xl: 'auto' } }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1, mb: 1.5 }}>
               <Typography variant="h3">
                 {t('feature_flags.overrides.title_tenants')}
               </Typography>
@@ -704,6 +816,8 @@ function FlagOverridesPanel({ flagId }: { flagId: string }) {
                       fontWeight: 600, fontSize: '0.75rem',
                       backgroundColor: to.is_enabled === false ? alpha(theme.palette.error.main, 0.1) : alpha(theme.palette.info.main, 0.1),
                       color: to.is_enabled === false ? 'error.main' : 'info.main',
+                      maxWidth: '100%',
+                      '& .MuiChip-label': { overflow: 'hidden', textOverflow: 'ellipsis' },
                     }}
                   />
                 ))}
@@ -770,7 +884,7 @@ function FlagOverridesPanel({ flagId }: { flagId: string }) {
             </FormControl>
           </Box>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
+        <DialogActions sx={{ px: 3, pb: 2, flexDirection: { xs: 'column-reverse', sm: 'row' }, alignItems: { xs: 'stretch', sm: 'center' }, '& > *': { width: { xs: '100%', sm: 'auto' } } }}>
           <Button onClick={() => setAddRoleOpen(false)} sx={{ textTransform: 'none' }}>{t('btn_cancel')}</Button>
           <Button
             variant="contained"
@@ -835,7 +949,7 @@ function FlagOverridesPanel({ flagId }: { flagId: string }) {
             </FormControl>
           </Box>
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={{ flexDirection: { xs: 'column-reverse', sm: 'row' }, alignItems: { xs: 'stretch', sm: 'center' }, '& > *': { width: { xs: '100%', sm: 'auto' } } }}>
           <Button onClick={() => setAddUserOpen(false)}>{tCommon('cancel')}</Button>
           <Button
             variant="contained"
@@ -912,7 +1026,7 @@ function FlagOverridesPanel({ flagId }: { flagId: string }) {
             </Box>
           </Box>
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={{ flexDirection: { xs: 'column-reverse', sm: 'row' }, alignItems: { xs: 'stretch', sm: 'center' }, '& > *': { width: { xs: '100%', sm: 'auto' } } }}>
           <Button onClick={() => setAddTenantOpen(false)}>{tCommon('cancel')}</Button>
           <Button
             variant="contained"
@@ -1064,7 +1178,7 @@ function CreateFlagDialog({ open, onClose, onSuccess }: CreateFlagDialogProps) {
             rows={2}
             placeholder={t('feature_flags.dialog_create.placeholder_desc')}
           />
-          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
             <TextField
               label={t('feature_flags.dialog_create.label_starts_at')}
               type="datetime-local"
@@ -1082,7 +1196,7 @@ function CreateFlagDialog({ open, onClose, onSuccess }: CreateFlagDialogProps) {
           </Box>
         </Box>
       </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2 }}>
+      <DialogActions sx={{ px: 3, pb: 2, flexDirection: { xs: 'column-reverse', sm: 'row' }, alignItems: { xs: 'stretch', sm: 'center' }, '& > *': { width: { xs: '100%', sm: 'auto' } } }}>
         <Button onClick={onClose} sx={{ textTransform: 'none' }}>{t('btn_cancel')}</Button>
         <Button
           variant="contained"

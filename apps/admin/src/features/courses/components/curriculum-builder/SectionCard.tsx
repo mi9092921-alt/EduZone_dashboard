@@ -236,7 +236,7 @@ export function SectionCard({
         }}
         onClick={() => setExpanded(!expanded)}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, width: '100%' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flex: 1, minWidth: 0 }}>
           <Box
             {...attributes}
             {...listeners}
@@ -247,7 +247,7 @@ export function SectionCard({
           </Box>
           {editingTitle ? (
             <Box
-              sx={{ display: 'flex', gap: 1, flexGrow: 1 }}
+              sx={{ display: 'flex', gap: 1, flexGrow: 1, minWidth: 0 }}
               onClick={(e) => e.stopPropagation()}
             >
               <TextField
@@ -320,8 +320,8 @@ export function SectionCard({
             direction="row"
             spacing={1}
             flexWrap="wrap"
-            justifyContent={{ xs: 'space-between', sm: 'flex-end' }}
-            sx={{ width: { xs: '100%', sm: 'auto' } }}
+            justifyContent="flex-end"
+            sx={{ width: { xs: '100%', sm: 'auto' }, rowGap: 1 }}
           >
             <IconButton
               size="small"
@@ -436,11 +436,19 @@ export function SectionCard({
                   onChange={(e) => setNewLessonIsPreview(e.target.checked)}
                 />
               </Stack>
-              <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  flexDirection: { xs: 'column-reverse', sm: 'row' },
+                  gap: 1,
+                  justifyContent: 'flex-end',
+                  alignItems: { xs: 'stretch', sm: 'center' },
+                }}
+              >
                 <Button
                   size="small"
                   onClick={() => setAddingLesson(false)}
-                  sx={{ textTransform: 'none', fontSize: '0.8125rem' }}
+                  sx={{ textTransform: 'none', fontSize: '0.8125rem', width: { xs: '100%', sm: 'auto' } }}
                 >
                   {t('cancel')}
                 </Button>
@@ -454,6 +462,7 @@ export function SectionCard({
                     fontSize: '0.8125rem',
                     boxShadow: 'none',
                     borderRadius: 2,
+                    width: { xs: '100%', sm: 'auto' },
                   }}
                 >
                   {t('add_lesson_btn')}

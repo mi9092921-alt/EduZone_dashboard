@@ -166,14 +166,20 @@ CREATE MATERIALIZED VIEW IF NOT EXISTS private.mv_course_stats AS
 SELECT
   c.id         AS course_id,
   c.tenant_id,
+  -- All non-deleted enrollments (active + completed): "% Complete" in the UI
+  -- divides completed by enrolled, so completed-only courses must not drop
+  -- out of the denominator (they showed enrolled=0, "0% Complete").
   (SELECT count(*) FROM public.enrollments e
-     WHERE e.course_id = c.id AND e.status = 'active'
-       AND e.deleted_at IS NULL)                                    AS enrolled,
+     WHERE e.course_id = c.id AND e.deleted_at IS NULL)             AS enrolled,
   (SELECT count(*) FROM public.enrollments e
      WHERE e.course_id = c.id AND e.status = 'completed'
        AND e.deleted_at IS NULL)                                    AS completed,
-  (SELECT round(avg(up.progress_pct)::numeric, 2) FROM public.user_progress up
-     WHERE up.course_id = c.id AND up.lesson_id IS NULL)             AS avg_progress,
+  -- Course-level progress lives in enrollments.progress_pct (same source as
+  -- get_dashboard_stats.total_progress). user_progress.lesson_id is NOT NULL,
+  -- so the previous "course-level rows" filter (up.lesson_id IS NULL) could
+  -- never match and avg_progress was permanently NULL.
+  (SELECT round(coalesce(avg(e.progress_pct), 0)::numeric, 2) FROM public.enrollments e
+     WHERE e.course_id = c.id AND e.deleted_at IS NULL)             AS avg_progress,
   (SELECT count(*) FROM public.video_views vv
      WHERE vv.course_id = c.id)                                      AS total_views,
   now()                                                              AS refreshed_at

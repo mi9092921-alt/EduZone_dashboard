@@ -114,7 +114,7 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
           gap: 2,
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, minWidth: 0, flex: 1 }}>
           <Typography
             variant="h4"
             sx={{
@@ -122,6 +122,8 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
               color: '#0F172A',
               letterSpacing: '-0.025em',
               fontSize: { xs: '1.25rem', md: '1.5rem' },
+              minWidth: 0,
+              overflowWrap: 'break-word',
             }}
           >
             {course.title}
@@ -140,7 +142,15 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
             }}
           />
         </Box>
-        <Box sx={{ display: 'flex', gap: 1.5 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            gap: 1.5,
+            flexWrap: 'wrap',
+            width: { xs: '100%', sm: 'auto' },
+            '& > *': { flexGrow: { xs: 1, sm: 0 } },
+          }}
+        >
           <Button
             variant="outlined"
             startIcon={<ArrowBack />}
@@ -169,13 +179,18 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
         <Tabs
           value={activeTab}
           onChange={(_, v) => handleTabChange(v)}
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
           sx={{
             '& .MuiTab-root': {
               textTransform: 'none',
               fontWeight: 600,
-              fontSize: '0.875rem',
+              fontSize: { xs: '0.8125rem', sm: '0.875rem' },
               color: '#64748B',
               minHeight: 48,
+              minWidth: { xs: 'auto', sm: 120 },
+              px: { xs: 1.5, sm: 2 },
               '&.Mui-selected': { color: '#6366F1' },
             },
             '& .MuiTabs-indicator': { backgroundColor: '#6366F1', height: 2 },
@@ -189,7 +204,7 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
       </Box>
 
       {/* Tab Content */}
-      <Box sx={{ maxWidth: '100%' }}>
+      <Box sx={{ maxWidth: '100%', minWidth: 0, overflowX: 'clip' }}>
         {activeTab === 0 && <CourseInfoForm course={course} />}
         {activeTab === 1 && <CurriculumBuilder courseId={course.id} sections={course.sections} />}
         {activeTab === 2 && <CourseEnrollmentsTab courseId={course.id} />}

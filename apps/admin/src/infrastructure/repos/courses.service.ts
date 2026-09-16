@@ -1094,6 +1094,93 @@ export async function getVideoViewsByUser(
   };
 }
 
+/**
+ * Admin (service_role) variant of getVideoViewsByUser.
+ *
+ * Root cause for Activities → Views showing incomplete data: `video_views`
+ * is a partitioned table (PARTITION BY RANGE viewed_at) and every child
+ * partition carries `partition_deny_direct USING (false)` for the
+ * authenticated role (see supabase/schema/09_rls.sql). Postgres evaluates
+ * partition policies even when querying the parent, so any browser-client
+ * (authenticated JWT) read returns zero/incomplete rows. The title
+ * enrichment (courses/lessons via RLS) suffers the same filtering.
+ *
+ * This variant uses the service-role client (bypasses RLS, including the
+ * partition deny) and MUST only be called from a tenant-scoped server
+ * action (see activities.actions.ts) that authenticates, authorizes and
+ * asserts same-tenant before invoking it. `tenantId` scopes the read to
+ * the target user's tenant when provided.
+ */
+export async function getVideoViewsByUserAdmin(
+  userId: string,
+  page: number,
+  pageSize: number,
+  tenantId?: string,
+): Promise<PaginatedResult<VideoView>> {
+  const admin = createAdminClient();
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  let query = admin
+    .from('video_views')
+    .select('*', { count: 'exact' })
+    .eq('user_id', userId)
+    .order('viewed_at', { ascending: false })
+    .range(from, to);
+  if (tenantId) query = query.eq('tenant_id', tenantId);
+
+  const { data, error, count } = await query;
+  if (error) throw mapDbError(error, 'courses.service.ts');
+
+  const rows = (data ?? []) as Record<string, unknown>[];
+  const courseIds = [
+    ...new Set(
+      rows.map((row) => row.course_id).filter((id): id is string => typeof id === 'string'),
+    ),
+  ];
+  const lessonIds = [
+    ...new Set(
+      rows.map((row) => row.lesson_id).filter((id): id is string => typeof id === 'string'),
+    ),
+  ];
+
+  const [coursesRes, lessonsRes] = await Promise.all([
+    courseIds.length
+      ? admin.from('courses').select('id, title').in('id', courseIds)
+      : Promise.resolve({ data: [] as { id: string; title: string }[] }),
+    lessonIds.length
+      ? admin.from('lessons').select('id, title').in('id', lessonIds)
+      : Promise.resolve({ data: [] as { id: string; title: string }[] }),
+  ]);
+
+  const courseTitles = new Map(
+    ((coursesRes.data ?? []) as { id: string; title: string }[]).map((row) => [
+      row.id,
+      row.title,
+    ]),
+  );
+  const lessonTitles = new Map(
+    ((lessonsRes.data ?? []) as { id: string; title: string }[]).map((row) => [
+      row.id,
+      row.title,
+    ]),
+  );
+
+  const views = rows.map((row) => ({
+    ...row,
+    course_title: courseTitles.get(row.course_id as string),
+    lesson_title: lessonTitles.get(row.lesson_id as string),
+  })) as VideoView[];
+
+  return {
+    data: views,
+    count: count ?? 0,
+    page,
+    pageSize,
+    totalPages: Math.ceil((count ?? 0) / pageSize),
+  };
+}
+
 // ══════════════════════════════════════════════════
 // LEARNING OBJECTIVES & PREREQUISITES
 // ══════════════════════════════════════════════════

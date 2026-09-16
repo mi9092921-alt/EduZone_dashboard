@@ -2,10 +2,10 @@ import { useQuery } from '@tanstack/react-query';
 
 import { queryKeys } from './keys';
 
+import { getActivityLogsAction } from '@/adapters/actions/activities.actions';
 import { getQueuedActivitiesAction } from '@/adapters/actions/admin.actions';
 import type { AuditFilters } from '@/domain/types/audit.types';
 import {
-  getActivityLogs,
   getAuditChainState,
   getSecurityAlerts,
 } from '@/infrastructure/repos/audit.service';
@@ -17,7 +17,10 @@ import {
 export function useActivityLogs(filters: AuditFilters, page: number, pageSize: number) {
   return useQuery({
     queryKey: queryKeys.audit.logs({ ...filters, page, pageSize }),
-    queryFn: () => getActivityLogs(filters, page, pageSize),
+    // M-ACTIVITIES-FULL: activity_logs is partitioned with deny-all on child
+    // partitions for authenticated — browser reads are incomplete. Route
+    // through the tenant-scoped service-role server action instead.
+    queryFn: () => getActivityLogsAction(filters, page, pageSize),
     placeholderData: (prev) => prev,
   });
 }

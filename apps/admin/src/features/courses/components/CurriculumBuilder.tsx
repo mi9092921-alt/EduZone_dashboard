@@ -246,7 +246,15 @@ export function CurriculumBuilder({ courseId, sections }: CurriculumBuilderProps
                 },
               }}
             />
-            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: { xs: 'column-reverse', sm: 'row' },
+                gap: 1,
+                justifyContent: 'flex-end',
+                alignItems: { xs: 'stretch', sm: 'center' },
+              }}
+            >
               <Button
                 onClick={() => setAddingSec(false)}
                 sx={{
@@ -254,6 +262,7 @@ export function CurriculumBuilder({ courseId, sections }: CurriculumBuilderProps
                   fontWeight: 600,
                   color: 'text.secondary',
                   borderRadius: 2,
+                  width: { xs: '100%', sm: 'auto' },
                 }}
               >
                 {t('cancel')}
@@ -269,6 +278,7 @@ export function CurriculumBuilder({ courseId, sections }: CurriculumBuilderProps
                   backgroundColor: 'primary.main',
                   '&:hover': { backgroundColor: 'primary.dark' },
                   boxShadow: 'none',
+                  width: { xs: '100%', sm: 'auto' },
                 }}
               >
                 {t('create_section')}

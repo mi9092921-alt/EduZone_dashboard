@@ -4291,7 +4291,7 @@ $$;
 -- ALTER DEFAULT PRIVILEGES REVOKE there strips the implicit PUBLIC grant.
 -- ============================================================================
 CREATE OR REPLACE FUNCTION public.get_tenants_usage(p_tenant_ids uuid[])
-RETURNS TABLE (tenant_id uuid, user_count bigint, course_count bigint)
+RETURNS TABLE (tenant_id uuid, user_count bigint, course_count bigint, storage_bytes bigint)
 LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER SET search_path = public, pg_temp
@@ -4315,6 +4315,23 @@ BEGIN
       FROM public.courses c
       WHERE c.tenant_id = t.id
         AND c.deleted_at IS NULL
+    ),
+    -- Tenant storage attribution: every bucket path that embeds the tenant id
+    -- as a path segment (exports/{tenant_id}/... today; Flutter-app buckets
+    -- follow the same convention). User-scoped-only paths (avatars/{user_id})
+    -- are not attributable per-tenant and are intentionally excluded. The
+    -- regex guard tolerates NULL/malformed metadata.size instead of failing
+    -- the whole RPC on one bad row.
+    (
+      SELECT coalesce(sum(
+        CASE WHEN (o.metadata ->> 'size') ~ '^[0-9]+$'
+             THEN (o.metadata ->> 'size')::bigint
+             ELSE 0 END
+      ), 0)::bigint
+      FROM storage.objects o
+      WHERE o.name = t.id::text
+         OR o.name LIKE t.id::text || '/%'
+         OR o.name LIKE '%/' || t.id::text || '/%'
     )
   FROM public.tenants t
   WHERE t.id = ANY(p_tenant_ids)

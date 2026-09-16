@@ -900,7 +900,7 @@ function ProgressRow({
           {ta('percent_done', { pct: completionRate })}
         </span>
         <span className="text-[10px] text-muted-foreground">
-          {ta('avg_label', { val: course.avg_progress })}
+          {ta('avg_label', { val: Math.round(course.avg_progress ?? 0) })}
         </span>
       </div>
     </div>

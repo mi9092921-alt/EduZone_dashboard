@@ -181,14 +181,18 @@ export async function deleteFeatureFlagAction(id: string): Promise<void> {
   });
 }
 
-export async function toggleFeatureFlagAction(id: string, enabled: boolean): Promise<void> {
+export async function toggleFeatureFlagAction(
+  id: string,
+  enabled: boolean,
+): Promise<FeatureFlag> {
   const ctx = await requirePermission('feature_flags.manage');
-  await featureFlagsService.toggleFeatureFlagAdmin(id, enabled);
+  const flag = await featureFlagsService.toggleFeatureFlagAdmin(id, enabled);
   await makeAuditLogger().record(ctx, {
     type: 'feature_flag_toggled',
     summary: `Feature flag ${enabled ? 'enabled' : 'disabled'}`,
     riskLevel: 'medium',
   });
+  return flag;
 }
 
 export async function addRoleOverrideAction(

@@ -76,7 +76,7 @@ export async function getDashboardStats(tenantId?: string): Promise<DashboardSta
     pendingWarnings: Number(raw['warnings_count'] ?? 0),
     dailySessions: Number(raw['active_sessions'] ?? 0),
     totalViews: Number(raw['total_views'] ?? 0),
-    totalProgress: Number(raw['total_progress'] ?? 0),
+    totalProgress: Math.round(Number(raw['total_progress'] ?? 0)),
     totalTenants: 0,
     totalLessons: Number(raw['total_lessons'] ?? 0),
     totalTodos: Number(raw['total_todos'] ?? 0),

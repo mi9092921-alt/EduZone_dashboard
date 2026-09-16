@@ -98,13 +98,15 @@ export function TeacherCourseDetailPage() {
             gap: 2,
           }}
         >
-          <Box>
+          <Box sx={{ minWidth: 0, flex: 1 }}>
             <Typography
               variant="h4"
               sx={{
                 fontWeight: 800,
                 color: 'primary.main',
                 letterSpacing: '-0.02em',
+                fontSize: { xs: '1.25rem', sm: '1.5rem', md: '2rem' },
+                overflowWrap: 'break-word',
               }}
             >
               {course.title}
@@ -124,6 +126,7 @@ export function TeacherCourseDetailPage() {
               borderColor: 'divider',
               color: 'text.secondary',
               gap: 1,
+              width: { xs: '100%', sm: 'auto' },
               '& .MuiButton-startIcon': { margin: 0 },
               '&:hover': { borderColor: 'primary.main', color: 'primary.main' },
             }}
@@ -149,8 +152,9 @@ export function TeacherCourseDetailPage() {
             '& .MuiTab-root': {
               textTransform: 'none',
               fontWeight: 700,
-              fontSize: '0.9rem',
-              minWidth: 120,
+              fontSize: { xs: '0.8125rem', sm: '0.9rem' },
+              minWidth: { xs: 'auto', sm: 120 },
+              px: { xs: 1.5, sm: 2 },
               marginInlineEnd: 2,
               color: 'text.secondary',
               gap: 1.25,
@@ -185,7 +189,7 @@ export function TeacherCourseDetailPage() {
       </Box>
 
       {/* Tab Panels */}
-      <Box sx={{ minHeight: 400 }}>
+      <Box sx={{ minHeight: 400, minWidth: 0, overflowX: 'clip' }}>
         {activeTab === 0 && (
           <Fade in timeout={400}>
             <Box>
@@ -197,12 +201,14 @@ export function TeacherCourseDetailPage() {
           <Fade in timeout={400}>
             <Box
               sx={{
-                p: 4,
+                p: { xs: 2, sm: 3, md: 4 },
                 borderRadius: 4,
                 backgroundColor: 'background.paper',
                 border: '1px solid',
                 borderColor: 'divider',
                 boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                minWidth: 0,
+                overflowX: 'clip',
               }}
             >
               <CurriculumBuilder courseId={course!.id} sections={course!.sections} />
@@ -218,7 +224,7 @@ export function TeacherCourseDetailPage() {
         )}
         {activeTab === 3 && (
           <Fade in timeout={400}>
-            <Box sx={{ maxWidth: 800 }}>
+            <Box sx={{ maxWidth: 800, width: '100%', minWidth: 0 }}>
               <CourseInfoForm course={course!} hideTeacherSelect={true} />
             </Box>
           </Fade>

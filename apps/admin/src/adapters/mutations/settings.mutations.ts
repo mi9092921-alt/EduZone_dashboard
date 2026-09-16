@@ -15,6 +15,7 @@ import {
 import { queryKeys } from '@/adapters/queries/keys';
 import type {
   CreateFeatureFlagInput,
+  FeatureFlag,
   UpdateFeatureFlagInput,
 } from '@/domain/types/feature-flag.types';
 import type { MaintenanceModeParams } from '@/domain/types/settings.types';
@@ -126,9 +127,34 @@ export function useUpdateFeatureFlag() {
   return useMutation({
     mutationFn: (vars: { id: string; input: UpdateFeatureFlagInput }) =>
       updateFeatureFlagAction(vars.id, vars.input),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.featureFlags.all });
+    onMutate: async (vars) => {
+      await qc.cancelQueries({ queryKey: queryKeys.featureFlags.all });
+      const previous = qc.getQueryData<FeatureFlag[]>(queryKeys.featureFlags.all);
+      const patch = mapUpdateInputToFlagPatch(vars.input);
+      qc.setQueryData<FeatureFlag[]>(queryKeys.featureFlags.all, (old) => {
+        if (!old) return old;
+        return old.map((flag) => (flag.id === vars.id ? { ...flag, ...patch } : flag));
+      });
+      return { previous };
     },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        qc.setQueryData(queryKeys.featureFlags.all, context.previous);
+      }
+    },
+    onSuccess: (updated) => {
+      // Reconcile with authoritative server value instantly (no wait for refetch).
+      if (updated && typeof updated === 'object' && 'id' in updated) {
+        const serverFlag = updated as FeatureFlag;
+        qc.setQueryData<FeatureFlag[]>(queryKeys.featureFlags.all, (old) => {
+          if (!old) return old;
+          return old.map((flag) => (flag.id === serverFlag.id ? { ...flag, ...serverFlag } : flag));
+        });
+      }
+    },
+    // No onSettled refetch: the mutation response is authoritative and merged
+    // above, so the cache stays exact without a full-list refetch flashing the
+    // "updating" indicator after every interaction.
   });
 }
 
@@ -136,7 +162,21 @@ export function useDeleteFeatureFlag() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: deleteFeatureFlagAction,
-    onSuccess: () => {
+    onMutate: async (id: string) => {
+      await qc.cancelQueries({ queryKey: queryKeys.featureFlags.all });
+      const previous = qc.getQueryData<FeatureFlag[]>(queryKeys.featureFlags.all);
+      qc.setQueryData<FeatureFlag[]>(queryKeys.featureFlags.all, (old) => {
+        if (!old) return old;
+        return old.filter((flag) => flag.id !== id);
+      });
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        qc.setQueryData(queryKeys.featureFlags.all, context.previous);
+      }
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: queryKeys.featureFlags.all });
     },
   });
@@ -147,10 +187,57 @@ export function useToggleFeatureFlag() {
   return useMutation({
     mutationFn: (vars: { id: string; enabled: boolean }) =>
       toggleFeatureFlagAction(vars.id, vars.enabled),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.featureFlags.all });
+    onMutate: async (vars) => {
+      await qc.cancelQueries({ queryKey: queryKeys.featureFlags.all });
+      const previous = qc.getQueryData<FeatureFlag[]>(queryKeys.featureFlags.all);
+      qc.setQueryData<FeatureFlag[]>(queryKeys.featureFlags.all, (old) => {
+        if (!old) return old;
+        return old.map((flag) =>
+          flag.id === vars.id ? { ...flag, is_enabled: vars.enabled } : flag,
+        );
+      });
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        qc.setQueryData(queryKeys.featureFlags.all, context.previous);
+      }
+    },
+    onSuccess: (updated) => {
+      // Reconcile with the authoritative server row (no background refetch —
+      // a refetch per toggle made the table visibly churn after every click).
+      if (updated && typeof updated === 'object' && 'id' in updated) {
+        const serverFlag = updated as FeatureFlag;
+        qc.setQueryData<FeatureFlag[]>(queryKeys.featureFlags.all, (old) => {
+          if (!old) return old;
+          return old.map((flag) => (flag.id === serverFlag.id ? { ...flag, ...serverFlag } : flag));
+        });
+      }
     },
   });
+}
+
+/**
+ * Map UI update input to a partial FeatureFlag patch for optimistic cache updates.
+ * Keeps schedule columns in sync (starts_at/ends_at + enabled_from/enabled_until).
+ */
+function mapUpdateInputToFlagPatch(input: UpdateFeatureFlagInput): Partial<FeatureFlag> {
+  const patch: Partial<FeatureFlag> & Record<string, unknown> = {};
+  if (input.is_enabled !== undefined) patch.is_enabled = input.is_enabled;
+  if (input.rollout_pct !== undefined) patch.rollout_pct = input.rollout_pct;
+  if (input.status !== undefined) patch.status = input.status;
+  if (input.label !== undefined) patch.label = input.label;
+  if (input.description !== undefined) patch.description = input.description;
+  if (input.starts_at !== undefined) {
+    patch.starts_at = input.starts_at;
+    patch.enabled_from = input.starts_at;
+  }
+  if (input.ends_at !== undefined) {
+    patch.ends_at = input.ends_at;
+    patch.enabled_until = input.ends_at;
+  }
+  if (input.metadata !== undefined) patch.metadata = input.metadata;
+  return patch;
 }
 
 export function useAddRoleOverride() {
