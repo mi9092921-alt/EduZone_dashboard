@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowBack } from '@mui/icons-material';
+import { ArrowBack, Star } from '@mui/icons-material';
 import {
   Box,
   Typography,
@@ -141,6 +141,28 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
               borderRadius: 5,
             }}
           />
+          {/* Rating aggregate (denormalized by trg_course_ratings_apply).
+              Hidden entirely until the course collects its first rating so
+              the header never shows a misleading placeholder. */}
+          {typeof course.rating === 'number' && course.rating > 0 && (
+            <Chip
+              icon={<Star fontSize="small" />}
+              label={
+                `${course.rating.toFixed(1)}` +
+                (course.rating_count ? ` (${course.rating_count})` : '')
+              }
+              size="small"
+              sx={{
+                height: 24,
+                fontSize: '0.625rem',
+                fontWeight: 700,
+                letterSpacing: '0.04em',
+                backgroundColor: '#FFFBEB',
+                color: '#D97706',
+                borderRadius: 5,
+              }}
+            />
+          )}
         </Box>
         <Box
           sx={{

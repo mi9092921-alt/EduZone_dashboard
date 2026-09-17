@@ -1,6 +1,15 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "globalDependencies": ["**/.env.*local"],
+  "globalEnv": [
+    "NEXT_PUBLIC_SUPABASE_URL",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    "NEXT_PUBLIC_APP_ENV",
+    "NEXT_PUBLIC_SENTRY_DSN",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "CRON_SECRET",
+    "YOUTUBE_API_KEY"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

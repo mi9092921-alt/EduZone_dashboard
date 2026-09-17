@@ -1464,6 +1464,149 @@ BEGIN
 END;
 $$;
 
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Course ratings (1-5 stars per user per course)
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- Keeps courses.rating / courses.rating_count denormalized from
+-- course_ratings on every write (insert, update — including soft delete
+-- via deleted_at — and physical delete, which only service_role/admin
+-- tooling can perform). Mirrors trg_update_enrollment_progress's
+-- synchronous row-level pattern.
+CREATE OR REPLACE FUNCTION public.trg_apply_course_rating_agg()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_cid uuid := COALESCE(NEW.course_id, OLD.course_id);
+  v_avg numeric;
+  v_count integer;
+BEGIN
+  SELECT pg_catalog.round(pg_catalog.avg(rating)::numeric, 2),
+         pg_catalog.count(*)::integer
+    INTO v_avg, v_count
+  FROM public.course_ratings
+  WHERE course_id = v_cid
+    AND deleted_at IS NULL;
+
+  UPDATE public.courses
+  SET rating = v_avg,
+      rating_count = v_count
+  WHERE id = v_cid;
+
+  RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
+-- Student-facing rating submission. Same shape as enroll_in_course:
+-- server-side session/tenant/enrollment derivation, upsert on
+-- (user_id, course_id), uppercase error codes. Direct table writes are
+-- admin-only by RLS — this RPC is the only student path.
+CREATE OR REPLACE FUNCTION public.rate_course(
+  p_course_id uuid,
+  p_rating integer
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_uid uuid := auth.uid();
+  v_tenant uuid;
+  v_course_tenant uuid;
+  v_new_avg numeric;
+  v_new_count integer;
+BEGIN
+  IF current_setting('role', true) != 'service_role' AND v_uid IS NULL THEN
+    RAISE EXCEPTION 'AUTH_REQUIRED';
+  END IF;
+
+  IF p_rating IS NULL OR p_rating < 1 OR p_rating > 5 THEN
+    RAISE EXCEPTION 'INVALID_RATING';
+  END IF;
+
+  SELECT tenant_id INTO v_tenant
+  FROM public.users
+  WHERE id = v_uid
+    AND account_status = 'active'
+    AND deleted_at IS NULL;
+
+  IF v_tenant IS NULL THEN
+    RAISE EXCEPTION 'USER_NOT_FOUND_OR_INACTIVE';
+  END IF;
+
+  SELECT tenant_id INTO v_course_tenant
+  FROM public.courses
+  WHERE id = p_course_id
+    AND deleted_at IS NULL
+  FOR SHARE;
+
+  IF v_course_tenant IS NULL OR v_course_tenant <> v_tenant THEN
+    RAISE EXCEPTION 'COURSE_NOT_FOUND_OR_NOT_PUBLISHED';
+  END IF;
+
+  IF NOT public.has_course_access(v_uid, p_course_id) THEN
+    RAISE EXCEPTION 'NOT_ENROLLED';
+  END IF;
+
+  INSERT INTO public.course_ratings (user_id, course_id, tenant_id, rating, created_by, updated_by)
+  VALUES (v_uid, p_course_id, v_tenant, p_rating, v_uid, v_uid)
+  ON CONFLICT (user_id, course_id) DO UPDATE
+    SET rating = EXCLUDED.rating,
+        updated_by = v_uid,
+        updated_at = pg_catalog.now(),
+        deleted_at = NULL
+  WHERE public.course_ratings.deleted_at IS NOT NULL
+     OR public.course_ratings.rating <> EXCLUDED.rating;
+
+  -- The aggregate trigger already ran; read back the authoritative values.
+  SELECT c.rating, c.rating_count INTO v_new_avg, v_new_count
+  FROM public.courses c
+  WHERE c.id = p_course_id;
+
+  RETURN jsonb_build_object(
+    'course_id', p_course_id,
+    'rating', v_new_avg,
+    'rating_count', v_new_count
+  );
+END;
+$$;
+
+-- Resolves the public instructor display fields (name + avatar) for a set
+-- of courses without exposing the underlying users rows. The users SELECT
+-- RLS only lets a student read their own row, so PostgREST
+-- teacher:users!teacher_id(...) joins resolve to NULL for students and
+-- instructor names disappeared from Discover/Saved cards. RLS filters
+-- rows, not columns, so widening that policy would leak sensitive columns
+-- (token_version etc.); this SECURITY DEFINER function emits only the
+-- three public display fields, tenant-scoped and published-courses-only.
+CREATE OR REPLACE FUNCTION public.get_courses_instructors(
+  p_course_ids uuid[]
+)
+RETURNS TABLE(
+  course_id uuid,
+  instructor_name text,
+  instructor_avatar text
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+  SELECT c.id,
+         pg_catalog.btrim(
+           pg_catalog.concat_ws(' ', u.first_name, u.last_name)
+         ),
+         u.avatar_url
+  FROM public.courses c
+  JOIN public.users u ON u.id = c.teacher_id
+  WHERE c.id = ANY(p_course_ids)
+    AND c.status = 'published'
+    AND c.deleted_at IS NULL
+    AND c.tenant_id = public.get_current_tenant_id()
+    AND u.deleted_at IS NULL;
+$$;
+
 -- courses-subsystem-production-hardening-plan.md, Phase 2/3: the previous
 -- write path had the Flutter client resolve `tenant_id` itself (from
 -- user_metadata, falling back to a second round-trip query against

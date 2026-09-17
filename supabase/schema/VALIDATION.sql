@@ -2125,7 +2125,68 @@ BEGIN
   );
 END $$;
 
--- Display Results (includes Checks 27-41 above)
+-- Check 42 (course ratings, 2026-09-17): table + aggregate columns exist,
+-- RLS enabled with the three policies, aggregate trigger wired, student
+-- RPCs granted to authenticated only (no anon leak).
+DO $$
+DECLARE
+  v_table boolean;
+  v_columns int;
+  v_rls text;
+  v_policies int;
+  v_trigger boolean;
+  v_rate_grant boolean;
+  v_instructors_grant boolean;
+  v_anon_leaks int;
+BEGIN
+  SELECT to_regclass('public.course_ratings') IS NOT NULL INTO v_table;
+  SELECT count(*) INTO v_columns
+  FROM information_schema.columns
+  WHERE table_schema = 'public' AND table_name = 'courses'
+    AND column_name IN ('rating', 'rating_count');
+  SELECT c.relrowsecurity::text INTO v_rls
+  FROM pg_class c
+  WHERE c.oid = 'public.course_ratings'::regclass;
+  SELECT count(*) INTO v_policies
+  FROM pg_policies
+  WHERE schemaname = 'public' AND tablename = 'course_ratings'
+    AND policyname IN (
+      'course_ratings_select',
+      'course_ratings_admin_insert',
+      'course_ratings_update'
+    );
+  SELECT EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgname = 'trg_course_ratings_apply'
+      AND tgrelid = 'public.course_ratings'::regclass
+      AND NOT tgisinternal
+  ) INTO v_trigger;
+  SELECT has_function_privilege(
+    'authenticated', 'public.rate_course(uuid,integer)', 'EXECUTE'
+  ) INTO v_rate_grant;
+  SELECT has_function_privilege(
+    'authenticated', 'public.get_courses_instructors(uuid[])', 'EXECUTE'
+  ) INTO v_instructors_grant;
+  SELECT count(*) INTO v_anon_leaks
+  FROM unnest(ARRAY['anon']) AS r(role)
+  WHERE has_function_privilege(r.role, 'public.rate_course(uuid,integer)', 'EXECUTE')
+     OR has_function_privilege(r.role, 'public.get_courses_instructors(uuid[])', 'EXECUTE');
+
+  INSERT INTO validation_results VALUES (
+    'Course Ratings Feature',
+    CASE WHEN v_table AND v_columns = 2 AND v_rls = 'true'
+       AND v_policies = 3 AND v_trigger
+       AND v_rate_grant AND v_instructors_grant AND v_anon_leaks = 0
+      THEN 'PASS' ELSE 'FAIL' END,
+    format(
+      'table=%s, aggregate-columns=%s/2, rls=%s, policies=%s/3, agg-trigger=%s, rate grant=%s, instructors grant=%s, anon-leaks=%s',
+      v_table, v_columns, v_rls, v_policies, v_trigger,
+      v_rate_grant, v_instructors_grant, v_anon_leaks
+    )
+  );
+END $$;
+
+-- Display Results (includes Checks 27-42 above)
 SELECT * FROM validation_results ORDER BY check_name;
 
 -- Summary

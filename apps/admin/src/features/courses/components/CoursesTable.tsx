@@ -1,6 +1,6 @@
 'use client';
 
-import { School } from '@mui/icons-material';
+import { School, Star } from '@mui/icons-material';
 import { useTranslations } from 'next-intl';
 
 import { CourseRowActions } from './CourseRowActions';
@@ -38,8 +38,30 @@ const LEVEL_CONFIG = {
 // Shared grid template for the desktop list — header and data rows MUST use the
 // same tracks so labels stay aligned with cells. minmax(0,1fr) lets the course
 // column shrink so truncation works instead of content overflowing neighbours.
+// The 5rem track after the level column is the rating aggregate.
 const DESKTOP_ROW_GRID =
-  'grid grid-cols-[3rem_minmax(0,1fr)_9rem_7.5rem_6rem_6rem_13rem_5rem] items-center';
+  'grid grid-cols-[3rem_minmax(0,1fr)_9rem_7.5rem_5rem_6rem_6rem_13rem_5rem] items-center';
+
+// Rating cell content shared by the desktop row and the mobile card:
+// amber star + average (— when the course has no ratings yet).
+function RatingCell({ course }: { course: Course }) {
+  const hasRating = typeof course.rating === 'number' && course.rating > 0;
+  return (
+    <span className="inline-flex items-center gap-1 font-bold text-sm">
+      <Star
+        className={cn('h-4 w-4', hasRating ? 'text-amber-400' : 'text-muted-foreground/40')}
+      />
+      <span className={hasRating ? 'text-foreground' : 'text-muted-foreground'}>
+        {hasRating ? course.rating!.toFixed(1) : '—'}
+      </span>
+      {hasRating && course.rating_count ? (
+        <span className="text-[11px] font-medium text-muted-foreground">
+          ({course.rating_count})
+        </span>
+      ) : null}
+    </span>
+  );
+}
 
 interface CoursesTableProps {
   courses: Course[];
@@ -83,6 +105,7 @@ export function CoursesTable({
     { label: t('course_header'), className: 'text-start px-6' },
     { label: t('status_header'), className: 'text-start px-6' },
     { label: t('level_header'), className: 'text-start px-6' },
+    { label: t('rating_header'), className: 'text-center px-6' },
     { label: t('dashboard_lessons'), className: 'text-center px-6' },
     { label: t('price_header'), className: 'text-end px-6' },
     { label: t('teacher_date_header'), className: 'text-start px-6' },
@@ -298,6 +321,11 @@ export function CoursesTable({
                         </div>
                       </div>
 
+                      {/* Rating */}
+                      <div role="cell" className="px-6 py-5 text-center">
+                        <RatingCell course={course} />
+                      </div>
+
                       {/* Lessons Count */}
                       <div role="cell" className="px-6 py-5 text-center">
                         <div className="inline-flex items-center justify-center min-w-[2.5rem] h-8 px-3 rounded-full bg-primary/10 text-primary font-bold text-sm">
@@ -470,6 +498,7 @@ export function CoursesTable({
                         <div className="inline-flex items-center justify-center min-w-[2.5rem] h-8 px-3 rounded-full bg-primary/10 text-primary font-bold text-sm">
                           {course.lesson_count || 0}
                         </div>
+                        <RatingCell course={course} />
                         {course.is_free || course.price === 0 ? (
                           <span className="text-emerald-600 dark:text-emerald-400 font-extrabold text-[15px]">
                             {t('free')}

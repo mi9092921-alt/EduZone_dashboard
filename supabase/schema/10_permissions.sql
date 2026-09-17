@@ -100,6 +100,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.courses, public.course_prerequisi
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.lesson_contents TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.enrollments TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.user_progress TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.course_ratings TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.devices TO authenticated;
 GRANT INSERT ON public.security_incidents TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.sessions TO authenticated;
@@ -352,6 +353,27 @@ GRANT EXECUTE ON FUNCTION public.is_teacher_of_course(uuid, uuid) TO authenticat
 
 REVOKE EXECUTE ON FUNCTION public.enroll_in_course(uuid) FROM anon;
 GRANT EXECUTE ON FUNCTION public.enroll_in_course(uuid) TO authenticated, service_role;
+
+-- rate_course(uuid, integer): student-facing rating submission (upsert on
+-- course_ratings). The RPC derives tenant/enrollment server-side; direct
+-- table writes stay admin-only via RLS. Same least-privilege pattern as
+-- enroll_in_course above. The PUBLIC revoke is required: functions default
+-- to GRANT EXECUTE TO PUBLIC at creation, and anon inherits via PUBLIC
+-- membership, so revoking from anon alone still leaks EXECUTE to anon
+-- (caught by VALIDATION's Course Ratings anon-leak).
+REVOKE ALL ON FUNCTION public.rate_course(uuid, integer) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.rate_course(uuid, integer) FROM anon;
+GRANT EXECUTE ON FUNCTION public.rate_course(uuid, integer) TO authenticated, service_role;
+
+-- get_courses_instructors(uuid[]): resolves instructor display name/avatar
+-- for published courses in the caller's tenant without exposing users rows
+-- (the users SELECT RLS intentionally hides other users' rows from
+-- students, which is why PostgREST teacher joins resolve to NULL for
+-- them). Read-only, STABLE. PUBLIC revoke required for the same reason as
+-- rate_course above.
+REVOKE ALL ON FUNCTION public.get_courses_instructors(uuid[]) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.get_courses_instructors(uuid[]) FROM anon;
+GRANT EXECUTE ON FUNCTION public.get_courses_instructors(uuid[]) TO authenticated, service_role;
 
 -- extend_enrollment(uuid, uuid, timestamptz): admin/teacher operation to extend
 -- or renew a student's enrollment. The function body enforces courses.manage

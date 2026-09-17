@@ -391,7 +391,8 @@
     "view": "View",
     "suspend": "Suspend",
     "toggle_free_preview": "Toggle free preview",
-    "toggle_edit": "Toggle edit"
+    "toggle_edit": "Toggle edit",
+    "rating_header": "Rating"
   },
   "warnings": {
     "page_title": "Student Warnings",

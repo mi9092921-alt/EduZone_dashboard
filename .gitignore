@@ -73,3 +73,5 @@ pw3/
 **/report.zip
 # DB dumps — never commit
 supabase/backups/
+
+.vercel

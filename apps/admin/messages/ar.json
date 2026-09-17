@@ -391,7 +391,8 @@
     "view": "عرض",
     "suspend": "تعليق",
     "toggle_free_preview": "تبديل المعاينة المجانية",
-    "toggle_edit": "تبديل التعديل"
+    "toggle_edit": "تبديل التعديل",
+    "rating_header": "التقييم"
   },
   "warnings": {
     "page_title": "تحذيرات الطلاب",

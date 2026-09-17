@@ -1,0 +1,7 @@
+# Local test artifacts and patches not needed for the Next.js build
+pw2/
+pw3/
+pw-report-dl/
+patch files/
+*.patch
+dist/

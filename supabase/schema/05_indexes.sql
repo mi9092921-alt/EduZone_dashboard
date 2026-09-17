@@ -99,6 +99,10 @@ CREATE INDEX IF NOT EXISTS idx_enrollments_tenant ON public.enrollments (tenant_
 
 CREATE INDEX IF NOT EXISTS idx_enrollments_enrolled_by ON public.enrollments (enrolled_by) WHERE enrolled_by IS NOT NULL AND deleted_at IS NULL;
 
+CREATE INDEX IF NOT EXISTS idx_course_ratings_course ON public.course_ratings (course_id) WHERE deleted_at IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_course_ratings_user ON public.course_ratings (user_id) WHERE deleted_at IS NULL;
+
 CREATE INDEX IF NOT EXISTS idx_user_progress_user_course ON public.user_progress (user_id, course_id) WHERE deleted_at IS NULL;
 
 CREATE INDEX IF NOT EXISTS idx_user_progress_completed_recent 

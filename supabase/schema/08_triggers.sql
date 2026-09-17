@@ -328,6 +328,33 @@ CREATE TRIGGER trg_up_enrollment_progress_upd
   WHEN (pg_trigger_depth() = 0 AND OLD IS DISTINCT FROM NEW)
   EXECUTE FUNCTION public.trg_update_enrollment_progress();
 
+-- ─────────────────────────────────────────────────────────────────────────────
+-- course_ratings: aggregate sync + standard housekeeping
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- Recomputes courses.rating / courses.rating_count on every rating write.
+-- Covers soft delete (an UPDATE of deleted_at) and physical delete
+-- (service_role/admin tooling only) via the same function.
+DROP TRIGGER IF EXISTS trg_course_ratings_apply ON public.course_ratings;
+
+CREATE TRIGGER trg_course_ratings_apply
+  AFTER INSERT OR UPDATE OR DELETE ON public.course_ratings
+  FOR EACH ROW
+  WHEN (pg_trigger_depth() = 0)
+  EXECUTE FUNCTION public.trg_apply_course_rating_agg();
+
+DROP TRIGGER IF EXISTS trg_course_ratings_updated_at ON public.course_ratings;
+
+CREATE TRIGGER trg_course_ratings_updated_at
+  BEFORE UPDATE ON public.course_ratings
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_prevent_physical_delete_course_ratings ON public.course_ratings;
+
+CREATE TRIGGER trg_prevent_physical_delete_course_ratings
+  BEFORE DELETE ON public.course_ratings
+  FOR EACH ROW EXECUTE FUNCTION public.prevent_physical_delete();
+
 DROP TRIGGER IF EXISTS trg_notification_fanout ON public.notifications;
 
 CREATE TRIGGER trg_notification_fanout
