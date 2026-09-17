@@ -3,7 +3,7 @@ import createMiddleware from 'next-intl/middleware';
 
 import { routing } from './i18n/routing';
 
-import { updateSession } from '@/infrastructure/supabase/middleware';
+import { updateSession, getApiUser } from '@/infrastructure/supabase/middleware';
 import { buildCspHeader, generateCspNonce, NONCE_REQUEST_HEADER } from '@/lib/csp-nonce';
 
 const handleI18nRouting = createMiddleware(routing);
@@ -14,9 +14,20 @@ const handleI18nRouting = createMiddleware(routing);
  * and injects a per-request CSP nonce (CSP FIX 2026-09-12).
  */
 export async function middleware(request: NextRequest) {
-  // 0. Skip API routes — they don't need i18n or auth session handling
+  // 0. API routes: no i18n routing or CSP here. This is only a COARSE auth
+  // backstop so a newly added route.ts can never ship unauthenticated by
+  // accident — each route still performs its own fine-grained checks
+  // (role/tenant/permission). The cron route authenticates with CRON_SECRET
+  // instead of a user session and is exempt.
   if (request.nextUrl.pathname.startsWith('/api')) {
-    return NextResponse.next();
+    if (request.nextUrl.pathname.startsWith('/api/cron')) {
+      return NextResponse.next();
+    }
+    const { user, response } = await getApiUser(request);
+    if (!user) {
+      return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+    }
+    return response;
   }
 
   // ── CSP nonce (per-request) ───────────────────────────────────
@@ -60,8 +71,11 @@ export const config = {
      * - _next/image (image optimization)
      * - favicon.ico (favicon file)
      * - public files (images, etc.)
+     *
+     * NOTE: /api IS matched (since the API auth backstop was added) — the
+     * handler branches on it first.
      */
-    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
   // EDGE-RUNTIME NOTE (2026-09-12): @supabase/ssr → @supabase/supabase-js
   // reads `process.version` at module load (for environment detection /

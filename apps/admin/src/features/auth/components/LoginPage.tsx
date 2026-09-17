@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
 
+import { checkLoginRateLimitAction } from '@/adapters/actions/auth-rate-limit.actions';
 import { recordCurrentSessionAction } from '@/adapters/actions/session.actions';
 import { useAuthStore, type PrimaryRole } from '@/adapters/stores/auth.store';
 import { Button } from '@/components/ui/Button';
@@ -43,6 +44,15 @@ export function LoginPage() {
     setIsLoading(true);
 
     try {
+      // Pre-auth brute-force backstop (rate_limit_rules 'login', enforced
+      // per source IP server-side). Fail-open by design — see the action.
+      const rate = await checkLoginRateLimitAction();
+      if (!rate.allowed) {
+        const minutes = Math.max(1, Math.ceil((rate.retryAfterSeconds ?? 900) / 60));
+        setError(t('rate_limited', { minutes }));
+        return;
+      }
+
       const supabase = createBrowserClient();
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: email.trim(),

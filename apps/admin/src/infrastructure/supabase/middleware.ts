@@ -3,13 +3,10 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 import { env } from '@/lib/env';
 
-/**
- * Supabase middleware client — refreshes session on every request.
- * Called from Next.js middleware.
- */
-export async function updateSession(request: NextRequest, response?: NextResponse) {
-  let supabaseResponse = response ?? NextResponse.next({ request });
+type CookieUser = Awaited<ReturnType<ReturnType<typeof createClient>['auth']['getUser']>>['data']['user'];
 
+function createMiddlewareSupabase(request: NextRequest, initialResponse: NextResponse) {
+  let response = initialResponse;
   const supabase = createClient(
     env.NEXT_PUBLIC_SUPABASE_URL,
     env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -20,14 +17,24 @@ export async function updateSession(request: NextRequest, response?: NextRespons
         },
         setAll(cookiesToSet: { name: string; value: string; options?: CookieOptions }[]) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          supabaseResponse = response ?? NextResponse.next({ request });
+          response = initialResponse;
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options!),
+            response.cookies.set(name, value, options!),
           );
         },
       },
     },
   );
+  return { supabase, getResponse: () => response };
+}
+
+/**
+ * Supabase middleware client — refreshes session on every request.
+ * Called from Next.js middleware.
+ */
+export async function updateSession(request: NextRequest, response?: NextResponse) {
+  const initialResponse = response ?? NextResponse.next({ request });
+  const { supabase, getResponse } = createMiddlewareSupabase(request, initialResponse);
 
   // Refresh session — this will set cookies. supabase.auth.getUser() makes
   // a network round trip to the Auth server to validate the token, and can
@@ -99,5 +106,49 @@ export async function updateSession(request: NextRequest, response?: NextRespons
     return NextResponse.redirect(url);
   }
 
-  return supabaseResponse;
+  return getResponse();
+}
+
+/**
+ * Coarse auth backstop for API routes (middleware branch for /api).
+ * Returns the authenticated user (or null) plus a response carrying any
+ * refreshed session cookies. Unlike updateSession this never redirects —
+ * API callers get a JSON 401 from middleware.ts instead.
+ */
+export async function getApiUser(
+  request: NextRequest,
+): Promise<{ user: CookieUser; response: NextResponse }> {
+  const { supabase, getResponse } = createMiddlewareSupabase(
+    request,
+    NextResponse.next({ request }),
+  );
+
+  let user: CookieUser = null;
+  const MAX_GET_USER_ATTEMPTS = 2;
+  for (let attempt = 1; attempt <= MAX_GET_USER_ATTEMPTS; attempt++) {
+    try {
+      const { data, error } = await supabase.auth.getUser();
+      if (!error) {
+        user = data.user;
+        break;
+      }
+      if (error.name === 'AuthSessionMissingError' || /session missing/i.test(error.message)) {
+        break;
+      }
+      console.error(
+        `[MIDDLEWARE] api auth.getUser() error (attempt ${attempt}/${MAX_GET_USER_ATTEMPTS}):`,
+        error.message,
+      );
+    } catch (error) {
+      console.error(
+        `[MIDDLEWARE ERROR] api Supabase fetch failed (attempt ${attempt}/${MAX_GET_USER_ATTEMPTS}):`,
+        error,
+      );
+    }
+    if (attempt < MAX_GET_USER_ATTEMPTS) {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+  }
+
+  return { user, response: getResponse() };
 }
