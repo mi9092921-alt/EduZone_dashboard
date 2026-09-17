@@ -34,7 +34,7 @@ export function CourseSettingsTab({ course }: CourseSettingsTabProps) {
   const canPublish = publishedSections.length > 0 && publishedLessons.length > 0;
 
   return (
-    <Box sx={{ maxWidth: 640 }}>
+    <Box sx={{ maxWidth: 640, width: '100%', minWidth: 0 }}>
       <Typography sx={{ fontWeight: 700, fontSize: '1.125rem', color: '#0F172A', mb: 0.5 }}>
         {t('course_settings_title')}
       </Typography>
@@ -51,14 +51,14 @@ export function CourseSettingsTab({ course }: CourseSettingsTabProps) {
       {/* Current Status */}
       <Box
         sx={{
-          p: 3,
+          p: { xs: 2, sm: 3 },
           border: '1px solid #E2E8F0',
           borderRadius: 3,
           backgroundColor: '#F8FAFC',
           mb: 3,
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
           <Typography variant="body2" sx={{ fontWeight: 600, color: '#475569' }}>
             {t('current_status_label')}
           </Typography>
@@ -153,7 +153,7 @@ export function CourseSettingsTab({ course }: CourseSettingsTabProps) {
       {/* Course Info */}
       <Box
         sx={{
-          p: 3,
+          p: { xs: 2, sm: 3 },
           border: '1px solid #E2E8F0',
           borderRadius: 3,
           backgroundColor: '#fff',
@@ -162,44 +162,94 @@ export function CourseSettingsTab({ course }: CourseSettingsTabProps) {
         <Typography variant="body2" sx={{ fontWeight: 600, color: '#475569', mb: 2 }}>
           {t('course_details_label')}
         </Typography>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-            <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, minWidth: 0 }}>
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: { xs: 'column', sm: 'row' },
+              justifyContent: 'space-between',
+              gap: { xs: 0.25, sm: 2 },
+            }}
+          >
+            <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, flexShrink: 0 }}>
               {t('id_label')}
             </Typography>
-            <Typography variant="caption" sx={{ color: '#475569', fontFamily: 'JetBrains Mono' }}>
+            <Typography
+              variant="caption"
+              sx={{
+                color: '#475569',
+                fontFamily: 'JetBrains Mono',
+                overflowWrap: 'anywhere',
+                wordBreak: 'break-all',
+                textAlign: { xs: 'start', sm: 'end' },
+              }}
+            >
               {course.id}
             </Typography>
           </Box>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-            <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600 }}>
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: { xs: 'column', sm: 'row' },
+              justifyContent: 'space-between',
+              gap: { xs: 0.25, sm: 2 },
+            }}
+          >
+            <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, flexShrink: 0 }}>
               {t('url_slug')}
             </Typography>
-            <Typography variant="caption" sx={{ color: '#475569' }}>
+            <Typography
+              variant="caption"
+              sx={{ color: '#475569', overflowWrap: 'anywhere', textAlign: { xs: 'start', sm: 'end' } }}
+            >
               {course.slug ?? '—'}
             </Typography>
           </Box>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-            <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600 }}>
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: { xs: 'column', sm: 'row' },
+              justifyContent: 'space-between',
+              gap: { xs: 0.25, sm: 2 },
+            }}
+          >
+            <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, flexShrink: 0 }}>
               {t('region_label')}
             </Typography>
-            <Typography variant="caption" sx={{ color: '#475569' }}>
+            <Typography
+              variant="caption"
+              sx={{ color: '#475569', overflowWrap: 'anywhere', textAlign: { xs: 'start', sm: 'end' } }}
+            >
               {course.region_id}
             </Typography>
           </Box>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-            <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600 }}>
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: { xs: 'column', sm: 'row' },
+              justifyContent: 'space-between',
+              gap: { xs: 0.25, sm: 2 },
+            }}
+          >
+            <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, flexShrink: 0 }}>
               {t('created_label')}
             </Typography>
-            <Typography variant="caption" sx={{ color: '#475569' }}>
+            <Typography variant="caption" sx={{ color: '#475569', textAlign: { xs: 'start', sm: 'end' } }}>
               {new Date(course.created_at).toLocaleString()}
             </Typography>
           </Box>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-            <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600 }}>
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: { xs: 'column', sm: 'row' },
+              justifyContent: 'space-between',
+              gap: { xs: 0.25, sm: 2 },
+            }}
+          >
+            <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, flexShrink: 0 }}>
               {t('updated_label')}
             </Typography>
-            <Typography variant="caption" sx={{ color: '#475569' }}>
+            <Typography variant="caption" sx={{ color: '#475569', textAlign: { xs: 'start', sm: 'end' } }}>
               {new Date(course.updated_at).toLocaleString()}
             </Typography>
           </Box>

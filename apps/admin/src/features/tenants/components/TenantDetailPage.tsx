@@ -419,7 +419,8 @@ function AuditTab({ tenantId }: { tenantId: string }) {
         <h3 className="text-sm font-bold text-foreground">{t('scoped_audit_title')}</h3>
         <span className="text-xs text-muted-foreground">{t('latest_entries', { count: 20 })}</span>
       </div>
-      <table className="w-full text-start border-collapse">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[640px] text-start border-collapse">
         <thead>
           <tr className="border-b border-border/50 bg-muted/40">
             {['col_timestamp', 'col_action', 'col_risk', 'col_user', 'col_details'].map((col) => (
@@ -464,7 +465,8 @@ function AuditTab({ tenantId }: { tenantId: string }) {
             ))
           )}
         </tbody>
-      </table>
+        </table>
+      </div>
       {(auditData?.count ?? 0) > 0 && (
         <div className="px-4 py-3 border-t border-border/50 bg-slate-50/50 text-xs text-muted-foreground">
           {t('total_log_entries', { count: auditData?.count ?? 0 })}

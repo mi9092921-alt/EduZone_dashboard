@@ -41,6 +41,7 @@ export async function getWarnings(
 
   if (filters.issued_by) query = query.eq('issued_by', filters.issued_by);
   if (filters.severity) query = query.eq('severity', filters.severity);
+  if (filters.acknowledged !== undefined) query = query.eq('is_acknowledged', filters.acknowledged);
 
   const { data, error, count } = await query;
   if (error) throw mapDbError(error, 'warnings.service.ts');

@@ -54,7 +54,7 @@ export function LiveActivityStream({ open, onClose }: LiveActivityStreamProps) {
   if (!open) return null;
 
   return (
-    <div className="fixed top-0 end-0 h-full w-[380px] bg-card border-s border-border shadow-2xl z-[var(--z-modal)] flex flex-col animate-in slide-in-from-right duration-300">
+    <div className="fixed top-0 end-0 h-full w-full max-w-[380px] bg-card border-s border-border shadow-2xl z-[var(--z-modal)] flex flex-col animate-in slide-in-from-right rtl:slide-in-from-left duration-300">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/30">
         <div className="flex items-center gap-2">

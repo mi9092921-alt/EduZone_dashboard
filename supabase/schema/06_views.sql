@@ -157,21 +157,34 @@ WHERE deleted_at IS NULL
 GROUP BY tenant_id
 WITH NO DATA;
 
+-- Correlated scalar subqueries instead of a tri-join: LEFT JOIN
+-- enrollments × user_progress × video_views multiplies rows (a course with
+-- 2 enrollments and 52 video views reported enrolled=104), inflating every
+-- count() FILTER in the projection. One subquery per metric keeps each
+-- aggregate independent and lets enrollments exclude soft-deleted rows.
 CREATE MATERIALIZED VIEW IF NOT EXISTS private.mv_course_stats AS
 SELECT
   c.id         AS course_id,
   c.tenant_id,
-  count(e.id)  FILTER (WHERE e.status = 'active')    AS enrolled,
-  count(e.id)  FILTER (WHERE e.status = 'completed') AS completed,
-  round(avg(up.progress_pct)::numeric, 2)            AS avg_progress,
-  count(vv.id)                                        AS total_views,
-  now()                                               AS refreshed_at
+  -- All non-deleted enrollments (active + completed): "% Complete" in the UI
+  -- divides completed by enrolled, so completed-only courses must not drop
+  -- out of the denominator (they showed enrolled=0, "0% Complete").
+  (SELECT count(*) FROM public.enrollments e
+     WHERE e.course_id = c.id AND e.deleted_at IS NULL)             AS enrolled,
+  (SELECT count(*) FROM public.enrollments e
+     WHERE e.course_id = c.id AND e.status = 'completed'
+       AND e.deleted_at IS NULL)                                    AS completed,
+  -- Course-level progress lives in enrollments.progress_pct (same source as
+  -- get_dashboard_stats.total_progress). user_progress.lesson_id is NOT NULL,
+  -- so the previous "course-level rows" filter (up.lesson_id IS NULL) could
+  -- never match and avg_progress was permanently NULL.
+  (SELECT round(coalesce(avg(e.progress_pct), 0)::numeric, 2) FROM public.enrollments e
+     WHERE e.course_id = c.id AND e.deleted_at IS NULL)             AS avg_progress,
+  (SELECT count(*) FROM public.video_views vv
+     WHERE vv.course_id = c.id)                                      AS total_views,
+  now()                                                              AS refreshed_at
 FROM public.courses c
-LEFT JOIN public.enrollments    e  ON e.course_id  = c.id
-LEFT JOIN public.user_progress  up ON up.course_id = c.id AND up.lesson_id IS NULL
-LEFT JOIN public.video_views    vv ON vv.course_id = c.id
 WHERE c.deleted_at IS NULL
-GROUP BY c.id, c.tenant_id
 WITH NO DATA;
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS private.mv_course_stats_tenant AS
@@ -284,6 +297,19 @@ WHERE tenant_id = public.get_current_tenant_id()
 
 -- Compatibility alias so both names work
 CREATE OR REPLACE VIEW public.mv_course_stats AS SELECT * FROM public.vw_course_stats;
+
+-- Self-healing grants + invoker rights: a past DROP/recreate of these views
+-- (MV CASCADE patch above) silently lost the 10_permissions.sql grants, so
+-- authenticated browsers got permission-denied on vw_course_stats and the
+-- System Analytics course section rendered empty despite data existing.
+-- Re-applying here makes the file order-independent. Mirrors 10_permissions.sql.
+ALTER VIEW IF EXISTS public.vw_course_stats SET (security_invoker = true);
+ALTER VIEW IF EXISTS public.mv_course_stats SET (security_invoker = true);
+GRANT SELECT ON public.vw_course_stats TO authenticated, anon, service_role;
+GRANT SELECT ON public.mv_course_stats TO authenticated, service_role, anon;
+-- security_invoker passes the invoker's privileges down to the underlying MV;
+-- without this grant every authenticated read of the view fails closed.
+GRANT SELECT ON private.mv_course_stats TO authenticated, anon;
 
 -- Harden exposed public views to run with caller privileges.
 ALTER VIEW IF EXISTS public.users_active SET (security_invoker = true);

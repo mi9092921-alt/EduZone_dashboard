@@ -74,6 +74,13 @@ export async function getYoutubeVideoDetails(
 export const YOUTUBE_BATCH_LIMIT = 50;
 export const YOUTUBE_FETCH_TIMEOUT_MS = 8000;
 export const YOUTUBE_RATE_LIMIT_RETRY_DELAY_MS = 2000;
+/**
+ * Cap for a single batch metadata server-action request — bounds shared
+ * quota burn per RPC call. Lives here (not in the `'use server'` action
+ * file) because Next.js forbids exporting non-function values from
+ * `'use server'` modules.
+ */
+export const YOUTUBE_METADATA_BATCH_ACTION_LIMIT = 200;
 
 export interface YouTubeBatchPartialFailure {
   url_or_id: string;

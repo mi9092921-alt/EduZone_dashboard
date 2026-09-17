@@ -1,7 +1,8 @@
+import { resolveDatabaseUrl } from "./lib/db.mjs";
 import pg from 'pg';
 
 async function run() {
-  const dbUrl = "postgresql://postgres.xpvljdyyjxxrlcqmfisl:fpimmo5-boop's%20Project@aws-0-eu-west-1.pooler.supabase.com:5432/postgres";
+  const dbUrl = resolveDatabaseUrl();
   const client = new pg.Client({ connectionString: dbUrl });
   await client.connect();
   console.log('Connected!');
@@ -17,6 +18,22 @@ async function run() {
     iters++;
   }
   console.log(`notification_fanout: processed ${total_fanout} total jobs`);
+
+  // Drain automatic lesson/enrollment notification jobs in a loop. The SQL
+  // worker groups lesson jobs by course and marks every source job together.
+  let total_course_notifications = 0;
+  iters = 0;
+  while (iters < 200) {
+    const r = await client.query(
+      `SELECT internal.process_course_notify_jobs(500, $1) AS processed`,
+      [`drain-course-notify-${iters}`],
+    );
+    const n = Number(r.rows[0].processed);
+    total_course_notifications += n;
+    if (n === 0) break;
+    iters++;
+  }
+  console.log(`course notifications: processed ${total_course_notifications} total jobs`);
 
   // Drain all PURGE_COURSE_CACHE jobs in a loop
   let total_cache = 0;

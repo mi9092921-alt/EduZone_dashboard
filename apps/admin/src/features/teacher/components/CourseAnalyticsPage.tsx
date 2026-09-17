@@ -198,10 +198,17 @@ export function CourseAnalyticsPage() {
   }, [lessons, courseId, t]);
 
   return (
-    <Box>
+    <Box sx={{ minWidth: 0 }}>
       {/* Actions Bar */}
       <Box
-        sx={{ display: 'flex', justifyContent: 'flex-end', mb: 4, gap: 2, alignItems: 'center' }}
+        sx={{
+          display: 'flex',
+          flexDirection: { xs: 'column', sm: 'row' },
+          justifyContent: { xs: 'stretch', sm: 'flex-end' },
+          mb: 4,
+          gap: 1.5,
+          alignItems: { xs: 'stretch', sm: 'center' },
+        }}
       >
         <Button
           variant="outlined"
@@ -213,6 +220,7 @@ export function CourseAnalyticsPage() {
             borderColor: 'divider',
             color: alpha(theme.palette.text.primary, 0.6),
             px: 2,
+            width: { xs: '100%', sm: 'auto' },
             '&:hover': { borderColor: 'primary.main', color: 'primary.main' },
           }}
         >
@@ -228,6 +236,7 @@ export function CourseAnalyticsPage() {
             borderRadius: 3,
             px: 3,
             boxShadow: 'none',
+            width: { xs: '100%', sm: 'auto' },
             '&:hover': {
               boxShadow: (theme) => `0 4px 12px ${alpha(theme.palette.primary.main, 0.2)}`,
             },
@@ -344,24 +353,26 @@ export function CourseAnalyticsPage() {
                 boxShadow: (t) => t.shadows[1],
               }}
             >
-              <Box sx={{ p: 4 }}>
+              <Box sx={{ p: { xs: 2.5, sm: 3, md: 4 } }}>
                 <Box
                   sx={{
                     display: 'flex',
+                    flexDirection: { xs: 'column', sm: 'row' },
                     justifyContent: 'space-between',
-                    alignItems: 'center',
+                    alignItems: { xs: 'flex-start', sm: 'center' },
+                    gap: 2,
                     mb: 4,
                   }}
                 >
-                  <Box>
-                    <Typography variant="h6" sx={{ fontWeight: 800, color: 'text.primary' }}>
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography variant="h6" sx={{ fontWeight: 800, color: 'text.primary', fontSize: { xs: '1rem', sm: '1.25rem' } }}>
                       {t('enrollment_trends')}
                     </Typography>
                     <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 500 }}>
                       {t('new_students_30d')}
                     </Typography>
                   </Box>
-                  <Box sx={{ display: 'flex', gap: 3 }}>
+                  <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <Box
                         sx={{
@@ -462,19 +473,21 @@ export function CourseAnalyticsPage() {
                 flexDirection: 'column',
               }}
             >
-              <Box sx={{ p: 4, flex: 1, display: 'flex', flexDirection: 'column' }}>
+              <Box sx={{ p: { xs: 2.5, sm: 3, md: 4 }, flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                 <Box
                   sx={{
                     display: 'flex',
+                    flexDirection: { xs: 'column', sm: 'row' },
                     justifyContent: 'space-between',
-                    alignItems: 'flex-start',
+                    alignItems: { xs: 'flex-start', sm: 'flex-start' },
+                    gap: 1.5,
                     mb: 0.5,
                   }}
                 >
-                  <Box>
+                  <Box sx={{ minWidth: 0 }}>
                     <Typography
                       variant="h6"
-                      sx={{ fontWeight: 800, color: 'text.primary', mb: 0.5 }}
+                      sx={{ fontWeight: 800, color: 'text.primary', mb: 0.5, fontSize: { xs: '1rem', sm: '1.25rem' } }}
                     >
                       {t('progress_dist')}
                     </Typography>
@@ -491,6 +504,7 @@ export function CourseAnalyticsPage() {
                       bgcolor: alpha(theme.palette.primary.main, 0.08),
                       color: 'primary.main',
                       borderRadius: 2,
+                      maxWidth: '100%',
                     }}
                   />
                 </Box>
@@ -500,10 +514,11 @@ export function CourseAnalyticsPage() {
                     display: 'flex',
                     alignItems: 'stretch',
                     justifyContent: 'space-between',
-                    gap: { xs: 1.5, sm: 2 },
+                    gap: { xs: 1, sm: 2 },
                     mt: 3,
                     height: 230,
-                    px: 1,
+                    px: { xs: 0, sm: 1 },
+                    minWidth: 0,
                   }}
                 >
                   {bars.map((bar) => (
@@ -577,7 +592,7 @@ export function CourseAnalyticsPage() {
                       <Typography
                         variant="caption"
                         sx={{
-                          fontSize: '0.7rem',
+                          fontSize: { xs: '0.6rem', sm: '0.7rem' },
                           color: 'text.secondary',
                           fontWeight: 700,
                           whiteSpace: 'nowrap',
@@ -620,16 +635,18 @@ export function CourseAnalyticsPage() {
           >
             <Box
               sx={{
-                p: 4,
+                p: { xs: 2.5, sm: 3, md: 4 },
                 borderBottom: '1px solid',
                 borderColor: 'divider',
                 display: 'flex',
+                flexDirection: { xs: 'column', sm: 'row' },
                 justifyContent: 'space-between',
-                alignItems: 'center',
+                alignItems: { xs: 'flex-start', sm: 'center' },
+                gap: 1,
               }}
             >
-              <Box>
-                <Typography variant="h6" sx={{ fontWeight: 800, color: 'text.primary' }}>
+              <Box sx={{ minWidth: 0 }}>
+                <Typography variant="h6" sx={{ fontWeight: 800, color: 'text.primary', fontSize: { xs: '1rem', sm: '1.25rem' } }}>
                   {t('lesson_analytics')}
                 </Typography>
                 <Typography
@@ -640,7 +657,7 @@ export function CourseAnalyticsPage() {
                 </Typography>
               </Box>
             </Box>
-            <TableContainer>
+            <TableContainer sx={{ overflowX: 'auto' }}>
               <Table sx={{ minWidth: 900 }}>
                 <TableHead>
                   <TableRow sx={{ backgroundColor: 'action.hover' }}>
@@ -777,12 +794,14 @@ export function CourseAnalyticsPage() {
             </TableContainer>
             <Box
               sx={{
-                p: 3,
+                p: { xs: 2, sm: 3 },
                 borderTop: '1px solid',
                 borderColor: 'divider',
                 display: 'flex',
+                flexDirection: { xs: 'column', sm: 'row' },
                 justifyContent: 'space-between',
-                alignItems: 'center',
+                alignItems: { xs: 'flex-start', sm: 'center' },
+                gap: 1,
                 backgroundColor: 'action.hover',
               }}
             >

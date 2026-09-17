@@ -432,6 +432,67 @@ Moves records from activity_log_queue into activity_logs with cryptographic hash
 |                       **_release_stale_job_locks()_**                       |       INT       |     Resets status=pending for jobs where lock_expires_at < NOW()      |
 | **_log_activity_async(uid, type, details?, ip?, device?, risk?, tenant?)_** |      UUID       | Non-blocking insert to activity_log_queue; notifies on high/critical  |
 
+## **2.12 rate_course(p_course_id, p_rating)**
+
+Student-facing course rating submission (1–5 stars, one rating per user per course). Upserts the student's rating and returns the refreshed course-wide aggregate. Enrollment is required; the tenant and access checks are derived server-side (same shape as `enroll_in_course`). Direct PostgREST writes to `course_ratings` remain admin-only via RLS — this RPC is the only student path.
+
+### **Parameters**
+
+|   **Field**    |  **Type** |              **Description**               |
+| :------------: | :-------: | :----------------------------------------: |
+| **p_course_id** | _UUID_   | Target course. Must be published, same tenant, not soft-deleted. |
+| **p_rating**    | _INT_    | Star rating, 1–5 inclusive. |
+
+### **TypeScript Call**
+
+`const { data, error } = await supabase.rpc('rate_course', { p_course_id: courseId, p_rating: 4 });`
+
+### **Response (JSONB)**
+
+|     **Field**     |   **Type**  |                         **Notes**                          |
+| :---------------: | :---------: | :---------------------------------------------------------: |
+|   **course_id**   |    _UUID_   |                     Echoed course id                        |
+|    **rating**     |  _NUMERIC?_ | Refreshed course-wide average (null when count returns to 0) |
+|  **rating_count** |     _INT_   |           Refreshed count of non-deleted ratings            |
+
+### **Error Codes**
+
+|             **Error Code**                      | **HTTP / PG** |                  **Condition + UI Action**                   |
+| :---------------------------------------------: | :-----------: | :----------------------------------------------------------: |
+|                **AUTH_REQUIRED**                |  **PG 401**   |                       auth.uid() is NULL                      |
+|               **INVALID_RATING**                |  **PG 422**   |                  rating is NULL or outside 1–5                 |
+|          **USER_NOT_FOUND_OR_INACTIVE**         |  **PG 404**   | Caller missing/inactive in public.users                       |
+|     **COURSE_NOT_FOUND_OR_NOT_PUBLISHED**       |  **PG 404**   | Course missing, soft-deleted, or in another tenant             |
+|                **NOT_ENROLLED**                 |  **PG 403**   | Caller has no active/completed access to the course            |
+
+**Side effects:** `courses.rating` / `courses.rating_count` are re-maintained synchronously by the `trg_course_ratings_apply` trigger; the returned values are the post-trigger authoritative aggregate.
+
+## **2.13 get_courses_instructors(p_course_ids)**
+
+Resolves the public instructor display fields (name + avatar URL) for a batch of courses. Exists because the `users` SELECT RLS intentionally hides other users' rows from students, which makes PostgREST `teacher:users!teacher_id(...)` embeds resolve to `NULL` for student callers — row-level policies cannot filter columns, so instead of widening that policy (it would leak sensitive columns such as `token_version`), this SECURITY DEFINER function emits only the three public display fields. Tenant-scoped, published courses only.
+
+### **Parameters**
+
+|    **Field**     |  **Type**  |                **Description**                |
+| :--------------: | :--------: | :-------------------------------------------: |
+| **p_course_ids** | _UUID[]_   | Course ids to resolve (batch: one call per screen load). |
+
+### **TypeScript Call**
+
+`const { data } = await supabase.rpc('get_courses_instructors', { p_course_ids: courseIds });`
+
+### **Response (SETOF record)**
+
+|       **Field**        |  **Type** |                     **Notes**                      |
+| :--------------------: | :-------: | :------------------------------------------------: |
+|      **course_id**     |   _UUID_  |                    Matching course                  |
+|   **instructor_name**  |  _TEXT?_  | `first_name + last_name` trimmed (null if no teacher) |
+|  **instructor_avatar** |  _TEXT?_  |                Teacher avatar_url or NULL           |
+
+### **Error Codes**
+
+None raised; rows are silently filtered by tenant/published state (read-only, STABLE).
+
 # **3. Edge Function Contracts**
 
 **AUTH:** Every Edge Function validates the Bearer JWT using \_shared/auth.ts. Service-role operations use \_shared/supabaseAdmin.ts (Deno env only — never exposed to browser).
@@ -991,5 +1052,6 @@ const FN = process.env.NEXT_PUBLIC_APP_ENV === 'production'
 | **Version** |  **Date**  |                                                                            **Changes**                                                                             |
 | :---------: | :--------: | :----------------------------------------------------------------------------------------------------------------------------------------------------------------: |
 |   **1.0**   | 2026-03-08 | Initial release — all RPC contracts from Schema v5.0; Edge Functions: bulk-action, bulk-worker, bulk-export, export-report; full TypeScript interface definitions. |
+|   **1.1**   | 2026-09-17 | Course ratings: §2.12 `rate_course` (student star-rating upsert + aggregate) and §2.13 `get_courses_instructors` (column-safe instructor resolution for students). New table `course_ratings`; denormalized `courses.rating`/`courses.rating_count` maintained by trigger. |
 
 EduZone Platform | Schema v5.0 | Page of

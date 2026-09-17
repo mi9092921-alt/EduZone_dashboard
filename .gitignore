@@ -71,3 +71,7 @@ pw-report-dl/
 pw2/
 pw3/
 **/report.zip
+# DB dumps — never commit
+supabase/backups/
+
+.vercel

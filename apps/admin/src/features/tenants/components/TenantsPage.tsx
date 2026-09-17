@@ -11,6 +11,7 @@ import {
 import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useState, useCallback } from 'react';
+import { z } from 'zod';
 
 import {
   useCreateTenant,
@@ -18,7 +19,10 @@ import {
   useDeleteTenant,
 } from '@/adapters/mutations/tenants.mutations';
 import { useTenants } from '@/adapters/queries/tenants.queries';
+import { useToast } from '@/adapters/stores/toast.store';
 import { Button } from '@/components/ui/Button';
+import { Modal } from '@/components/ui/Modal';
+import { QueryErrorBanner } from '@/components/ui/QueryErrorBanner';
 import { TablePagination } from '@/components/ui/TablePagination';
 import type { Tenant, TenantFilters, TenantPlan, TenantStatus, CreateTenantInput } from '@/domain/types/tenant.types';
 import { usePathname, useRouter } from '@/i18n/routing';
@@ -48,12 +52,19 @@ function formatBytes(bytes: number): string {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 }
 
+const tenantSchema = z.object({
+  slug: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'invalid_slug'),
+  name: z.string().trim().min(2, 'invalid_name').max(120, 'invalid_name'),
+  plan: z.enum(['free', 'starter', 'pro', 'enterprise']),
+});
+
 export function TenantsPage() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const t = useTranslations('tenants');
   const tCommon = useTranslations('common');
+  const { showToast } = useToast();
 
   const setSearchParam = useCallback(
     (key: string, value: string | null) => {
@@ -99,8 +110,9 @@ export function TenantsPage() {
   const [newSlug, setNewSlug] = useState('');
   const [newName, setNewName] = useState('');
   const [newPlan, setNewPlan] = useState<TenantPlan>('free');
+  const [formError, setFormError] = useState<string | null>(null);
 
-  const { data, isLoading } = useTenants(filters, page, pageSize);
+  const { data, isLoading, isError, refetch } = useTenants(filters, page, pageSize);
   const tenants = data?.data ?? [];
   const totalCount = data?.count ?? 0;
 
@@ -114,26 +126,45 @@ export function TenantsPage() {
   }, [searchInput]);
 
   const handleCreate = async () => {
-    if (!newSlug || !newName) return;
-    const input: CreateTenantInput = { slug: newSlug, name: newName, plan: newPlan };
-    await createMut.mutateAsync(input);
-    handleCloseCreate();
-    setNewSlug('');
-    setNewName('');
-    setNewPlan('free');
+    const parsed = tenantSchema.safeParse({ slug: newSlug, name: newName, plan: newPlan });
+    if (!parsed.success) {
+      setFormError(t(parsed.error.issues[0]?.message === 'invalid_slug' ? 'invalid_slug' : 'invalid_name'));
+      return;
+    }
+    setFormError(null);
+    try {
+      await createMut.mutateAsync(parsed.data as CreateTenantInput);
+      showToast(t('create_success'), 'success');
+      handleCloseCreate();
+      setNewSlug('');
+      setNewName('');
+      setNewPlan('free');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : t('action_error'), 'error');
+    }
   };
 
   const handleSuspend = async () => {
     if (!suspendTarget || !suspendReason) return;
-    await suspendMut.mutateAsync({ id: suspendTarget.id, reason: suspendReason });
-    setSuspendTarget(null);
-    setSuspendReason('');
+    try {
+      await suspendMut.mutateAsync({ id: suspendTarget.id, reason: suspendReason.trim() });
+      showToast(t('suspend_success'), 'success');
+      setSuspendTarget(null);
+      setSuspendReason('');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : t('action_error'), 'error');
+    }
   };
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
-    await deleteMut.mutateAsync(deleteTarget.id);
-    setDeleteTarget(null);
+    try {
+      await deleteMut.mutateAsync(deleteTarget.id);
+      showToast(t('delete_success'), 'success');
+      setDeleteTarget(null);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : t('action_error'), 'error');
+    }
   };
 
   return (
@@ -196,6 +227,7 @@ export function TenantsPage() {
       </div>
 
       {/* Tenants Table */}
+      <QueryErrorBanner isError={isError} refetch={refetch} />
       <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-start border-collapse">
@@ -335,10 +367,18 @@ export function TenantsPage() {
       </div>
 
       {/* ═══ Create Dialog ═══════════════════════════════════════ */}
-      {isCreateOpen && (
-        <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/50 animate-in fade-in">
-          <div className="bg-card rounded-2xl border border-border shadow-2xl w-full max-w-md mx-4 p-6 animate-in zoom-in-95">
-            <h3 className="text-lg font-bold text-foreground mb-4">{t('dialog_create_title')}</h3>
+      <Modal
+        open={isCreateOpen}
+        onClose={handleCloseCreate}
+        title={t('dialog_create_title')}
+        maxWidth="sm"
+        footer={(
+          <>
+            <Button variant="ghost" size="sm" onClick={handleCloseCreate}>{tCommon('cancel')}</Button>
+            <Button variant="primary" size="sm" onClick={handleCreate} isLoading={createMut.isPending} disabled={!newSlug || !newName}>{tCommon('save')}</Button>
+          </>
+        )}
+      >
             <div className="space-y-3">
               <div>
                 <label className="text-xs font-semibold text-muted-foreground uppercase block mb-1">{t('label_slug')} *</label>
@@ -361,47 +401,46 @@ export function TenantsPage() {
                 </select>
               </div>
             </div>
-            {createMut.error && <p className="text-xs text-destructive mt-2">{(createMut.error as Error).message}</p>}
-            <div className="flex justify-end gap-2 mt-5">
-              <Button variant="ghost" size="sm" onClick={handleCloseCreate}>{tCommon('cancel')}</Button>
-              <Button variant="primary" size="sm" onClick={handleCreate} isLoading={createMut.isPending} disabled={!newSlug || !newName}>{tCommon('save')}</Button>
-            </div>
-          </div>
-        </div>
-      )}
+            {(formError || createMut.error) && <p className="text-xs text-destructive mt-2">{formError ?? (createMut.error as Error).message}</p>}
+      </Modal>
 
       {/* ═══ Suspend Dialog ══════════════════════════════════════ */}
-      {suspendTarget && (
-        <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/50 animate-in fade-in">
-          <div className="bg-card rounded-2xl border border-border shadow-2xl w-full max-w-md mx-4 p-6 animate-in zoom-in-95">
-            <h3 className="text-lg font-bold text-foreground mb-2">{t('dialog_suspend_title')}</h3>
-            <p className="text-sm text-muted-foreground mb-4">{t('dialog_suspend_desc', { name: suspendTarget.name })}</p>
+      <Modal
+        open={Boolean(suspendTarget)}
+        onClose={() => { setSuspendTarget(null); setSuspendReason(''); }}
+        title={t('dialog_suspend_title')}
+        description={suspendTarget ? t('dialog_suspend_desc', { name: suspendTarget.name }) : undefined}
+        maxWidth="sm"
+        footer={(
+          <>
+            <Button variant="ghost" size="sm" onClick={() => { setSuspendTarget(null); setSuspendReason(''); }}>{tCommon('cancel')}</Button>
+            <Button variant="destructive" size="sm" onClick={handleSuspend} isLoading={suspendMut.isPending} disabled={!suspendReason.trim()}>{t('tooltip_suspend')}</Button>
+          </>
+        )}
+      >
             <div>
               <label className="text-xs font-semibold text-muted-foreground uppercase block mb-1">{t('label_reason')} *</label>
               <input value={suspendReason} onChange={(e) => setSuspendReason(e.target.value)}
                 placeholder={t('placeholder_reason')} className="w-full h-9 px-3 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
             </div>
-            <div className="flex justify-end gap-2 mt-5">
-              <Button variant="ghost" size="sm" onClick={() => { setSuspendTarget(null); setSuspendReason(''); }}>{tCommon('cancel')}</Button>
-              <Button variant="destructive" size="sm" onClick={handleSuspend} isLoading={suspendMut.isPending} disabled={!suspendReason}>{t('tooltip_suspend')}</Button>
-            </div>
-          </div>
-        </div>
-      )}
+      </Modal>
 
       {/* ═══ Delete Dialog ═══════════════════════════════════════ */}
-      {deleteTarget && (
-        <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/50 animate-in fade-in">
-          <div className="bg-card rounded-2xl border border-border shadow-2xl w-full max-w-md mx-4 p-6 animate-in zoom-in-95">
-            <h3 className="text-lg font-bold text-foreground mb-2">{t('dialog_delete_title')}</h3>
-            <p className="text-sm text-muted-foreground">{t('dialog_delete_desc', { name: deleteTarget.name })}</p>
-            <div className="flex justify-end gap-2 mt-5">
-              <Button variant="ghost" size="sm" onClick={() => setDeleteTarget(null)}>{tCommon('cancel')}</Button>
-              <Button variant="destructive" size="sm" onClick={handleDelete} isLoading={deleteMut.isPending}>{tCommon('delete')}</Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Modal
+        open={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        title={t('dialog_delete_title')}
+        description={deleteTarget ? t('dialog_delete_desc', { name: deleteTarget.name }) : undefined}
+        maxWidth="sm"
+        footer={(
+          <>
+            <Button variant="ghost" size="sm" onClick={() => setDeleteTarget(null)}>{tCommon('cancel')}</Button>
+            <Button variant="destructive" size="sm" onClick={handleDelete} isLoading={deleteMut.isPending}>{tCommon('delete')}</Button>
+          </>
+        )}
+      >
+        <p className="text-sm text-destructive">{t('delete_warning')}</p>
+      </Modal>
     </div>
   );
 }

@@ -46,6 +46,37 @@ export async function checkRateLimitForUser(
   };
 }
 
+// ── Pre-auth login brute-force gate (per source IP) ──────────────
+// The seeded 'login' rule had no caller: login is a pre-auth flow, so it
+// cannot go through checkRateLimitForUser (no auth.uid() yet) and the RPC
+// is deliberately revoked from anon (10_permissions.sql "Rate-Limit RPC
+// Least Privilege"). The admin client keys the counter on the client IP
+// extracted by the calling action. Unlike the bulk-action gate this FAILS
+// OPEN on RPC error by design — GoTrue's own auth rate limits remain the
+// hard boundary and this must never become a login outage. The caller must
+// invoke it at most once per submitted login attempt (each call records a
+// hit).
+export async function checkRateLimitForIp(
+  ip: string,
+  action: string,
+): Promise<{ allowed: boolean; retryAfter?: string }> {
+  const admin = createAdminClient();
+  const { data, error } = await admin.rpc('check_rate_limit', {
+    p_action: action,
+    p_user_id: null,
+    p_ip: ip,
+  });
+  if (error) {
+    mapDbError(error, 'rate-limits.service.ts:check_rate_limit_for_ip');
+    return { allowed: true };
+  }
+  const result = data as { allowed?: boolean; retryAfter?: string | null } | null;
+  return {
+    allowed: result?.allowed !== false,
+    ...(typeof result?.retryAfter === 'string' ? { retryAfter: result.retryAfter } : {}),
+  };
+}
+
 // ── Get active blocks (blocked_until > now) ──────────────────────
 // IDOR guard: this reads via the service-role client (bypasses RLS), and
 // rate_limits.tenant_id carries user_id/ip_address/email — cross-tenant

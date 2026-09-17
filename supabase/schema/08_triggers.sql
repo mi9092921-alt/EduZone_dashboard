@@ -164,6 +164,22 @@ CREATE TRIGGER trg_validate_enrollments_tenant_match
   FOR EACH ROW
   EXECUTE FUNCTION public.trg_validate_enrollments_tenant_match();
 
+DROP TRIGGER IF EXISTS trg_enrollment_notify_ins ON public.enrollments;
+
+CREATE TRIGGER trg_enrollment_notify_ins
+  AFTER INSERT ON public.enrollments
+  FOR EACH ROW
+  WHEN (NEW.status = 'active')
+  EXECUTE FUNCTION public.trg_enrollment_notify();
+
+DROP TRIGGER IF EXISTS trg_enrollment_notify_react ON public.enrollments;
+
+CREATE TRIGGER trg_enrollment_notify_react
+  AFTER UPDATE OF status ON public.enrollments
+  FOR EACH ROW
+  WHEN (OLD.status <> 'active' AND NEW.status = 'active')
+  EXECUTE FUNCTION public.trg_enrollment_notify();
+
 -- ============================================================================
 -- 007_triggers.sql
 -- ============================================================================
@@ -312,6 +328,33 @@ CREATE TRIGGER trg_up_enrollment_progress_upd
   WHEN (pg_trigger_depth() = 0 AND OLD IS DISTINCT FROM NEW)
   EXECUTE FUNCTION public.trg_update_enrollment_progress();
 
+-- ─────────────────────────────────────────────────────────────────────────────
+-- course_ratings: aggregate sync + standard housekeeping
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- Recomputes courses.rating / courses.rating_count on every rating write.
+-- Covers soft delete (an UPDATE of deleted_at) and physical delete
+-- (service_role/admin tooling only) via the same function.
+DROP TRIGGER IF EXISTS trg_course_ratings_apply ON public.course_ratings;
+
+CREATE TRIGGER trg_course_ratings_apply
+  AFTER INSERT OR UPDATE OR DELETE ON public.course_ratings
+  FOR EACH ROW
+  WHEN (pg_trigger_depth() = 0)
+  EXECUTE FUNCTION public.trg_apply_course_rating_agg();
+
+DROP TRIGGER IF EXISTS trg_course_ratings_updated_at ON public.course_ratings;
+
+CREATE TRIGGER trg_course_ratings_updated_at
+  BEFORE UPDATE ON public.course_ratings
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_prevent_physical_delete_course_ratings ON public.course_ratings;
+
+CREATE TRIGGER trg_prevent_physical_delete_course_ratings
+  BEFORE DELETE ON public.course_ratings
+  FOR EACH ROW EXECUTE FUNCTION public.prevent_physical_delete();
+
 DROP TRIGGER IF EXISTS trg_notification_fanout ON public.notifications;
 
 CREATE TRIGGER trg_notification_fanout
@@ -336,11 +379,19 @@ CREATE TRIGGER trg_course_invalidations_upd
   EXECUTE FUNCTION internal.queue_course_cache_purge();
 
 DROP TRIGGER IF EXISTS trg_lesson_notify ON public.lessons;
+DROP TRIGGER IF EXISTS trg_lesson_notify_ins ON public.lessons;
+DROP TRIGGER IF EXISTS trg_lesson_notify_pub ON public.lessons;
 
-CREATE TRIGGER trg_lesson_notify
+CREATE TRIGGER trg_lesson_notify_ins
+  AFTER INSERT ON public.lessons
+  FOR EACH ROW
+  WHEN (NEW.is_published)
+  EXECUTE FUNCTION public.trg_lessons_publish_notify();
+
+CREATE TRIGGER trg_lesson_notify_pub
   AFTER UPDATE OF is_published ON public.lessons
   FOR EACH ROW
-  WHEN (OLD IS DISTINCT FROM NEW)
+  WHEN (OLD.is_published IS DISTINCT FROM NEW.is_published AND NEW.is_published)
   EXECUTE FUNCTION public.trg_lessons_publish_notify();
 
 DROP TRIGGER IF EXISTS tr_audit_access_rules ON public.access_rules;

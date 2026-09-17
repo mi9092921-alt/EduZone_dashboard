@@ -1,7 +1,8 @@
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery, keepPreviousData } from '@tanstack/react-query';
 
 import { queryKeys } from './keys';
 
+import { getVideoViewsByUserAction } from '@/adapters/actions/activities.actions';
 import { getCourseStatsAction } from '@/adapters/actions/admin.actions';
 import type { CourseFilters } from '@/domain/types/course.types';
 import {
@@ -11,7 +12,6 @@ import {
   getCourseEnrollments,
   getUserEnrollments,
   getCoursesOverviewStats,
-  getVideoViewsByUser,
   getLearningObjectives,
   getPrerequisites,
   getPrerequisiteOptions,
@@ -89,10 +89,20 @@ export function useCoursesOverviewStats(tenantId?: string) {
   });
 }
 
-export function useVideoViews(userId: string, page: number, pageSize: number) {
-  return useQuery({
-    queryKey: ['video_views', userId, page, pageSize],
-    queryFn: () => getVideoViewsByUser(userId, page, pageSize),
+/**
+ * Paginated activity views hook — 20 rows per page, "load more" driven.
+ * M-ACTIVITIES-FULL: getVideoViewsByUser() reads partitioned video_views via
+ * the browser client (authenticated RLS) and returns incomplete rows because
+ * every child partition denies authenticated reads. Route through the
+ * tenant-scoped service-role server action instead.
+ */
+export function useVideoViewsInfinite(userId: string) {
+  return useInfiniteQuery({
+    queryKey: ['video_views', userId, 'infinite'],
+    queryFn: ({ pageParam }) => getVideoViewsByUserAction(userId, pageParam, 20),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) =>
+      lastPage.page < lastPage.totalPages ? lastPage.page + 1 : undefined,
     enabled: !!userId,
   });
 }

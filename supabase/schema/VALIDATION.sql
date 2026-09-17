@@ -1971,7 +1971,222 @@ BEGIN
   );
 END $$;
 
--- Display Results (includes Checks 27-38 above)
+-- Check 39: explicit-user notification fanout must be represented in the
+-- source row and treated as an exclusive allow-list by the worker. This is a
+-- regression guard for the P1 production incident where target_audience='all'
+-- was combined with notification_targets.
+DO $$
+DECLARE
+  v_column boolean;
+  v_constraint boolean;
+  v_worker text;
+  v_worker_hardened boolean;
+BEGIN
+  SELECT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'notifications'
+      AND column_name = 'targeting_mode'
+  ) INTO v_column;
+
+  SELECT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.notifications'::regclass
+      AND conname = 'chk_notification_targeting_mode'
+  ) INTO v_constraint;
+
+  SELECT pg_get_functiondef(to_regprocedure('internal.process_notification_fanout_jobs(integer,text)'))
+    INTO v_worker;
+  v_worker_hardened := v_worker IS NOT NULL
+    AND v_worker ILIKE '%notification_targets%'
+    AND v_worker ILIKE '%targeting_mode%'
+    AND v_worker ILIKE '%NOT EXISTS%';
+
+  INSERT INTO validation_results VALUES (
+    'Explicit Notification Targets Are Exclusive',
+    CASE WHEN v_column AND v_constraint AND v_worker_hardened THEN 'PASS' ELSE 'FAIL' END,
+    format(
+      'targeting_mode column=%s, constraint=%s, worker exclusive-target guard=%s',
+      v_column, v_constraint, v_worker_hardened
+    )
+  );
+END $$;
+
+-- Check 40: automatic course notifications must have the complete guarded
+-- pipeline: source triggers, service-only workers, explicit-recipient no-op
+-- guard, and inline fanout GUC protection.
+DO $$
+DECLARE
+  v_course_worker text;
+  v_system_notification text;
+  v_fanout text;
+  v_dequeue text;
+  v_lesson_trigger boolean;
+  v_enrollment_trigger boolean;
+  v_permissions boolean;
+BEGIN
+  SELECT pg_get_functiondef(to_regprocedure('internal.process_course_notify_jobs(integer,text)'))
+    INTO v_course_worker;
+  SELECT pg_get_functiondef(to_regprocedure('internal.send_system_notification(uuid,text,text,uuid[])'))
+    INTO v_system_notification;
+  SELECT pg_get_functiondef(to_regprocedure('public.fanout_notification()'))
+    INTO v_fanout;
+  SELECT pg_get_functiondef(
+    to_regprocedure('internal.dequeue_job(text,text[],integer,integer)')
+  ) INTO v_dequeue;
+
+  SELECT EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgname = 'trg_lesson_notify_ins'
+      AND tgrelid = 'public.lessons'::regclass
+  ) INTO v_lesson_trigger;
+  SELECT EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgname = 'trg_enrollment_notify_ins'
+      AND tgrelid = 'public.enrollments'::regclass
+  ) INTO v_enrollment_trigger;
+  SELECT has_function_privilege(
+    'service_role',
+    'public.process_course_notify_jobs(integer,text)',
+    'EXECUTE'
+  ) INTO v_permissions;
+
+  INSERT INTO validation_results VALUES (
+    'Automatic Course Notification Pipeline',
+    CASE WHEN v_course_worker IS NOT NULL
+       AND v_system_notification ILIKE '%cardinality(p_user_ids)%'
+       AND v_system_notification ILIKE '%RETURN NULL%'
+       AND v_fanout ILIKE '%eduzone.skip_async_fanout%'
+       AND v_dequeue ILIKE '%p_batch_size%'
+       AND v_lesson_trigger
+       AND v_enrollment_trigger
+       AND v_permissions
+      THEN 'PASS' ELSE 'FAIL' END,
+    format(
+      'worker=%s, explicit-empty guard=%s, fanout GUC guard=%s, batch dequeue=%s, lesson trigger=%s, enrollment trigger=%s, service grant=%s',
+      v_course_worker IS NOT NULL,
+      v_system_notification IS NOT NULL
+        AND v_system_notification ILIKE '%cardinality(p_user_ids)%'
+        AND v_system_notification ILIKE '%RETURN NULL%',
+      v_fanout IS NOT NULL AND v_fanout ILIKE '%eduzone.skip_async_fanout%',
+      v_dequeue IS NOT NULL AND v_dequeue ILIKE '%p_batch_size%',
+      v_lesson_trigger, v_enrollment_trigger, v_permissions
+    )
+  );
+END $$;
+
+-- Check 41 (launch audit B2, 2026-09-15): the cron routine must have
+-- PostgREST-resolvable public wrappers for its four maintenance RPCs, each
+-- granted to service_role ONLY, and the queue-health snapshot must exist.
+DO $$
+DECLARE
+  v_wrapper_grants int;
+  v_public_grants int;
+  v_health_grant boolean;
+  v_health_grants_other int;
+BEGIN
+  -- Every wrapper must be executable by service_role.
+  SELECT count(*) INTO v_wrapper_grants
+  FROM (VALUES
+    ('public.manage_partitions()'),
+    ('public.prune_expired_access_cache()'),
+    ('public.process_cache_purges(integer,text)'),
+    ('public.process_update_enrollment_totals_jobs(integer)')
+  ) AS f(sig)
+  WHERE has_function_privilege('service_role', f.sig, 'EXECUTE')
+    AND to_regprocedure(f.sig) IS NOT NULL;
+
+  -- None of the wrappers may leak to anon.
+  SELECT count(*) INTO v_public_grants
+  FROM (VALUES
+    ('public.manage_partitions()'),
+    ('public.prune_expired_access_cache()'),
+    ('public.process_cache_purges(integer,text)'),
+    ('public.process_update_enrollment_totals_jobs(integer)')
+  ) AS f(sig)
+  WHERE has_function_privilege('anon', f.sig, 'EXECUTE');
+
+  SELECT has_function_privilege('service_role', 'public.cron_queue_health()', 'EXECUTE')
+    INTO v_health_grant;
+  SELECT count(*) INTO v_health_grants_other
+  FROM unnest(ARRAY['anon','authenticated']) AS r(role)
+  WHERE to_regprocedure('public.cron_queue_health()') IS NOT NULL
+    AND has_function_privilege(r.role, 'public.cron_queue_health()', 'EXECUTE');
+
+  INSERT INTO validation_results VALUES (
+    'Cron Routine Public RPC Wrappers',
+    CASE WHEN v_wrapper_grants = 4 AND v_public_grants = 0
+       AND v_health_grant AND v_health_grants_other = 0
+      THEN 'PASS' ELSE 'FAIL' END,
+    format(
+      'service-grants=%s/4, anon-leaks=%s, queue-health service grant=%s, queue-health other grants=%s',
+      v_wrapper_grants, v_public_grants, v_health_grant, v_health_grants_other
+    )
+  );
+END $$;
+
+-- Check 42 (course ratings, 2026-09-17): table + aggregate columns exist,
+-- RLS enabled with the three policies, aggregate trigger wired, student
+-- RPCs granted to authenticated only (no anon leak).
+DO $$
+DECLARE
+  v_table boolean;
+  v_columns int;
+  v_rls text;
+  v_policies int;
+  v_trigger boolean;
+  v_rate_grant boolean;
+  v_instructors_grant boolean;
+  v_anon_leaks int;
+BEGIN
+  SELECT to_regclass('public.course_ratings') IS NOT NULL INTO v_table;
+  SELECT count(*) INTO v_columns
+  FROM information_schema.columns
+  WHERE table_schema = 'public' AND table_name = 'courses'
+    AND column_name IN ('rating', 'rating_count');
+  SELECT c.relrowsecurity::text INTO v_rls
+  FROM pg_class c
+  WHERE c.oid = 'public.course_ratings'::regclass;
+  SELECT count(*) INTO v_policies
+  FROM pg_policies
+  WHERE schemaname = 'public' AND tablename = 'course_ratings'
+    AND policyname IN (
+      'course_ratings_select',
+      'course_ratings_admin_insert',
+      'course_ratings_update'
+    );
+  SELECT EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgname = 'trg_course_ratings_apply'
+      AND tgrelid = 'public.course_ratings'::regclass
+      AND NOT tgisinternal
+  ) INTO v_trigger;
+  SELECT has_function_privilege(
+    'authenticated', 'public.rate_course(uuid,integer)', 'EXECUTE'
+  ) INTO v_rate_grant;
+  SELECT has_function_privilege(
+    'authenticated', 'public.get_courses_instructors(uuid[])', 'EXECUTE'
+  ) INTO v_instructors_grant;
+  SELECT count(*) INTO v_anon_leaks
+  FROM unnest(ARRAY['anon']) AS r(role)
+  WHERE has_function_privilege(r.role, 'public.rate_course(uuid,integer)', 'EXECUTE')
+     OR has_function_privilege(r.role, 'public.get_courses_instructors(uuid[])', 'EXECUTE');
+
+  INSERT INTO validation_results VALUES (
+    'Course Ratings Feature',
+    CASE WHEN v_table AND v_columns = 2 AND v_rls = 'true'
+       AND v_policies = 3 AND v_trigger
+       AND v_rate_grant AND v_instructors_grant AND v_anon_leaks = 0
+      THEN 'PASS' ELSE 'FAIL' END,
+    format(
+      'table=%s, aggregate-columns=%s/2, rls=%s, policies=%s/3, agg-trigger=%s, rate grant=%s, instructors grant=%s, anon-leaks=%s',
+      v_table, v_columns, v_rls, v_policies, v_trigger,
+      v_rate_grant, v_instructors_grant, v_anon_leaks
+    )
+  );
+END $$;
+
+-- Display Results (includes Checks 27-42 above)
 SELECT * FROM validation_results ORDER BY check_name;
 
 -- Summary

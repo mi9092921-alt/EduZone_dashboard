@@ -256,8 +256,12 @@ export function LessonRow({
               onChange={() => { void handleTogglePreview(); }}
             />
           </Stack>
-          <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-            <Button size="small" onClick={() => setEditing(false)} sx={{ textTransform: 'none', fontSize: '0.8125rem' }}>
+          <Box sx={{ display: 'flex', flexDirection: { xs: 'column-reverse', sm: 'row' }, gap: 1, justifyContent: 'flex-end' }}>
+            <Button
+              size="small"
+              onClick={() => setEditing(false)}
+              sx={{ textTransform: 'none', fontSize: '0.8125rem', width: { xs: '100%', sm: 'auto' } }}
+            >
               {t('cancel')}
             </Button>
             <Button
@@ -270,6 +274,7 @@ export function LessonRow({
                 fontSize: '0.8125rem',
                 boxShadow: 'none',
                 borderRadius: 2,
+                width: { xs: '100%', sm: 'auto' },
               }}
             >
               {t('save')}
@@ -304,7 +309,7 @@ export function LessonRow({
         },
       }}
     >
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0, flex: 1 }}>
         <Box
           {...attributes}
           {...listeners}
@@ -327,7 +332,7 @@ export function LessonRow({
         >
           <LessonIcon lesson={lesson} />
         </Box>
-        <Box>
+        <Box sx={{ minWidth: 0, flex: 1 }}>
           <Typography
             variant="body2"
             sx={{
@@ -337,6 +342,7 @@ export function LessonRow({
               maxWidth: { xs: '100%', sm: 300, md: 500 },
               whiteSpace: 'normal',
               wordBreak: 'break-word',
+              overflowWrap: 'anywhere',
             }}
           >
             {index + 1}. {lesson.title}
@@ -366,7 +372,14 @@ export function LessonRow({
           </Typography>
         </Box>
       </Box>
-      <Stack direction="row" alignItems="center" spacing={0.5}>
+      <Stack
+        direction="row"
+        alignItems="center"
+        spacing={0.5}
+        flexWrap="wrap"
+        rowGap={1}
+        sx={{ width: { xs: '100%', sm: 'auto' }, justifyContent: { xs: 'flex-start', sm: 'flex-end' } }}
+      >
         <Box sx={{ mr: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <Typography variant="caption" sx={{ fontSize: '0.6rem', color: 'text.disabled', fontWeight: 700, mb: -0.5 }}>
             {t('is_preview_label') || 'PREVIEW'}

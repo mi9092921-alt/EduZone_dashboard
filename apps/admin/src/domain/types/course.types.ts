@@ -47,6 +47,10 @@ export interface Course extends BaseCourse {
   teacher_name?: string;
   enrollment_count?: number;
   lesson_count?: number;
+  // Rating aggregate (denormalized from course_ratings by
+  // trg_course_ratings_apply); null when the course has no ratings.
+  rating?: number | null;
+  rating_count?: number;
 }
 
 export interface CourseLearningObjective {
@@ -133,6 +137,7 @@ export interface CreateCourseInput {
   teacher_id?: string;
   thumbnail_url?: string;
   status?: CourseStatus;
+  is_discoverable?: boolean;
 }
 
 export interface UpdateCourseInput extends Omit<

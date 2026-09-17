@@ -160,7 +160,7 @@ export function SettingsPage() {
           value={editValue}
           onChange={(e) => setEditValue(e.target.value)}
           size="small"
-          sx={{ width: 300, fontFamily: 'monospace', fontSize: '0.8rem' }}
+          sx={{ width: 300, maxWidth: '100%', fontFamily: 'monospace', fontSize: '0.8rem' }}
           autoFocus
           error={(() => { try { JSON.parse(editValue); return false; } catch { return true; } })()}
           helperText={(() => { try { JSON.parse(editValue); return ''; } catch { return t('error_invalid_json'); } })()}

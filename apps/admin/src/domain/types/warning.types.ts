@@ -36,6 +36,7 @@ export interface Warning extends BaseWarning {
 export interface WarningFilters {
   severity?: WarningSeverity;
   issued_by?: string;
+  acknowledged?: boolean;
   search?: string;
 }
 

@@ -45,7 +45,10 @@ export interface CourseWithStats extends MvCourseStats {
 
 // ── Geographic distribution ──────────────────────────────────────
 export interface GeoPoint {
+  /** Data-residency region id (e.g. "me-south-1") — NOT a country code. */
   country_code: string;
+  /** Human-readable region label resolved from public.regions. */
+  label?: string;
   user_count: number;
 }
 

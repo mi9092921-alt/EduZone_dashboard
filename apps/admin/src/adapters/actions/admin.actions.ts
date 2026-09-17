@@ -181,14 +181,18 @@ export async function deleteFeatureFlagAction(id: string): Promise<void> {
   });
 }
 
-export async function toggleFeatureFlagAction(id: string, enabled: boolean): Promise<void> {
+export async function toggleFeatureFlagAction(
+  id: string,
+  enabled: boolean,
+): Promise<FeatureFlag> {
   const ctx = await requirePermission('feature_flags.manage');
-  await featureFlagsService.toggleFeatureFlagAdmin(id, enabled);
+  const flag = await featureFlagsService.toggleFeatureFlagAdmin(id, enabled);
   await makeAuditLogger().record(ctx, {
     type: 'feature_flag_toggled',
     summary: `Feature flag ${enabled ? 'enabled' : 'disabled'}`,
     riskLevel: 'medium',
   });
+  return flag;
 }
 
 export async function addRoleOverrideAction(
@@ -443,12 +447,15 @@ export async function getTopOffendersAction(): Promise<TopOffender[]> {
 
 export async function getAnalyticsCourseStatsAction(tenantId?: string): Promise<CourseWithStats[]> {
   const ctx = await requirePermission(['reports.read', 'courses.read', 'audit.read']);
-  // IDOR guard: getCourseStats reads via the service-role client. The
-  // `tenantId` argument was previously passed through unchecked — a
-  // non-super_admin caller could pass another tenant's id (or omit it)
-  // to see top-course/enrollment analytics across every tenant.
+  // IDOR guard: the `tenantId` argument passes through unchecked for
+  // super_admins only — a non-super_admin caller could pass another tenant's
+  // id (or omit it) to see top-course/enrollment analytics across every tenant.
   const scopedTenantId = ctx.permissions.includes('*') ? tenantId : ctx.tenantId;
-  return analyticsService.getCourseStats(scopedTenantId);
+  // vw_course_stats is security_invoker, so the query must run under the
+  // caller's own JWT: reuse the cookie-bound client the boundary authenticated
+  // with (the browser client in container.supabase carries no session
+  // server-side → PostgREST sees anon → zero rows).
+  return analyticsService.getCourseStats(scopedTenantId, ctx.supabase);
 }
 
 export async function getCourseStatsAction(courseId: string): Promise<CourseStats | null> {

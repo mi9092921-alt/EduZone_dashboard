@@ -28,15 +28,20 @@ async function withTenantUsage(tenants: Tenant[]): Promise<TenantWithUsage[]> {
   });
   if (error) throw mapDbError(error, 'tenants.service.ts');
 
-  const usage = new Map<string, { user_count: number; course_count: number }>();
+  const usage = new Map<
+    string,
+    { user_count: number; course_count: number; storage_bytes: number }
+  >();
   for (const row of (data ?? []) as Array<{
     tenant_id: string;
     user_count: number | string;
     course_count: number | string;
+    storage_bytes?: number | string | null;
   }>) {
     usage.set(row.tenant_id, {
       user_count: Number(row.user_count ?? 0),
       course_count: Number(row.course_count ?? 0),
+      storage_bytes: Number(row.storage_bytes ?? 0),
     });
   }
 
@@ -44,7 +49,7 @@ async function withTenantUsage(tenants: Tenant[]): Promise<TenantWithUsage[]> {
     ...tenant,
     current_users: usage.get(tenant.id)?.user_count ?? 0,
     current_courses: usage.get(tenant.id)?.course_count ?? 0,
-    current_storage_bytes: 0,
+    current_storage_bytes: usage.get(tenant.id)?.storage_bytes ?? 0,
   }));
 }
 

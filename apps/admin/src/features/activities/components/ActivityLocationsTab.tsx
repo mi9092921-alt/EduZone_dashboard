@@ -8,13 +8,14 @@ import {
   Check,
   GpsFixed,
   TravelExplore,
+  ExpandMore,
 } from '@mui/icons-material';
 import { useTranslations, useLocale } from 'next-intl';
 import React, { useState } from 'react';
 
 import { useActivityLogs } from '@/adapters/queries/audit.queries';
 import { useUserLocationLogs } from '@/adapters/queries/user_locations.queries';
-import { useUserSessions } from '@/adapters/queries/user_sessions.queries';
+import { useUserSessionsInfinite } from '@/adapters/queries/user_sessions.queries';
 import { cn } from '@/lib/utils';
 
 interface ActivityLocationsTabProps {
@@ -43,13 +44,25 @@ export function ActivityLocationsTab({ userId }: ActivityLocationsTabProps) {
     50,
   );
 
-  const { data: locationLogs, isLoading: isLocationsLoading } = useUserLocationLogs(userId);
+  const {
+    data: locationLogs,
+    isLoading: isLocationsLoading,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+  } = useUserLocationLogs(userId);
 
-  const { data: sessions, isLoading: isSessionsLoading } = useUserSessions(userId);
+  const {
+    data: sessions,
+    isLoading: isSessionsLoading,
+    hasNextPage: hasMoreSessions,
+    isFetchingNextPage: isFetchingSessions,
+    fetchNextPage: fetchMoreSessions,
+  } = useUserSessionsInfinite(userId);
 
   const logs = auditData?.data ?? [];
-  const locationData = locationLogs ?? [];
-  const sessionList = sessions ?? [];
+  const locationData = locationLogs?.pages.flat() ?? [];
+  const sessionList = sessions?.pages.flat() ?? [];
 
   // Filter for unique sessions based on IP and Region
   const uniqueSessions = logs.filter(
@@ -205,6 +218,20 @@ export function ActivityLocationsTab({ userId }: ActivityLocationsTabProps) {
               </table>
             </div>
           </div>
+
+          {hasNextPage && (
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={() => fetchNextPage()}
+                disabled={isFetchingNextPage}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wide bg-muted/60 text-foreground hover:bg-muted border border-border/50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <ExpandMore fontSize="inherit" />
+                {isFetchingNextPage ? t('label_loading_more') : t('label_load_more')}
+              </button>
+            </div>
+          )}
         </section>
       )}
 
@@ -276,6 +303,20 @@ export function ActivityLocationsTab({ userId }: ActivityLocationsTabProps) {
               </table>
             </div>
           </div>
+
+          {hasMoreSessions && sessionList.length > 0 && (
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={() => fetchMoreSessions()}
+                disabled={isFetchingSessions}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wide bg-muted/60 text-foreground hover:bg-muted border border-border/50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <ExpandMore fontSize="inherit" />
+                {isFetchingSessions ? t('label_loading_more') : t('label_load_more')}
+              </button>
+            </div>
+          )}
         </section>
       )}
     </div>

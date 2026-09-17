@@ -16,6 +16,8 @@ export const createCourseBaseSchema = z.object({
   description: z.string().max(5000).optional().or(z.literal('')),
   category: z.string().max(100).optional().or(z.literal('')),
   level: courseLevelSchema.optional().default('beginner'),
+  status: courseStatusSchema.optional().default('draft'),
+  is_discoverable: z.boolean().optional().default(true),
   is_free: z.boolean().default(true),
   price: z
     .number({ invalid_type_error: 'Price must be a number' })

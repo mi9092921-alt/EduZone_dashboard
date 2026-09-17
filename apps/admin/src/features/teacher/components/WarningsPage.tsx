@@ -31,6 +31,8 @@ import {
   Chip,
   CircularProgress,
   Alert,
+  Badge,
+  Collapse,
   IconButton,
   useTheme,
 } from '@mui/material';
@@ -49,6 +51,7 @@ import {
 } from '@/components/ui/Card';
 import { TablePagination } from '@/components/ui/TablePagination';
 import type { WarningSeverity, WarningFilters } from '@/domain/types/warning.types';
+import { getWarnings } from '@/infrastructure/repos/warnings.service';
 
 
 function getSeverityTokens(severity: WarningSeverity, theme: Theme) {
@@ -91,12 +94,15 @@ export function WarningsPage() {
   // ── List state ──────────────────────────────────────────────────
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [filters] = useState<WarningFilters>({});
+  const [filters, setFilters] = useState<WarningFilters>({});
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const { data, isLoading, isFetching } = useTeacherWarnings(filters, page, pageSize);
   const warnings = data?.data ?? [];
   const totalCount = data?.count ?? 0;
   const totalResolved = warnings.filter((w) => w.is_acknowledged).length;
   const totalReviewNeeded = warnings.filter((w) => !w.is_acknowledged).length;
+  const hasActiveFilters = filters.severity !== undefined || filters.acknowledged !== undefined;
 
   // ── Form state ──────────────────────────────────────────────────
   const [studentId, setStudentId] = useState('');
@@ -135,6 +141,80 @@ export function WarningsPage() {
     [studentId, reason, severity, actionTaken, issueMutation],
   );
 
+  const handleSeverityFilterChange = useCallback((value: string) => {
+    setFilters((f) => {
+      const next = { ...f };
+      if (value === 'all') {
+        delete next.severity;
+      } else {
+        next.severity = Number(value) as WarningSeverity;
+      }
+      return next;
+    });
+    setPage(1);
+  }, []);
+
+  const handleStatusFilterChange = useCallback((value: string) => {
+    setFilters((f) => {
+      const next = { ...f };
+      if (value === 'all') {
+        delete next.acknowledged;
+      } else {
+        next.acknowledged = value === 'processed';
+      }
+      return next;
+    });
+    setPage(1);
+  }, []);
+
+  const handleClearFilters = useCallback(() => {
+    setFilters({});
+    setPage(1);
+  }, []);
+
+  const handleExportCSV = useCallback(async () => {
+    if (totalCount === 0) {
+      showToast(t('export_empty'), 'info');
+      return;
+    }
+    try {
+      setIsExporting(true);
+      // Mirror useTeacherWarnings scoping: teachers export only their own warnings.
+      const resolved = isTeacher ? { ...filters, issued_by: user?.id } : filters;
+      const all = await getWarnings(resolved, 1, Math.min(Math.max(totalCount, 1), 5000));
+      const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+      const header = [
+        t('header_student'),
+        t('header_reason'),
+        t('header_severity'),
+        t('header_date'),
+        t('header_status'),
+      ].map(esc).join(',');
+      const rows = all.data.map((w) =>
+        [
+          w.student_name ?? 'Unknown',
+          w.reason,
+          t(`severity_${w.severity}` as 'severity_1' | 'severity_2' | 'severity_3'),
+          formatDate(w.created_at, locale),
+          w.is_acknowledged ? t('status_processed') : t('status_review'),
+        ].map(esc).join(','),
+      );
+      const blob = new Blob([[header, ...rows].join('\n')], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `warnings-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      showToast(t('export_error'), 'error');
+    } finally {
+      setIsExporting(false);
+    }
+  }, [filters, isTeacher, user?.id, totalCount, showToast, t, locale]);
+
   const severityButtons: { value: WarningSeverity; icon: React.ReactNode; color: string }[] = [
     { value: 1, icon: <CheckCircle color="success" sx={{ fontSize: 20 }} />, color: 'success.main' },
     { value: 2, icon: <WarningIcon color="primary" sx={{ fontSize: 20 }} />, color: 'primary.main' },
@@ -142,11 +222,11 @@ export function WarningsPage() {
   ];
 
   return (
-    <Box>
+    <Box sx={{ minWidth: 0, overflowX: 'clip' }}>
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-        <div className="flex items-center gap-3">
-          <h1 className="text-title">{t('page_title')}</h1>
+        <div className="flex items-center flex-wrap gap-3 min-w-0">
+          <h1 className="text-title break-words min-w-0">{t('page_title')}</h1>
           <div className="px-2 py-0.5 rounded-full bg-muted text-muted-foreground text-[11px] font-bold uppercase tracking-wider border border-border">
             {totalCount.toLocaleString()} {tCommon('total')}
           </div>
@@ -170,6 +250,8 @@ export function WarningsPage() {
               backgroundColor: 'primary.main',
               boxShadow: (theme) => `0 4px 12px ${alpha(theme.palette.primary.main, 0.2)}`,
               '&:hover': { backgroundColor: 'primary.dark' },
+              width: { xs: '100%', md: 'auto' },
+              whiteSpace: 'nowrap',
             }}
           >
             {t('btn_add_warning')}
@@ -211,7 +293,8 @@ export function WarningsPage() {
               whiteSpace: 'nowrap',
               px: 2,
               minWidth: 'fit-content',
-              fontSize: '0.75rem'
+              fontSize: '0.75rem',
+              width: { xs: '100%', sm: 'auto' },
             }}
           >
             {t('btn_full_policy')}
@@ -220,10 +303,10 @@ export function WarningsPage() {
       </Alert>
 
       {/* Grid: Form + Table */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(12, 1fr)' }, gap: 3 }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: 'repeat(12, 1fr)' }, gap: 3, minWidth: 0 }}>
         {/* Left: Issue Form */}
         {canIssue && (
-          <MuiCard id="warning-form" sx={{ gridColumn: { xs: 'span 1', md: 'span 5', lg: 'span 4' }, borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none', alignSelf: 'flex-start', bgcolor: 'background.paper' }}>
+          <MuiCard id="warning-form" sx={{ gridColumn: { xs: 'span 1', lg: 'span 5', xl: 'span 4' }, borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none', alignSelf: 'flex-start', bgcolor: 'background.paper', minWidth: 0 }}>
             <Box sx={{ p: 2.5, borderBottom: '1px solid', borderColor: 'divider', backgroundColor: 'background.default' }}>
               <Typography variant="subtitle1" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
                 <ReportProblem sx={{ color: 'primary.main', fontSize: 20 }} />
@@ -348,29 +431,38 @@ export function WarningsPage() {
         )}
 
         {/* Right: Warnings Table */}
-        <Box sx={{ gridColumn: { xs: 'span 1', md: canIssue ? 'span 7' : 'span 12', lg: canIssue ? 'span 8' : 'span 12' } }}>
+        <Box sx={{ gridColumn: { xs: 'span 1', lg: canIssue ? 'span 7' : 'span 12', xl: canIssue ? 'span 8' : 'span 12' }, minWidth: 0 }}>
           <MuiCard sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none', overflow: 'hidden', bgcolor: 'background.paper' }}>
-            <Box sx={{ p: 2.5, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+            <Box sx={{ p: { xs: 2, sm: 2.5 }, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1.5 }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, minWidth: 0, overflowWrap: 'break-word' }}>
                 {isTeacher ? t('table_title_mine') : t('table_title_all')}
               </Typography>
               <Box sx={{ display: 'flex', gap: 1 }}>
                 <IconButton
                   size="small"
                   aria-label={tCommon('filter')}
+                  aria-expanded={filtersOpen}
+                  onClick={() => setFiltersOpen((v) => !v)}
                   sx={{
                     border: '1px solid',
-                    borderColor: 'divider',
+                    borderColor: hasActiveFilters ? 'primary.main' : 'divider',
                     borderRadius: 2,
-                    color: 'text.secondary',
-                    '&:hover': { color: 'text.primary', bgcolor: 'action.hover' },
+                    color: hasActiveFilters || filtersOpen ? 'primary.main' : 'text.secondary',
+                    backgroundColor: hasActiveFilters
+                      ? alpha(theme.palette.primary.main, 0.08)
+                      : 'transparent',
+                    '&:hover': { color: 'primary.main', bgcolor: 'action.hover' },
                   }}
                 >
-                  <FilterList sx={{ fontSize: 18 }} />
+                  <Badge variant="dot" color="primary" invisible={!hasActiveFilters}>
+                    <FilterList sx={{ fontSize: 18 }} />
+                  </Badge>
                 </IconButton>
                 <IconButton
                   size="small"
                   aria-label={tCommon('download')}
+                  onClick={handleExportCSV}
+                  disabled={isExporting || totalCount === 0}
                   sx={{
                     border: '1px solid',
                     borderColor: 'divider',
@@ -384,7 +476,70 @@ export function WarningsPage() {
               </Box>
             </Box>
 
-            <TableContainer sx={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            {/* Filter bar */}
+            <Collapse in={filtersOpen} timeout="auto" unmountOnExit>
+              <Box
+                sx={{
+                  px: { xs: 2, sm: 2.5 },
+                  py: 2,
+                  borderBottom: '1px solid',
+                  borderColor: 'divider',
+                  display: 'flex',
+                  flexDirection: { xs: 'column', sm: 'row' },
+                  gap: 1.5,
+                  alignItems: { xs: 'stretch', sm: 'center' },
+                }}
+              >
+                <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 170 } }}>
+                  <InputLabel>{t('filter_severity')}</InputLabel>
+                  <Select
+                    value={filters.severity ?? 'all'}
+                    onChange={(e) => handleSeverityFilterChange(e.target.value as string)}
+                    label={t('filter_severity')}
+                    sx={{ borderRadius: 2 }}
+                  >
+                    <MenuItem value="all">{t('filter_all')}</MenuItem>
+                    <MenuItem value={1}>{t('severity_1')}</MenuItem>
+                    <MenuItem value={2}>{t('severity_2')}</MenuItem>
+                    <MenuItem value={3}>{t('severity_3')}</MenuItem>
+                  </Select>
+                </FormControl>
+                <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 170 } }}>
+                  <InputLabel>{t('filter_status')}</InputLabel>
+                  <Select
+                    value={
+                      filters.acknowledged === undefined
+                        ? 'all'
+                        : filters.acknowledged
+                          ? 'processed'
+                          : 'review'
+                    }
+                    onChange={(e) => handleStatusFilterChange(e.target.value as string)}
+                    label={t('filter_status')}
+                    sx={{ borderRadius: 2 }}
+                  >
+                    <MenuItem value="all">{t('filter_all')}</MenuItem>
+                    <MenuItem value="review">{t('status_review')}</MenuItem>
+                    <MenuItem value="processed">{t('status_processed')}</MenuItem>
+                  </Select>
+                </FormControl>
+                <Button
+                  variant="text"
+                  size="small"
+                  onClick={handleClearFilters}
+                  disabled={!hasActiveFilters}
+                  sx={{
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    alignSelf: { xs: 'flex-start', sm: 'center' },
+                  }}
+                >
+                  {t('filter_clear')}
+                </Button>
+              </Box>
+            </Collapse>
+
+            <TableContainer sx={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
               <Table sx={{ minWidth: 600 }}>
                 <TableHead>
                   <TableRow sx={{ backgroundColor: 'background.default' }}>
@@ -418,21 +573,21 @@ export function WarningsPage() {
                       return (
                         <TableRow key={row.id} hover sx={{ '&:last-child td': { border: 0 } }}>
                           <TableCell>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
                               <Avatar
                                 src={row.student_avatar_url || ''}
-                                sx={{ width: 32, height: 32, fontSize: '0.7rem', fontWeight: 700, backgroundColor: 'action.selected', color: 'text.secondary' }}
+                                sx={{ width: 32, height: 32, fontSize: '0.7rem', fontWeight: 700, backgroundColor: 'action.selected', color: 'text.secondary', flexShrink: 0 }}
                               >
                                 {getInitials(row.student_name ?? 'U')}
                               </Avatar>
-                              <Box>
-                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                              <Box sx={{ minWidth: 0 }}>
+                                <Typography variant="body2" sx={{ fontWeight: 600, overflowWrap: 'break-word' }}>
                                   {row.student_name ?? 'Unknown'}
                                 </Typography>
                               </Box>
                             </Box>
                           </TableCell>
-                          <TableCell sx={{ maxWidth: 250 }}>
+                          <TableCell sx={{ maxWidth: { xs: 140, sm: 250 } }}>
                             <Typography variant="body2" noWrap>
                               {row.reason}
                             </Typography>

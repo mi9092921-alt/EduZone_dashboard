@@ -252,13 +252,16 @@ export async function toggleFeatureFlag(id: string, enabled: boolean): Promise<v
 }
 
 /** Server-action variant — uses service_role to bypass RLS. */
-export async function toggleFeatureFlagAdmin(id: string, enabled: boolean): Promise<void> {
+export async function toggleFeatureFlagAdmin(id: string, enabled: boolean): Promise<FeatureFlag> {
   const admin = createAdminClient();
-  const { error } = await admin
+  const { data, error } = await admin
     .from('feature_flags')
     .update({ is_enabled: enabled, updated_at: new Date().toISOString() })
-    .eq('id', id);
+    .eq('id', id)
+    .select()
+    .single();
   if (error) throw mapDbError(error, 'feature-flags.service.ts');
+  return mapDbRowToFeatureFlag(data as FeatureFlagDbRow)!;
 }
 
 // ══════════════════════════════════════════════════

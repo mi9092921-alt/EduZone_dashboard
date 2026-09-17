@@ -605,6 +605,8 @@ CREATE TABLE IF NOT EXISTS public.courses (
     CHECK (level IN ('beginner', 'intermediate', 'advanced')),
   price numeric(12,2) NOT NULL DEFAULT 0 CHECK (price >= 0),
   is_free boolean GENERATED ALWAYS AS (price = 0) STORED,
+  rating numeric(3,2) CHECK (rating IS NULL OR (rating >= 0 AND rating <= 5)),
+  rating_count integer NOT NULL DEFAULT 0,
   region_id text NOT NULL DEFAULT public.get_default_region_id() REFERENCES public.regions(id),
   language text NOT NULL DEFAULT 'en',
   search_vector tsvector GENERATED ALWAYS AS (
@@ -620,9 +622,16 @@ CREATE TABLE IF NOT EXISTS public.courses (
   CONSTRAINT courses_id_tenant_unique UNIQUE (id, tenant_id)
 ) WITH (fillfactor = 85);
 
-COMMENT ON TABLE public.courses IS 
+COMMENT ON TABLE public.courses IS
 'Educational courses. Managed by teachers, accessible by enrolled students.
 Soft-delete via deleted_at. Status state machine: draft -> published -> archived.';
+
+-- Rating aggregate columns (backfill for pre-existing databases; the
+-- CREATE TABLE above already carries them for fresh installs). Maintained
+-- exclusively by trg_course_ratings_apply — never written by clients.
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS rating numeric(3,2)
+  CHECK (rating IS NULL OR (rating >= 0 AND rating <= 5));
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS rating_count integer NOT NULL DEFAULT 0;
 
 -- Trigger removed: trg_normalize_course_fields function does not exist
 -- DROP TRIGGER IF EXISTS trg_normalize_courses ON public.courses;
@@ -780,10 +789,43 @@ CREATE TABLE IF NOT EXISTS public.enrollments (
   autovacuum_analyze_threshold = 25
 );
 
-COMMENT ON TABLE public.enrollments IS 
+COMMENT ON TABLE public.enrollments IS
 'Student course enrollment record. Links user → course.
 Soft-delete aware: deleted_at = unenroll.
 Progress tracked separately in user_progress table (1:many).';
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- course_ratings
+-- ─────────────────────────────────────────────────────────────────────────────
+-- One rating (1-5 stars) per user per course. Students write exclusively
+-- through the rate_course() RPC; direct table writes are admin-only (RLS).
+-- The per-course aggregate is denormalized onto courses.rating/rating_count
+-- by trg_course_ratings_apply (see 07_functions/08_triggers).
+CREATE TABLE IF NOT EXISTS public.course_ratings (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES public.users(id) ON DELETE RESTRICT,
+  course_id uuid NOT NULL REFERENCES public.courses(id) ON DELETE RESTRICT,
+  tenant_id uuid NOT NULL REFERENCES public.tenants(id) ON DELETE RESTRICT,
+  rating smallint NOT NULL CHECK (rating BETWEEN 1 AND 5),
+
+  created_by uuid REFERENCES public.users(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED,
+  updated_by uuid REFERENCES public.users(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  deleted_at timestamptz,
+  UNIQUE (user_id, course_id),
+  CONSTRAINT course_ratings_course_tenant CHECK (
+    course_id IS NOT NULL AND tenant_id IS NOT NULL
+  )
+) WITH (fillfactor = 85);
+
+-- Idempotent backfill for databases created before this column set.
+ALTER TABLE public.course_ratings ADD COLUMN IF NOT EXISTS rating smallint NOT NULL DEFAULT 5;
+
+COMMENT ON TABLE public.course_ratings IS
+'Student course ratings (1-5 stars, one per user per course).
+Aggregated onto courses.rating / courses.rating_count by trigger.
+Removal is a soft delete (deleted_at) by admins; physical DELETE is blocked.';
 
 CREATE TABLE IF NOT EXISTS public.user_progress (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -1269,6 +1311,11 @@ CREATE TABLE IF NOT EXISTS public.notifications (
   region_id text REFERENCES public.regions(id) ON DELETE SET NULL,
   target_audience text NOT NULL DEFAULT 'all'
     CHECK (target_audience IN ('all', 'students', 'teachers', 'admins')),
+  -- Explicit user targeting is separate from the audience value so a queued
+  -- fanout cannot fall back to a tenant-wide audience while target rows are
+  -- being attached by the caller.
+  targeting_mode text NOT NULL DEFAULT 'audience'
+    CHECK (targeting_mode IN ('audience', 'users')),
   target_permission text REFERENCES public.permissions(name) ON DELETE RESTRICT,
   deleted_at timestamptz,
   created_by uuid REFERENCES public.users(id) ON DELETE SET NULL,
@@ -1280,6 +1327,22 @@ CREATE TABLE IF NOT EXISTS public.notifications (
 COMMENT ON TABLE public.notifications IS 
 'In-app notifications for users. region_id allows targeting by data residency region.
 Soft-delete via deleted_at.';
+
+-- Existing production databases use CREATE TABLE IF NOT EXISTS, so ensure the
+-- hardening column exists before 07_functions.sql is applied on an upgrade.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'notifications'
+      AND column_name = 'targeting_mode'
+  ) THEN
+    ALTER TABLE public.notifications
+      ADD COLUMN targeting_mode text NOT NULL DEFAULT 'audience'
+      CHECK (targeting_mode IN ('audience', 'users'));
+  END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS public.notification_targets (
   notification_id uuid NOT NULL REFERENCES public.notifications(id) ON DELETE CASCADE,

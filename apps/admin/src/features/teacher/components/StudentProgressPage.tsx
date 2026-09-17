@@ -98,10 +98,17 @@ export function StudentProgressPage() {
   // Aggregate stats for the cards
 
   return (
-    <Box>
+    <Box sx={{ minWidth: 0 }}>
       {/* Actions Bar */}
       <Box
-        sx={{ display: 'flex', justifyContent: 'flex-end', mb: 4, gap: 2, alignItems: 'center' }}
+        sx={{
+          display: 'flex',
+          flexDirection: { xs: 'column', sm: 'row' },
+          justifyContent: { xs: 'stretch', sm: 'flex-end' },
+          mb: 4,
+          gap: 1.5,
+          alignItems: { xs: 'stretch', sm: 'center' },
+        }}
       >
         <Button
           variant="contained"
@@ -112,6 +119,8 @@ export function StudentProgressPage() {
             borderRadius: 3,
             px: 3,
             boxShadow: 'none',
+            width: { xs: '100%', sm: 'auto' },
+            order: { xs: 1, sm: 0 },
             '&:hover': {
               boxShadow: (theme) => `0 4px 12px ${alpha(theme.palette.primary.main, 0.2)}`,
               backgroundColor: 'primary.dark',
@@ -131,6 +140,7 @@ export function StudentProgressPage() {
             borderColor: 'divider',
             color: alpha(theme.palette.text.primary, 0.6),
             px: 3,
+            width: { xs: '100%', sm: 'auto' },
             '&:hover': { borderColor: 'primary.main', color: 'primary.main' },
           }}
         >
@@ -161,7 +171,7 @@ export function StudentProgressPage() {
         {/* Search */}
         <Box
           sx={{
-            p: 3,
+            p: { xs: 2, sm: 3 },
             borderBottom: '1px solid',
             borderColor: 'divider',
             display: 'flex',
@@ -194,7 +204,7 @@ export function StudentProgressPage() {
           />
         </Box>
 
-        <TableContainer>
+        <TableContainer sx={{ overflowX: 'auto' }}>
           <Table sx={{ minWidth: 650 }}>
             <TableHead>
               <TableRow sx={{ backgroundColor: 'action.hover' }}>

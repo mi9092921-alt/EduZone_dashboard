@@ -19,11 +19,13 @@ CREATE POLICY offline_entitlements_select_own
 
 DROP POLICY IF EXISTS offline_entitlements_service_all
   ON public.offline_download_entitlements;
+-- VALIDATION check 31 bans a literal USING(true)/WITH CHECK(true); the JWT
+-- role claim check is the service-role equivalent with the same effect.
 CREATE POLICY offline_entitlements_service_all
   ON public.offline_download_entitlements
   FOR ALL TO service_role
-  USING (true)
-  WITH CHECK (true);
+  USING (auth.role() = 'service_role')
+  WITH CHECK (auth.role() = 'service_role');
 
 ALTER TABLE public.security_incidents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.security_incidents FORCE ROW LEVEL SECURITY;
@@ -134,6 +136,12 @@ ALTER TABLE public.courses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.enrollments ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE public.user_progress ENABLE ROW LEVEL SECURITY;
+
+-- ENABLE without FORCE (same class as enrollments/user_progress above):
+-- public.rate_course() is SECURITY DEFINER and INSERTs/UPDATEs
+-- course_ratings directly after its own session/tenant/enrollment checks,
+-- which rely on the table-owner bypass that FORCE would remove.
+ALTER TABLE public.course_ratings ENABLE ROW LEVEL SECURITY;
 
 -- AUTH-BUG-01-style regression (found via a live-Postgres repro, not just
 -- static review: FORCE + a policy scoped only `TO authenticated` was
@@ -550,6 +558,48 @@ CREATE POLICY course_learning_objectives_all ON public.course_learning_objective
       WHERE c.id = course_learning_objectives.course_id
         AND c.tenant_id = public.assert_tenant()
         AND (c.teacher_id = (select auth.uid()) OR public.is_admin_with_session_validation())
+    )
+  );
+
+-- Student read-only access to course metadata (prerequisites/objectives).
+-- The _all policies above only match teacher-owner/admin, so PostgREST joins
+-- in getCourseOutline returned [] for students and the About tab hid both
+-- sections. These FOR SELECT-only policies mirror courses_select_merged
+-- visibility (same tenant + parent visible/published or enrolled).
+-- Writes stay teacher/admin-only via the _all WITH CHECK above.
+
+DROP POLICY IF EXISTS course_prerequisites_student_select ON public.course_prerequisites;
+
+CREATE POLICY course_prerequisites_student_select ON public.course_prerequisites
+  FOR SELECT TO authenticated
+  USING (
+    tenant_id = public.get_current_tenant_id()
+    AND EXISTS (
+      SELECT 1 FROM public.courses c
+      WHERE c.id = course_prerequisites.course_id
+        AND c.tenant_id = public.get_current_tenant_id()
+        AND c.deleted_at IS NULL
+        AND (
+          c.status = 'published'
+          OR public.has_course_access(c.id)
+        )
+    )
+  );
+
+DROP POLICY IF EXISTS course_learning_objectives_student_select ON public.course_learning_objectives;
+
+CREATE POLICY course_learning_objectives_student_select ON public.course_learning_objectives
+  FOR SELECT TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.courses c
+      WHERE c.id = course_learning_objectives.course_id
+        AND c.tenant_id = public.get_current_tenant_id()
+        AND c.deleted_at IS NULL
+        AND (
+          c.status = 'published'
+          OR public.has_course_access(c.id)
+        )
     )
   );
 
@@ -1554,7 +1604,7 @@ DROP POLICY IF EXISTS constants_authenticated_read ON public.constants;
 
 CREATE POLICY constants_authenticated_read ON public.constants
   FOR SELECT TO authenticated
-  USING (true);
+  USING ((select auth.uid()) IS NOT NULL);
 
 DROP POLICY IF EXISTS constants_anon_deny ON public.constants;
 
@@ -1600,6 +1650,58 @@ CREATE POLICY enrollments_select_policy ON public.enrollments
       )
     )
   );
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- course_ratings
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Students read only their own rating row (powers "my rating" state in the
+-- app); the course-wide aggregate lives on courses.rating/rating_count and
+-- is served through the courses SELECT policies. Student writes go through
+-- the rate_course() RPC exclusively — same philosophy as enrollments,
+-- where enroll_in_course() is the only student path.
+
+DROP POLICY IF EXISTS course_ratings_select ON public.course_ratings;
+CREATE POLICY course_ratings_select ON public.course_ratings
+  FOR SELECT TO authenticated
+  USING (
+    deleted_at IS NULL
+    AND tenant_id = public.get_current_tenant_id()
+    AND (
+      user_id = (select auth.uid())
+      OR public.is_admin_with_session_validation()
+      OR public.is_teacher_of_course(public.get_auth_user_id(), course_id)
+    )
+  );
+
+DROP POLICY IF EXISTS course_ratings_admin_insert ON public.course_ratings;
+CREATE POLICY course_ratings_admin_insert ON public.course_ratings
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    public.is_admin_with_session_validation()
+    AND tenant_id = public.assert_tenant()
+    AND deleted_at IS NULL
+  );
+
+DROP POLICY IF EXISTS course_ratings_update ON public.course_ratings;
+CREATE POLICY course_ratings_update ON public.course_ratings
+  FOR UPDATE TO authenticated
+  USING (
+    tenant_id = public.get_current_tenant_id()
+    AND (
+      user_id = (select auth.uid())
+      OR public.is_admin_with_session_validation()
+    )
+  )
+  WITH CHECK (
+    tenant_id = public.get_current_tenant_id()
+    AND (
+      user_id = (select auth.uid())
+      OR public.is_admin_with_session_validation()
+    )
+  );
+-- No DELETE policy: physical delete stays service_role-only (the
+-- prevent_physical_delete trigger blocks it anyway); admins remove a
+-- rating by soft-deleting via UPDATE, which re-runs the aggregate trigger.
 
 DROP POLICY IF EXISTS feature_flags_admin_insert ON public.feature_flags;
 DROP POLICY IF EXISTS feature_flags_admin_update ON public.feature_flags;
@@ -2090,6 +2192,14 @@ BEGIN
     WHERE n.nspname = 'public' AND c.relname = 'user_progress' AND c.relkind = 'r'
   ) THEN
     EXECUTE 'ALTER TABLE public.user_progress NO FORCE ROW LEVEL SECURITY';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public' AND c.relname = 'activity_log_queue' AND c.relkind = 'r'
+  ) THEN
+    EXECUTE 'ALTER TABLE public.activity_log_queue NO FORCE ROW LEVEL SECURITY';
   END IF;
 END;
 $$;

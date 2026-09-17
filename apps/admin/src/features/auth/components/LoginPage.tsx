@@ -2,8 +2,10 @@
 
 import { School, Lock, ErrorOutline as AlertCircle } from '@mui/icons-material';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
 
+import { checkLoginRateLimitAction } from '@/adapters/actions/auth-rate-limit.actions';
 import { recordCurrentSessionAction } from '@/adapters/actions/session.actions';
 import { useAuthStore, type PrimaryRole } from '@/adapters/stores/auth.store';
 import { Button } from '@/components/ui/Button';
@@ -17,6 +19,8 @@ import { createBrowserClient } from '@/infrastructure/supabase/client';
 export function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const locale = useLocale();
+  const t = useTranslations('auth');
   const reason = searchParams.get('reason');
 
   const [email, setEmail] = useState('');
@@ -28,10 +32,10 @@ export function LoginPage() {
   const setUser = useAuthStore((s) => s.setUser);
 
   const reasonMessages: Record<string, string> = {
-    session_invalidated: 'Your session has been invalidated. Please log in again.',
-    maintenance_mode: 'The system is currently under maintenance.',
-    account_locked: 'Your account has been locked. Contact your administrator.',
-    unauthorized: 'You are not authorized to access this resource.',
+    session_invalidated: t('reason_session_invalidated'),
+    maintenance_mode: t('reason_maintenance_mode'),
+    account_locked: t('reason_account_locked'),
+    unauthorized: t('reason_unauthorized'),
   };
 
   async function handleSubmit(e: React.FormEvent) {
@@ -40,6 +44,15 @@ export function LoginPage() {
     setIsLoading(true);
 
     try {
+      // Pre-auth brute-force backstop (rate_limit_rules 'login', enforced
+      // per source IP server-side). Fail-open by design — see the action.
+      const rate = await checkLoginRateLimitAction();
+      if (!rate.allowed) {
+        const minutes = Math.max(1, Math.ceil((rate.retryAfterSeconds ?? 900) / 60));
+        setError(t('rate_limited', { minutes }));
+        return;
+      }
+
       const supabase = createBrowserClient();
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: email.trim(),
@@ -49,7 +62,7 @@ export function LoginPage() {
       if (authError) {
         setError(
           authError.message === 'Invalid login credentials'
-            ? 'Invalid email or password. Please try again.'
+            ? t('invalid_credentials')
             : authError.message,
         );
         return;
@@ -58,7 +71,7 @@ export function LoginPage() {
       // M11: RPC call lives in infrastructure/repos/auth-rpc.service.ts
       const access = await checkDashboardAccess();
       if (!access.ok) {
-        setError('Failed to verify account access. Please try again.');
+        setError(t('access_check_failed'));
         return;
       }
 
@@ -66,17 +79,18 @@ export function LoginPage() {
 
       if (!accessResult?.allowed) {
         const reason = accessResult?.reason;
-        if (reason === 'account_banned') setError('Your account has been permanently banned.');
+        if (reason === 'account_banned') setError(t('account_banned'));
         else if (reason === 'account_locked')
-          setError('Your account is locked. Contact your administrator.');
+          setError(t('account_locked'));
         else if (reason === 'account_suspended') {
           const until = accessResult?.until;
-          setError(
-            `Your account is suspended${until ? ` until ${new Date(until).toLocaleString()}` : ''}.`,
-          );
+          const formattedUntil = until
+            ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(until))
+            : '';
+          setError(formattedUntil ? t('account_suspended_until', { until: formattedUntil }) : t('account_suspended'));
         } else if (reason === 'maintenance_mode')
-          setError(accessResult?.message || 'System is under maintenance.');
-        else setError('Access denied.');
+          setError(accessResult?.message || t('reason_maintenance_mode'));
+        else setError(t('access_denied'));
         await supabase.auth.signOut();
         return;
       }
@@ -85,7 +99,7 @@ export function LoginPage() {
       if (sessionId) {
         const sessionResult = await recordCurrentSessionAction(sessionId);
         if (!sessionResult.success && sessionResult.active === false) {
-          setError('Your session has been invalidated. Please log in again.');
+          setError(t('reason_session_invalidated'));
           await supabase.auth.signOut();
           return;
         }
@@ -103,14 +117,14 @@ export function LoginPage() {
       router.push('/');
       router.refresh();
     } catch {
-      setError('An unexpected error occurred. Please try again.');
+      setError(t('unexpected_error'));
     } finally {
       setIsLoading(false);
     }
   }
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/10 via-background to-background p-6">
+    <div className="min-h-[100dvh] w-full flex items-center justify-center bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/10 via-background to-background p-6">
       <Card className="w-full max-w-[440px] shadow-2xl border-border/50 animate-in fade-in zoom-in-95 duration-500">
         <CardHeader className="text-center space-y-1 pb-8">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-primary shadow-lg shadow-primary/20 mb-4 transition-faang hover:scale-105">
@@ -118,7 +132,7 @@ export function LoginPage() {
           </div>
           <CardTitle className="text-2xl font-bold tracking-tight">EduZone Admin</CardTitle>
           <CardDescription className="text-muted-foreground">
-            Sign in to your administration panel
+            {t('description')}
           </CardDescription>
         </CardHeader>
 
@@ -139,11 +153,11 @@ export function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email address</Label>
+            <Label htmlFor="email">{t('email_label')}</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="admin@eduzone.com"
+                placeholder={t('email_placeholder')}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -153,13 +167,13 @@ export function LoginPage() {
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">{t('password_label')}</Label>
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="text-xs font-medium text-primary hover:underline transition-faang"
                 >
-                  {showPassword ? 'Hide' : 'Show'}
+                  {showPassword ? t('hide_password') : t('show_password')}
                 </button>
               </div>
               <Input
@@ -182,7 +196,7 @@ export function LoginPage() {
               {isLoading ? (
                 <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
               ) : (
-                'Sign In'
+                t('submit')
               )}
             </Button>
           </form>

@@ -106,6 +106,7 @@ export function CourseInfoForm({
       category: course.category ?? '',
       level: (course.level as 'beginner' | 'intermediate' | 'advanced') ?? 'beginner',
       is_free: course.is_free,
+      is_discoverable: course.is_discoverable ?? true,
       price: course.price,
       slug: course.slug ?? '',
       thumbnail_url: course.thumbnail_url ?? '',
@@ -122,6 +123,7 @@ export function CourseInfoForm({
       category: course.category ?? '',
       level: (course.level as 'beginner' | 'intermediate' | 'advanced') ?? 'beginner',
       is_free: course.is_free,
+      is_discoverable: course.is_discoverable ?? true,
       price: course.price,
       slug: course.slug ?? '',
       thumbnail_url: course.thumbnail_url ?? '',
@@ -144,6 +146,7 @@ export function CourseInfoForm({
     if (data.description !== undefined) payload.description = data.description || null;
     if (data.category !== undefined) payload.category = data.category || null;
     if (data.level !== undefined) payload.level = data.level;
+    if (data.is_discoverable !== undefined) payload.is_discoverable = data.is_discoverable;
     if (data.price !== undefined) {
       payload.price = data.is_free ? 0 : data.price;
     }
@@ -273,8 +276,24 @@ export function CourseInfoForm({
               </div>
             </div>
 
-            <div className="flex items-center justify-between p-4 rounded-2xl bg-muted/30 border border-border/50">
-              <div className="space-y-1">
+            <div className="flex items-center justify-between gap-3 p-4 rounded-2xl bg-muted/30 border border-border/50">
+              <div className="space-y-1 min-w-0 flex-1">
+                <Label className="text-base font-bold">{t('discoverable_label')}</Label>
+                <p className="text-xs text-muted-foreground font-medium">
+                  {t('discoverable_desc')}
+                </p>
+              </div>
+              <Controller
+                name="is_discoverable"
+                control={control}
+                render={({ field }) => (
+                  <Switch checked={!!field.value} onCheckedChange={field.onChange} />
+                )}
+              />
+            </div>
+
+            <div className="flex items-center justify-between gap-3 p-4 rounded-2xl bg-muted/30 border border-border/50">
+              <div className="space-y-1 min-w-0 flex-1">
                 <Label className="text-base font-bold">{t('free_course_label')}</Label>
                 <p className="text-xs text-muted-foreground font-medium">{t('free_course_desc')}</p>
               </div>
@@ -394,7 +413,7 @@ export function CourseInfoForm({
                       value={obj}
                       onChange={(e) => handleObjectiveChange(index, e.target.value)}
                       placeholder={t('objective_placeholder')}
-                      className="flex-1"
+                      className="flex-1 min-w-0"
                     />
                     <Button
                       type="button"
@@ -420,12 +439,12 @@ export function CourseInfoForm({
             </div>
           </div>
 
-          <div className="flex items-center justify-between pt-8 mt-4 border-t border-border">
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between pt-8 mt-4 border-t border-border">
             <Button
               type="submit"
               disabled={isPending}
               isLoading={isPending}
-              className="min-w-[160px] font-bold uppercase tracking-wider text-xs text-white"
+              className="w-full sm:w-auto sm:min-w-[160px] font-bold uppercase tracking-wider text-xs text-white"
             >
               <Save className="me-2 h-4 w-4" />
               {t('save_changes')}
@@ -434,7 +453,7 @@ export function CourseInfoForm({
             <Button
               variant="ghost"
               onClick={() => setIsDeleteDialogOpen(true)}
-              className="font-bold uppercase tracking-wider text-xs text-destructive hover:bg-destructive/10"
+              className="w-full sm:w-auto font-bold uppercase tracking-wider text-xs text-destructive hover:bg-destructive/10"
             >
               <DeleteOutline className="me-2 h-4 w-4" />
               {t('delete_course')}

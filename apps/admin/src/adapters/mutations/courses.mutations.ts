@@ -1,6 +1,10 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { deleteCourseAction } from '@/adapters/actions/admin.actions';
+import {
+  getYoutubeMetadataAction,
+  getYoutubeMetadataBatchAction,
+} from '@/adapters/actions/video.actions';
 import { queryKeys } from '@/adapters/queries/keys';
 import { container } from '@/container';
 import type {
@@ -9,6 +13,7 @@ import type {
   CreateSectionInput,
   CreateLessonInput,
 } from '@/domain/types/course.types';
+import { parseVideoUrl } from '@/domain/video.utils';
 import {
   createCourse,
   updateCourse,
@@ -27,6 +32,7 @@ import {
   saveLearningObjectives,
   savePrerequisites,
 } from '@/infrastructure/repos/courses.service';
+import { extractYoutubeId } from '@/infrastructure/youtube.service';
 
 /**
  * Mutation hooks for course management actions.
@@ -128,11 +134,37 @@ export function useReorderSections() {
 
 // ── Lesson mutations ─────────────────────────────────────────────
 
+/**
+ * Resolves a YouTube duration on the server for a single lesson input.
+ *
+ * `youtube.service` reads YOUTUBE_API_KEY via `getServerEnv()`, which
+ * throws in the browser. These mutation hooks run client-side, so they
+ * must NEVER call it directly — they go through the `video.actions`
+ * server boundary first and hand the resolved `duration_sec` to the
+ * infra service (which then skips its own lookup). Failures degrade to
+ * duration 0; lesson creation itself never fails on metadata.
+ */
+async function resolveSingleLessonDuration(
+  data: CreateLessonInput | Partial<CreateLessonInput>,
+): Promise<number | undefined> {
+  if (!data.video_url || data.duration_sec) return data.duration_sec;
+  if (parseVideoUrl(data.video_url).provider !== 'youtube') return data.duration_sec;
+  try {
+    const res = await getYoutubeMetadataAction(data.video_url);
+    if (res.success && res.data) return res.data.duration_sec;
+  } catch (err) {
+    console.warn('[courses.mutations] YouTube metadata lookup failed, using duration 0:', err);
+  }
+  return data.duration_sec;
+}
+
 export function useCreateLesson() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (vars: { sectionId: string; courseId: string; data: CreateLessonInput }) =>
-      createLesson(vars.sectionId, vars.data),
+    mutationFn: async (vars: { sectionId: string; courseId: string; data: CreateLessonInput }) => {
+      const duration_sec = await resolveSingleLessonDuration(vars.data);
+      return createLesson(vars.sectionId, { ...vars.data, ...(duration_sec !== undefined ? { duration_sec } : {}) });
+    },
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: queryKeys.courses.sections(vars.courseId) });
       qc.invalidateQueries({ queryKey: queryKeys.courses.detail(vars.courseId) });
@@ -143,8 +175,42 @@ export function useCreateLesson() {
 export function useCreateLessons() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (vars: { sectionId: string; courseId: string; data: CreateLessonInput[] }) =>
-      createLessons(vars.sectionId, vars.data),
+    mutationFn: async (vars: { sectionId: string; courseId: string; data: CreateLessonInput[] }) => {
+      const targets = vars.data.filter(
+        (item) => item.video_url && !item.duration_sec && parseVideoUrl(item.video_url).provider === 'youtube',
+      );
+      const durationByUrl = new Map<string, number>();
+      if (targets.length > 0) {
+        try {
+          const batch = await getYoutubeMetadataBatchAction(
+            targets.map((item) => item.video_url as string),
+          );
+          if (batch.success) {
+            // Re-attach metadata (keyed by video ID) to the input URLs.
+            const durationById = new Map(batch.results.map((m) => [m.id, m.duration_sec]));
+            for (const item of targets) {
+              const id = extractYoutubeId(item.video_url as string);
+              if (id && durationById.has(id)) {
+                durationByUrl.set(item.video_url as string, durationById.get(id)!);
+              }
+            }
+          } else {
+            console.warn('[courses.mutations] Batch metadata lookup failed:', batch.error);
+          }
+        } catch (err) {
+          console.warn('[courses.mutations] Batch metadata lookup threw, using duration 0:', err);
+        }
+      }
+      const enriched =
+        durationByUrl.size > 0
+          ? vars.data.map((item) =>
+              item.video_url && durationByUrl.has(item.video_url)
+                ? { ...item, duration_sec: durationByUrl.get(item.video_url)! }
+                : item,
+            )
+          : vars.data;
+      return createLessons(vars.sectionId, enriched);
+    },
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: queryKeys.courses.sections(vars.courseId) });
       qc.invalidateQueries({ queryKey: queryKeys.courses.detail(vars.courseId) });
@@ -155,8 +221,13 @@ export function useCreateLessons() {
 export function useUpdateLesson() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (vars: { id: string; courseId: string; data: Partial<CreateLessonInput> }) =>
-      updateLesson(vars.id, vars.data),
+    mutationFn: async (vars: { id: string; courseId: string; data: Partial<CreateLessonInput> }) => {
+      const duration_sec = await resolveSingleLessonDuration(vars.data);
+      return updateLesson(vars.id, {
+        ...vars.data,
+        ...(duration_sec !== undefined ? { duration_sec } : {}),
+      });
+    },
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: queryKeys.courses.sections(vars.courseId) });
       qc.invalidateQueries({ queryKey: queryKeys.courses.detail(vars.courseId) });

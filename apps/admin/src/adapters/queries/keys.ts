@@ -69,7 +69,8 @@ export const queryKeys = {
     activity: (filters: Record<string, unknown>) => ['analytics', 'activity', filters] as const,
     userStats: (tenantId?: string) => ['analytics', 'userStats', tenantId] as const,
     courseStats: (tenantId?: string) => ['analytics', 'courseStats', tenantId] as const,
-    dailyActivity: (tenantId?: string) => ['analytics', 'dailyActivity', tenantId] as const,
+    dailyActivity: (tenantId?: string, days = 30) =>
+      ['analytics', 'dailyActivity', tenantId, days] as const,
     registrationTrend: (days: number) => ['analytics', 'registrationTrend', days] as const,
     geographic: (tenantId?: string) => ['analytics', 'geographic', tenantId] as const,
     globalCoordinates: ['analytics', 'globalCoordinates'] as const,

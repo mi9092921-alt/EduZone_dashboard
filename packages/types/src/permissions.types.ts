@@ -12,6 +12,7 @@ export type PermissionName =
   | 'settings.read'
   | 'settings.write'
   | 'warnings.write'
+  | 'notifications.delete'
   | 'devices.manage'
   | 'sessions.manage'
   | 'audit.read'

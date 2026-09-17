@@ -45,7 +45,7 @@ export default async function RootLayout({
   const dir = getDir(locale);
 
   return (
-    <html lang={locale} dir={dir} suppressHydrationWarning {...(nonce ? { nonce } : {})}>
+    <html lang={locale} dir={dir} suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -56,7 +56,7 @@ export default async function RootLayout({
       </head>
       <body>
         <NextIntlClientProvider messages={messages}>
-          <Providers>{children}</Providers>
+          <Providers {...(nonce ? { nonce } : {})}>{children}</Providers>
         </NextIntlClientProvider>
       </body>
     </html>

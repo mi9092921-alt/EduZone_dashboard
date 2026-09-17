@@ -119,6 +119,8 @@ export interface Course {
   price: number;
   region_id: string;
   thumbnail_url: string | null;
+  /** Visible in catalog/search discovery. DB default true. */
+  is_discoverable?: boolean;
   /** v13: Server-generated tsvector for full-text search */
   search_vector?: string;
   created_at: string;

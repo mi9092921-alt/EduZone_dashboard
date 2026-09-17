@@ -327,7 +327,6 @@ src/features/
 ├── auth/
 │   ├── components/
 │   │   ├── LoginPage.tsx
-│   │   ├── ForgotPasswordPage.tsx
 │   │   └── MaintenanceBanner.tsx
 │   └── index.ts
 ├── dashboard/

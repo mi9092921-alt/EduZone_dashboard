@@ -1270,9 +1270,9 @@ LANGUAGE plpgsql
 SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
 BEGIN
-  REFRESH MATERIALIZED VIEW CONCURRENTLY private.mv_course_stats;
-  REFRESH MATERIALIZED VIEW CONCURRENTLY public.vw_student_progress_timeline;
-  REFRESH MATERIALIZED VIEW CONCURRENTLY public.vw_daily_revenue;
+  PERFORM private.refresh_mv_resilient('private', 'mv_course_stats');
+  PERFORM private.refresh_mv_resilient('public', 'vw_student_progress_timeline');
+  PERFORM private.refresh_mv_resilient('public', 'vw_daily_revenue');
 END;
 $$;
 
@@ -1462,6 +1462,149 @@ BEGIN
 
   RETURN v_id;
 END;
+$$;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Course ratings (1-5 stars per user per course)
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- Keeps courses.rating / courses.rating_count denormalized from
+-- course_ratings on every write (insert, update — including soft delete
+-- via deleted_at — and physical delete, which only service_role/admin
+-- tooling can perform). Mirrors trg_update_enrollment_progress's
+-- synchronous row-level pattern.
+CREATE OR REPLACE FUNCTION public.trg_apply_course_rating_agg()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_cid uuid := COALESCE(NEW.course_id, OLD.course_id);
+  v_avg numeric;
+  v_count integer;
+BEGIN
+  SELECT pg_catalog.round(pg_catalog.avg(rating)::numeric, 2),
+         pg_catalog.count(*)::integer
+    INTO v_avg, v_count
+  FROM public.course_ratings
+  WHERE course_id = v_cid
+    AND deleted_at IS NULL;
+
+  UPDATE public.courses
+  SET rating = v_avg,
+      rating_count = v_count
+  WHERE id = v_cid;
+
+  RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
+-- Student-facing rating submission. Same shape as enroll_in_course:
+-- server-side session/tenant/enrollment derivation, upsert on
+-- (user_id, course_id), uppercase error codes. Direct table writes are
+-- admin-only by RLS — this RPC is the only student path.
+CREATE OR REPLACE FUNCTION public.rate_course(
+  p_course_id uuid,
+  p_rating integer
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_uid uuid := auth.uid();
+  v_tenant uuid;
+  v_course_tenant uuid;
+  v_new_avg numeric;
+  v_new_count integer;
+BEGIN
+  IF current_setting('role', true) != 'service_role' AND v_uid IS NULL THEN
+    RAISE EXCEPTION 'AUTH_REQUIRED';
+  END IF;
+
+  IF p_rating IS NULL OR p_rating < 1 OR p_rating > 5 THEN
+    RAISE EXCEPTION 'INVALID_RATING';
+  END IF;
+
+  SELECT tenant_id INTO v_tenant
+  FROM public.users
+  WHERE id = v_uid
+    AND account_status = 'active'
+    AND deleted_at IS NULL;
+
+  IF v_tenant IS NULL THEN
+    RAISE EXCEPTION 'USER_NOT_FOUND_OR_INACTIVE';
+  END IF;
+
+  SELECT tenant_id INTO v_course_tenant
+  FROM public.courses
+  WHERE id = p_course_id
+    AND deleted_at IS NULL
+  FOR SHARE;
+
+  IF v_course_tenant IS NULL OR v_course_tenant <> v_tenant THEN
+    RAISE EXCEPTION 'COURSE_NOT_FOUND_OR_NOT_PUBLISHED';
+  END IF;
+
+  IF NOT public.has_course_access(v_uid, p_course_id) THEN
+    RAISE EXCEPTION 'NOT_ENROLLED';
+  END IF;
+
+  INSERT INTO public.course_ratings (user_id, course_id, tenant_id, rating, created_by, updated_by)
+  VALUES (v_uid, p_course_id, v_tenant, p_rating, v_uid, v_uid)
+  ON CONFLICT (user_id, course_id) DO UPDATE
+    SET rating = EXCLUDED.rating,
+        updated_by = v_uid,
+        updated_at = pg_catalog.now(),
+        deleted_at = NULL
+  WHERE public.course_ratings.deleted_at IS NOT NULL
+     OR public.course_ratings.rating <> EXCLUDED.rating;
+
+  -- The aggregate trigger already ran; read back the authoritative values.
+  SELECT c.rating, c.rating_count INTO v_new_avg, v_new_count
+  FROM public.courses c
+  WHERE c.id = p_course_id;
+
+  RETURN jsonb_build_object(
+    'course_id', p_course_id,
+    'rating', v_new_avg,
+    'rating_count', v_new_count
+  );
+END;
+$$;
+
+-- Resolves the public instructor display fields (name + avatar) for a set
+-- of courses without exposing the underlying users rows. The users SELECT
+-- RLS only lets a student read their own row, so PostgREST
+-- teacher:users!teacher_id(...) joins resolve to NULL for students and
+-- instructor names disappeared from Discover/Saved cards. RLS filters
+-- rows, not columns, so widening that policy would leak sensitive columns
+-- (token_version etc.); this SECURITY DEFINER function emits only the
+-- three public display fields, tenant-scoped and published-courses-only.
+CREATE OR REPLACE FUNCTION public.get_courses_instructors(
+  p_course_ids uuid[]
+)
+RETURNS TABLE(
+  course_id uuid,
+  instructor_name text,
+  instructor_avatar text
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+  SELECT c.id,
+         pg_catalog.btrim(
+           pg_catalog.concat_ws(' ', u.first_name, u.last_name)
+         ),
+         u.avatar_url
+  FROM public.courses c
+  JOIN public.users u ON u.id = c.teacher_id
+  WHERE c.id = ANY(p_course_ids)
+    AND c.status = 'published'
+    AND c.deleted_at IS NULL
+    AND c.tenant_id = public.get_current_tenant_id()
+    AND u.deleted_at IS NULL;
 $$;
 
 -- courses-subsystem-production-hardening-plan.md, Phase 2/3: the previous
@@ -1748,7 +1891,9 @@ SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_id uuid := gen_random_uuid();
+  v_user_id uuid := p_user_id;
   v_tenant_id uuid;
+  v_details jsonb := coalesce(p_details, '{}');
 BEGIN
   -- Only service_role may supply an explicit tenant_id
   IF p_tenant_id IS NOT NULL AND auth.role() <> 'service_role' THEN
@@ -1761,12 +1906,42 @@ BEGIN
     public.system_tenant_id()
   );
 
+  -- FK PAIR GUARD (2026-09-15): activity_logs enforces the composite
+  -- activity_logs_user_tenant_fkey (user_id, tenant_id) -> users(id, tenant_id)
+  -- while this queue table only carries simple FKs. An override naming a
+  -- tenant the actor is not a member of (e.g. a switched super_admin's
+  -- *acting* tenant, formerly sent by SupabaseAuditLogger as ctx.tenantId)
+  -- was accepted here, then detonated inside flush_activity_logs() with
+  -- 23503 -- and because the flush is a single transaction, every batch
+  -- aborted on the first poisoned row and the whole audit pipeline wedged.
+  -- Validate the pair now and self-heal instead; the hash chain is computed
+  -- at flush time from the final row values, so healing here keeps the
+  -- chain intact.
+  IF NOT EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = v_user_id AND u.tenant_id = v_tenant_id
+  ) THEN
+    IF p_tenant_id IS NOT NULL THEN
+      v_details := v_details || jsonb_build_object('tenant_override_dropped', v_tenant_id);
+    END IF;
+
+    SELECT u.tenant_id INTO v_tenant_id FROM public.users u WHERE u.id = v_user_id;
+    IF v_tenant_id IS NULL THEN
+      -- Actor row unknown/deleted: drop attribution entirely -- the same
+      -- (NULL user_id, system tenant) shape that ON DELETE SET NULL +
+      -- MATCH SIMPLE already accepts for deleted users.
+      v_details := v_details || jsonb_build_object('audit_actor_unresolved', v_user_id);
+      v_user_id := NULL;
+      v_tenant_id := public.system_tenant_id();
+    END IF;
+  END IF;
+
   INSERT INTO public.activity_log_queue (
     id, user_id, tenant_id, activity_type, details,
     ip_address, device_id, risk_level
   )
   VALUES (
-    v_id, p_user_id, v_tenant_id, p_type, coalesce(p_details, '{}'),
+    v_id, v_user_id, v_tenant_id, p_type, v_details,
     p_ip, p_device_id, p_risk_level
   );
 
@@ -1826,6 +2001,10 @@ DECLARE
   v_tenant_id uuid;
   v_id uuid;
   v_final_user_ids uuid[] := p_target_user_ids;
+  v_targeting_mode text := CASE
+    WHEN cardinality(coalesce(p_target_user_ids, ARRAY[]::uuid[])) > 0 THEN 'users'
+    ELSE 'audience'
+  END;
 BEGIN
   v_tenant_id := public.get_current_tenant_id();
 
@@ -1854,11 +2033,11 @@ BEGIN
 
   -- 1. Insert notification master record
   INSERT INTO public.notifications (
-    tenant_id, title, body, target_audience, created_by
+    tenant_id, title, body, target_audience, targeting_mode, created_by
   )
   VALUES (
     v_tenant_id, btrim(p_title), btrim(p_body),
-    coalesce(p_target_audience, 'all'), v_uid
+    coalesce(p_target_audience, 'all'), v_targeting_mode, v_uid
   )
   RETURNING id INTO v_id;
 
@@ -1977,10 +2156,13 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS internal.dequeue_job(text, text[], integer);
+
 CREATE OR REPLACE FUNCTION internal.dequeue_job(
   p_worker_id text,
   p_job_types text[] DEFAULT NULL,
-  p_lock_ttl_seconds integer DEFAULT 300
+  p_lock_ttl_seconds integer DEFAULT 300,
+  p_batch_size integer DEFAULT 1
 )
 RETURNS SETOF internal.job_queue
 LANGUAGE plpgsql
@@ -2005,7 +2187,7 @@ BEGIN
       AND (next_retry_at IS NULL OR next_retry_at <= pg_catalog.now())
       AND (p_job_types IS NULL OR job_type = ANY(p_job_types))
     ORDER BY priority DESC, run_at ASC
-    LIMIT 1
+    LIMIT greatest(1, least(coalesce(p_batch_size, 1), 500))
     FOR UPDATE SKIP LOCKED
   )
   UPDATE internal.job_queue
@@ -2611,6 +2793,27 @@ BEGIN
       'release-stale-job-locks',
       '* * * * *',
       'SELECT public.release_stale_job_locks();'
+    );
+  END IF;
+END $$;
+
+-- Automatic course notifications are SQL-only and must run every minute. Keep
+-- this independent from the HTTP push-worker schedule; the Vercel cron route
+-- remains a fallback for environments without pg_cron.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron')
+     AND EXISTS (
+       SELECT 1 FROM pg_tables WHERE schemaname = 'cron' AND tablename = 'job'
+     ) THEN
+    PERFORM cron.unschedule(jobid)
+    FROM cron.job
+    WHERE jobname = 'course-notification-worker';
+
+    PERFORM cron.schedule(
+      'course-notification-worker',
+      '* * * * *',
+      'SELECT internal.process_course_notify_jobs();'
     );
   END IF;
 END $$;
@@ -4009,6 +4212,13 @@ LANGUAGE plpgsql
 SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
 BEGIN
+  -- System notifications fan out inline so the course-notification worker
+  -- can complete the whole delivery transaction without a second audience
+  -- based job re-processing the notification.
+  IF coalesce(current_setting('eduzone.skip_async_fanout', true), 'off') = 'on' THEN
+    RETURN NEW;
+  END IF;
+
   -- Async fanout: enqueue a single job instead of per-user inserts.
   -- The job worker (service_role) handles the actual user_notifications inserts.
   INSERT INTO internal.job_queue (job_type, payload, priority)
@@ -4017,12 +4227,109 @@ BEGIN
     jsonb_build_object(
       'notification_id', NEW.id,
       'tenant_id',        NEW.tenant_id,
-      'target_audience',  NEW.target_audience
+      'target_audience',  NEW.target_audience,
+      'targeting_mode',   NEW.targeting_mode
     ),
     5  -- medium priority
   )
   ON CONFLICT (job_type, payload_hash) WHERE (status IN ('pending', 'processing')) DO NOTHING;
   RETURN NEW;
+END;
+$$;
+
+-- Internal, service-role-only notification primitive used by automatic course
+-- notifications. It intentionally accepts only an explicit recipient list:
+-- NULL/empty input is a no-op and can never fall through to an audience send.
+CREATE OR REPLACE FUNCTION internal.send_system_notification(
+  p_tenant_id uuid,
+  p_title text,
+  p_body text,
+  p_user_ids uuid[]
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = public, internal, pg_temp
+AS $$
+DECLARE
+  v_id uuid;
+BEGIN
+  IF coalesce(auth.role(), current_user) NOT IN
+      ('service_role', 'postgres', 'supabase_admin') THEN
+    RAISE EXCEPTION 'PERMISSION_DENIED';
+  END IF;
+
+  IF p_user_ids IS NULL OR cardinality(p_user_ids) = 0 THEN
+    RETURN NULL;
+  END IF;
+
+  PERFORM set_config('eduzone.skip_async_fanout', 'on', true);
+
+  INSERT INTO public.notifications (
+    tenant_id, title, body, target_audience, targeting_mode, created_by
+  )
+  VALUES (
+    p_tenant_id,
+    left(btrim(p_title), 100),
+    left(btrim(p_body), 500),
+    'all',
+    'users',
+    NULL
+  )
+  RETURNING id INTO v_id;
+
+  INSERT INTO public.notification_targets (notification_id, user_id)
+  SELECT v_id, u.id
+  FROM public.users u
+  WHERE u.id = ANY(p_user_ids)
+    AND u.tenant_id = p_tenant_id
+    AND u.deleted_at IS NULL
+    AND u.account_status = 'active'
+  ON CONFLICT DO NOTHING;
+
+  INSERT INTO public.user_notifications (user_id, notification_id, tenant_id, is_read)
+  SELECT u.id, v_id, p_tenant_id, false
+  FROM public.users u
+  WHERE u.id = ANY(p_user_ids)
+    AND u.tenant_id = p_tenant_id
+    AND u.deleted_at IS NULL
+    AND u.account_status = 'active'
+  ON CONFLICT (user_id, notification_id) DO NOTHING;
+
+  INSERT INTO public.push_deliveries (
+    notification_id, user_notification_id, user_id, tenant_id, push_token_id
+  )
+  SELECT un.notification_id, un.id, un.user_id, un.tenant_id, pt.id
+  FROM public.user_notifications un
+  JOIN public.push_tokens pt
+    ON pt.user_id = un.user_id
+   AND pt.tenant_id = un.tenant_id
+   AND pt.is_active
+  WHERE un.notification_id = v_id
+    AND un.tenant_id = p_tenant_id
+  ON CONFLICT (notification_id, push_token_id) DO NOTHING;
+
+  INSERT INTO internal.job_queue (tenant_id, job_type, payload, priority)
+  SELECT pd.tenant_id, 'notification_push',
+         jsonb_build_object(
+           'push_delivery_id', pd.id,
+           'notification_id', pd.notification_id,
+           'user_notification_id', pd.user_notification_id,
+           'push_token_id', pd.push_token_id
+         ), 10
+  FROM public.push_deliveries pd
+  WHERE pd.notification_id = v_id
+    AND pd.status = 'pending'
+    AND pd.attempt_count = 0
+  ON CONFLICT (job_type, payload_hash)
+    WHERE status IN ('pending', 'processing') DO NOTHING;
+
+  BEGIN
+    PERFORM internal.invoke_notification_push_worker();
+  EXCEPTION WHEN OTHERS THEN
+    NULL;
+  END;
+
+  RETURN v_id;
 END;
 $$;
 
@@ -4127,7 +4434,7 @@ $$;
 -- ALTER DEFAULT PRIVILEGES REVOKE there strips the implicit PUBLIC grant.
 -- ============================================================================
 CREATE OR REPLACE FUNCTION public.get_tenants_usage(p_tenant_ids uuid[])
-RETURNS TABLE (tenant_id uuid, user_count bigint, course_count bigint)
+RETURNS TABLE (tenant_id uuid, user_count bigint, course_count bigint, storage_bytes bigint)
 LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER SET search_path = public, pg_temp
@@ -4151,6 +4458,23 @@ BEGIN
       FROM public.courses c
       WHERE c.tenant_id = t.id
         AND c.deleted_at IS NULL
+    ),
+    -- Tenant storage attribution: every bucket path that embeds the tenant id
+    -- as a path segment (exports/{tenant_id}/... today; Flutter-app buckets
+    -- follow the same convention). User-scoped-only paths (avatars/{user_id})
+    -- are not attributable per-tenant and are intentionally excluded. The
+    -- regex guard tolerates NULL/malformed metadata.size instead of failing
+    -- the whole RPC on one bad row.
+    (
+      SELECT coalesce(sum(
+        CASE WHEN (o.metadata ->> 'size') ~ '^[0-9]+$'
+             THEN (o.metadata ->> 'size')::bigint
+             ELSE 0 END
+      ), 0)::bigint
+      FROM storage.objects o
+      WHERE o.name = t.id::text
+         OR o.name LIKE t.id::text || '/%'
+         OR o.name LIKE '%/' || t.id::text || '/%'
     )
   FROM public.tenants t
   WHERE t.id = ANY(p_tenant_ids)
@@ -5105,10 +5429,13 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS public.dequeue_job(text, text[], integer);
+
 CREATE OR REPLACE FUNCTION public.dequeue_job(
   p_worker_id text,
   p_job_types text[] DEFAULT NULL,
-  p_lock_ttl_seconds integer DEFAULT 300
+  p_lock_ttl_seconds integer DEFAULT 300,
+  p_batch_size integer DEFAULT 1
 )
 RETURNS SETOF internal.job_queue
 LANGUAGE plpgsql
@@ -5120,7 +5447,7 @@ BEGIN
   END IF;
 
   RETURN QUERY
-  SELECT * FROM internal.dequeue_job(p_worker_id, p_job_types, p_lock_ttl_seconds);
+  SELECT * FROM internal.dequeue_job(p_worker_id, p_job_types, p_lock_ttl_seconds, p_batch_size);
 END;
 $$;
 
@@ -5201,18 +5528,69 @@ RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
+DECLARE
+  v_should_notify boolean := false;
 BEGIN
-  IF TG_OP = 'UPDATE'
-     AND NEW.is_published = true
-     AND OLD.is_published IS DISTINCT FROM NEW.is_published THEN
-    INSERT INTO internal.job_queue (job_type, payload, priority)
+  IF TG_OP = 'INSERT' THEN
+    v_should_notify := NEW.is_published = true;
+  ELSIF TG_OP = 'UPDATE' THEN
+    v_should_notify := NEW.is_published = true
+      AND OLD.is_published IS DISTINCT FROM NEW.is_published;
+  END IF;
+
+  IF v_should_notify THEN
+    INSERT INTO internal.job_queue (tenant_id, job_type, payload, priority)
     VALUES (
-      'NOTIFY_LESSON_PUBLISHED',
-      jsonb_build_object('course_id', NEW.course_id, 'lesson_title', NEW.title),
-      10
+       NEW.tenant_id,
+       'NOTIFY_LESSON_PUBLISHED',
+       jsonb_build_object(
+         'lesson_id', NEW.id,
+         'course_id', NEW.course_id,
+         'tenant_id', NEW.tenant_id,
+         'lesson_title', NEW.title
+       ),
+       10
     )
     ON CONFLICT (job_type, payload_hash) WHERE (status IN ('pending', 'processing')) DO NOTHING;
   END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.trg_enrollment_notify()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = public, internal, pg_temp
+AS $$
+DECLARE
+  v_is_reactivation boolean := false;
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    IF NEW.status <> 'active' THEN
+      RETURN NEW;
+    END IF;
+  ELSIF TG_OP = 'UPDATE'
+        AND OLD.status <> 'active'
+        AND NEW.status = 'active' THEN
+    v_is_reactivation := true;
+  ELSE
+    RETURN NEW;
+  END IF;
+
+  INSERT INTO internal.job_queue (tenant_id, job_type, payload, priority)
+  VALUES (
+    NEW.tenant_id,
+    'NOTIFY_STUDENT_ENROLLED',
+    jsonb_build_object(
+      'user_id', NEW.user_id,
+      'course_id', NEW.course_id,
+      'tenant_id', NEW.tenant_id,
+      'is_reactivation', v_is_reactivation
+    ),
+    10
+  )
+  ON CONFLICT (job_type, payload_hash) WHERE (status IN ('pending', 'processing')) DO NOTHING;
+
   RETURN NEW;
 END;
 $$;
@@ -5671,26 +6049,83 @@ BEGIN
 END;
 $$;
 
+-- MVs are created WITH NO DATA; REFRESH ... CONCURRENTLY fails with
+-- "cannot be used when the materialized view is not populated" until the
+-- first populate. Check pg_matviews.ispopulated and choose the refresh mode
+-- accordingly, so analytics MVs can never stay permanently empty.
+CREATE OR REPLACE FUNCTION private.refresh_mv_resilient(p_schema text, p_name text)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_populated boolean;
+BEGIN
+  SELECT ispopulated INTO v_populated
+  FROM pg_catalog.pg_matviews
+  WHERE schemaname = p_schema AND matviewname = p_name;
+
+  IF v_populated IS NULL THEN
+    RAISE EXCEPTION 'MATERIALIZED_VIEW_NOT_FOUND: %.%', p_schema, p_name;
+  END IF;
+
+  IF v_populated THEN
+    EXECUTE pg_catalog.format('REFRESH MATERIALIZED VIEW CONCURRENTLY %I.%I', p_schema, p_name);
+  ELSE
+    EXECUTE pg_catalog.format('REFRESH MATERIALIZED VIEW %I.%I', p_schema, p_name);
+  END IF;
+END;
+$$;
+
 CREATE OR REPLACE FUNCTION private.refresh_all_materialized_views()
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
 BEGIN
-  IF auth.role() <> 'service_role' AND NOT public.is_admin_with_session_validation() THEN
+  -- Cron-safe guard: pg_cron runs as `postgres` with NO JWT context —
+  -- coalesce(auth.role(), current_user) lets cron/service_role through
+  -- while still accepting session-validated admins (PERF-01 pattern).
+  IF coalesce(auth.role(), current_user) NOT IN ('service_role', 'postgres', 'supabase_admin')
+     AND NOT public.is_admin_with_session_validation() THEN
     RAISE EXCEPTION 'PERMISSION_DENIED';
   END IF;
 
   DELETE FROM private.user_access_cache
   WHERE valid_until < pg_catalog.now();
 
-  REFRESH MATERIALIZED VIEW CONCURRENTLY private.mv_user_stats;
-  REFRESH MATERIALIZED VIEW CONCURRENTLY private.mv_course_stats;
-  REFRESH MATERIALIZED VIEW CONCURRENTLY private.mv_course_stats_tenant;
-  REFRESH MATERIALIZED VIEW CONCURRENTLY private.mv_hourly_activity_48h;
-  REFRESH MATERIALIZED VIEW CONCURRENTLY private.mv_daily_activity_30d;
+  PERFORM private.refresh_mv_resilient('private', 'mv_user_stats');
+  PERFORM private.refresh_mv_resilient('private', 'mv_course_stats');
+  PERFORM private.refresh_mv_resilient('private', 'mv_course_stats_tenant');
+  PERFORM private.refresh_mv_resilient('private', 'mv_hourly_activity_48h');
+  PERFORM private.refresh_mv_resilient('private', 'mv_daily_activity_30d');
 END;
 $$;
+
+-- ============================================================================
+-- MV refresh scheduling: private.refresh_all_materialized_views() previously
+-- had NO caller — no pg_cron registration and no worker call site — so every
+-- analytics MV created WITH NO DATA stayed empty forever (root cause of the
+-- System Analytics "Course Performance" section showing no data despite data
+-- existing). Refresh every 5 minutes, idempotent re-registration.
+-- ============================================================================
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron')
+     AND EXISTS (
+       SELECT 1 FROM pg_tables WHERE schemaname = 'cron' AND tablename = 'job'
+     ) THEN
+    PERFORM cron.unschedule(jobid)
+    FROM cron.job
+    WHERE jobname = 'refresh-materialized-views';
+
+    PERFORM cron.schedule(
+      'refresh-materialized-views',
+      '*/5 * * * *',
+      'SELECT private.refresh_all_materialized_views();'
+    );
+  END IF;
+END $$;
 
 -- ============================================================================
 -- 010_auth_hook.sql
@@ -6113,6 +6548,14 @@ DECLARE
   v_prev_hash text;
   v_entry_data text;
 BEGIN
+  -- flush_activity_logs() is the canonical writer for activity_logs. It
+  -- computes a single global chain from audit_chain_state and supplies both
+  -- hashes explicitly. Recomputing them here with the legacy per-tenant
+  -- formula breaks the global chain at the very first inserted row.
+  IF NEW.prev_hash IS NOT NULL AND NEW.entry_hash IS NOT NULL THEN
+    RETURN NEW;
+  END IF;
+
   -- Ensure pgcrypto extension is available
   PERFORM 1 FROM pg_extension WHERE extname = 'pgcrypto';
   -- Get previous hash from last entry for this tenant
@@ -6647,6 +7090,7 @@ DECLARE
   v_notif_id  uuid;
   v_tenant_id uuid;
   v_audience  text;
+  v_targeting_mode text;
 BEGIN
   -- Only service_role / postgres / supabase_admin may execute
   IF coalesce(auth.role(), current_user) NOT IN ('service_role','postgres','supabase_admin') THEN
@@ -6654,12 +7098,27 @@ BEGIN
   END IF;
 
   FOR v_job IN
-    SELECT * FROM internal.dequeue_job(p_worker_id, ARRAY['notification_fanout'], 300)
-    LIMIT greatest(1, least(coalesce(p_limit, 50), 500))
+    SELECT * FROM internal.dequeue_job(
+      p_worker_id,
+      ARRAY['notification_fanout'],
+      300,
+      greatest(1, least(coalesce(p_limit, 50), 500))
+    )
   LOOP
     v_notif_id  := (v_job.payload ->> 'notification_id')::uuid;
     v_tenant_id := (v_job.payload ->> 'tenant_id')::uuid;
-    v_audience  := v_job.payload ->> 'target_audience';
+
+    -- Read the source row, not only the job payload. This supports already
+    -- queued jobs created before this hardening and makes users-mode
+    -- authoritative during the insert/target-attachment race.
+    SELECT n.tenant_id, n.target_audience, n.targeting_mode
+      INTO v_tenant_id, v_audience, v_targeting_mode
+    FROM public.notifications n
+    WHERE n.id = v_notif_id;
+
+    IF v_tenant_id IS NULL THEN
+      RAISE EXCEPTION 'NOTIFICATION_NOT_FOUND';
+    END IF;
 
     BEGIN
       INSERT INTO public.user_notifications (user_id, notification_id, tenant_id, is_read)
@@ -6669,14 +7128,24 @@ BEGIN
         AND u.deleted_at      IS NULL
         AND u.account_status  = 'active'
         AND (
-              v_audience = 'all'
-          OR (v_audience = 'students'  AND u.primary_role = 'student')
-          OR (v_audience = 'teachers'  AND u.primary_role = 'teacher')
-          OR (v_audience = 'admins'    AND u.primary_role IN ('admin','super_admin'))
-          OR EXISTS (
-               SELECT 1 FROM public.notification_targets nt
-               WHERE nt.notification_id = v_notif_id AND nt.user_id = u.id
-             )
+          -- Explicit targets are an allow-list, never an additive audience.
+          EXISTS (
+            SELECT 1 FROM public.notification_targets nt
+            WHERE nt.notification_id = v_notif_id AND nt.user_id = u.id
+          )
+          OR (
+            coalesce(v_targeting_mode, 'audience') <> 'users'
+            AND NOT EXISTS (
+              SELECT 1 FROM public.notification_targets nt
+              WHERE nt.notification_id = v_notif_id
+            )
+            AND (
+                  v_audience = 'all'
+              OR (v_audience = 'students'  AND u.primary_role = 'student')
+              OR (v_audience = 'teachers'  AND u.primary_role = 'teacher')
+              OR (v_audience = 'admins'    AND u.primary_role IN ('admin','super_admin'))
+            )
+          )
         )
         AND NOT EXISTS (
           SELECT 1 FROM public.user_notifications un2
@@ -6734,6 +7203,11 @@ BEGIN
     EXCEPTION WHEN OTHERS THEN
       UPDATE internal.job_queue
       SET status              = CASE WHEN attempts >= max_attempts THEN 'failed' ELSE 'pending' END,
+          next_retry_at       = CASE WHEN attempts >= max_attempts THEN NULL
+                                      ELSE now() + least(interval '15 minutes',
+                                           greatest(interval '30 seconds',
+                                             make_interval(secs => power(2, greatest(attempts - 1, 0))::integer * 30)))
+                                 END,
           error_message       = SQLERRM,
           locked_by_worker_id = NULL,
           locked_at           = NULL,
@@ -6758,7 +7232,8 @@ $$;
 
 COMMENT ON FUNCTION internal.process_notification_fanout_jobs(integer, text) IS
   'Dequeues notification_fanout jobs from internal.job_queue and fans them out as
-   user_notifications rows filtered by target_audience (all/students/teachers/admins).
+   user_notifications rows. Explicit notification_targets are an exclusive
+   allow-list; audience fallback is used only when no explicit targets exist.
    Called by GET /api/cron/routine on every cron tick. Requires service_role.';
 
 CREATE OR REPLACE FUNCTION public.process_notification_fanout_jobs(
@@ -6771,6 +7246,337 @@ SECURITY DEFINER SET search_path = public, internal, pg_temp
 AS $$
   SELECT internal.process_notification_fanout_jobs(p_limit, p_worker_id);
 $$;
+
+-- ============================================================================
+-- Automatic course notification worker
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION internal.process_course_notify_jobs(
+  p_limit     integer DEFAULT 50,
+  p_worker_id text    DEFAULT gen_random_uuid()::text
+)
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = public, internal, pg_temp
+AS $$
+DECLARE
+  v_group record;
+  v_job record;
+  v_course_title text;
+  v_lesson_names text;
+  v_count_label text;
+  v_body text;
+  v_notification_id uuid;
+  v_recipient_ids uuid[];
+  v_result jsonb;
+  v_processed integer := 0;
+BEGIN
+  IF coalesce(auth.role(), current_user) NOT IN
+      ('service_role', 'postgres', 'supabase_admin') THEN
+    RAISE EXCEPTION 'PERMISSION_DENIED';
+  END IF;
+
+  IF coalesce(p_limit, 50) <= 0 THEN
+    RETURN 0;
+  END IF;
+
+  DROP TABLE IF EXISTS pg_temp.eduzone_course_notify_batch;
+  CREATE TEMP TABLE eduzone_course_notify_batch (
+    job_id uuid PRIMARY KEY,
+    tenant_id uuid,
+    job_type text NOT NULL,
+    payload jsonb NOT NULL
+  ) ON COMMIT DROP;
+
+  INSERT INTO eduzone_course_notify_batch (job_id, tenant_id, job_type, payload)
+  SELECT id, tenant_id, job_type, payload
+  FROM internal.dequeue_job(
+    p_worker_id,
+    ARRAY['NOTIFY_LESSON_PUBLISHED', 'NOTIFY_STUDENT_ENROLLED'],
+    300,
+    greatest(1, least(coalesce(p_limit, 50), 500))
+  );
+
+  -- Lesson jobs are grouped by course so a batch of published videos creates
+  -- one inbox/push notification per student instead of one per lesson.
+  FOR v_group IN
+    SELECT tenant_id,
+           (payload ->> 'course_id')::uuid AS course_id,
+           count(*)::integer AS lesson_count,
+           array_agg(job_id) AS job_ids,
+           string_agg(
+             '«' || left(btrim(payload ->> 'lesson_title'), 120) || '»',
+             '، ' ORDER BY job_id
+           ) AS lesson_names
+    FROM eduzone_course_notify_batch
+    WHERE job_type = 'NOTIFY_LESSON_PUBLISHED'
+    GROUP BY tenant_id, (payload ->> 'course_id')::uuid
+  LOOP
+    BEGIN
+      SELECT left(c.title, 120)
+        INTO v_course_title
+      FROM public.courses c
+      WHERE c.id = v_group.course_id
+        AND c.tenant_id = v_group.tenant_id
+        AND c.deleted_at IS NULL;
+
+      IF v_course_title IS NULL THEN
+        RAISE EXCEPTION 'COURSE_NOT_FOUND';
+      END IF;
+
+      SELECT array_agg(DISTINCT e.user_id ORDER BY e.user_id)
+        INTO v_recipient_ids
+      FROM public.enrollments e
+      WHERE e.course_id = v_group.course_id
+        AND e.tenant_id = v_group.tenant_id
+        AND e.status IN ('active', 'completed')
+        AND e.deleted_at IS NULL;
+
+      IF v_recipient_ids IS NULL OR cardinality(v_recipient_ids) = 0 THEN
+        v_result := jsonb_build_object('skipped', 'no_recipients');
+      ELSE
+        v_lesson_names := left(v_group.lesson_names, 360);
+        IF v_group.lesson_count = 1 THEN
+          v_body := format(
+            'أضيف الدرس %s إلى كورس «%s».',
+            v_lesson_names,
+            v_course_title
+          );
+        ELSE
+          v_count_label := CASE
+            WHEN v_group.lesson_count = 2 THEN 'درسين جديدين'
+            WHEN v_group.lesson_count BETWEEN 3 AND 10
+              THEN v_group.lesson_count::text || ' دروس جديدة'
+            ELSE v_group.lesson_count::text || ' درساً جديداً'
+          END;
+          v_body := format(
+            'أضيف %s إلى كورس «%s»: %s.',
+            v_count_label,
+            v_course_title,
+            v_lesson_names
+          );
+        END IF;
+
+        v_notification_id := internal.send_system_notification(
+          v_group.tenant_id,
+          'درس جديد',
+          left(v_body, 500),
+          v_recipient_ids
+        );
+        v_result := jsonb_build_object('notification_id', v_notification_id);
+      END IF;
+
+      UPDATE internal.job_queue
+      SET status = 'done',
+          result = v_result,
+          error_message = NULL,
+          locked_by_worker_id = NULL,
+          locked_at = NULL,
+          lock_expires_at = NULL,
+          finished_at = now(),
+          updated_at = now()
+      WHERE id = ANY(v_group.job_ids);
+      v_processed := v_processed + cardinality(v_group.job_ids);
+    EXCEPTION WHEN OTHERS THEN
+      UPDATE internal.job_queue
+      SET status = CASE WHEN attempts >= max_attempts THEN 'failed' ELSE 'pending' END,
+          next_retry_at = CASE WHEN attempts >= max_attempts THEN NULL
+                               ELSE now() + least(interval '15 minutes',
+                                    greatest(interval '30 seconds',
+                                      make_interval(secs => power(2, greatest(attempts - 1, 0))::integer * 30)))
+                          END,
+          error_message = left(SQLERRM, 1000),
+          locked_by_worker_id = NULL,
+          locked_at = NULL,
+          lock_expires_at = NULL,
+          updated_at = now()
+      WHERE id = ANY(v_group.job_ids);
+    END;
+  END LOOP;
+
+  -- Enrollment and reactivation notifications remain one-to-one.
+  FOR v_job IN
+    SELECT *
+    FROM eduzone_course_notify_batch
+    WHERE job_type = 'NOTIFY_STUDENT_ENROLLED'
+  LOOP
+    BEGIN
+      SELECT left(c.title, 120)
+        INTO v_course_title
+      FROM public.courses c
+      WHERE c.id = (v_job.payload ->> 'course_id')::uuid
+        AND c.tenant_id = v_job.tenant_id
+        AND c.deleted_at IS NULL;
+
+      IF v_course_title IS NULL THEN
+        RAISE EXCEPTION 'COURSE_NOT_FOUND';
+      END IF;
+
+      SELECT array_agg(u.id)
+        INTO v_recipient_ids
+      FROM public.users u
+      WHERE u.id = (v_job.payload ->> 'user_id')::uuid
+        AND u.tenant_id = v_job.tenant_id
+        AND u.deleted_at IS NULL
+        AND u.account_status = 'active';
+
+      IF v_recipient_ids IS NULL OR cardinality(v_recipient_ids) = 0 THEN
+        v_result := jsonb_build_object('skipped', 'no_recipients');
+      ELSE
+        IF coalesce((v_job.payload ->> 'is_reactivation')::boolean, false) THEN
+          v_body := format('تمت إعادة تفعيل اشتراكك في كورس «%s».', v_course_title);
+          v_notification_id := internal.send_system_notification(
+            v_job.tenant_id, '♻️ تم إعادة تفعيل اشتراكك', left(v_body, 500), v_recipient_ids
+          );
+        ELSE
+          v_body := format('تمت إضافتك إلى كورس «%s».', v_course_title);
+          v_notification_id := internal.send_system_notification(
+            v_job.tenant_id, '📚 كورس جديد', left(v_body, 500), v_recipient_ids
+          );
+        END IF;
+        v_result := jsonb_build_object('notification_id', v_notification_id);
+      END IF;
+
+      UPDATE internal.job_queue
+      SET status = 'done',
+          result = v_result,
+          error_message = NULL,
+          locked_by_worker_id = NULL,
+          locked_at = NULL,
+          lock_expires_at = NULL,
+          finished_at = now(),
+          updated_at = now()
+      WHERE id = v_job.job_id;
+      v_processed := v_processed + 1;
+    EXCEPTION WHEN OTHERS THEN
+      UPDATE internal.job_queue
+      SET status = CASE WHEN attempts >= max_attempts THEN 'failed' ELSE 'pending' END,
+          next_retry_at = CASE WHEN attempts >= max_attempts THEN NULL
+                               ELSE now() + least(interval '15 minutes',
+                                    greatest(interval '30 seconds',
+                                      make_interval(secs => power(2, greatest(attempts - 1, 0))::integer * 30)))
+                          END,
+          error_message = left(SQLERRM, 1000),
+          locked_by_worker_id = NULL,
+          locked_at = NULL,
+          lock_expires_at = NULL,
+          updated_at = now()
+      WHERE id = v_job.job_id;
+    END;
+  END LOOP;
+
+  RETURN v_processed;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.process_course_notify_jobs(
+  p_limit     integer DEFAULT 50,
+  p_worker_id text    DEFAULT gen_random_uuid()::text
+)
+RETURNS integer
+LANGUAGE sql
+SECURITY DEFINER SET search_path = public, internal, pg_temp
+AS $$
+  SELECT internal.process_course_notify_jobs(p_limit, p_worker_id);
+$$;
+
+COMMENT ON FUNCTION internal.process_course_notify_jobs(integer, text) IS
+  'Processes lesson-published and enrollment notification jobs in batches. Lesson jobs are grouped by course and explicit recipients are fanned out inline.';
+
+-- ============================================================================
+-- Cron routine public RPC wrappers (launch audit B2, 2026-09-15)
+-- ============================================================================
+-- GET /api/cron/routine resolves RPCs through PostgREST, which can only reach
+-- functions in the EXPOSED schemas (config.toml: public, graphql_public). The
+-- four maintenance routines below were defined in internal/maintenance/private
+-- schemas, so every cron tick failed with a schema-cache error before any
+-- notification work ran. These thin public wrappers are the only
+-- PostgREST-reachable entry points; each forwards to its canonical
+-- implementation and EXECUTE is granted to service_role ONLY in
+-- 10_permissions.sql. No logic lives here — the internal/maintenance/private
+-- functions remain the single source of truth.
+
+CREATE OR REPLACE FUNCTION public.manage_partitions()
+RETURNS void
+LANGUAGE sql
+SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+  SELECT maintenance.manage_partitions();
+$$;
+
+CREATE OR REPLACE FUNCTION public.prune_expired_access_cache()
+RETURNS integer
+LANGUAGE sql
+SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+  SELECT private.prune_expired_access_cache();
+$$;
+
+CREATE OR REPLACE FUNCTION public.process_cache_purges(
+  p_limit     integer DEFAULT 1000,
+  p_worker_id text    DEFAULT gen_random_uuid()::text
+)
+RETURNS integer
+LANGUAGE sql
+SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+  SELECT internal.process_cache_purges(p_limit, p_worker_id);
+$$;
+
+CREATE OR REPLACE FUNCTION public.process_update_enrollment_totals_jobs(
+  p_limit integer DEFAULT 100
+)
+RETURNS integer
+LANGUAGE sql
+SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+  SELECT internal.process_update_enrollment_totals_jobs(p_limit);
+$$;
+
+-- Queue health snapshot for the cron route (launch audit B11): lets the daily
+-- tick surface failed-job counts and backlog age to monitoring instead of
+-- dying silently. Read-only over internal.job_queue; service_role only.
+CREATE OR REPLACE FUNCTION public.cron_queue_health()
+RETURNS jsonb
+LANGUAGE sql
+SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+  SELECT jsonb_build_object(
+    'pending',
+      (SELECT count(*) FROM internal.job_queue WHERE status = 'pending'),
+    'processing',
+      (SELECT count(*) FROM internal.job_queue WHERE status = 'processing'),
+    'failed',
+      (SELECT count(*) FROM internal.job_queue WHERE status = 'failed'),
+    'failed_last_24h',
+      (SELECT count(*) FROM internal.job_queue
+       WHERE status = 'failed'
+         AND updated_at > pg_catalog.now() - interval '24 hours'),
+    'oldest_pending_age_seconds',
+      (SELECT coalesce(extract(epoch FROM pg_catalog.now() - min(run_at)), 0)::double precision
+       FROM internal.job_queue WHERE status = 'pending')
+  );
+$$;
+
+COMMENT ON FUNCTION public.cron_queue_health() IS
+  'Read-only job-queue health snapshot (pending/processing/failed counts + oldest pending age) consumed by GET /api/cron/routine for monitoring. service_role only.';
+
+-- One-time decommission of the pre-feature backlog. The old
+-- trg_lessons_publish_notify enqueued NOTIFY_LESSON_PUBLISHED jobs without
+-- tenant_id and without lesson_id; no worker ever consumed them, so existing
+-- environments can hold a long pending queue. The new worker resolves the
+-- tenant from the job row and would fail these with a misleading
+-- COURSE_NOT_FOUND after five retries. Fail them once with a clear message
+-- instead. Idempotent: matches only the legacy payload shape, and rows already
+-- done/failed are never re-examined.
+UPDATE internal.job_queue
+SET status = 'failed',
+    error_message = 'legacy pre-feature backlog (payload lacks lesson_id/tenant_id)',
+    finished_at = pg_catalog.now(),
+    updated_at = pg_catalog.now()
+WHERE job_type = 'NOTIFY_LESSON_PUBLISHED'
+  AND status IN ('pending', 'processing')
+  AND NOT (payload ? 'lesson_id');
 
 -- =============================================================================
 -- AUTHENTICATION / AUTHORIZATION RELEASE HARDENING
@@ -6975,6 +7781,112 @@ BEGIN
 EXCEPTION
   WHEN unique_violation THEN
     RAISE EXCEPTION 'DEVICE_ALREADY_BOUND';
+END;
+$$;
+
+-- Client-safe session recorder for a genuinely fresh login. The student
+-- app's AuthRemoteDataSource.recordSession() calls this instead of a
+-- direct public.sessions insert: it is the only way a session row can
+-- carry a trustworthy ip_address, because the client cannot know its own
+-- public IP and any client-supplied value would be trivially spoofable.
+-- The address is read server-side from the request headers injected by
+-- PostgREST/Supabase edge. SECURITY DEFINER with strict self-service
+-- scoping: the row is always created for auth.uid() in the caller's own
+-- tenant, with the caller's own active device and the authoritative
+-- users.region_id -- mirroring the sessions_insert_own RLS policy, which
+-- stays in place (VALIDATION.sql Check 34) as defense in depth.
+CREATE OR REPLACE FUNCTION public.record_current_session(
+  p_device_fingerprint text DEFAULT NULL,
+  p_user_agent text DEFAULT NULL
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_uid uuid := auth.uid();
+  v_tenant_id uuid := public.get_current_tenant_id();
+  v_session_id uuid;
+  v_device_id uuid;
+  v_region_id text;
+  v_headers jsonb;
+  v_ip_raw text;
+  v_ip inet;
+BEGIN
+  IF v_uid IS NULL OR v_tenant_id IS NULL THEN
+    RAISE EXCEPTION 'AUTH_REQUIRED';
+  END IF;
+
+  IF NOT public.validate_user_session() THEN
+    RAISE EXCEPTION 'AUTH_REQUIRED';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.users
+    WHERE id = v_uid
+      AND tenant_id = v_tenant_id
+      AND deleted_at IS NULL
+      AND account_status = 'active'
+  ) THEN
+    RAISE EXCEPTION 'TENANT_MISMATCH';
+  END IF;
+
+  -- Region comes from the authoritative users row, never from the client.
+  SELECT region_id
+    INTO v_region_id
+    FROM public.users
+   WHERE id = v_uid;
+
+  IF btrim(coalesce(p_device_fingerprint, '')) <> '' THEN
+    SELECT d.id
+      INTO v_device_id
+      FROM public.devices d
+     WHERE d.user_id = v_uid
+       AND d.tenant_id = v_tenant_id
+       AND d.device_id = btrim(p_device_fingerprint)
+       AND d.is_active = true
+     LIMIT 1;
+  END IF;
+
+  -- Server-side IP extraction: never trusted from the client. PostgREST
+  -- exposes request headers with lowercase keys; direct psql connections
+  -- have no request.headers GUC (current_setting returns NULL) and no
+  -- forwarded header, so the session is recorded with a NULL ip_address.
+  BEGIN
+    v_headers := nullif(btrim(current_setting('request.headers', true)), '')::jsonb;
+    v_ip_raw := coalesce(
+      v_headers ->> 'x-forwarded-for',
+      v_headers ->> 'x-real-ip'
+    );
+    v_ip := split_part(btrim(coalesce(v_ip_raw, '')), ',', 1)::inet;
+  EXCEPTION
+    WHEN others THEN
+      -- Malformed or absent header: record the session anyway.
+      v_ip := NULL;
+  END;
+
+  INSERT INTO public.sessions (
+    user_id,
+    tenant_id,
+    device_id,
+    region_id,
+    ip_address,
+    user_agent,
+    is_active
+  )
+  VALUES (
+    v_uid,
+    v_tenant_id,
+    v_device_id,
+    v_region_id,
+    v_ip,
+    nullif(btrim(coalesce(p_user_agent, '')), ''),
+    true
+  )
+  RETURNING id INTO v_session_id;
+
+  RETURN v_session_id;
 END;
 $$;
 

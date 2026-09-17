@@ -102,6 +102,14 @@ const UserRow = memo(({
   return (
     <tr
       onClick={() => onViewProfile(user)}
+      tabIndex={0}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onViewProfile(user);
+        }
+      }}
+      aria-label={t('open_user_profile', { name: displayName })}
       className="group hover:bg-muted/30 transition-all duration-200 cursor-pointer"
     >
       <td className="px-5 py-4 sticky start-0 bg-card group-hover:bg-muted/30 z-10 border-b border-border/40" onClick={(e) => e.stopPropagation()}>
@@ -169,6 +177,86 @@ const UserRow = memo(({
 });
 UserRow.displayName = 'UserRow';
 
+// ── Mobile Card (<md) — same row data/actions in a stacked layout ──
+const UserCard = memo(({
+  user,
+  isSelected,
+  onSelectToggle,
+  onViewProfile,
+  onAction,
+  onDeleteUser,
+  onTerminateSessions,
+  onResetDevices,
+  onIssueWarning,
+  locale,
+}: UserRowProps) => {
+  const t = useTranslations('users');
+  const statusConfig = STATUS_CONFIG[user.account_status as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.active;
+  const roleClass = ROLE_CONFIG[user.primary_role as keyof typeof ROLE_CONFIG] || ROLE_CONFIG.student;
+  const displayName = getUserDisplayName(user);
+  const initials = getUserInitials(user);
+
+  return (
+    <div
+      onClick={() => onViewProfile(user)}
+      className={cn(
+        'p-4 cursor-pointer transition-colors hover:bg-muted/30',
+        isSelected && 'bg-primary/5',
+      )}
+    >
+      <div className="flex items-start gap-3">
+        <input
+          type="checkbox"
+          aria-label={t('select_user', { name: displayName })}
+          className="h-4 w-4 mt-1.5 rounded border-border text-primary focus:ring-primary transition-faang cursor-pointer shrink-0"
+          checked={isSelected}
+          onClick={(e) => e.stopPropagation()}
+          onChange={() => onSelectToggle(user.id)}
+        />
+        {user.avatar_url ? (
+          <Image src={user.avatar_url} alt={displayName} width={36} height={36} sizes="36px" className="h-9 w-9 rounded-full object-cover border border-border/50 shrink-0" unoptimized />
+        ) : (
+          <div className="h-9 w-9 rounded-full bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center text-[11px] font-bold text-indigo-600 dark:text-indigo-400 border border-indigo-200/20 shrink-0">
+            {initials}
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm font-bold text-foreground truncate capitalize">{displayName}</span>
+            <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+              <UserRowActions
+                user={user}
+                onViewProfile={onViewProfile}
+                onAction={onAction}
+                onDeleteUser={onDeleteUser}
+                onTerminateSessions={onTerminateSessions}
+                onResetDevices={onResetDevices}
+                onIssueWarning={onIssueWarning}
+              />
+            </div>
+          </div>
+          <p className="text-sm text-foreground/80 font-medium truncate mt-0.5">{user.email || '—'}</p>
+          {user.phone && <p className="text-xs text-muted-foreground truncate">{user.phone}</p>}
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
+            <span className={cn("px-2 py-0.5 rounded-md border text-[10px] font-extrabold uppercase tracking-tight", roleClass)}>
+              {t(`role_${user.primary_role}` as 'role_super_admin' | 'role_admin' | 'role_teacher' | 'role_student')}
+            </span>
+            <div className={cn("inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-tight border transition-faang", statusConfig.bg, statusConfig.color)}>
+              <div className={cn("h-1.5 w-1.5 rounded-full", statusConfig.dot)} />
+              {t(`status_${user.account_status}` as 'status_active' | 'status_locked' | 'status_suspended' | 'status_banned')}
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            <span className="font-semibold">{t('table_header_last_login')}: </span>
+            {user.last_login ? formatDistanceToNow(user.last_login, locale) : t('temp_password_placeholder')}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+});
+UserCard.displayName = 'UserCard';
+
 interface UsersTableProps {
   users: User[];
   isLoading: boolean;
@@ -221,8 +309,9 @@ export function UsersTable({
 
   return (
     <div className="w-full overflow-hidden rounded-lg border border-border/50 bg-card shadow-sm">
-      <div className="relative w-full overflow-auto">
-        <table className="w-full caption-bottom text-sm">
+      {/* DESKTOP TABLE (≥md) — full columns with sticky edges */}
+      <div className="relative w-full overflow-auto hidden md:block">
+        <table className="w-full min-w-[760px] caption-bottom text-sm">
           <thead className="[&_tr]:border-b">
             <tr className="border-b border-border/40 transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
               <th className="h-12 px-5 text-start align-middle font-medium text-muted-foreground w-[1%] sticky start-0 bg-background z-20 border-b border-border/40">
@@ -297,6 +386,47 @@ export function UsersTable({
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* MOBILE (<md): stacked card list — the standard for wide tables on phones */}
+      <div className="md:hidden">
+        {isLoading ? (
+          <div className="divide-y divide-border/40">
+            {skeletonRows.map((i) => (
+              <div key={i} className="p-4 flex items-start gap-3 animate-pulse">
+                <div className="h-4 w-4 bg-muted rounded mt-1.5" />
+                <div className="h-9 w-9 bg-muted rounded-full shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 w-32 bg-muted rounded" />
+                  <div className="h-3 w-48 bg-muted rounded" />
+                  <div className="h-5 w-28 bg-muted rounded-full" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : users.length === 0 ? (
+          <p className="px-4 py-12 text-center text-muted-foreground text-sm font-medium">
+            {t('no_users_found')}
+          </p>
+        ) : (
+          <div className="divide-y divide-border/40">
+            {users.map((user) => (
+              <UserCard
+                key={user.id}
+                user={user}
+                isSelected={selectedIds.has(user.id)}
+                onSelectToggle={onSelectToggle}
+                onViewProfile={onViewProfile}
+                onAction={onAction}
+                onDeleteUser={onDeleteUser}
+                onTerminateSessions={onTerminateSessions}
+                onResetDevices={onResetDevices}
+                onIssueWarning={onIssueWarning}
+                locale={locale}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Pagination Footer */}
