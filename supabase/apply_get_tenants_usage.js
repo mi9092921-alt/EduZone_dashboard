@@ -1,10 +1,40 @@
 // Deploys public.get_tenants_usage() to the live Supabase database
 // and grants EXECUTE to authenticated + service_role.
 // Run with: node supabase/apply_get_tenants_usage.js
+//
+// Credentials are resolved from SUPABASE_DB_URL / DATABASE_URL env vars, or
+// from the gitignored supabase/db_url.txt (same loader as deploy.js) — never
+// hardcoded (SECURITY: a live connection string was once committed here).
 const { Client } = require('pg');
+const fs = require('fs');
+const path = require('path');
 
-const DB_URL =
-  'postgresql://postgres.evmrahlzcgqgjhwvxzih:qAm5Xf0mEHMlmXkE@aws-0-eu-central-1.pooler.supabase.com:5432/postgres';
+function resolveDbUrl() {
+  if (process.env.SUPABASE_DB_URL) return process.env.SUPABASE_DB_URL;
+  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
+
+  const urlFilePath = path.join(__dirname, 'db_url.txt');
+  if (fs.existsSync(urlFilePath)) {
+    let content = fs.readFileSync(urlFilePath, 'utf8');
+    if (content.includes('\u0000')) {
+      content = fs.readFileSync(urlFilePath, 'utf16le');
+    }
+    const lines = content.split('\n');
+    for (const line of lines) {
+      const cleanLine = line.replace(/\r/g, '').trim();
+      if (cleanLine.startsWith('DATABASE_URL=')) {
+        return cleanLine.substring('DATABASE_URL='.length).trim();
+      }
+    }
+  }
+
+  console.error(
+    'Error: SUPABASE_DB_URL or DATABASE_URL must be set in environment, or supabase/db_url.txt must exist.',
+  );
+  process.exit(1);
+}
+
+const DB_URL = resolveDbUrl();
 
 const CREATE_FUNCTION_SQL = `
 CREATE OR REPLACE FUNCTION public.get_tenants_usage(p_tenant_ids uuid[])
