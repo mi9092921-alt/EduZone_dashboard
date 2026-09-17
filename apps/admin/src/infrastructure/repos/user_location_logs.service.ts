@@ -1,4 +1,5 @@
 import { container } from '@/container';
+import { InfrastructureError } from '@/domain/errors';
 import type { UserLocationLog, CoordinatePoint } from '@/domain/types/analytics.types';
 import { createAdminClient } from '@/infrastructure/supabase/admin';
 
@@ -51,7 +52,12 @@ export async function getUserLocationLogsAdmin(
   if (tenantId) query = query.eq('tenant_id', tenantId);
 
   const { data, error } = await query;
-  if (error) throw error;
+  if (error) {
+    throw new InfrastructureError(
+      undefined,
+      `getUserLocationLogsAdmin: ${error.message}`,
+    );
+  }
   return (data ?? []) as UserLocationLog[];
 }
 

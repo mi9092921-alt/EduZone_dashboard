@@ -1,4 +1,5 @@
 import { container } from '@/container';
+import { InfrastructureError } from '@/domain/errors';
 import type { Session } from '@/domain/types/user.types';
 import { createAdminClient } from '@/infrastructure/supabase/admin';
 
@@ -55,6 +56,11 @@ export async function getUserSessionsAdmin(
   if (tenantId) query = query.eq('tenant_id', tenantId);
 
   const { data, error } = await query;
-  if (error) throw error;
+  if (error) {
+    throw new InfrastructureError(
+      undefined,
+      `getUserSessionsAdmin: ${error.message}`,
+    );
+  }
   return (data ?? []) as Session[];
 }
