@@ -1,5 +1,5 @@
 param(
-    [string]$ConfigFile = 'db_url.test.txt'
+    [string]$ConfigFile = 'db_url.txt'
 )
 
 $dbUrlFile = if ([System.IO.Path]::IsPathRooted($ConfigFile)) {
