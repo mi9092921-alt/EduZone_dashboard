@@ -4029,15 +4029,22 @@ RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
+DECLARE
+  v_changed_by uuid := auth.uid();
 BEGIN
-  IF NEW.is_published <> OLD.is_published THEN
+  -- Course deletion is performed through the server's service-role client.
+  -- Its cascade sets lessons to unpublished, but service_role has no caller
+  -- JWT, so auth.uid() is NULL. `changed_by` is intentionally NOT NULL;
+  -- skip this per-lesson transition row for that trusted system cascade.
+  -- The parent course deletion is still recorded by DeleteCourseUseCase.
+  IF NEW.is_published <> OLD.is_published AND v_changed_by IS NOT NULL THEN
     INSERT INTO audit.lesson_state_transitions (
       lesson_id, old_state, new_state, changed_by
     ) VALUES (
       NEW.id,
       CASE WHEN OLD.is_published THEN 'published' ELSE 'draft' END,
       CASE WHEN NEW.is_published THEN 'published' ELSE 'draft' END,
-      auth.uid()
+      v_changed_by
     );
   END IF;
   RETURN NEW;
@@ -8284,7 +8291,7 @@ DECLARE
   v_session jsonb := public._session_status();
   v_role text := v_session ->> 'role';
   v_tenant_id text := v_session ->> 'tenant_id';
-  v_token_version text := v_session ->> 'token_version';
+  v_token_version integer := (v_session ->> 'token_version')::integer;
   v_maintenance_excluded_roles text[] := ARRAY[]::text[];
   v_maintenance_excluded_users uuid[] := ARRAY[]::uuid[];
 BEGIN
