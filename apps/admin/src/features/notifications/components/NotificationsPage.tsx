@@ -985,6 +985,7 @@ export default function NotificationsPage() {
                       <TableCell>
                         <Typography
                           variant="body2"
+                          title={row.body}
                           sx={{
                             color: 'text.secondary',
                             overflow: 'hidden',

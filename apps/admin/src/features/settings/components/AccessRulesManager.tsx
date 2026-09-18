@@ -141,8 +141,8 @@ export function AccessRulesManager({ tenantId }: { tenantId?: string }) {
 
   return (
     <Box sx={{ mt: 4 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'between', alignItems: 'center', mb: 3 }}>
-        <Box>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1.5, mb: 3 }}>
+        <Box sx={{ minWidth: 0 }}>
           <Typography
             variant="h6"
             sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}
@@ -160,7 +160,7 @@ export function AccessRulesManager({ tenantId }: { tenantId?: string }) {
             setEditingRule({ rule_type: 'ip_whitelist', rule_value: {}, is_active: true });
             setIsDialogOpen(true);
           }}
-          sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700 }}
+          sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, width: { xs: '100%', sm: 'auto' } }}
         >
           Add Rule
         </Button>
@@ -233,6 +233,9 @@ export function AccessRulesManager({ tenantId }: { tenantId?: string }) {
                         px: 1,
                         py: 0.5,
                         borderRadius: 1,
+                        display: 'inline-block',
+                        maxWidth: 260,
+                        wordBreak: 'break-all',
                       }}
                     >
                       {JSON.stringify(rule.rule_value)}

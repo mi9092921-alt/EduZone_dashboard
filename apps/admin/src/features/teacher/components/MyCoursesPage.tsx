@@ -153,7 +153,7 @@ export function MyCoursesPage() {
             {t('manage_curriculum')}
           </Typography>
         </Box>
-        <Box sx={{ display: 'flex', gap: 1.5 }}>
+        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
           <Button
             variant="outlined"
             startIcon={<Upload />}
@@ -198,6 +198,9 @@ export function MyCoursesPage() {
         <Tabs
           value={tabValue}
           onChange={handleTabChange}
+          variant="scrollable"
+          scrollButtons={false}
+          allowScrollButtonsMobile
           sx={{
             minHeight: 40,
             '& .MuiTab-root': {

@@ -71,7 +71,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           <div
             role="alert"
             aria-live="polite"
-            className="bg-destructive text-destructive-foreground px-6 py-2 flex items-center justify-center gap-3 animate-in slide-in-from-top duration-300 font-medium text-sm shrink-0"
+            className="bg-destructive text-destructive-foreground px-4 sm:px-6 py-2 flex items-center justify-center gap-3 animate-in slide-in-from-top duration-300 font-medium text-sm shrink-0 text-center"
           >
             <Lock sx={{ fontSize: 18 }} aria-hidden="true" />
             <span>{t('app_lock.banner_locked')}</span>
@@ -83,7 +83,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           ref={mainRef}
           className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden bg-background"
         >
-          <div className="container-faang animate-in fade-in duration-500 pb-10">{children}</div>
+          <div className="container-faang animate-in fade-in duration-500 pb-[max(2.5rem,env(safe-area-inset-bottom))]">{children}</div>
         </main>
       </div>
     </div>

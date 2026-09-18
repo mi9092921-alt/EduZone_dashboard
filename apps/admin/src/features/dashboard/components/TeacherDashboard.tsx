@@ -3,7 +3,6 @@
 import { People, School, TrendingUp, Warning } from '@mui/icons-material';
 import { Typography, Box, useTheme } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 
 import { useTeacherDashboardStats } from '@/adapters/queries/analytics.queries';
@@ -16,6 +15,7 @@ import {
   StatsCardContent,
   StatsCardIcon,
 } from '@/components/ui/Card';
+import { Link } from '@/i18n/routing';
 
 export function TeacherDashboard() {
   const t = useTranslations('common');
@@ -160,7 +160,7 @@ export function TeacherDashboard() {
             <CardTitle>{t('direct_actions')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Link href="/en/courses?dialog=create-course" className="block p-4 rounded-xl bg-indigo-50/30 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-400/20 text-sm transition-colors hover:bg-indigo-50 dark:hover:bg-indigo-500/20">
+            <Link href="/courses?dialog=create-course" className="block p-4 rounded-xl bg-indigo-50/30 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-400/20 text-sm transition-colors hover:bg-indigo-50 dark:hover:bg-indigo-500/20">
               <p className="font-bold text-indigo-700 dark:text-indigo-300">{t('course_creation')}</p>
               <p className="text-[11px] text-indigo-600/70 dark:text-indigo-300/70 font-medium">
                 {t('course_creation_desc')}

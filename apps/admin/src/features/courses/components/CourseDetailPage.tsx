@@ -226,8 +226,9 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
         </Tabs>
       </Box>
 
-      {/* Tab Content */}
-      <Box sx={{ maxWidth: '100%', minWidth: 0, overflowX: 'clip' }}>
+      {/* Tab Content — minWidth: 0 lets children shrink; no overflow clip here
+          because it would break position:sticky inside the tab bodies */}
+      <Box sx={{ maxWidth: '100%', minWidth: 0 }}>
         {activeTab === 0 && <CourseInfoForm course={course} />}
         {activeTab === 1 && <CurriculumBuilder courseId={course.id} sections={course.sections} />}
         {activeTab === 2 && <CourseEnrollmentsTab courseId={course.id} />}

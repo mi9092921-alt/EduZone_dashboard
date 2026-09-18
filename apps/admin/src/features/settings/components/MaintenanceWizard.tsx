@@ -20,6 +20,8 @@ import {
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 
+import { useLayout } from '../../layout/hooks/useLayout';
+
 import {
   useEnableMaintenanceMode,
   useDisableMaintenanceMode,
@@ -46,6 +48,7 @@ export function MaintenanceWizard({ settings, canEdit = true }: MaintenanceWizar
   const t = useTranslations('settings.maintenance_wizard');
   const tVal = useTranslations('validation');
   const STEPS = getSteps(t);
+  const { isDesktop } = useLayout();
 
   const maintenanceSettings = settings?.maintenance ?? [];
   const isCurrentlyEnabled =
@@ -184,22 +187,52 @@ export function MaintenanceWizard({ settings, canEdit = true }: MaintenanceWizar
         </Alert>
       )}
 
-      {/* Stepper */}
-      <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 4 }}>
-        {STEPS.map((label) => (
-          <Step key={label}>
-            <StepLabel
-              sx={{
-                '& .MuiStepLabel-label': { fontSize: '0.8rem', fontWeight: 600 },
-                '& .MuiStepIcon-root.Mui-active': { color: 'primary.main' },
-                '& .MuiStepIcon-root.Mui-completed': { color: 'success.main' },
-              }}
-            >
-              {label}
-            </StepLabel>
-          </Step>
-        ))}
-      </Stepper>
+      {/* Stepper — full labels on desktop; compact dots + current step on
+          phones where 5 alternative-label steps overflow */}
+      {isDesktop ? (
+        <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 4 }}>
+          {STEPS.map((label) => (
+            <Step key={label}>
+              <StepLabel
+                sx={{
+                  '& .MuiStepLabel-label': { fontSize: '0.8rem', fontWeight: 600 },
+                  '& .MuiStepIcon-root.Mui-active': { color: 'primary.main' },
+                  '& .MuiStepIcon-root.Mui-completed': { color: 'success.main' },
+                }}
+              >
+                {label}
+              </StepLabel>
+            </Step>
+          ))}
+        </Stepper>
+      ) : (
+        <Box sx={{ mb: 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 1 }}>
+            {STEPS.map((label, i) => (
+              <Box
+                key={label}
+                sx={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  backgroundColor:
+                    i < activeStep
+                      ? 'success.main'
+                      : i === activeStep
+                        ? 'primary.main'
+                        : 'divider',
+                }}
+              />
+            ))}
+          </Box>
+          <Typography
+            variant="caption"
+            sx={{ display: 'block', textAlign: 'center', fontWeight: 700, color: 'text.primary' }}
+          >
+            {STEPS[activeStep]}
+          </Typography>
+        </Box>
+      )}
 
       {error && (
         <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>

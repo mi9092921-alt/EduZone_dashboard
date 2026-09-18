@@ -588,7 +588,7 @@ export function WarningsPage() {
                             </Box>
                           </TableCell>
                           <TableCell sx={{ maxWidth: { xs: 140, sm: 250 } }}>
-                            <Typography variant="body2" noWrap>
+                            <Typography variant="body2" noWrap title={row.reason}>
                               {row.reason}
                             </Typography>
                           </TableCell>

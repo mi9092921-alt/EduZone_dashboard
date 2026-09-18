@@ -183,7 +183,7 @@ function SidebarInnerContent({
       </nav>
 
       {/* FOOTER — User Profile / Role */}
-      <div className="p-3 mt-auto shrink-0 mb-2 border-t border-border/40 backdrop-blur-[8px] bg-popover/50">
+      <div className="p-3 mt-auto shrink-0 border-t border-border/40 backdrop-blur-[8px] bg-popover/50 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <div className={cn("flex items-center hover:bg-muted/40 transition-colors cursor-pointer border border-transparent hover:border-border/40 rounded-lg",
            isCollapsed ? "justify-center p-2" : "justify-between p-2"
         )}>
@@ -257,17 +257,20 @@ export function Sidebar() {
                 transition={{ duration: 0.2 }}
                 className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px]"
                 onClick={() => setSidebarOpen(false)}
+                aria-hidden="true"
               />
 
-              {/* Drawer Sheet */}
+              {/* Drawer Sheet — capped at 100vw minus gutters so it can never
+                  span the full screen on small phones; Escape/backdrop close
+                  it (Escape handled in useLayout). */}
               <motion.aside
                 initial={{ x: isRtl ? '100%' : '-100%' }}
                 animate={{ x: 0 }}
                 exit={{ x: isRtl ? '100%' : '-100%' }}
                 transition={{ type: 'spring', stiffness: 350, damping: 30 }}
-                className="fixed top-0 bottom-0 start-0 z-50 w-[220px] shadow-2xl overflow-hidden bg-background"
+                className="fixed top-0 bottom-0 start-0 z-50 w-[220px] max-w-[calc(100vw-24px)] shadow-2xl overflow-hidden bg-background"
               >
-                <div className="w-[220px] h-full absolute top-0 start-0">
+                <div className="w-full h-full absolute top-0 start-0">
                   <SidebarInnerContent {...contentProps} isCollapsed={false} />
                 </div>
               </motion.aside>

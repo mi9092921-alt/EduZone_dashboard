@@ -130,92 +130,143 @@ export function ActivityLocationsTab({ userId }: ActivityLocationsTabProps) {
           </div>
 
           <div className="overflow-hidden rounded-2xl border border-border/50 bg-card shadow-sm shadow-inner-glow">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border bg-muted/30">
-                    <th className="text-start px-5 py-3 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">
-                      {t('header_coordinates')}
-                    </th>
-                    <th className="text-start px-5 py-3 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">
-                      {t('header_accuracy')}
-                    </th>
-                    <th className="text-start px-5 py-3 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">
-                      Source
-                    </th>
-                    <th className="text-start px-5 py-3 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">
-                      {t('header_date')}
-                    </th>
-                    <th className="text-start px-5 py-3 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">
-                      {t('header_map')}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/30">
-                  {locationData.map((log, index) => (
-                    <tr key={`${log.id}-${index}`} className="hover:bg-muted/30 transition-colors group">
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 rounded-lg bg-background border border-border/40 group-hover:bg-card transition-colors">
-                            <TravelExplore fontSize="small" className="text-emerald-500" />
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="font-mono text-xs font-bold text-foreground">
-                              {log.latitude?.toFixed(6)}, {log.longitude?.toFixed(6)}
-                            </span>
-                            <span className="text-[10px] text-muted-foreground font-mono">
-                              {t('label_lat')}: {log.latitude} {t('label_lng')}: {log.longitude}
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-1.5">
-                          <div
-                            className={cn(
-                              'w-2 h-2 rounded-full',
-                              (log.accuracy ?? 100) < 50 ? 'bg-emerald-500' : 'bg-amber-500',
-                            )}
-                          />
-                          <span className="font-bold text-foreground text-xs">
-                            {log.accuracy?.toFixed(1) ?? '—'}
-                            {t('label_meters')}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-5 py-4">
-                        <span className="text-[10px] font-black uppercase tracking-tighter bg-muted px-1.5 py-0.5 rounded border border-border/50">
-                          {log.source || 'GPS'}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4 whitespace-nowrap">
-                        <div className="flex flex-col text-[11px]">
-                          <span className="text-foreground font-bold">
-                            {safeFormat(log.logged_at ?? log.created_at ?? log.timestamp, locale, { dateStyle: 'medium' })}
-                          </span>
-                          <span className="text-muted-foreground mt-0.5 uppercase text-[10px]">
-                            {safeFormat(log.logged_at ?? log.created_at ?? log.timestamp, locale, { timeStyle: 'short' })}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-5 py-4">
-                        {log.latitude != null && log.longitude != null && (
-                          <a
-                            href={`https://maps.google.com/?q=${log.latitude},${log.longitude}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title="Open in Google Maps"
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wide bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 border border-blue-500/20 transition-colors"
-                          >
-                            <Public fontSize="inherit" />
-                            Maps
-                          </a>
-                        )}
-                      </td>
+            {/* DESKTOP (≥md): full GPS table (horizontal scroll stays inside) */}
+            <div className="hidden md:block">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/30">
+                      <th className="text-start px-5 py-3 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">
+                        {t('header_coordinates')}
+                      </th>
+                      <th className="text-start px-5 py-3 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">
+                        {t('header_accuracy')}
+                      </th>
+                      <th className="text-start px-5 py-3 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">
+                        Source
+                      </th>
+                      <th className="text-start px-5 py-3 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">
+                        {t('header_date')}
+                      </th>
+                      <th className="text-start px-5 py-3 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">
+                        {t('header_map')}
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-border/30">
+                    {locationData.map((log, index) => (
+                      <tr key={`${log.id}-${index}`} className="hover:bg-muted/30 transition-colors group">
+                        <td className="px-5 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 rounded-lg bg-background border border-border/40 group-hover:bg-card transition-colors">
+                              <TravelExplore fontSize="small" className="text-emerald-500" />
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="font-mono text-xs font-bold text-foreground">
+                                {log.latitude?.toFixed(6)}, {log.longitude?.toFixed(6)}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground font-mono">
+                                {t('label_lat')}: {log.latitude} {t('label_lng')}: {log.longitude}
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-5 py-4">
+                          <div className="flex items-center gap-1.5">
+                            <div
+                              className={cn(
+                                'w-2 h-2 rounded-full',
+                                (log.accuracy ?? 100) < 50 ? 'bg-emerald-500' : 'bg-amber-500',
+                              )}
+                            />
+                            <span className="font-bold text-foreground text-xs">
+                              {log.accuracy?.toFixed(1) ?? '—'}
+                              {t('label_meters')}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-5 py-4">
+                          <span className="text-[10px] font-black uppercase tracking-tighter bg-muted px-1.5 py-0.5 rounded border border-border/50">
+                            {log.source || 'GPS'}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4 whitespace-nowrap">
+                          <div className="flex flex-col text-[11px]">
+                            <span className="text-foreground font-bold">
+                              {safeFormat(log.logged_at ?? log.created_at ?? log.timestamp, locale, { dateStyle: 'medium' })}
+                            </span>
+                            <span className="text-muted-foreground mt-0.5 uppercase text-[10px]">
+                              {safeFormat(log.logged_at ?? log.created_at ?? log.timestamp, locale, { timeStyle: 'short' })}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-5 py-4">
+                          {log.latitude != null && log.longitude != null && (
+                            <a
+                              href={`https://maps.google.com/?q=${log.latitude},${log.longitude}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Open in Google Maps"
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wide bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 border border-blue-500/20 transition-colors"
+                            >
+                              <Public fontSize="inherit" />
+                              Maps
+                            </a>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* MOBILE (<md): stacked GPS cards */}
+            <div className="md:hidden divide-y divide-border/30">
+              {locationData.map((log, index) => (
+                <div key={`${log.id}-${index}`} className="p-4 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="p-2 rounded-lg bg-background border border-border/40 shrink-0">
+                        <TravelExplore fontSize="small" className="text-emerald-500" />
+                      </div>
+                      <span className="font-mono text-xs font-bold text-foreground break-all min-w-0">
+                        {log.latitude?.toFixed(6)}, {log.longitude?.toFixed(6)}
+                      </span>
+                    </div>
+                    {log.latitude != null && log.longitude != null && (
+                      <a
+                        href={`https://maps.google.com/?q=${log.latitude},${log.longitude}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Open in Google Maps"
+                        className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-bold uppercase bg-blue-500/10 text-blue-500 border border-blue-500/20 shrink-0"
+                      >
+                        <Public fontSize="inherit" />
+                        Maps
+                      </a>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div
+                      className={cn(
+                        'w-2 h-2 rounded-full',
+                        (log.accuracy ?? 100) < 50 ? 'bg-emerald-500' : 'bg-amber-500',
+                      )}
+                    />
+                    <span className="font-bold text-foreground text-xs">
+                      {log.accuracy?.toFixed(1) ?? '—'}
+                      {t('label_meters')}
+                    </span>
+                    <span className="text-[10px] font-black uppercase tracking-tighter bg-muted px-1.5 py-0.5 rounded border border-border/50">
+                      {log.source || 'GPS'}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground ms-auto">
+                      {safeFormat(log.logged_at ?? log.created_at ?? log.timestamp, locale, { dateStyle: 'short', timeStyle: 'short' })}
+                    </span>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 

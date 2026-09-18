@@ -85,6 +85,7 @@ export function LessonRow({
 }) {
   const theme = useTheme();
   const t = useTranslations('common');
+  const isRtl = theme.direction === 'rtl';
   const { showToast } = useToast();
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(lesson.title);
@@ -307,7 +308,8 @@ export function LessonRow({
         '&:hover': {
           borderColor: 'primary.main',
           backgroundColor: 'action.hover',
-          transform: 'translateX(4px)',
+          // Shift toward the reading direction (right in LTR, left in RTL)
+          transform: isRtl ? 'translateX(-4px)' : 'translateX(4px)',
           '& .lesson-actions': { opacity: 1 },
         },
       }}
@@ -316,9 +318,20 @@ export function LessonRow({
         <Box
           {...attributes}
           {...listeners}
-          sx={{ display: 'flex', cursor: 'grab', touchAction: 'none' }}
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'grab',
+            touchAction: 'none',
+            // Enlarged hit area: ≥40px touch target for phones
+            p: 1,
+            m: -1,
+            borderRadius: 1.5,
+            '&:hover': { backgroundColor: 'action.hover' },
+          }}
         >
-          <DragIndicator sx={{ fontSize: 16, color: 'text.disabled' }} />
+          <DragIndicator sx={{ fontSize: 18, color: 'text.disabled' }} />
         </Box>
         <Box
           sx={{

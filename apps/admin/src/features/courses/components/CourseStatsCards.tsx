@@ -41,7 +41,7 @@ export function CourseStatsCards() {
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 sm:gap-6 mb-6">
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mb-6">
       {STAT_CARDS.map((card) => {
         const Icon = card.icon;
         const val = stats?.[card.key as keyof typeof stats];

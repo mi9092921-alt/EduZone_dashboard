@@ -145,7 +145,7 @@ export function AuditLogsTab() {
             mode="risk"
           />
 
-          {/* Date range */}
+          {/* Date range — full width inputs on phones */}
           <input
             type="date"
             onChange={(e) =>
@@ -154,7 +154,7 @@ export function AuditLogsTab() {
                 filters.dateTo,
               )
             }
-            className="h-9 px-3 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            className="w-full sm:w-auto h-9 px-3 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
           />
           <span className="text-xs text-muted-foreground">{t('label_to')}</span>
           <input
@@ -165,7 +165,7 @@ export function AuditLogsTab() {
                 e.target.value ? new Date(e.target.value + 'T23:59:59').toISOString() : undefined,
               )
             }
-            className="h-9 px-3 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            className="w-full sm:w-auto h-9 px-3 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
           />
         </div>
 
@@ -208,49 +208,67 @@ export function AuditLogsTab() {
           </div>
         )}
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted/30">
-                <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs w-8" />
-                <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">
-                  {t('header_seq')}
-                </th>
-                <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">
-                  {t('header_time')}
-                </th>
-                <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">
-                  {t('header_user')}
-                </th>
-                <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">
-                  {t('header_activity')}
-                </th>
-                <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">
-                  {t('header_risk')}
-                </th>
-                <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">
-                  {t('header_hash')}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {logs.map((log) => (
-                <LogRow
-                  key={`${log.id}-${log.created_at}`}
-                  log={log}
-                  isExpanded={expandedRow === log.id}
-                  onToggle={() => setExpandedRow(expandedRow === log.id ? null : log.id)}
-                />
-              ))}
-              {!isLoading && logs.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="text-center py-12 text-muted-foreground">
-                    {t('no_logs_found')}
-                  </td>
+        {/* DESKTOP (≥md): full table (horizontal scroll stays inside) */}
+        <div className="hidden md:block">
+          <div className="table-scroll">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/30">
+                  <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs w-8" />
+                  <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">
+                    {t('header_seq')}
+                  </th>
+                  <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">
+                    {t('header_time')}
+                  </th>
+                  <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">
+                    {t('header_user')}
+                  </th>
+                  <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">
+                    {t('header_activity')}
+                  </th>
+                  <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">
+                    {t('header_risk')}
+                  </th>
+                  <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">
+                    {t('header_hash')}
+                  </th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {logs.map((log) => (
+                  <LogRow
+                    key={`${log.id}-${log.created_at}`}
+                    log={log}
+                    isExpanded={expandedRow === log.id}
+                    onToggle={() => setExpandedRow(expandedRow === log.id ? null : log.id)}
+                  />
+                ))}
+                {!isLoading && logs.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="text-center py-12 text-muted-foreground">
+                      {t('no_logs_found')}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* MOBILE (<md): stacked log cards, tap to expand details */}
+        <div className="md:hidden divide-y divide-border/50">
+          {logs.map((log) => (
+            <LogCard
+              key={`${log.id}-${log.created_at}`}
+              log={log}
+              isExpanded={expandedRow === log.id}
+              onToggle={() => setExpandedRow(expandedRow === log.id ? null : log.id)}
+            />
+          ))}
+          {!isLoading && logs.length === 0 && (
+            <p className="text-center py-12 text-muted-foreground text-sm">{t('no_logs_found')}</p>
+          )}
         </div>
 
         <TablePagination
@@ -340,81 +358,158 @@ function LogRow({
       {isExpanded && (
         <tr className="bg-muted/10">
           <td colSpan={7} className="px-6 py-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Details JSON */}
-              <div>
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">
-                  {t('details_title')}
-                </h4>
-                <pre className="text-[11px] font-mono bg-background rounded-xl p-3 border border-border overflow-x-auto max-h-48 text-foreground">
-                  {JSON.stringify(log.details, null, 2)}
-                </pre>
-              </div>
-
-              {/* Chain info */}
-              <div className="space-y-3">
-                <div>
-                  <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">
-                    {t('chain_link_title')}
-                  </h4>
-                  <div className="flex items-center gap-2 text-xs">
-                    <LinkOutlined className="text-sm text-muted-foreground" />
-                    <span className="text-muted-foreground">{t('prev_hash_label')}</span>
-                    <Tooltip title={log.prev_hash ?? ''}>
-                      <span className="font-mono text-foreground cursor-help">
-                        {log.prev_hash ? `${log.prev_hash.slice(0, 16)}…` : '—'}
-                      </span>
-                    </Tooltip>
-                    <CopyButton text={log.prev_hash ?? ''} />
-                  </div>
-                  <div className="flex items-center gap-2 text-xs mt-1">
-                    <LinkOutlined className="text-sm text-primary" />
-                    <span className="text-muted-foreground">{t('entry_hash_label')}</span>
-                    <Tooltip title={log.entry_hash}>
-                      <span className="font-mono text-foreground cursor-help">
-                        {log.entry_hash.slice(0, 16)}…
-                      </span>
-                    </Tooltip>
-                    <CopyButton text={log.entry_hash} />
-                  </div>
-                </div>
-
-                {/* Metadata */}
-                <div>
-                  <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">
-                    {t('metadata_title')}
-                  </h4>
-                  <div className="space-y-1 text-xs">
-                    {log.ip_address && (
-                      <p>
-                        <span className="text-muted-foreground">{t('ip_label')}</span>{' '}
-                        <span className="font-mono text-foreground">{log.ip_address}</span>
-                      </p>
-                    )}
-                    {log.device_id && (
-                      <p>
-                        <span className="text-muted-foreground">{t('device_label')}</span>{' '}
-                        <span className="font-mono text-foreground">{log.device_id}</span>
-                      </p>
-                    )}
-                    {log.user_agent && (
-                      <p>
-                        <span className="text-muted-foreground">{t('ua_label')}</span>{' '}
-                        <span className="font-mono text-foreground truncate">{log.user_agent}</span>
-                      </p>
-                    )}
-                    <p>
-                      <span className="text-muted-foreground">{t('region_label')}</span>{' '}
-                      <span className="font-mono text-foreground">{log.region_id ?? '—'}</span>
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <LogDetails log={log} />
           </td>
         </tr>
       )}
     </>
+  );
+}
+
+// ── Expanded details (shared by desktop row and mobile card) ──
+function LogDetails({ log }: { log: ActivityLog }) {
+  const t = useTranslations('audit');
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Details JSON */}
+      <div>
+        <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">
+          {t('details_title')}
+        </h4>
+        <pre className="text-[11px] font-mono bg-background rounded-xl p-3 border border-border overflow-x-auto max-h-48 text-foreground">
+          {JSON.stringify(log.details, null, 2)}
+        </pre>
+      </div>
+
+      {/* Chain info */}
+      <div className="space-y-3">
+        <div>
+          <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">
+            {t('chain_link_title')}
+          </h4>
+          <div className="flex items-center gap-2 text-xs flex-wrap">
+            <LinkOutlined className="text-sm text-muted-foreground" />
+            <span className="text-muted-foreground">{t('prev_hash_label')}</span>
+            <Tooltip title={log.prev_hash ?? ''}>
+              <span className="font-mono text-foreground cursor-help break-all min-w-0">
+                {log.prev_hash ? `${log.prev_hash.slice(0, 16)}…` : '—'}
+              </span>
+            </Tooltip>
+            <CopyButton text={log.prev_hash ?? ''} />
+          </div>
+          <div className="flex items-center gap-2 text-xs mt-1 flex-wrap">
+            <LinkOutlined className="text-sm text-primary" />
+            <span className="text-muted-foreground">{t('entry_hash_label')}</span>
+            <Tooltip title={log.entry_hash}>
+              <span className="font-mono text-foreground cursor-help break-all min-w-0">
+                {log.entry_hash.slice(0, 16)}…
+              </span>
+            </Tooltip>
+            <CopyButton text={log.entry_hash} />
+          </div>
+        </div>
+
+        {/* Metadata */}
+        <div>
+          <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">
+            {t('metadata_title')}
+          </h4>
+          <div className="space-y-1 text-xs">
+            {log.ip_address && (
+              <p>
+                <span className="text-muted-foreground">{t('ip_label')}</span>{' '}
+                <span className="font-mono text-foreground break-all">{log.ip_address}</span>
+              </p>
+            )}
+            {log.device_id && (
+              <p>
+                <span className="text-muted-foreground">{t('device_label')}</span>{' '}
+                <span className="font-mono text-foreground break-all">{log.device_id}</span>
+              </p>
+            )}
+            {log.user_agent && (
+              <p>
+                <span className="text-muted-foreground">{t('ua_label')}</span>{' '}
+                {/* block + break-all: inline spans ignore overflow, and long
+                    user-agent strings must wrap instead of stretching the panel */}
+                <span className="font-mono text-foreground block break-all">{log.user_agent}</span>
+              </p>
+            )}
+            <p>
+              <span className="text-muted-foreground">{t('region_label')}</span>{' '}
+              <span className="font-mono text-foreground">{log.region_id ?? '—'}</span>
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Mobile card (<md) — tap to expand details ───────────────
+function LogCard({
+  log,
+  isExpanded,
+  onToggle,
+}: {
+  log: ActivityLog;
+  isExpanded: boolean;
+  onToggle: () => void;
+}) {
+  const t = useTranslations('audit');
+  const risk = RISK_CHIPS[log.risk_level] ?? RISK_CHIPS.low;
+  const time = new Date(log.created_at);
+
+  return (
+    <div onClick={onToggle} className="p-4 cursor-pointer hover:bg-muted/20 transition-colors">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <span className="text-xs font-medium text-foreground bg-muted px-2 py-0.5 rounded-md break-all">
+            {t.has(`activity_types.${log.activity_type}`)
+              ? t(`activity_types.${log.activity_type}`)
+              : log.activity_type}
+          </span>
+          <p className="text-[11px] text-muted-foreground mt-1">
+            {time.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}{' '}
+            {time.toLocaleTimeString(undefined, {
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+              hour12: false,
+            })}
+          </p>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span
+            className={cn(
+              'text-[10px] font-bold uppercase px-2 py-0.5 rounded-md',
+              risk.bg,
+              risk.text,
+            )}
+          >
+            {t(`risk_levels.${log.risk_level}`)}
+          </span>
+          {isExpanded ? (
+            <ExpandLess className="text-base text-muted-foreground" />
+          ) : (
+            <ExpandMore className="text-base text-muted-foreground" />
+          )}
+        </div>
+      </div>
+      <div className="flex items-center gap-3 mt-2 text-[10px] font-mono text-muted-foreground min-w-0">
+        <span className="shrink-0">#{log.seq}</span>
+        {log.user_id && <span>{log.user_id.slice(0, 8)}…</span>}
+        <Tooltip title={log.entry_hash}>
+          <span className="truncate cursor-help min-w-0">{log.entry_hash.slice(0, 12)}…</span>
+        </Tooltip>
+      </div>
+      {isExpanded && (
+        <div className="mt-3" onClick={(e) => e.stopPropagation()}>
+          <LogDetails log={log} />
+        </div>
+      )}
+    </div>
   );
 }
 

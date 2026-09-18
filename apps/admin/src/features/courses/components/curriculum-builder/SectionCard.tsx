@@ -241,10 +241,21 @@ export function SectionCard({
           <Box
             {...attributes}
             {...listeners}
-            sx={{ display: 'flex', cursor: 'grab', touchAction: 'none' }}
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'grab',
+              touchAction: 'none',
+              // Enlarged hit area: ≥40px touch target for phones
+              p: 1,
+              m: -1,
+              borderRadius: 1.5,
+              '&:hover': { backgroundColor: 'action.hover' },
+            }}
             onClick={(e) => e.stopPropagation()}
           >
-            <DragIndicator sx={{ fontSize: 18, color: 'text.disabled' }} />
+            <DragIndicator sx={{ fontSize: 20, color: 'text.disabled' }} />
           </Box>
           {editingTitle ? (
             <Box

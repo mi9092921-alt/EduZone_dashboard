@@ -121,6 +121,7 @@ export function AppLockControl({ settings, canEdit = true }: AppLockControlProps
               fontWeight: 600,
               borderRadius: 2,
               gap: 1,
+              width: { xs: '100%', sm: 'auto' },
               '& .MuiButton-startIcon': {
                 margin: 0,
               },
@@ -144,6 +145,8 @@ export function AppLockControl({ settings, canEdit = true }: AppLockControlProps
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 1.5,
           }}
         >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -177,6 +180,7 @@ export function AppLockControl({ settings, canEdit = true }: AppLockControlProps
               fontWeight: 600,
               borderRadius: 2,
               gap: 1,
+              width: { xs: '100%', sm: 'auto' },
               '& .MuiButton-startIcon': {
                 margin: 0,
               },
