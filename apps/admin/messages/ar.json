@@ -309,6 +309,7 @@
     "user_id": "معرف المستخدم",
     "progress_pct": "نسبة التقدم",
     "dashboard_views": "إجمالي المشاهدات",
+    "dashboard_sessions_today": "جلسات اليوم",
     "dashboard_progress": "إجمالي التقدم",
     "dashboard_tenants": "إجمالي المستأجرين",
     "dashboard_lessons": "إجمالي الدروس",

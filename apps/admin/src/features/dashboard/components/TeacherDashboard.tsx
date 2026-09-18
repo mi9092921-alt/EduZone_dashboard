@@ -43,7 +43,7 @@ export function TeacherDashboard() {
       color: '#10B981',
     },
     {
-      label: t('analytics'),
+      label: t('dashboard_sessions_today'),
       value: stats?.dailySessions ?? '—',
       icon: TrendingUp,
       bg: '#EEF2FF',

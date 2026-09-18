@@ -309,6 +309,7 @@
     "user_id": "User ID",
     "progress_pct": "Progress %",
     "dashboard_views": "Total Views",
+    "dashboard_sessions_today": "Sessions Today",
     "dashboard_progress": "Total Progress",
     "dashboard_tenants": "Total Tenants",
     "dashboard_lessons": "Total Lessons",
