@@ -19,7 +19,6 @@ import { createAdminClient } from '@/infrastructure/supabase/admin';
  */
 export class SupabaseAuditLogger implements IAuditLogger {
   async record(ctx: Readonly<RequestContext>, event: AuditEventInput): Promise<void> {
-    const admin = createAdminClient();
     const details: Record<string, unknown> = {
       request_id: ctx.requestId ?? null,
       actor_role: ctx.role,
@@ -42,6 +41,10 @@ export class SupabaseAuditLogger implements IAuditLogger {
     };
 
     try {
+      // Keep client construction inside the best-effort boundary. If server
+      // configuration is incomplete, auditing must not turn an already
+      // successful destructive operation into a failed Server Action.
+      const admin = createAdminClient();
       await logActivityAsync(admin, {
         userId: ctx.userId,
         type: event.type,

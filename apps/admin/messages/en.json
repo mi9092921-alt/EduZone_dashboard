@@ -605,6 +605,7 @@
     "targeting_role": "By Role",
     "targeting_permission": "By Permission",
     "targeting_users": "Specific Users",
+    "recipient_scope_hint": "Recipients are limited to the roles allowed for your account.",
     "label_audience": "Audience",
     "audience_all": "All Users",
     "audience_students": "All Students",

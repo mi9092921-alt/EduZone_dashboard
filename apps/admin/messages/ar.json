@@ -605,6 +605,7 @@
     "targeting_role": "حسب الدور",
     "targeting_permission": "حسب الصلاحية",
     "targeting_users": "مستخدمين محددين",
+    "recipient_scope_hint": "سيتم تقييد المستلمين بالأدوار المسموح بها لحسابك.",
     "label_audience": "الجمهور",
     "audience_all": "جميع المستخدمين",
     "audience_students": "جميع الطلاب",

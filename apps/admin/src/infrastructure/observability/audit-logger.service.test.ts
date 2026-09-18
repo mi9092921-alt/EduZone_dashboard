@@ -4,6 +4,7 @@ import { SupabaseAuditLogger } from './audit-logger.service';
 
 import type { RequestContext } from '@/domain/types/context.types';
 import { logActivityAsync } from '@/infrastructure/repos/jobs-rpc.service';
+import { createAdminClient } from '@/infrastructure/supabase/admin';
 
 // Mock the RPC wrapper + admin client factory (both are infrastructure).
 vi.mock('@/infrastructure/repos/jobs-rpc.service', () => ({
@@ -14,6 +15,7 @@ vi.mock('@/infrastructure/supabase/admin', () => ({
 }));
 
 const mockLogActivityAsync = logActivityAsync as ReturnType<typeof vi.fn>;
+const mockCreateAdminClient = createAdminClient as ReturnType<typeof vi.fn>;
 
 const ctx: RequestContext = {
   userId: 'admin-1',
@@ -120,6 +122,21 @@ describe('SupabaseAuditLogger (M13 — §17)', () => {
       '[audit-logger] log_activity_async failed:',
       expect.objectContaining({ type: 'user_deleted', request_id: 'req_abc123' }),
     );
+    consoleSpy.mockRestore();
+  });
+
+  it('never throws when the admin client cannot be created', async () => {
+    mockCreateAdminClient.mockImplementationOnce(() => {
+      throw new Error('SUPABASE_SERVICE_ROLE_KEY is missing');
+    });
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const logger = new SupabaseAuditLogger();
+
+    await expect(
+      logger.record(ctx, { type: 'course_deleted', riskLevel: 'high' }),
+    ).resolves.toBeUndefined();
+
+    expect(mockLogActivityAsync).not.toHaveBeenCalled();
     consoleSpy.mockRestore();
   });
 

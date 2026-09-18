@@ -31,10 +31,18 @@ export interface INotificationAdminRepository {
    * explicit ids → permission-based roles → audience roles.
    * Returns a deduplicated list of user ids scoped to the tenant.
    */
-  resolveTargetUserIds(input: ResolveNotificationTargetsInput, tenantId: string): Promise<string[]>;
+  resolveTargetUserIds(
+    input: ResolveNotificationTargetsInput,
+    tenantId: string,
+    allowedRecipientRoles?: readonly string[],
+  ): Promise<string[]>;
 
   /** Inserts the notification row and returns its id. */
-  insertNotification(input: SendNotificationInput, tenantId: string, createdBy: string): Promise<string>;
+  insertNotification(
+    input: SendNotificationInput,
+    tenantId: string,
+    createdBy: string,
+  ): Promise<string>;
 
   /** Upserts notification_targets rows for explicit recipients. */
   attachNotificationTargets(notificationId: string, userIds: string[]): Promise<void>;
@@ -71,4 +79,10 @@ export interface INotificationAdminRepository {
 }
 
 /** Type re-export convenience for use cases */
-export type { MyNotificationsResult, NotificationListResult, SendNotificationInput, TargetAudience, UserNotification };
+export type {
+  MyNotificationsResult,
+  NotificationListResult,
+  SendNotificationInput,
+  TargetAudience,
+  UserNotification,
+};

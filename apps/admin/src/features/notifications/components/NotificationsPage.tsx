@@ -50,6 +50,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import { useTranslations, useLocale } from 'next-intl';
 import React, { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
@@ -63,7 +64,7 @@ import {
 import { useNotifications, type TargetAudience } from '@/adapters/queries/notifications.queries';
 import { useAuthUser } from '@/adapters/stores/auth.store';
 import { useToastStore } from '@/adapters/stores/toast.store';
-import { StatsCard, StatsCardContent, StatsCardIcon } from '@/components/ui/Card';
+import { StatsCard, StatsCardContent } from '@/components/ui/Card';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { QueryErrorBanner } from '@/components/ui/QueryErrorBanner';
 import { TablePagination } from '@/components/ui/TablePagination';
@@ -90,14 +91,29 @@ function getAllowedAudiences(role: string): TargetAudience[] {
   }
 }
 
+function getAllowedRecipientRoles(role: string): string[] {
+  switch (role) {
+    case 'super_admin':
+      return ['student', 'teacher', 'admin', 'super_admin'];
+    case 'admin':
+      return ['student', 'teacher'];
+    case 'teacher':
+      return ['student'];
+    default:
+      return [];
+  }
+}
+
 function AudienceChip({
   audience,
   permission,
   usersCount,
+  targetingMode,
 }: {
   audience: TargetAudience;
   permission?: string | null;
   usersCount?: number | null;
+  targetingMode?: 'audience' | 'users' | null | undefined;
 }) {
   const t = useTranslations('notifications');
   const icons: Record<TargetAudience, React.ReactNode> = {
@@ -127,7 +143,7 @@ function AudienceChip({
     );
   }
 
-  if (usersCount && usersCount > 0) {
+  if (targetingMode === 'users' && usersCount && usersCount > 0) {
     return (
       <Chip
         icon={<PersonIcon sx={{ fontSize: 14 }} />}
@@ -162,37 +178,46 @@ function StatCard({
   label,
   value,
   icon,
+  color,
 }: {
   label: string;
   value: number | string;
   icon: React.ReactNode;
-  color?: string;
+  color?: 'primary' | 'success' | 'secondary' | 'warning';
 }) {
+  const tone = color ?? 'primary';
+
   return (
     <StatsCard>
       <StatsCardContent>
-        <StatsCardIcon
-          style={{ backgroundColor: 'primary.main', color: 'primary.contrastText', opacity: 0.1 }}
-        >
-          {icon}
-        </StatsCardIcon>
-        <div className="flex flex-col items-center">
-          <Typography
-            variant="overline"
-            color="text.secondary"
-            sx={{
-              fontWeight: 700,
-              mb: 1,
-              lineHeight: 1.2,
-              textTransform: 'uppercase',
-              fontSize: '0.625rem',
-            }}
+        <div className="flex items-center gap-4">
+          <Box
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+            sx={(theme) => ({
+              backgroundColor: alpha(theme.palette[tone].main, 0.14),
+              color: theme.palette[tone].main,
+            })}
           >
-            {label}
-          </Typography>
-          <Typography variant="h3" color="text.primary" sx={{ fontWeight: 800 }}>
-            {value}
-          </Typography>
+            {icon}
+          </Box>
+          <div className="flex min-w-0 flex-col">
+            <Typography
+              variant="overline"
+              color="text.secondary"
+              sx={{
+                fontWeight: 700,
+                mb: 1,
+                lineHeight: 1.2,
+                textTransform: 'uppercase',
+                fontSize: '0.625rem',
+              }}
+            >
+              {label}
+            </Typography>
+            <Typography variant="h3" color="text.primary" sx={{ fontWeight: 800 }}>
+              {value}
+            </Typography>
+          </div>
         </div>
       </StatsCardContent>
     </StatsCard>
@@ -205,6 +230,9 @@ interface SendDialogProps {
   open: boolean;
   onClose: () => void;
   allowedAudiences: TargetAudience[];
+  allowedRecipientRoles: string[];
+  tenantId?: string | undefined;
+  senderRole: string;
   onSuccess: (msg: string) => void;
 }
 
@@ -213,6 +241,7 @@ interface UserOption {
   first_name?: string | null;
   last_name?: string | null;
   email?: string | null;
+  primary_role?: string;
 }
 
 const sendNotificationSchema = z
@@ -232,11 +261,26 @@ const sendNotificationSchema = z
         message: 'Select at least one user',
       });
     }
+    if (data.targeting_type === 'permission' && !data.target_permission) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['target_permission'],
+        message: 'Select a permission',
+      });
+    }
   });
 
 type SendNotificationFormData = z.infer<typeof sendNotificationSchema>;
 
-function SendNotificationDialog({ open, onClose, allowedAudiences, onSuccess }: SendDialogProps) {
+function SendNotificationDialog({
+  open,
+  onClose,
+  allowedAudiences,
+  allowedRecipientRoles,
+  tenantId,
+  senderRole,
+  onSuccess,
+}: SendDialogProps) {
   const t = useTranslations('notifications');
   const tCommon = useTranslations('common');
   const sendMutation = useSendNotification();
@@ -245,25 +289,34 @@ function SendNotificationDialog({ open, onClose, allowedAudiences, onSuccess }: 
   const [userOptions, setUserOptions] = useState<UserOption[]>([]);
 
   useEffect(() => {
-    getAllPermissions().then(setPermissions);
-  }, []);
+    if (senderRole !== 'teacher') {
+      getAllPermissions()
+        .then(setPermissions)
+        .catch(() => setPermissions([]));
+    } else {
+      setPermissions([]);
+    }
+  }, [senderRole]);
 
   useEffect(() => {
     if (userQuery.length > 1) {
       // M9: project the search results onto the option shape the dialog needs,
       // instead of blind-casting the wider UserSearchResult[].
-      searchUsers(userQuery).then((res) =>
+      searchUsers(userQuery, 20, tenantId, allowedRecipientRoles).then((res) =>
         setUserOptions(
           res.map((u) => ({
             id: u.id,
             first_name: u.first_name,
             last_name: u.last_name,
             email: u.email,
+            primary_role: u.primary_role,
           })),
         ),
       );
+    } else {
+      setUserOptions([]);
     }
-  }, [userQuery]);
+  }, [allowedRecipientRoles, tenantId, userQuery]);
 
   const {
     control,
@@ -312,6 +365,7 @@ function SendNotificationDialog({ open, onClose, allowedAudiences, onSuccess }: 
         payload.target_permission = data.target_permission || null;
         payload.target_audience = defaultAudience;
       } else if (data.targeting_type === 'users') {
+        payload.target_audience = defaultAudience;
         payload.target_user_ids = data.target_user_ids?.length ? data.target_user_ids : null;
       }
 
@@ -329,7 +383,14 @@ function SendNotificationDialog({ open, onClose, allowedAudiences, onSuccess }: 
       onClose={onClose}
       maxWidth="sm"
       fullWidth
-      PaperProps={{ sx: { borderRadius: 3, bgcolor: 'background.paper', backgroundImage: 'none' } }}
+      PaperProps={{
+        sx: {
+          borderRadius: { xs: 0, sm: 3 },
+          bgcolor: 'background.paper',
+          backgroundImage: 'none',
+          maxHeight: { xs: '100dvh', sm: 'calc(100dvh - 64px)' },
+        },
+      }}
     >
       <DialogTitle sx={{ p: 3, pb: 2 }}>
         <Stack direction="row" alignItems="center" justifyContent="space-between">
@@ -363,8 +424,11 @@ function SendNotificationDialog({ open, onClose, allowedAudiences, onSuccess }: 
 
       <Divider />
 
-      <DialogContent sx={{ p: 3 }}>
+      <DialogContent sx={{ p: { xs: 2, sm: 3 } }}>
         <Stack gap={3}>
+          <Typography variant="body2" color="text.secondary">
+            {t('recipient_scope_hint')}
+          </Typography>
           {/* Targeting Type */}
           <Box>
             <Typography
@@ -386,14 +450,16 @@ function SendNotificationDialog({ open, onClose, allowedAudiences, onSuccess }: 
                   onChange={(_, value) => {
                     if (value) field.onChange(value);
                   }}
-                  sx={{ borderRadius: 2 }}
+                  sx={{ borderRadius: 2, flexWrap: 'wrap', gap: 0.5 }}
                 >
                   <ToggleButton value="role" sx={{ textTransform: 'none' }}>
                     {t('targeting_role')}
                   </ToggleButton>
-                  <ToggleButton value="permission" sx={{ textTransform: 'none' }}>
-                    {t('targeting_permission')}
-                  </ToggleButton>
+                  {senderRole !== 'teacher' && (
+                    <ToggleButton value="permission" sx={{ textTransform: 'none' }}>
+                      {t('targeting_permission')}
+                    </ToggleButton>
+                  )}
                   <ToggleButton value="users" sx={{ textTransform: 'none' }}>
                     {t('targeting_users')}
                   </ToggleButton>
@@ -434,7 +500,9 @@ function SendNotificationDialog({ open, onClose, allowedAudiences, onSuccess }: 
                       <MenuItem key={p} value={p}>
                         <Stack direction="row" alignItems="center" gap={1}>
                           <PermissionIcon sx={{ fontSize: 16, color: 'info.main' }} />
-                          <Typography variant="body2">{p}</Typography>
+                          <Typography variant="body2" color="text.primary">
+                            {p}
+                          </Typography>
                         </Stack>
                       </MenuItem>
                     ))}
@@ -460,6 +528,25 @@ function SendNotificationDialog({ open, onClose, allowedAudiences, onSuccess }: 
                   getOptionLabel={(option) => `${option.first_name} ${option.last_name}`}
                   onInputChange={(_, value) => setUserQuery(value)}
                   onChange={(_, value) => field.onChange(value.map((v) => v.id))}
+                  isOptionEqualToValue={(option, value) => option.id === value.id}
+                  renderOption={(props, option) => (
+                    <li {...props} key={option.id}>
+                      <Stack direction="row" alignItems="center" gap={1.25} sx={{ width: '100%' }}>
+                        <Avatar sx={{ width: 28, height: 28, fontSize: 12 }}>
+                          {option.first_name?.[0] ?? option.email?.[0]?.toUpperCase()}
+                        </Avatar>
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography variant="body2" noWrap color="text.primary">
+                            {[option.first_name, option.last_name].filter(Boolean).join(' ') ||
+                              option.email}
+                          </Typography>
+                          <Typography variant="caption" noWrap color="text.secondary">
+                            {option.email}
+                          </Typography>
+                        </Box>
+                      </Stack>
+                    </li>
+                  )}
                   renderInput={(params) => {
                     const { InputLabelProps, InputProps, ...rest } = params;
                     return (
@@ -539,7 +626,16 @@ function SendNotificationDialog({ open, onClose, allowedAudiences, onSuccess }: 
 
       <Divider />
 
-      <DialogActions sx={{ p: 2.5, px: 3, bgcolor: 'background.default' }}>
+      <DialogActions
+        sx={{
+          p: { xs: 2, sm: 2.5 },
+          px: { sm: 3 },
+          bgcolor: 'background.default',
+          flexDirection: { xs: 'column-reverse', sm: 'row' },
+          gap: 1,
+          '& > button': { width: { xs: '100%', sm: 'auto' } },
+        }}
+      >
         <Button
           onClick={handleClose}
           variant="outlined"
@@ -617,6 +713,7 @@ export default function NotificationsPage() {
   const user = useAuthUser();
   const role = user?.primary_role ?? 'student';
   const allowedAudiences = getAllowedAudiences(role);
+  const allowedRecipientRoles = getAllowedRecipientRoles(role);
 
   const [page, setPage] = useState(1);
   const { showToast } = useToastStore();
@@ -645,7 +742,11 @@ export default function NotificationsPage() {
   };
 
   const activeAudience = getAudienceFromTab(tabValue);
-  const { data, isLoading, isFetching, isError, refetch } = useNotifications(page, pageSize, activeAudience);
+  const { data, isLoading, isFetching, isError, refetch } = useNotifications(
+    page,
+    pageSize,
+    activeAudience,
+  );
 
   const notifications = data?.data ?? [];
   const totalCount = data?.count ?? 0;
@@ -700,13 +801,13 @@ export default function NotificationsPage() {
 
       {/* Stats Cards — super_admin and admin only */}
       {!isTeacher && (
-        <Grid container spacing={3} mb={4}>
+        <Grid container spacing={{ xs: 2, sm: 3 }} mb={4}>
           <Grid item xs={12} sm={6} md={3}>
             <StatCard
               label={t('stat_total')}
               value={totalCount}
               icon={<NotificationsIcon />}
-              color="#6366F1"
+              color="primary"
             />
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
@@ -714,7 +815,7 @@ export default function NotificationsPage() {
               label={t('stat_students')}
               value={stats.students || '0'}
               icon={<SchoolIcon />}
-              color="#22C55E"
+              color="success"
             />
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
@@ -722,7 +823,7 @@ export default function NotificationsPage() {
               label={t('stat_teachers')}
               value={stats.teachers || '0'}
               icon={<PersonIcon />}
-              color="#A855F7"
+              color="secondary"
             />
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
@@ -730,7 +831,7 @@ export default function NotificationsPage() {
               label={t('stat_admins')}
               value={stats.admins || '0'}
               icon={<SupervisorIcon />}
-              color="#F59E0B"
+              color="warning"
             />
           </Grid>
         </Grid>
@@ -747,13 +848,24 @@ export default function NotificationsPage() {
           bgcolor: 'background.paper',
         }}
       >
-        <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 2, bgcolor: 'background.default' }}>
+        <Box
+          sx={{
+            borderBottom: 1,
+            borderColor: 'divider',
+            px: { xs: 0.5, sm: 2 },
+            bgcolor: 'background.default',
+            overflowX: 'auto',
+          }}
+        >
           <Tabs
             value={tabValue}
             onChange={(_, v) => {
               setTabValue(v);
               setPage(1);
             }}
+            variant="scrollable"
+            scrollButtons={false}
+            sx={{ minHeight: 48, '& .MuiTab-root': { minWidth: { xs: 112, sm: 140 } } }}
           >
             {!isTeacher && (
               <Tab label={t('tab_all')} sx={{ textTransform: 'none', fontWeight: 600 }} />
@@ -783,150 +895,238 @@ export default function NotificationsPage() {
           </Tabs>
         </Box>
 
-        <TableContainer>
-          <Table sx={{ minWidth: 800 }}>
-            <TableHead>
-              <TableRow sx={{ backgroundColor: 'background.default' }}>
-                <TableCell
-                  sx={{
-                    fontWeight: 800,
-                    textTransform: 'uppercase',
-                    fontSize: '0.75rem',
-                    color: 'text.secondary',
-                    py: 2,
-                  }}
-                >
-                  {t('header_title')}
-                </TableCell>
-                <TableCell
-                  sx={{
-                    fontWeight: 800,
-                    textTransform: 'uppercase',
-                    fontSize: '0.75rem',
-                    color: 'text.secondary',
-                    py: 2,
-                  }}
-                >
-                  {t('header_body')}
-                </TableCell>
-                <TableCell
-                  sx={{
-                    fontWeight: 800,
-                    textTransform: 'uppercase',
-                    fontSize: '0.75rem',
-                    color: 'text.secondary',
-                    py: 2,
-                  }}
-                >
-                  {t('header_audience')}
-                </TableCell>
-                <TableCell
-                  sx={{
-                    fontWeight: 800,
-                    textTransform: 'uppercase',
-                    fontSize: '0.75rem',
-                    color: 'text.secondary',
-                    py: 2,
-                  }}
-                >
-                  {t('header_date')}
-                </TableCell>
-                <TableCell
-                  align="right"
-                  sx={{
-                    fontWeight: 800,
-                    textTransform: 'uppercase',
-                    fontSize: '0.75rem',
-                    color: 'text.secondary',
-                    py: 2,
-                  }}
-                >
-                  {t('header_actions')}
-                </TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {(isLoading || isFetching) && (
-                <TableRow>
-                  <TableCell colSpan={5}>
-                    <LinearProgress sx={{ height: 2 }} />
+        <Box sx={{ display: { xs: 'none', md: 'block' } }}>
+          <TableContainer>
+            <Table sx={{ minWidth: 800 }}>
+              <TableHead>
+                <TableRow sx={{ backgroundColor: 'background.default' }}>
+                  <TableCell
+                    sx={{
+                      fontWeight: 800,
+                      textTransform: 'uppercase',
+                      fontSize: '0.75rem',
+                      color: 'text.secondary',
+                      py: 2,
+                    }}
+                  >
+                    {t('header_title')}
+                  </TableCell>
+                  <TableCell
+                    sx={{
+                      fontWeight: 800,
+                      textTransform: 'uppercase',
+                      fontSize: '0.75rem',
+                      color: 'text.secondary',
+                      py: 2,
+                    }}
+                  >
+                    {t('header_body')}
+                  </TableCell>
+                  <TableCell
+                    sx={{
+                      fontWeight: 800,
+                      textTransform: 'uppercase',
+                      fontSize: '0.75rem',
+                      color: 'text.secondary',
+                      py: 2,
+                    }}
+                  >
+                    {t('header_audience')}
+                  </TableCell>
+                  <TableCell
+                    sx={{
+                      fontWeight: 800,
+                      textTransform: 'uppercase',
+                      fontSize: '0.75rem',
+                      color: 'text.secondary',
+                      py: 2,
+                    }}
+                  >
+                    {t('header_date')}
+                  </TableCell>
+                  <TableCell
+                    align="right"
+                    sx={{
+                      fontWeight: 800,
+                      textTransform: 'uppercase',
+                      fontSize: '0.75rem',
+                      color: 'text.secondary',
+                      py: 2,
+                    }}
+                  >
+                    {t('header_actions')}
                   </TableCell>
                 </TableRow>
-              )}
-              {notifications.length === 0 && !isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={5} align="center" sx={{ py: 8 }}>
-                    <Typography variant="body2" color="text.secondary">
-                      {t('no_notifs')}
-                    </Typography>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                notifications.map((row) => (
-                  <TableRow key={row.id} hover sx={{ '&:last-child td': { border: 0 } }}>
-                    <TableCell>
-                      <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary' }}>
-                        {row.title}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          color: 'text.secondary',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          maxWidth: 300,
-                        }}
-                      >
-                        {row.body}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <AudienceChip
-                        audience={row.target_audience}
-                        permission={row.target_permission}
-                        usersCount={row.target_user_ids?.length ?? 0}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Typography
-                        variant="body2"
-                        sx={{ color: 'text.secondary', fontSize: '0.8125rem' }}
-                      >
-                        {new Date(row.created_at).toLocaleDateString(locale, {
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric',
-                        })}
-                      </Typography>
-                    </TableCell>
-                    <TableCell align="right">
-                      <PermissionGate permission="notifications.delete">
-                        <Tooltip title={t('btn_delete')}>
-                          <IconButton
-                            size="small"
-                            onClick={() => setDeleteId(row.id)}
-                            aria-label={t('btn_delete')}
-                            sx={{
-                              color: 'error.main',
-                              bgcolor: 'error.main' + '1A',
-                              borderRadius: 2,
-                              '&:hover': { bgcolor: 'error.main' + '2A' },
-                            }}
-                          >
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </PermissionGate>
+              </TableHead>
+              <TableBody>
+                {(isLoading || isFetching) && (
+                  <TableRow>
+                    <TableCell colSpan={5}>
+                      <LinearProgress sx={{ height: 2 }} />
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
+                )}
+                {notifications.length === 0 && !isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={5} align="center" sx={{ py: 8 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        {t('no_notifs')}
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  notifications.map((row) => (
+                    <TableRow key={row.id} hover sx={{ '&:last-child td': { border: 0 } }}>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                          {row.title}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            color: 'text.secondary',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            maxWidth: 300,
+                          }}
+                        >
+                          {row.body}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <AudienceChip
+                          audience={row.target_audience}
+                          permission={row.target_permission}
+                          usersCount={row.target_user_ids?.length ?? 0}
+                          targetingMode={row.targeting_mode}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Typography
+                          variant="body2"
+                          sx={{ color: 'text.secondary', fontSize: '0.8125rem' }}
+                        >
+                          {new Date(row.created_at).toLocaleDateString(locale, {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                          })}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="right">
+                        <PermissionGate permission="notifications.delete">
+                          <Tooltip title={t('btn_delete')}>
+                            <IconButton
+                              size="small"
+                              onClick={() => setDeleteId(row.id)}
+                              aria-label={t('btn_delete')}
+                              sx={{
+                                color: 'error.main',
+                                bgcolor: (theme) => alpha(theme.palette.error.main, 0.12),
+                                borderRadius: 2,
+                                '&:hover': {
+                                  bgcolor: (theme) => alpha(theme.palette.error.main, 0.22),
+                                },
+                              }}
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </PermissionGate>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Box>
+
+        <Box sx={{ display: { xs: 'block', md: 'none' }, p: { xs: 1.5, sm: 2 } }}>
+          {(isLoading || isFetching) && <LinearProgress sx={{ height: 2, mb: 1.5 }} />}
+          {notifications.length === 0 && !isLoading ? (
+            <Typography variant="body2" color="text.secondary" sx={{ py: 6, textAlign: 'center' }}>
+              {t('no_notifs')}
+            </Typography>
+          ) : (
+            <Stack gap={1.5}>
+              {notifications.map((row) => (
+                <Box
+                  key={row.id}
+                  sx={{
+                    p: 2,
+                    border: 1,
+                    borderColor: 'divider',
+                    borderRadius: 2,
+                    bgcolor: 'background.paper',
+                  }}
+                >
+                  <Stack
+                    direction="row"
+                    alignItems="flex-start"
+                    justifyContent="space-between"
+                    gap={1}
+                  >
+                    <Typography
+                      variant="subtitle2"
+                      color="text.primary"
+                      sx={{ minWidth: 0, overflowWrap: 'anywhere' }}
+                    >
+                      {row.title}
+                    </Typography>
+                    <PermissionGate permission="notifications.delete">
+                      <IconButton
+                        size="small"
+                        onClick={() => setDeleteId(row.id)}
+                        aria-label={t('btn_delete')}
+                        sx={{
+                          flexShrink: 0,
+                          color: 'error.main',
+                          bgcolor: (theme) => alpha(theme.palette.error.main, 0.12),
+                          borderRadius: 2,
+                          '&:hover': { bgcolor: (theme) => alpha(theme.palette.error.main, 0.22) },
+                        }}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </PermissionGate>
+                  </Stack>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mt: 1, overflowWrap: 'anywhere' }}
+                  >
+                    {row.body}
+                  </Typography>
+                  <Stack
+                    direction={{ xs: 'column', sm: 'row' }}
+                    alignItems={{ xs: 'flex-start', sm: 'center' }}
+                    justifyContent="space-between"
+                    gap={1}
+                    sx={{ mt: 1.5 }}
+                  >
+                    <AudienceChip
+                      audience={row.target_audience}
+                      permission={row.target_permission}
+                      usersCount={row.target_user_ids?.length ?? 0}
+                      targetingMode={row.targeting_mode}
+                    />
+                    <Typography variant="caption" color="text.secondary">
+                      {new Date(row.created_at).toLocaleDateString(locale, {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                    </Typography>
+                  </Stack>
+                </Box>
+              ))}
+            </Stack>
+          )}
+        </Box>
 
         <TablePagination
           page={page}
@@ -942,6 +1142,9 @@ export default function NotificationsPage() {
         open={sendOpen}
         onClose={() => setSendOpen(false)}
         allowedAudiences={allowedAudiences}
+        allowedRecipientRoles={allowedRecipientRoles}
+        tenantId={user?.acting_tenant_id ?? user?.tenant_id}
+        senderRole={role}
         onSuccess={(msg) => showToast(msg, 'success')}
       />
 

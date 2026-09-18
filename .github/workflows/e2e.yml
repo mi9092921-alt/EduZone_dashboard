@@ -195,7 +195,12 @@ jobs:
 
       - name: Run Playwright (chromium)
         env:
-          E2E_EMAIL: super_admin@eduzone-test.com
+          # Keep the shared setup session separate from auth.spec.ts.
+          # auth.spec.ts intentionally signs in as super_admin and the local
+          # session trigger invalidates the previous session for that user.
+          # Using the tenant admin here prevents the auth tests from logging
+          # out every page test while they run in parallel.
+          E2E_EMAIL: admin@eduzone-test.com
           E2E_PASSWORD: Admin@12345
         run: pnpm --filter @eduzone/admin exec playwright test --project=chromium
 

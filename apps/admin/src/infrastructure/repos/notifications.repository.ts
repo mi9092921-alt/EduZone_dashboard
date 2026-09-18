@@ -33,18 +33,29 @@ export function makeNotificationAdminRepository(
     async resolveTargetUserIds(
       input: ResolveNotificationTargetsInput,
       tenantId: string,
+      allowedRecipientRoles: readonly string[] = [],
     ): Promise<string[]> {
       if (input.target_user_ids?.length) {
         // Explicit ids are still resolved through the tenant boundary. Never
         // let service-role writes trust caller-provided ids across tenants.
         const { data, error } = await admin
           .from('users')
-          .select('id')
+          .select('id, primary_role')
           .eq('tenant_id', tenantId)
           .is('deleted_at', null)
           .in('id', input.target_user_ids);
         if (error) throw mapDbError(error, 'notifications.repository.ts');
-        return Array.from(new Set((data ?? []).map((row) => row.id as string)));
+        return Array.from(
+          new Set(
+            (data ?? [])
+              .filter(
+                (row) =>
+                  allowedRecipientRoles.length === 0 ||
+                  allowedRecipientRoles.includes(row.primary_role as string),
+              )
+              .map((row) => row.id as string),
+          ),
+        );
       }
 
       if (input.target_permission) {
@@ -58,7 +69,7 @@ export function makeNotificationAdminRepository(
         const roleIdsWithPermission = new Set((rolePerms ?? []).map((rp) => rp.role_id));
         if (roleIdsWithPermission.size === 0) return [];
 
-        // Find all active users assigned to any of these roles
+        // Find all active users assigned to any of these roles.
         const { data: activeUsersWithRole, error: activeError } = await admin
           .from('user_roles')
           .select('user_id')
@@ -67,7 +78,27 @@ export function makeNotificationAdminRepository(
           .in('role_id', Array.from(roleIdsWithPermission));
         if (activeError) throw activeError;
 
-        return Array.from(new Set((activeUsersWithRole ?? []).map((ur) => ur.user_id as string)));
+        const candidateUserIds = Array.from(
+          new Set((activeUsersWithRole ?? []).map((ur) => ur.user_id as string)),
+        );
+        if (candidateUserIds.length === 0) return [];
+
+        let usersQuery = admin
+          .from('users')
+          .select('id, primary_role')
+          .eq('tenant_id', tenantId)
+          .is('deleted_at', null)
+          .in('id', candidateUserIds);
+
+        const roleFilter = getRecipientRoleFilter(input.target_audience, allowedRecipientRoles);
+        if (allowedRecipientRoles.length > 0 || input.target_audience !== undefined) {
+          if (roleFilter.length === 0) return [];
+          usersQuery = usersQuery.in('primary_role', roleFilter);
+        }
+
+        const { data: users, error: usersError } = await usersQuery;
+        if (usersError) throw mapDbError(usersError, 'notifications.repository.ts');
+        return Array.from(new Set((users ?? []).map((user) => user.id as string)));
       }
 
       let query = admin
@@ -76,10 +107,11 @@ export function makeNotificationAdminRepository(
         .eq('tenant_id', tenantId)
         .is('deleted_at', null);
 
-      if (input.target_audience === 'students') query = query.eq('primary_role', 'student');
-      if (input.target_audience === 'teachers') query = query.eq('primary_role', 'teacher');
-      if (input.target_audience === 'admins')
-        query = query.in('primary_role', ['admin', 'super_admin']);
+      const roleFilter = getRecipientRoleFilter(input.target_audience, allowedRecipientRoles);
+      if (allowedRecipientRoles.length > 0 || input.target_audience !== undefined) {
+        if (roleFilter.length === 0) return [];
+        query = query.in('primary_role', roleFilter);
+      }
 
       const { data, error } = await query;
       if (error) throw mapDbError(error, 'notifications.repository.ts');
@@ -149,7 +181,8 @@ export function makeNotificationAdminRepository(
         p_limit: 500,
         p_worker_id: workerId,
       });
-      if (error) throw mapDbError(error, 'notifications.repository.ts:process_notification_fanout_jobs');
+      if (error)
+        throw mapDbError(error, 'notifications.repository.ts:process_notification_fanout_jobs');
     },
 
     async listForAdmin(
@@ -182,7 +215,10 @@ export function makeNotificationAdminRepository(
       // Count on the database instead of loading the entire notification
       // history into Node. This remains O(1) in memory as the tenant grows.
       const countAudience = async (targetAudience?: TargetAudience) => {
-        let statsQuery = admin.from('notifications').select('id', { count: 'exact', head: true }).is('deleted_at', null);
+        let statsQuery = admin
+          .from('notifications')
+          .select('id', { count: 'exact', head: true })
+          .is('deleted_at', null);
         if (tenantId) statsQuery = statsQuery.eq('tenant_id', tenantId);
         if (targetAudience) statsQuery = statsQuery.eq('target_audience', targetAudience);
         const { count: audienceCount, error: statsError } = await statsQuery;
@@ -197,6 +233,23 @@ export function makeNotificationAdminRepository(
         countAudience('admins'),
       ]);
 
+      const targetUserIdsByNotification = new Map<string, string[]>();
+      const notificationIds = (data ?? []).map((row) => row.id as string);
+      if (notificationIds.length > 0) {
+        const { data: targets, error: targetsError } = await admin
+          .from('notification_targets')
+          .select('notification_id, user_id')
+          .in('notification_id', notificationIds);
+        if (targetsError) throw mapDbError(targetsError, 'notifications.repository.ts:targets');
+
+        for (const target of targets ?? []) {
+          const notificationId = target.notification_id as string;
+          const current = targetUserIdsByNotification.get(notificationId) ?? [];
+          current.push(target.user_id as string);
+          targetUserIdsByNotification.set(notificationId, current);
+        }
+      }
+
       const stats = {
         all,
         students,
@@ -205,7 +258,15 @@ export function makeNotificationAdminRepository(
       };
 
       return {
-        data: (data ?? []) as NotificationListResult['data'],
+        data: (data ?? []).map((row) => ({
+          ...(row as NotificationListResult['data'][number]),
+          // `notification_targets` is the source of truth for explicit
+          // recipients; expose only the ids needed by the admin UI.
+          target_user_ids:
+            row.targeting_mode === 'users'
+              ? (targetUserIdsByNotification.get(row.id as string) ?? [])
+              : null,
+        })),
         count: count ?? 0,
         stats,
       };
@@ -292,4 +353,20 @@ export function makeNotificationAdminRepository(
       if (error) throw mapDbError(error, 'notifications.repository.ts');
     },
   };
+}
+
+const AUDIENCE_ROLES: Record<TargetAudience, readonly string[]> = {
+  all: ['student', 'teacher', 'admin', 'super_admin'],
+  students: ['student'],
+  teachers: ['teacher'],
+  admins: ['admin', 'super_admin'],
+};
+
+function getRecipientRoleFilter(
+  audience: TargetAudience | undefined,
+  allowedRecipientRoles: readonly string[],
+): string[] {
+  const requestedRoles = audience ? AUDIENCE_ROLES[audience] : AUDIENCE_ROLES.all;
+  if (allowedRecipientRoles.length === 0) return [...requestedRoles];
+  return requestedRoles.filter((role) => allowedRecipientRoles.includes(role));
 }
