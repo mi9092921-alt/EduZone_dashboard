@@ -6094,24 +6094,74 @@ SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_count integer := 0;
+  v_job internal.job_queue%ROWTYPE;
   v_course_id uuid;
-  v_last_checked timestamptz;
+  v_worker_id text := 'enrollment-totals-' || gen_random_uuid()::text;
 BEGIN
-  SELECT last_processed_at INTO v_last_checked
-  FROM internal.job_progress
-  WHERE job_type = 'UPDATE_ENROLLMENT_TOTALS';
-  
-  v_last_checked := COALESCE(v_last_checked, '1970-01-01'::timestamptz);
+  IF coalesce(auth.role(), current_user) NOT IN
+      ('service_role', 'postgres', 'supabase_admin') THEN
+    RAISE EXCEPTION 'PERMISSION_DENIED';
+  END IF;
 
-  -- Aggregate courses that need updating based on recent lesson changes
-  FOR v_course_id IN 
-    SELECT DISTINCT course_id 
-    FROM public.lessons 
-    WHERE updated_at > v_last_checked
-    LIMIT p_limit
+  IF coalesce(p_limit, 100) <= 0 THEN
+    RETURN 0;
+  END IF;
+
+  -- The lesson trigger enqueues one job per affected course. Dequeue those
+  -- rows explicitly; a timestamp checkpoint can never acknowledge the queue
+  -- row and leaves it pending forever.
+  FOR v_job IN
+    SELECT *
+    FROM internal.dequeue_job(
+      v_worker_id,
+      ARRAY[p_job_type],
+      300,
+      greatest(1, least(coalesce(p_limit, 100), 500))
+    )
   LOOP
-    PERFORM internal.apply_update_enrollment_totals_course(v_course_id);
-    v_count := v_count + 1;
+    BEGIN
+      IF nullif(pg_catalog.btrim(v_job.payload ->> 'course_id'), '') IS NULL THEN
+        RAISE EXCEPTION 'MISSING_COURSE_ID';
+      END IF;
+
+      v_course_id := (v_job.payload ->> 'course_id')::uuid;
+      PERFORM internal.apply_update_enrollment_totals_course(v_course_id);
+
+      UPDATE internal.job_queue
+      SET status = 'done',
+          result = jsonb_build_object('course_id', v_course_id),
+          error_message = NULL,
+          next_retry_at = NULL,
+          locked_by_worker_id = NULL,
+          locked_at = NULL,
+          lock_expires_at = NULL,
+          finished_at = pg_catalog.now(),
+          updated_at = pg_catalog.now()
+      WHERE id = v_job.id;
+
+      v_count := v_count + 1;
+    EXCEPTION WHEN OTHERS THEN
+      UPDATE internal.job_queue
+      SET status = CASE WHEN attempts >= max_attempts THEN 'failed' ELSE 'pending' END,
+          next_retry_at = CASE
+            WHEN attempts >= max_attempts THEN NULL
+            ELSE pg_catalog.now() + least(
+              interval '15 minutes',
+              greatest(
+                interval '30 seconds',
+                pg_catalog.make_interval(
+                  secs => power(2, greatest(attempts - 1, 0))::integer * 30
+                )
+              )
+            )
+          END,
+          error_message = left(SQLERRM, 1000),
+          locked_by_worker_id = NULL,
+          locked_at = NULL,
+          lock_expires_at = NULL,
+          updated_at = pg_catalog.now()
+      WHERE id = v_job.id;
+    END;
   END LOOP;
 
   INSERT INTO internal.job_progress (job_type, checkpoint_key, last_processed_at, processed_count)
