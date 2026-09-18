@@ -1,11 +1,12 @@
 import { createBrowserClient as createClient } from '@supabase/ssr';
 
+import { createBrowserId } from '@/lib/browser-id';
 import { env } from '@/lib/env';
 
 let client: ReturnType<typeof createClient> | null = null;
 
 // Unique ID for the current browser session/tab lifecycle
-const SESSION_ID = typeof window !== 'undefined' ? crypto.randomUUID() : 'server-side';
+const SESSION_ID = typeof window !== 'undefined' ? createBrowserId() : 'server-side';
 
 /**
  * Singleton Supabase browser client.

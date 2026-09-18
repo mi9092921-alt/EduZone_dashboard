@@ -45,10 +45,11 @@ export function useSetting(key: string) {
 
 // ── Feature Flags ────────────────────────────────────────────
 
-export function useFeatureFlags() {
+export function useFeatureFlags(enabled = true) {
   return useQuery({
     queryKey: queryKeys.featureFlags.all,
     queryFn: getAllFeatureFlagsAction,
+    enabled,
     staleTime: 30_000,
   });
 }

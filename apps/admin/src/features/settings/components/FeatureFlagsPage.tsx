@@ -63,6 +63,7 @@ import {
   useDeleteTenantOverride,
 } from '@/adapters/mutations/settings.mutations';
 import { useFeatureFlags, useFeatureFlagDetail, useRoles } from '@/adapters/queries/settings.queries';
+import { useAuthUser } from '@/adapters/stores/auth.store';
 import { useToastStore } from '@/adapters/stores/toast.store';
 import { LtrIsland } from '@/components/ui/LtrIsland';
 import { toClientMessage } from '@/domain/errors';
@@ -74,6 +75,9 @@ import type {
 import { usePathname, useRouter } from '@/i18n/routing';
 
 export function FeatureFlagsPage() {
+  const user = useAuthUser();
+  const canManageFeatureFlags = user?.primary_role === 'super_admin' ||
+    user?.permissions.includes('feature_flags.manage');
   const theme = useTheme();
   const isRtl = theme.direction === 'rtl';
   const t = useTranslations('settings');
@@ -119,7 +123,10 @@ export function FeatureFlagsPage() {
 
   const [deleteTarget, setDeleteTarget] = useState<FeatureFlag | null>(null);
 
-  const { data: flags, isLoading, isFetching } = useFeatureFlags();
+  // Do not invoke the server action for a user who is going to be denied by
+  // the gate below. This avoids a predictable Permission denied event when a
+  // non-manager reaches the route through a stale bookmark.
+  const { data: flags, isLoading, isFetching } = useFeatureFlags(Boolean(canManageFeatureFlags));
   const deleteMutation = useDeleteFeatureFlag();
 
   const handleDelete = useCallback(async () => {
@@ -558,6 +565,7 @@ const FeatureFlagRow = memo(function FeatureFlagRow({
             const formatDate = (d: string | null | undefined) => {
               if (!d) return '—';
               const dateVal = new Date(d);
+              if (!Number.isFinite(dateVal.getTime())) return '—';
               return dateVal.toLocaleDateString(isRtl ? 'ar-SA' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric' });
             };
             return (

@@ -23,9 +23,10 @@ import type { SettingsByCategory } from '@/domain/types/settings.types';
 
 interface AppLockControlProps {
   settings?: SettingsByCategory;
+  canEdit?: boolean;
 }
 
-export function AppLockControl({ settings }: AppLockControlProps) {
+export function AppLockControl({ settings, canEdit = true }: AppLockControlProps) {
   const t = useTranslations('settings.app_lock');
   const tVal = useTranslations('validation');
   const maintenanceSettings = settings?.maintenance ?? [];
@@ -110,7 +111,7 @@ export function AppLockControl({ settings }: AppLockControlProps) {
               </Typography>
             )}
           </Box>
-          <Button
+          {canEdit && <Button
             variant="contained"
             color="success"
             startIcon={<LockOpen />}
@@ -126,7 +127,7 @@ export function AppLockControl({ settings }: AppLockControlProps) {
             }}
           >
             {t('btn_unlock')}
-          </Button>
+          </Button>}
         </Paper>
       )}
 
@@ -166,7 +167,7 @@ export function AppLockControl({ settings }: AppLockControlProps) {
               </Typography>
             </Box>
           </Box>
-          <Button
+          {canEdit && <Button
             variant="outlined"
             color="error"
             startIcon={<Lock />}
@@ -182,7 +183,7 @@ export function AppLockControl({ settings }: AppLockControlProps) {
             }}
           >
             {t('btn_lock')}
-          </Button>
+          </Button>}
         </Paper>
       )}
 

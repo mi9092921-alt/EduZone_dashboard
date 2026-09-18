@@ -2,6 +2,19 @@ import type { ErrorEvent, EventHint } from '@sentry/nextjs';
 
 const SENSITIVE_KEY = /password|passwd|secret|token|authorization|cookie|apikey|api_key|email|phone/i;
 
+export function shouldDropSentryEvent(event: ErrorEvent): boolean {
+  const exceptionMessages = (event.exception?.values ?? [])
+    .map((value) => `${value.type ?? ''} ${value.value ?? ''}`)
+    .join(' ');
+
+  // Navigation/fetch cancellations are expected and authorization failures
+  // are handled by the UI (redirect, gate, or toast). Neither is an
+  // unhandled application fault worth retaining as a Sentry issue.
+  return /\b(?:AbortError|aborted|request aborted|Authentication required|User profile not found or inactive|Permission denied|Super admin access required)\b/i.test(
+    exceptionMessages,
+  );
+}
+
 function scrubRecord(record: Record<string, string> | undefined): Record<string, string> | undefined {
   if (!record) return undefined;
   return Object.fromEntries(
@@ -10,7 +23,12 @@ function scrubRecord(record: Record<string, string> | undefined): Record<string,
 }
 
 /** Remove identity, credentials and request payloads before an event leaves the app. */
-export function scrubSentryEvent(event: ErrorEvent, _hint: EventHint): ErrorEvent {
+export function scrubSentryEvent(event: ErrorEvent, _hint: EventHint): ErrorEvent | null {
+  // Fetches and Server Actions are routinely cancelled during App Router
+  // transitions. They are not application failures and otherwise create a
+  // steadily growing Sentry issue whenever a user leaves a loading page.
+  if (shouldDropSentryEvent(event)) return null;
+
   delete event.user;
   if (event.request) {
     const requestUrl = event.request.url;

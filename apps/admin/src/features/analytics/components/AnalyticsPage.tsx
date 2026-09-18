@@ -421,12 +421,16 @@ function SectionHeader({
         {refreshedAt && (
           <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
             <AccessTime className="text-xs" />
-            {ta('updated_label', {
-              time: new Date(refreshedAt).toLocaleTimeString(locale, {
-                hour: '2-digit',
-                minute: '2-digit',
-              }),
-            })}
+            {(() => {
+              const date = new Date(refreshedAt);
+              if (!Number.isFinite(date.getTime())) return ta('updated_label', { time: '—' });
+              return ta('updated_label', {
+                time: date.toLocaleTimeString(locale, {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                }),
+              });
+            })()}
           </span>
         )}
         {onExport && (

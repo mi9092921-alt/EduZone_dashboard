@@ -38,9 +38,10 @@ const getSteps = (t: ReturnType<typeof useTranslations>) => [
 
 interface MaintenanceWizardProps {
   settings?: SettingsByCategory;
+  canEdit?: boolean;
 }
 
-export function MaintenanceWizard({ settings }: MaintenanceWizardProps) {
+export function MaintenanceWizard({ settings, canEdit = true }: MaintenanceWizardProps) {
   const t = useTranslations('settings.maintenance_wizard');
   const tVal = useTranslations('validation');
   const STEPS = getSteps(t);
@@ -116,6 +117,8 @@ export function MaintenanceWizard({ settings }: MaintenanceWizardProps) {
   };
 
   const isPending = enableMutation.isPending || disableMutation.isPending;
+
+  if (!canEdit) return null;
 
   return (
     <Paper

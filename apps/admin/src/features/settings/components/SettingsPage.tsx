@@ -43,6 +43,7 @@ import { MaintenanceWizard } from './MaintenanceWizard';
 
 import { useSetSetting } from '@/adapters/mutations/settings.mutations';
 import { useSettingsByCategory } from '@/adapters/queries/settings.queries';
+import { useAuthUser } from '@/adapters/stores/auth.store';
 import { useToastStore } from '@/adapters/stores/toast.store';
 import { parseRpcError } from '@/domain/errors';
 import type { SettingKv } from '@/domain/types/settings.types';
@@ -70,6 +71,9 @@ export function SettingsPage() {
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
   const { showToast } = useToastStore();
+  const user = useAuthUser();
+  const canWriteSettings = user?.primary_role === 'super_admin' ||
+    user?.permissions.includes('settings.write');
 
   const { data: grouped, isLoading, isFetching } = useSettingsByCategory();
   const setSettingMutation = useSetSetting();
@@ -78,9 +82,10 @@ export function SettingsPage() {
   const settings = grouped?.[currentCategory as keyof typeof grouped] ?? [];
 
   const handleEdit = useCallback((setting: SettingKv) => {
+    if (!canWriteSettings) return;
     setEditingKey(setting.key);
     setEditValue(setting.value);
-  }, []);
+  }, [canWriteSettings]);
 
   const handleCancel = useCallback(() => {
     setEditingKey(null);
@@ -211,7 +216,7 @@ export function SettingsPage() {
         </div>
 
         {/* App Lock Control */}
-        {grouped ? <AppLockControl settings={grouped} /> : <AppLockControl />}
+        {grouped ? <AppLockControl settings={grouped} canEdit={Boolean(canWriteSettings)} /> : <AppLockControl canEdit={Boolean(canWriteSettings)} />}
 
         {/* Category Tabs */}
         <Paper
@@ -391,6 +396,7 @@ export function SettingsPage() {
                             <IconButton
                               size="small"
                               onClick={() => handleEdit(row)}
+                              disabled={!canWriteSettings}
                               aria-label={t('tooltip_edit')}
                               sx={{
                                 color: 'primary.main',
@@ -413,7 +419,7 @@ export function SettingsPage() {
 
         {/* Maintenance Wizard — only on Maintenance tab */}
         {currentCategory === 'maintenance' && (
-          grouped ? <MaintenanceWizard settings={grouped} /> : <MaintenanceWizard />
+          grouped ? <MaintenanceWizard settings={grouped} canEdit={Boolean(canWriteSettings)} /> : <MaintenanceWizard canEdit={Boolean(canWriteSettings)} />
         )}
 
         {/* Access Rules Manager — only on Security tab */}
