@@ -5307,6 +5307,88 @@ BEGIN
   END IF;
 END $$;
 
+-- Nightly telemetry retention. Partition creation (manage_partitions) only
+-- ever ADDS partitions — nothing retired rows, so activity_logs, video_views,
+-- user_location_logs, rate_limits, push_deliveries and download_logs grew
+-- without bound. These deletes run from the postgres role (pg_cron), so RLS
+-- does not apply. Retention windows (documented, adjust deliberately):
+--   rate_limits 90d · activity_log_queue (flushed rows only) 90d ·
+--   user_location_logs 180d (privacy minimization) · push_deliveries 180d ·
+--   download_logs 365d · activity_logs / video_views 730d.
+-- session_snapshots is deliberately NOT cleaned: one small row per real
+-- login is the security audit trail.
+CREATE OR REPLACE FUNCTION maintenance.apply_telemetry_retention()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_cutoff timestamptz;
+BEGIN
+  v_cutoff := pg_catalog.now() - interval '730 days';
+  DELETE FROM public.activity_logs WHERE logged_at < v_cutoff;
+  DELETE FROM public.video_views WHERE viewed_at < v_cutoff;
+
+  v_cutoff := pg_catalog.now() - interval '180 days';
+  DELETE FROM public.user_location_logs WHERE accessed_at < v_cutoff;
+  DELETE FROM public.push_deliveries WHERE created_at < v_cutoff;
+
+  v_cutoff := pg_catalog.now() - interval '90 days';
+  DELETE FROM public.rate_limits WHERE window_start < v_cutoff;
+  -- Only rows the queue worker already flushed are safe to remove; an
+  -- unflushed row is pending work, never garbage.
+  DELETE FROM public.activity_log_queue
+   WHERE flushed_at IS NOT NULL AND flushed_at < v_cutoff;
+
+  v_cutoff := pg_catalog.now() - interval '365 days';
+  DELETE FROM public.download_logs WHERE downloaded_at < v_cutoff;
+END;
+$$;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_extension WHERE extname = 'pg_cron'
+  ) THEN
+    IF EXISTS (
+      SELECT 1 FROM pg_tables WHERE schemaname = 'cron' AND tablename = 'job'
+    ) THEN
+      PERFORM cron.unschedule(jobid)
+      FROM cron.job
+      WHERE jobname = 'telemetry-retention';
+    END IF;
+
+    PERFORM cron.schedule(
+      'telemetry-retention',
+      '30 4 * * *',
+      'SELECT maintenance.apply_telemetry_retention();'
+    );
+  END IF;
+END $$;
+
+-- internal.cleanup_old_jobs() has existed unscheduled: processed
+-- internal.job_queue rows past retention are only removed here.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_extension WHERE extname = 'pg_cron'
+  ) THEN
+    IF EXISTS (
+      SELECT 1 FROM pg_tables WHERE schemaname = 'cron' AND tablename = 'job'
+    ) THEN
+      PERFORM cron.unschedule(jobid)
+      FROM cron.job
+      WHERE jobname = 'job-queue-cleanup';
+    END IF;
+
+    PERFORM cron.schedule(
+      'job-queue-cleanup',
+      '40 4 * * *',
+      'SELECT internal.cleanup_old_jobs(30);'
+    );
+  END IF;
+END $$;
+
 CREATE OR REPLACE FUNCTION internal.invoke_notification_push_worker()
 RETURNS bigint
 LANGUAGE plpgsql
@@ -7885,6 +7967,32 @@ BEGIN
     true
   )
   RETURNING id INTO v_session_id;
+
+  -- Immutable audit snapshot of the user's authoritative state at the
+  -- moment this session began. Fills public.session_snapshots (one row
+  -- per real login, FK-tied to this exact session row) so forensics can
+  -- answer "who was this account when this session started" even after
+  -- the live users row changes (token_version bump, role change, ban).
+  -- Deliberately written here — the only trusted session-creation path —
+  -- and NOT cleaned by telemetry retention (it is the audit trail).
+  INSERT INTO public.session_snapshots (session_id, started_at, tenant_id, user_snapshot)
+  SELECT s.id,
+         s.started_at,
+         s.tenant_id,
+         jsonb_build_object(
+           'email', u.email,
+           'first_name', u.first_name,
+           'last_name', u.last_name,
+           'primary_role', u.primary_role,
+           'account_status', u.account_status,
+           'region_id', u.region_id,
+           'token_version', u.token_version,
+           'device_id', s.device_id,
+           'ip_address', host(s.ip_address)
+         )
+    FROM public.sessions s
+    JOIN public.users u ON u.id = s.user_id
+   WHERE s.id = v_session_id;
 
   RETURN v_session_id;
 END;
