@@ -676,7 +676,7 @@ export function WarningsPage() {
                     height: 16,
                     position: 'absolute',
                     top: 8,
-                    right: 8,
+                    insetInlineEnd: 8,
                     backgroundColor: 'primary.main',
                     color: 'white'
                   }}
@@ -709,7 +709,7 @@ export function WarningsPage() {
                     height: 16,
                     position: 'absolute',
                     top: 8,
-                    right: 8,
+                    insetInlineEnd: 8,
                     backgroundColor: 'success.main',
                     color: 'white'
                   }}
@@ -742,7 +742,7 @@ export function WarningsPage() {
                     height: 16,
                     position: 'absolute',
                     top: 8,
-                    right: 8,
+                    insetInlineEnd: 8,
                     backgroundColor: 'error.main',
                     color: 'white'
                   }}

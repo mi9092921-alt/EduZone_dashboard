@@ -63,7 +63,11 @@ const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
             borderWidth: '1.5px',
           },
           '& .MuiSelect-select': {
-            padding: '0.625rem 2.5rem 0.625rem 0.75rem',
+            // Reserve space on the icon's logical end. A physical
+            // `padding-right` leaves the text under the icon in RTL.
+            paddingBlock: '0.625rem',
+            paddingInlineStart: '0.75rem',
+            paddingInlineEnd: '2.5rem',
             display: 'flex',
             alignItems: 'center',
             fontSize: 'inherit',

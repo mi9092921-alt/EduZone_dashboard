@@ -45,6 +45,7 @@ import { useSetSetting } from '@/adapters/mutations/settings.mutations';
 import { useSettingsByCategory } from '@/adapters/queries/settings.queries';
 import { useAuthUser } from '@/adapters/stores/auth.store';
 import { useToastStore } from '@/adapters/stores/toast.store';
+import { LtrIsland } from '@/components/ui/LtrIsland';
 import { parseRpcError } from '@/domain/errors';
 import type { SettingKv } from '@/domain/types/settings.types';
 
@@ -136,11 +137,13 @@ export function SettingsPage() {
 
     if (setting.value_type === 'boolean') {
       return (
-        <Switch
-          checked={editValue === 'true'}
-          onChange={(e) => setEditValue(e.target.checked ? 'true' : 'false')}
-          color="primary"
-        />
+        <LtrIsland>
+          <Switch
+            checked={editValue === 'true'}
+            onChange={(e) => setEditValue(e.target.checked ? 'true' : 'false')}
+            color="primary"
+          />
+        </LtrIsland>
       );
     }
 

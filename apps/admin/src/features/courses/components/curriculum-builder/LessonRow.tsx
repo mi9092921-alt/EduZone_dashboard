@@ -26,6 +26,7 @@ import { useState, useEffect } from 'react';
 import { useUpdateLesson, useDeleteLesson } from '@/adapters/mutations/courses.mutations';
 import { useToast } from '@/adapters/stores/toast.store';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { LtrIsland } from '@/components/ui/LtrIsland';
 import { type Lesson } from '@/domain/types/course.types';
 
 // ── Helpers ─────────────────────────────────────────────
@@ -250,11 +251,13 @@ export function LessonRow({
             <Typography variant="caption" sx={{ color: 'text.secondary', flexGrow: 1, minWidth: 0 }}>
               {t('is_preview_label') || 'Free Preview'}
             </Typography>
-            <Switch
-              size="small"
-              checked={localPreview}
-              onChange={() => { void handleTogglePreview(); }}
-            />
+            <LtrIsland>
+              <Switch
+                size="small"
+                checked={localPreview}
+                onChange={() => { void handleTogglePreview(); }}
+              />
+            </LtrIsland>
           </Stack>
           <Box sx={{ display: 'flex', flexDirection: { xs: 'column-reverse', sm: 'row' }, gap: 1, justifyContent: 'flex-end' }}>
             <Button
@@ -384,27 +387,31 @@ export function LessonRow({
           <Typography variant="caption" sx={{ fontSize: '0.65rem', color: 'text.secondary', fontWeight: 700, lineHeight: 1.2, whiteSpace: 'nowrap' }}>
             {t('is_preview_label') || 'PREVIEW'}
           </Typography>
-          <Switch
-            size="small"
-            checked={localPreview}
-            onChange={() => { void handleTogglePreview(); }}
-            onClick={(e) => e.stopPropagation()}
-            sx={{
-              '& .MuiSwitch-switchBase.Mui-checked': { color: 'success.main' },
-              '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: 'success.main' },
-            }}
-          />
+          <LtrIsland>
+            <Switch
+              size="small"
+              checked={localPreview}
+              onChange={() => { void handleTogglePreview(); }}
+              onClick={(e) => e.stopPropagation()}
+              sx={{
+                '& .MuiSwitch-switchBase.Mui-checked': { color: 'success.main' },
+                '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: 'success.main' },
+              }}
+            />
+          </LtrIsland>
         </Box>
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.25, minWidth: 58, flexShrink: 0 }}>
           <Typography variant="caption" sx={{ fontSize: '0.65rem', color: 'text.secondary', fontWeight: 700, lineHeight: 1.2, whiteSpace: 'nowrap' }}>
             {t('is_published_label') || 'PUBLIC'}
           </Typography>
-          <Switch
-            size="small"
-            checked={localPublished}
-            onChange={() => { void handleTogglePublish(); }}
-            onClick={(e) => e.stopPropagation()}
-          />
+          <LtrIsland>
+            <Switch
+              size="small"
+              checked={localPublished}
+              onChange={() => { void handleTogglePublish(); }}
+              onClick={(e) => e.stopPropagation()}
+            />
+          </LtrIsland>
         </Box>
         <Box
           className="lesson-actions"

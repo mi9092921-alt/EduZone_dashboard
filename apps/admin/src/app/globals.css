@@ -340,3 +340,13 @@ body,
 [dir='rtl'] .custom-scrollbar > * {
   direction: rtl;
 }
+
+/* Use logical spacing for MUI buttons so icons do not touch Arabic labels. */
+.MuiButton-root {
+  column-gap: 0.5rem;
+}
+
+.MuiButton-root > .MuiButton-startIcon,
+.MuiButton-root > .MuiButton-endIcon {
+  margin: 0;
+}

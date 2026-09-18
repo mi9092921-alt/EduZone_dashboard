@@ -51,6 +51,7 @@ import {
 } from '@/adapters/mutations/courses.mutations';
 import { useToast } from '@/adapters/stores/toast.store';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { LtrIsland } from '@/components/ui/LtrIsland';
 import type { Section, Lesson } from '@/domain/types/course.types';
 import { isValidVideoUrl } from '@/domain/video.utils';
 
@@ -304,18 +305,20 @@ export function SectionCard({
           <Typography variant="caption" sx={{ color: 'text.secondary', whiteSpace: 'nowrap', flexShrink: 0 }}>
             {t('lesson_count', { count: section.lessons?.length ?? 0 })}
           </Typography>
-          <Switch
-            size="small"
-            checked={localPublished}
-            onChange={() => { void handleTogglePublish(); }}
-            onClick={(e) => e.stopPropagation()}
-            sx={{
-              '& .MuiSwitch-switchBase.Mui-checked': { color: 'primary.main' },
-              '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                backgroundColor: 'primary.main',
-              },
-            }}
-          />
+          <LtrIsland>
+            <Switch
+              size="small"
+              checked={localPublished}
+              onChange={() => { void handleTogglePublish(); }}
+              onClick={(e) => e.stopPropagation()}
+              sx={{
+                '& .MuiSwitch-switchBase.Mui-checked': { color: 'primary.main' },
+                '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                  backgroundColor: 'primary.main',
+                },
+              }}
+            />
+          </LtrIsland>
           <Stack
             direction="row"
             spacing={1}
@@ -430,11 +433,13 @@ export function SectionCard({
                 <Typography variant="body2" sx={{ color: 'text.secondary', flexGrow: 1, fontWeight: 500 }}>
                   {t('is_preview_label') || 'Free Preview'}
                 </Typography>
-                <Switch
-                  size="small"
-                  checked={newLessonIsPreview}
-                  onChange={(e) => setNewLessonIsPreview(e.target.checked)}
-                />
+                <LtrIsland>
+                  <Switch
+                    size="small"
+                    checked={newLessonIsPreview}
+                    onChange={(e) => setNewLessonIsPreview(e.target.checked)}
+                  />
+                </LtrIsland>
               </Stack>
               <Box
                 sx={{

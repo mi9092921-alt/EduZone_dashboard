@@ -37,6 +37,7 @@ import { useState, useEffect } from 'react';
 
 import { useRole } from '@/adapters/hooks/usePermission';
 import { useToastStore } from '@/adapters/stores/toast.store';
+import { LtrIsland } from '@/components/ui/LtrIsland';
 import {
   getAccessRules,
   upsertAccessRule,
@@ -238,11 +239,13 @@ export function AccessRulesManager({ tenantId }: { tenantId?: string }) {
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Switch
-                      checked={rule.is_active}
-                      onChange={() => handleToggle(rule.id, rule.is_active)}
-                      size="small"
-                    />
+                    <LtrIsland>
+                      <Switch
+                        checked={rule.is_active}
+                        onChange={() => handleToggle(rule.id, rule.is_active)}
+                        size="small"
+                      />
+                    </LtrIsland>
                   </TableCell>
                   <TableCell>
                     <Typography variant="caption" color="text.secondary">

@@ -25,6 +25,7 @@ import {
   useDisableMaintenanceMode,
 } from '@/adapters/mutations/settings.mutations';
 import { useRoles } from '@/adapters/queries/settings.queries';
+import { LtrIsland } from '@/components/ui/LtrIsland';
 import { parseRpcError } from '@/domain/errors';
 import type { MaintenanceModeParams, SettingsByCategory } from '@/domain/types/settings.types';
 
@@ -159,7 +160,7 @@ export function MaintenanceWizard({ settings, canEdit = true }: MaintenanceWizar
             label="مفعل"
             size="small"
             sx={{
-              ml: 'auto',
+              marginInlineStart: 'auto',
               backgroundColor: 'error.light',
               color: 'error.dark',
               fontWeight: 700,
@@ -213,12 +214,14 @@ export function MaintenanceWizard({ settings, canEdit = true }: MaintenanceWizar
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
             <FormControlLabel
               control={
-                <Switch
-                  checked={enabled}
-                  onChange={(e) => setEnabled(e.target.checked)}
-                  color="warning"
-                  sx={{ transform: 'scale(1.3)' }}
-                />
+                <LtrIsland>
+                  <Switch
+                    checked={enabled}
+                    onChange={(e) => setEnabled(e.target.checked)}
+                    color="warning"
+                    sx={{ transform: 'scale(1.3)' }}
+                  />
+                </LtrIsland>
               }
               label={
                 <Typography sx={{ fontWeight: 600, fontSize: '1.1rem' }}>

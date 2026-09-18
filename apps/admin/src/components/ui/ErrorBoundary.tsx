@@ -106,7 +106,7 @@ export function ErrorPage({ error, reset }: { error?: Error | undefined; reset?:
         </Box>
 
         {error && process.env.NODE_ENV === 'development' && (
-          <Box sx={{ mt: 6, textAlign: 'left', width: '100%', overflow: 'auto' }}>
+          <Box dir="ltr" sx={{ mt: 6, textAlign: 'left', width: '100%', overflow: 'auto' }}>
             <Typography
               variant="caption"
               sx={{

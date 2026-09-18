@@ -294,7 +294,7 @@ export function MyCoursesPage() {
                       <School sx={{ fontSize: 48, color: 'rgba(255,255,255,0.3)' }} />
                     </Box>
                   )}
-                  <Box sx={{ position: 'absolute', top: 12, left: 12 }}>
+                  <Box sx={{ position: 'absolute', top: 12, insetInlineStart: 12 }}>
                     <Chip
                       label={t(course.status as Parameters<typeof t>[0])}
                       size="small"
