@@ -4,11 +4,8 @@ import { test, expect, type Page } from '@playwright/test';
 // Safe)"). Neither of that file's two tests could have been passing as
 // written:
 //
-//  - It intercepts 'POST **/rest/v1/rpc/lock_app'. There is no lock_app RPC
-//    anywhere in supabase/schema/ -- the real action
-//    (infrastructure/repos/settings.service.ts's lockApp()) does two plain
-//    REST upserts into settings_kv (key='app_locked', key='app_lock_message'),
-//    not an RPC call.
+//  - It intercepts 'POST **/rest/v1/rpc/lock_app'. The real action uses the
+//    lock_app_for_all RPC, which enforces the super_admin check server-side.
 //  - It drives a generic 'textarea, input[name="message"]' and a button
 //    matching /Proceed|Lock/i. The real dialog (AppLockControl.tsx) is a MUI
 //    TextField labelled "Lock Message" (t('settings.app_lock.label_message')),
@@ -33,23 +30,17 @@ test.describe('System Lock', () => {
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByText('Lock System')).toBeVisible();
 
-    // lockApp() (settings.service.ts) does two separate
-    // supabase.from('settings_kv').upsert(...) calls -- one per key -- so
-    // two requests hit this route, not one. Mocking rather than a real
+    // lockApp() calls the lock_app_for_all RPC. Mocking rather than a real
     // write: 'app_locked' is a single global row, and fullyParallel: true
     // runs this alongside every other spec file against the same dev
     // server + Supabase instance -- a real write here would flip the
     // AdminShell banner (and, if this were the separate maintenance-mode
     // setting instead, block login outright) for all of them mid-run.
     let sawLockMessageInBody = false;
-    await page.route('**/rest/v1/settings_kv*', async (route) => {
-      if (route.request().method() === 'GET') {
-        await route.continue();
-        return;
-      }
+    await page.route('**/rest/v1/rpc/lock_app_for_all', async (route) => {
       const body = route.request().postData() ?? '';
       if (body.includes('Playwright automated lockdown')) sawLockMessageInBody = true;
-      await route.fulfill({ status: 201, contentType: 'application/json', body: '[]' });
+      await route.fulfill({ status: 200, contentType: 'application/json', body: 'null' });
     });
 
     await dialog.getByLabel('Lock Message').fill('Playwright automated lockdown');
@@ -97,15 +88,13 @@ test.describe('System Lock', () => {
 // a single Maintenance switch that saves on toggle. The real UI is a
 // 5-step MaintenanceWizard (status -> message -> deadline -> roles ->
 // users -> submit; MaintenanceWizard.tsx) writing via enable/disable
-// mutations (plain settings_kv upserts, settings.service.ts -- same
-// transport correction as the app-lock port above documents).
+// mutations (server-side RPCs in settings.service.ts).
 //
 // Cloud Safety: unlike notification/course rows (tenant data, invisible
 // to other specs), maintenance_mode is GLOBAL -- enabling it for real
 // makes check_dashboard_access deny fresh logins, which would break the
 // parallel auth.spec.ts trio mid-run. So, exactly like the app-lock test
-// above, the write is intercepted (GETs continue to the real backend;
-// only the mutating settings_kv calls are fulfilled) while the FULL
+// above, the write is intercepted while the FULL
 // wizard interaction runs for real, and the test asserts the captured
 // request payloads -- what the app WOULD persist -- plus wizard
 // progression. Zero global side effects, zero restore needed.
@@ -166,17 +155,12 @@ test.describe('Maintenance mode wizard (Cloud Safe -- write mocked)', () => {
     await page.getByRole('button', { name: 'Next Step' }).click();
     await expect(page.getByRole('button', { name: 'Enable Maintenance' })).toBeVisible();
 
-    // Intercept the write (see the Cloud Safety note above): GETs pass
-    // through so the page keeps reading real settings; the three
-    // mutating upserts (mode/message/ends_at) are captured + fulfilled.
+    // Intercept the write (see the Cloud Safety note above). The server-side
+    // RPC receives the complete maintenance payload in one request.
     const writeBodies: string[] = [];
-    await page.route('**/rest/v1/settings_kv*', async (route) => {
-      if (route.request().method() === 'GET') {
-        await route.continue();
-        return;
-      }
+    await page.route('**/rest/v1/rpc/enable_maintenance_mode', async (route) => {
       writeBodies.push(route.request().postData() ?? '');
-      await route.fulfill({ status: 201, contentType: 'application/json', body: '[]' });
+      await route.fulfill({ status: 200, contentType: 'application/json', body: 'null' });
     });
 
     await page.getByRole('button', { name: 'Enable Maintenance' }).click();
@@ -186,8 +170,8 @@ test.describe('Maintenance mode wizard (Cloud Safe -- write mocked)', () => {
     // captured body is already recorded (capture happens on request,
     // before the mocked response resolves the mutation).
     await expect(wizardToggle(page)).toBeVisible();
-    expect(writeBodies.some((b) => b.includes('maintenance_mode'))).toBe(true);
-    expect(writeBodies.some((b) => b.includes('maintenance_message'))).toBe(true);
-    expect(writeBodies.some((b) => b.includes('maintenance_ends_at'))).toBe(true);
+    expect(writeBodies.some((b) => b.includes('p_message'))).toBe(true);
+    expect(writeBodies.some((b) => b.includes('p_ends_at'))).toBe(true);
+    expect(writeBodies.some((b) => b.includes('p_exclude_roles'))).toBe(true);
   });
 });

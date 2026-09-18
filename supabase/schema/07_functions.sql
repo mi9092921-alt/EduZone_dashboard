@@ -5215,8 +5215,14 @@ DECLARE
   v_parent regclass;
   v_year integer := coalesce(p_year, pg_catalog.date_part('year', pg_catalog.now())::integer + 1);
   v_partition_name text := p_table || '_' || v_year::text;
+  v_future_name text := p_table || '_future';
   v_start date := pg_catalog.make_date(v_year, 1, 1);
   v_end date := pg_catalog.make_date(v_year + 1, 1, 1);
+  v_future regclass;
+  v_future_start date;
+  v_future_start_year integer;
+  v_partition_key text;
+  v_is_attached boolean;
 BEGIN
   IF coalesce(auth.role(), '') <> 'service_role'
      AND current_user NOT IN ('app_executor', 'app_maintenance', 'postgres', 'supabase_admin')
@@ -5230,6 +5236,65 @@ BEGIN
   END IF;
 
   IF to_regclass(format('%I.%I', p_schema, v_partition_name)) IS NULL THEN
+    /*
+     * A MAXVALUE catch-all overlaps every future range, so PostgreSQL will
+     * reject CREATE TABLE ... PARTITION OF while it is attached.  Roll that
+     * catch-all forward one year at a time before creating the requested
+     * partition.  Keeping the same relation preserves its RLS policies and
+     * grants, while the row move makes this safe even if a future-dated row
+     * was inserted before the maintenance tick ran.
+     */
+    v_future := to_regclass(format('%I.%I', p_schema, v_future_name));
+
+    IF v_future IS NOT NULL THEN
+      SELECT EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_inherits
+        WHERE inhparent = v_parent
+          AND inhrelid = v_future
+      )
+      INTO v_is_attached;
+
+      IF v_is_attached THEN
+        SELECT (
+          pg_catalog.regexp_match(
+            pg_catalog.pg_get_expr(c.relpartbound, c.oid),
+            $partition_bound$FROM \('([0-9]{4})-[0-9]{2}-[0-9]{2}[^']*'\) TO \(MAXVALUE\)$partition_bound$
+          )
+        )[1]::integer
+        INTO v_future_start_year
+        FROM pg_catalog.pg_class c
+        WHERE c.oid = v_future;
+
+        v_future_start := pg_catalog.make_date(v_future_start_year, 1, 1);
+
+        IF v_future_start IS NOT NULL AND v_start >= v_future_start THEN
+          SELECT a.attname
+          INTO v_partition_key
+          FROM pg_catalog.pg_partitioned_table pt
+          CROSS JOIN LATERAL pg_catalog.unnest(pt.partattrs)
+            WITH ORDINALITY AS key(attnum, ordinal)
+          JOIN pg_catalog.pg_attribute a
+            ON a.attrelid = pt.partrelid
+           AND a.attnum = key.attnum
+          WHERE pt.partrelid = v_parent
+            AND key.ordinal = 1;
+
+          IF v_partition_key IS NULL THEN
+            RAISE EXCEPTION 'UNSUPPORTED_PARTITION_KEY %.%', p_schema, p_table;
+          END IF;
+
+          EXECUTE format(
+            'ALTER TABLE %I.%I DETACH PARTITION %I.%I',
+            p_schema,
+            p_table,
+            p_schema,
+            v_future_name
+          );
+        END IF;
+      END IF;
+    END IF;
+
     EXECUTE format(
       'CREATE TABLE %I.%I PARTITION OF %I.%I FOR VALUES FROM (%L) TO (%L)',
       p_schema,
@@ -5239,6 +5304,40 @@ BEGIN
       v_start,
       v_end
     );
+
+    IF v_future IS NOT NULL
+       AND v_is_attached
+       AND v_future_start IS NOT NULL
+       AND v_start >= v_future_start THEN
+      EXECUTE format(
+        'INSERT INTO %I.%I SELECT * FROM %I.%I WHERE %I >= %L AND %I < %L',
+        p_schema,
+        p_table,
+        p_schema,
+        v_future_name,
+        v_partition_key,
+        v_start,
+        v_partition_key,
+        v_end
+      );
+      EXECUTE format(
+        'DELETE FROM %I.%I WHERE %I >= %L AND %I < %L',
+        p_schema,
+        v_future_name,
+        v_partition_key,
+        v_start,
+        v_partition_key,
+        v_end
+      );
+      EXECUTE format(
+        'ALTER TABLE %I.%I ATTACH PARTITION %I.%I FOR VALUES FROM (%L) TO (MAXVALUE)',
+        p_schema,
+        p_table,
+        p_schema,
+        v_future_name,
+        v_end
+      );
+    END IF;
   END IF;
 
   EXECUTE format('ALTER TABLE %I.%I ENABLE ROW LEVEL SECURITY', p_schema, v_partition_name);
