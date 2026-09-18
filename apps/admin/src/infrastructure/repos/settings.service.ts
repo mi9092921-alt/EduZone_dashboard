@@ -138,13 +138,12 @@ export async function setSetting(key: string, value: string, valueType?: string)
     }
   }
 
-  const updatePayload: Record<string, unknown> = {
-    value: parsedValue,
-    updated_by: user.id,
-    updated_at: new Date().toISOString(),
-  };
-
-  const { error } = await supabase.from('settings_kv').update(updatePayload).eq('key', key);
+  // settings_kv is super-admin-only at the table policy level. Use the
+  // SECURITY DEFINER RPC, which enforces settings.write and invalidates cache.
+  const { error } = await supabase.rpc('set_setting', {
+    p_key: key,
+    p_value: parsedValue,
+  });
 
   if (error) {
     if (error.code === 'PGRST116') throw new NotFoundError('Setting');
@@ -211,66 +210,18 @@ export async function deleteSetting(key: string): Promise<void> {
 
 export async function enableMaintenanceMode(params: MaintenanceModeParams): Promise<void> {
   const { supabase } = container;
-
-  const settings: Array<{ key: string; value: unknown; category: string }> = [
-    { key: 'maintenance_mode', value: true, category: 'maintenance' },
-    { key: 'maintenance_message', value: params.message, category: 'maintenance' },
-    { key: 'maintenance_ends_at', value: params.ends_at, category: 'maintenance' },
-  ];
-
-  if (params.message_en) {
-    settings.push({
-      key: 'maintenance_message_en',
-      value: params.message_en,
-      category: 'maintenance',
-    });
-  }
-  if (params.exclude_roles?.length) {
-    settings.push({
-      key: 'maintenance_exclude_roles',
-      value: params.exclude_roles,
-      category: 'maintenance',
-    });
-  }
-  if (params.exclude_users?.length) {
-    settings.push({
-      key: 'maintenance_exclude_users',
-      value: params.exclude_users,
-      category: 'maintenance',
-    });
-  }
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  for (const s of settings) {
-    const { error } = await supabase
-      .from('settings_kv')
-      .upsert(
-        { ...s, updated_by: user?.id, updated_at: new Date().toISOString() },
-        { onConflict: 'key' },
-      );
-    if (error) throw mapDbError(error, 'settings.service.ts');
-  }
+  const { error } = await supabase.rpc('enable_maintenance_mode', {
+    p_message: params.message,
+    p_ends_at: params.ends_at,
+    p_exclude_roles: params.exclude_roles ?? ['super_admin', 'admin'],
+    p_exclude_users: params.exclude_users ?? [],
+  });
+  if (error) throw mapDbError(error, 'settings.service.ts');
 }
 
 export async function disableMaintenanceMode(): Promise<void> {
   const { supabase } = container;
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const { error } = await supabase.from('settings_kv').upsert(
-    {
-      key: 'maintenance_mode',
-      value: false,
-      category: 'maintenance',
-      updated_by: user?.id,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: 'key' },
-  );
+  const { error } = await supabase.rpc('disable_maintenance_mode');
 
   if (error) throw mapDbError(error, 'settings.service.ts');
 }
@@ -281,42 +232,13 @@ export async function disableMaintenanceMode(): Promise<void> {
 
 export async function lockApp(message: string): Promise<void> {
   const { supabase } = container;
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const settings = [
-    { key: 'app_locked', value: true, category: 'maintenance' },
-    { key: 'app_lock_message', value: message, category: 'maintenance' },
-  ];
-
-  for (const s of settings) {
-    const { error } = await supabase
-      .from('settings_kv')
-      .upsert(
-        { ...s, updated_by: user?.id, updated_at: new Date().toISOString() },
-        { onConflict: 'key' },
-      );
-    if (error) throw mapDbError(error, 'settings.service.ts');
-  }
+  const { error } = await supabase.rpc('lock_app_for_all', { p_message: message });
+  if (error) throw mapDbError(error, 'settings.service.ts');
 }
 
 export async function unlockApp(): Promise<void> {
   const { supabase } = container;
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const { error } = await supabase.from('settings_kv').upsert(
-    {
-      key: 'app_locked',
-      value: false,
-      category: 'maintenance',
-      updated_by: user?.id,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: 'key' },
-  );
+  const { error } = await supabase.rpc('unlock_app');
 
   if (error) throw mapDbError(error, 'settings.service.ts');
 }

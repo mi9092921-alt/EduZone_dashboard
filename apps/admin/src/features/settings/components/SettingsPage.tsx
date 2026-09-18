@@ -74,6 +74,7 @@ export function SettingsPage() {
   const user = useAuthUser();
   const canWriteSettings = user?.primary_role === 'super_admin' ||
     user?.permissions.includes('settings.write');
+  const canManageAppLock = user?.primary_role === 'super_admin';
 
   const { data: grouped, isLoading, isFetching } = useSettingsByCategory();
   const setSettingMutation = useSetSetting();
@@ -216,7 +217,7 @@ export function SettingsPage() {
         </div>
 
         {/* App Lock Control */}
-        {grouped ? <AppLockControl settings={grouped} canEdit={Boolean(canWriteSettings)} /> : <AppLockControl canEdit={Boolean(canWriteSettings)} />}
+        {grouped ? <AppLockControl settings={grouped} canEdit={canManageAppLock} /> : <AppLockControl canEdit={canManageAppLock} />}
 
         {/* Category Tabs */}
         <Paper

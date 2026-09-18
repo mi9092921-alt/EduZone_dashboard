@@ -2454,6 +2454,10 @@ BEGIN
 END;
 $$;
 
+-- Keep a single public signature. Having both (text, jsonb) and (text, text)
+-- makes PostgREST report an ambiguous function when p_value is sent as JSON.
+DROP FUNCTION IF EXISTS public.set_setting(text, text);
+
 CREATE OR REPLACE FUNCTION public.set_setting(p_key text, p_value jsonb)
 RETURNS void
 LANGUAGE plpgsql
@@ -2503,17 +2507,6 @@ BEGIN
   VALUES ('settings:' || p_key, 'settings', jsonb_build_object('key', p_key));
 END;
 $$;
-
-CREATE OR REPLACE FUNCTION public.set_setting(p_key text, p_value text)
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER SET search_path = public, pg_temp
-AS $$
-BEGIN
-  PERFORM public.set_setting(p_key, p_value::jsonb);
-END;
-$$;
-
 
 CREATE OR REPLACE FUNCTION public.check_rate_limit(
   p_action text,
