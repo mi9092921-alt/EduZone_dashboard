@@ -22,37 +22,56 @@ import { test, expect, type Page } from '@playwright/test';
 //    non-blocking, and visible to admins too, so they can get back into
 //    Settings to unlock it.
 test.describe('System Lock', () => {
-  test('locks the system with a message and closes the dialog on success', async ({ page }) => {
-    await page.goto('/settings');
+  test.describe('super-admin controls', () => {
+    // The app-lock RPC is intentionally restricted to super_admin. Do not
+    // reuse the shared tenant-admin storage state here: the session trigger
+    // invalidates the previous session whenever this account logs in, and
+    // auth.spec.ts also exercises the super-admin account independently.
+    test.use({ storageState: { cookies: [], origins: [] } });
 
-    await page.getByRole('button', { name: 'Lock System' }).click();
+    test('locks the system with a message and closes the dialog on success', async ({ page }) => {
+      await page.goto('/login');
+      await page
+        .getByLabel(/email/i)
+        .fill(process.env['E2E_SUPER_ADMIN_EMAIL'] ?? 'super_admin@eduzone-test.com');
+      await page
+        .getByLabel(/password/i)
+        .fill(process.env['E2E_SUPER_ADMIN_PASSWORD'] ?? 'Admin@12345');
+      await page.getByRole('button', { name: /sign in/i }).click();
+      await expect(page).toHaveURL(/\/(en|ar)\/?$/);
 
-    const dialog = page.getByRole('dialog');
-    await expect(dialog.getByText('Lock System')).toBeVisible();
+      await expect(page.locator('#user-menu-button')).toBeVisible();
+      await page.goto('/settings');
 
-    // lockApp() calls the lock_app_for_all RPC. Mocking rather than a real
-    // write: 'app_locked' is a single global row, and fullyParallel: true
-    // runs this alongside every other spec file against the same dev
-    // server + Supabase instance -- a real write here would flip the
-    // AdminShell banner (and, if this were the separate maintenance-mode
-    // setting instead, block login outright) for all of them mid-run.
-    let sawLockMessageInBody = false;
-    await page.route('**/rest/v1/rpc/lock_app_for_all', async (route) => {
-      const body = route.request().postData() ?? '';
-      if (body.includes('Playwright automated lockdown')) sawLockMessageInBody = true;
-      await route.fulfill({ status: 200, contentType: 'application/json', body: 'null' });
+      await page.getByRole('button', { name: 'Lock System' }).click();
+
+      const dialog = page.getByRole('dialog');
+      await expect(dialog.getByText('Lock System')).toBeVisible();
+
+      // lockApp() calls the lock_app_for_all RPC. Mocking rather than a real
+      // write: 'app_locked' is a single global row, and fullyParallel: true
+      // runs this alongside every other spec file against the same dev
+      // server + Supabase instance -- a real write here would flip the
+      // AdminShell banner (and, if this were the separate maintenance-mode
+      // setting instead, block login outright) for all of them mid-run.
+      let sawLockMessageInBody = false;
+      await page.route('**/rest/v1/rpc/lock_app_for_all', async (route) => {
+        const body = route.request().postData() ?? '';
+        if (body.includes('Playwright automated lockdown')) sawLockMessageInBody = true;
+        await route.fulfill({ status: 200, contentType: 'application/json', body: 'null' });
+      });
+
+      await dialog.getByLabel('Lock Message').fill('Playwright automated lockdown');
+      await dialog.getByRole('button', { name: 'Lock System' }).click();
+
+      // No success toast exists for this action (checked messages/en.json's
+      // settings.app_lock namespace and AppLockControl.tsx's handleLock --
+      // neither calls a toast). On failure the dialog stays open with an
+      // inline Alert (same pattern as the Lock/Unlock user dialog); closing
+      // is the real, only success signal here.
+      await expect(dialog).not.toBeVisible();
+      expect(sawLockMessageInBody).toBe(true);
     });
-
-    await dialog.getByLabel('Lock Message').fill('Playwright automated lockdown');
-    await dialog.getByRole('button', { name: 'Lock System' }).click();
-
-    // No success toast exists for this action (checked messages/en.json's
-    // settings.app_lock namespace and AppLockControl.tsx's handleLock --
-    // neither calls a toast). On failure the dialog stays open with an
-    // inline Alert (same pattern as the Lock/Unlock user dialog); closing
-    // is the real, only success signal here.
-    await expect(dialog).not.toBeVisible();
-    expect(sawLockMessageInBody).toBe(true);
   });
 
   test('shows the locked banner across the admin shell when the system is locked', async ({

@@ -276,7 +276,7 @@ export function CourseInfoForm({
               </div>
             </div>
 
-            <div className="flex items-center justify-between gap-3 p-4 rounded-2xl bg-muted/30 border border-border/50">
+            <div dir="rtl" className="flex min-w-0 items-center justify-between gap-4 p-4 rounded-2xl bg-muted/30 border border-border/50">
               <div className="space-y-1 min-w-0 flex-1">
                 <Label className="text-base font-bold">{t('discoverable_label')}</Label>
                 <p className="text-xs text-muted-foreground font-medium">
@@ -292,7 +292,7 @@ export function CourseInfoForm({
               />
             </div>
 
-            <div className="flex items-center justify-between gap-3 p-4 rounded-2xl bg-muted/30 border border-border/50">
+            <div dir="rtl" className="flex min-w-0 items-center justify-between gap-4 p-4 rounded-2xl bg-muted/30 border border-border/50">
               <div className="space-y-1 min-w-0 flex-1">
                 <Label className="text-base font-bold">{t('free_course_label')}</Label>
                 <p className="text-xs text-muted-foreground font-medium">{t('free_course_desc')}</p>

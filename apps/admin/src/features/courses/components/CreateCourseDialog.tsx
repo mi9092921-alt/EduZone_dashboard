@@ -290,8 +290,8 @@ export function CreateCourseDialog({ open, onClose }: CreateCourseDialogProps) {
           </div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-muted/30 border border-border/50 flex items-center justify-between gap-4">
-          <div className="space-y-0.5">
+        <div dir="rtl" className="p-4 rounded-2xl bg-muted/30 border border-border/50 flex min-w-0 items-center justify-between gap-4">
+          <div className="min-w-0 space-y-0.5">
             <Label className="text-base">{t('discoverable_label')}</Label>
             <p className="text-xs text-muted-foreground font-medium">{t('discoverable_desc')}</p>
           </div>
@@ -304,8 +304,8 @@ export function CreateCourseDialog({ open, onClose }: CreateCourseDialogProps) {
           />
         </div>
 
-        <div className="p-4 rounded-2xl bg-muted/30 border border-border/50 flex items-center justify-between gap-4">
-          <div className="space-y-0.5">
+        <div dir="rtl" className="p-4 rounded-2xl bg-muted/30 border border-border/50 flex min-w-0 items-center justify-between gap-4">
+          <div className="min-w-0 space-y-0.5">
             <Label className="text-base">{t('free_course_label')}</Label>
             <p className="text-xs text-muted-foreground font-medium">{t('free_course_desc')}</p>
           </div>

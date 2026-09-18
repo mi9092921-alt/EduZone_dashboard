@@ -298,10 +298,10 @@ export function SectionCard({
           direction="row"
           alignItems="center"
           justifyContent={{ xs: 'space-between', sm: 'flex-end' }}
-          spacing={1}
+          spacing={1.5}
           sx={{ width: { xs: '100%', sm: 'auto' } }}
         >
-          <Typography variant="caption" sx={{ color: 'text.disabled', whiteSpace: 'nowrap' }}>
+          <Typography variant="caption" sx={{ color: 'text.secondary', whiteSpace: 'nowrap', flexShrink: 0 }}>
             {t('lesson_count', { count: section.lessons?.length ?? 0 })}
           </Typography>
           <Switch

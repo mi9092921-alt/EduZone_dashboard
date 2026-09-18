@@ -246,8 +246,8 @@ export function LessonRow({
               } 
             }}
           />
-          <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 1 }}>
-            <Typography variant="caption" sx={{ color: 'text.secondary', flexGrow: 1 }}>
+          <Stack direction="row" alignItems="center" spacing={1.5} sx={{ px: 1, minWidth: 0 }}>
+            <Typography variant="caption" sx={{ color: 'text.secondary', flexGrow: 1, minWidth: 0 }}>
               {t('is_preview_label') || 'Free Preview'}
             </Typography>
             <Switch
@@ -375,13 +375,13 @@ export function LessonRow({
       <Stack
         direction="row"
         alignItems="center"
-        spacing={0.5}
+        spacing={1.25}
         flexWrap="wrap"
         rowGap={1}
         sx={{ width: { xs: '100%', sm: 'auto' }, justifyContent: { xs: 'flex-start', sm: 'flex-end' } }}
       >
-        <Box sx={{ mr: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <Typography variant="caption" sx={{ fontSize: '0.6rem', color: 'text.disabled', fontWeight: 700, mb: -0.5 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.25, minWidth: 58, flexShrink: 0 }}>
+          <Typography variant="caption" sx={{ fontSize: '0.65rem', color: 'text.secondary', fontWeight: 700, lineHeight: 1.2, whiteSpace: 'nowrap' }}>
             {t('is_preview_label') || 'PREVIEW'}
           </Typography>
           <Switch
@@ -395,8 +395,8 @@ export function LessonRow({
             }}
           />
         </Box>
-        <Box sx={{ mr: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <Typography variant="caption" sx={{ fontSize: '0.6rem', color: 'text.disabled', fontWeight: 700, mb: -0.5 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.25, minWidth: 58, flexShrink: 0 }}>
+          <Typography variant="caption" sx={{ fontSize: '0.65rem', color: 'text.secondary', fontWeight: 700, lineHeight: 1.2, whiteSpace: 'nowrap' }}>
             {t('is_published_label') || 'PUBLIC'}
           </Typography>
           <Switch
