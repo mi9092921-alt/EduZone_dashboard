@@ -1,3 +1,4 @@
+import nextPlugin from '@next/eslint-plugin-next';
 import tsPlugin from '@typescript-eslint/eslint-plugin';
 import tsParser from '@typescript-eslint/parser';
 import importPlugin from 'eslint-plugin-import';
@@ -43,9 +44,11 @@ export default [
     },
     plugins: {
       '@typescript-eslint': tsPlugin,
+      '@next/next': nextPlugin,
       import: importPlugin,
     },
     rules: {
+      ...nextPlugin.configs.recommended.rules,
       ...tsPlugin.configs.recommended.rules,
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': ['error', {
