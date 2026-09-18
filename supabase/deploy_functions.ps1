@@ -2,6 +2,8 @@ param(
     [string]$ConfigFile = 'db_url.txt'
 )
 
+$ErrorActionPreference = 'Stop'
+
 $dbUrlFile = if ([System.IO.Path]::IsPathRooted($ConfigFile)) {
     $ConfigFile
 } else {
@@ -26,14 +28,24 @@ if (-not $configValues['SUPABASE_ACCESS_TOKEN'] -or -not $configValues['SUPABASE
 $env:SUPABASE_ACCESS_TOKEN = $configValues['SUPABASE_ACCESS_TOKEN']
 $PROJECT_REF = ([Uri]$configValues['SUPABASE_URL']).Host.Split('.')[0]
 
-npx supabase functions deploy bulk-action --project-ref $PROJECT_REF
-npx supabase functions deploy bulk-export --project-ref $PROJECT_REF
-npx supabase functions deploy bulk-worker --project-ref $PROJECT_REF
-npx supabase functions deploy create-user --project-ref $PROJECT_REF
-npx supabase functions deploy export-report --project-ref $PROJECT_REF
-npx supabase functions deploy get-lesson-content --project-ref $PROJECT_REF
-npx supabase functions deploy send-push-notification --project-ref $PROJECT_REF
-npx supabase functions deploy validate-course-access --project-ref $PROJECT_REF
-npx supabase functions deploy log-download-attempt --project-ref $PROJECT_REF
-npx supabase functions deploy video-info --project-ref $PROJECT_REF
+$functionNames = @(
+    'bulk-action',
+    'bulk-export',
+    'bulk-worker',
+    'create-user',
+    'export-report',
+    'get-lesson-content',
+    'send-push-notification',
+    'validate-course-access',
+    'log-download-attempt',
+    'video-info'
+)
+
+foreach ($functionName in $functionNames) {
+    Write-Host "Deploying function: $functionName"
+    & npx.cmd supabase functions deploy $functionName --project-ref $PROJECT_REF --use-api
+    if ($LASTEXITCODE -ne 0) {
+        throw "Deployment failed for '$functionName' (exit code $LASTEXITCODE). Verify the token has Edge Functions read-write access to project $PROJECT_REF."
+    }
+}
 
