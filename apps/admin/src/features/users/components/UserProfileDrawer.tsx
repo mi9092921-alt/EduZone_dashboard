@@ -270,7 +270,8 @@ const CopyButton = memo(({ value }: { value: string }) => {
         onClick={handleCopy}
         aria-label={copied ? tCommon('copied') : tCommon('copy')}
         className={cn(
-          "w-6 h-6 flex items-center justify-center rounded-md transition-all duration-300 active:scale-95 opacity-0 group-hover/contact:opacity-100 focus-visible:opacity-100 bg-muted/40 hover:bg-muted ms-1",
+          // Always visible on touch (no hover); revealed on hover at md+ only
+          "w-6 h-6 flex items-center justify-center rounded-md transition-all duration-300 active:scale-95 opacity-100 md:opacity-0 md:group-hover/contact:opacity-100 md:focus-visible:opacity-100 bg-muted/40 hover:bg-muted ms-1",
           copied
             ? "text-emerald-500 dark:text-emerald-400"
             : "text-muted-foreground hover:text-primary"
@@ -478,8 +479,9 @@ function ActivityTab({ user, t, locale }: { user: User, t: TranslationFn, locale
 
             return (
               <div key={log.id} className="relative group">
-                {/* Node icon */}
-                <div className="absolute -start-6 top-3 -translate-x-1/2 w-6 h-6 rounded-full bg-card border-2 border-border flex items-center justify-center shadow-xs">
+                {/* Node icon — -start-6 + centered dot; the translate flips in
+                    RTL because the inline "start" side flips */}
+                <div className="absolute -start-6 top-3 -translate-x-1/2 rtl:translate-x-1/2 w-6 h-6 rounded-full bg-card border-2 border-border flex items-center justify-center shadow-xs">
                   <div className={cn("w-2 h-2 rounded-full", risk.dot)} />
                 </div>
 

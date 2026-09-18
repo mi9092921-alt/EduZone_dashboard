@@ -1,5 +1,7 @@
 import * as Sentry from '@sentry/nextjs';
 
+import { shouldDropSentryEvent } from '@/lib/sentry';
+
 // SENTRY FIX (2026-09-12): Next.js 15.x deprecated `sentry.client.config.ts`
 // in favor of `instrumentation-client.ts` (the client-side counterpart of
 // `instrumentation.ts`). With Turbopack builds the old filename is silently
@@ -15,6 +17,7 @@ if (dsn) {
     environment: process.env.NEXT_PUBLIC_APP_ENV || process.env.NODE_ENV,
     tracesSampleRate: 0.1,
     debug: false,
+    beforeSend: (event) => (shouldDropSentryEvent(event) ? null : event),
   });
 }
 

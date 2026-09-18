@@ -59,7 +59,8 @@ export function TablePagination({
           onClick={() => onPageChange(page - 1)}
           className="h-8 w-8 p-0"
         >
-          <ChevronLeft className="text-sm" />
+          {/* Rotated in RTL so "previous" points the right way */}
+          <ChevronLeft className="text-sm rtl:rotate-180" />
         </Button>
         <div className="flex items-center gap-1">
           {(() => {
@@ -94,7 +95,7 @@ export function TablePagination({
           onClick={() => onPageChange(page + 1)}
           className="h-8 w-8 p-0"
         >
-          <ChevronRight className="text-sm" />
+          <ChevronRight className="text-sm rtl:rotate-180" />
         </Button>
       </div>
     </div>

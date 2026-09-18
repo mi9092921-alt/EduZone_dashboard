@@ -51,6 +51,7 @@ import {
 } from '@/adapters/mutations/courses.mutations';
 import { useToast } from '@/adapters/stores/toast.store';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { LtrIsland } from '@/components/ui/LtrIsland';
 import type { Section, Lesson } from '@/domain/types/course.types';
 import { isValidVideoUrl } from '@/domain/video.utils';
 
@@ -240,10 +241,21 @@ export function SectionCard({
           <Box
             {...attributes}
             {...listeners}
-            sx={{ display: 'flex', cursor: 'grab', touchAction: 'none' }}
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'grab',
+              touchAction: 'none',
+              // Enlarged hit area: ≥40px touch target for phones
+              p: 1,
+              m: -1,
+              borderRadius: 1.5,
+              '&:hover': { backgroundColor: 'action.hover' },
+            }}
             onClick={(e) => e.stopPropagation()}
           >
-            <DragIndicator sx={{ fontSize: 18, color: 'text.disabled' }} />
+            <DragIndicator sx={{ fontSize: 20, color: 'text.disabled' }} />
           </Box>
           {editingTitle ? (
             <Box
@@ -298,24 +310,26 @@ export function SectionCard({
           direction="row"
           alignItems="center"
           justifyContent={{ xs: 'space-between', sm: 'flex-end' }}
-          spacing={1}
+          spacing={1.5}
           sx={{ width: { xs: '100%', sm: 'auto' } }}
         >
-          <Typography variant="caption" sx={{ color: 'text.disabled', whiteSpace: 'nowrap' }}>
+          <Typography variant="caption" sx={{ color: 'text.secondary', whiteSpace: 'nowrap', flexShrink: 0 }}>
             {t('lesson_count', { count: section.lessons?.length ?? 0 })}
           </Typography>
-          <Switch
-            size="small"
-            checked={localPublished}
-            onChange={() => { void handleTogglePublish(); }}
-            onClick={(e) => e.stopPropagation()}
-            sx={{
-              '& .MuiSwitch-switchBase.Mui-checked': { color: 'primary.main' },
-              '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                backgroundColor: 'primary.main',
-              },
-            }}
-          />
+          <LtrIsland>
+            <Switch
+              size="small"
+              checked={localPublished}
+              onChange={() => { void handleTogglePublish(); }}
+              onClick={(e) => e.stopPropagation()}
+              sx={{
+                '& .MuiSwitch-switchBase.Mui-checked': { color: 'primary.main' },
+                '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                  backgroundColor: 'primary.main',
+                },
+              }}
+            />
+          </LtrIsland>
           <Stack
             direction="row"
             spacing={1}
@@ -430,11 +444,13 @@ export function SectionCard({
                 <Typography variant="body2" sx={{ color: 'text.secondary', flexGrow: 1, fontWeight: 500 }}>
                   {t('is_preview_label') || 'Free Preview'}
                 </Typography>
-                <Switch
-                  size="small"
-                  checked={newLessonIsPreview}
-                  onChange={(e) => setNewLessonIsPreview(e.target.checked)}
-                />
+                <LtrIsland>
+                  <Switch
+                    size="small"
+                    checked={newLessonIsPreview}
+                    onChange={(e) => setNewLessonIsPreview(e.target.checked)}
+                  />
+                </LtrIsland>
               </Stack>
               <Box
                 sx={{

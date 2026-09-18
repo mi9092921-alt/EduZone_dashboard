@@ -1,8 +1,8 @@
 import type { IAuditLogger } from '@/application/ports/IAuditLogger';
 import type { INotificationAdminRepository } from '@/application/ports/INotificationAdminRepository';
-import { ValidationError } from '@/domain/errors';
+import { ForbiddenError, ValidationError } from '@/domain/errors';
 import type { RequestContext } from '@/domain/types/context.types';
-import type { SendNotificationInput } from '@/domain/types/notification.types';
+import type { SendNotificationInput, TargetAudience } from '@/domain/types/notification.types';
 
 /**
  * SendNotificationUseCase — admin broadcast notification with recipient
@@ -35,6 +35,24 @@ export class SendNotificationUseCase {
     const tenantId = ctx.tenantId;
     if (!tenantId) throw new ValidationError('Tenant context is missing');
 
+    const allowedRecipientRoles = getAllowedRecipientRoles(ctx.role);
+    if (allowedRecipientRoles.length === 0) {
+      throw new ForbiddenError('The current role cannot send notifications');
+    }
+
+    const targetAudience = input.target_audience ?? getDefaultAudience(ctx.role);
+    if (!isAllowedAudience(ctx.role, targetAudience)) {
+      throw new ForbiddenError('The selected audience is outside the sender role scope');
+    }
+
+    // Normalize the audience before resolving recipients and inserting the
+    // broadcast row. This keeps role/permission/user targeting consistent
+    // even when a client sends a hand-crafted request.
+    const scopedInput: SendNotificationInput = {
+      ...input,
+      target_audience: targetAudience,
+    };
+
     // An explicit users-mode send must never fall through to an audience
     // default when the selected list is empty.
     const hasExplicitUserSelection = input.target_user_ids !== undefined;
@@ -42,11 +60,19 @@ export class SendNotificationUseCase {
       throw new ValidationError('At least one target user is required');
     }
 
-    const targetUserIds = await this.notifications.resolveTargetUserIds(input, tenantId);
+    const targetUserIds = await this.notifications.resolveTargetUserIds(
+      scopedInput,
+      tenantId,
+      allowedRecipientRoles,
+    );
     if (hasExplicitUserSelection && targetUserIds.length === 0) {
       throw new ValidationError('No valid target users were found in this tenant');
     }
-    const notificationId = await this.notifications.insertNotification(input, tenantId, ctx.userId);
+    const notificationId = await this.notifications.insertNotification(
+      scopedInput,
+      tenantId,
+      ctx.userId,
+    );
 
     if (targetUserIds.length) {
       try {
@@ -88,4 +114,28 @@ export class SendNotificationUseCase {
 
     return notificationId;
   }
+}
+
+/** Roles that can receive a notification from each sender role. */
+export function getAllowedRecipientRoles(role: RequestContext['role']): string[] {
+  switch (role) {
+    case 'super_admin':
+      return ['student', 'teacher', 'admin', 'super_admin'];
+    case 'admin':
+      return ['student', 'teacher'];
+    case 'teacher':
+      return ['student'];
+    default:
+      return [];
+  }
+}
+
+function getDefaultAudience(role: RequestContext['role']): TargetAudience {
+  return role === 'super_admin' ? 'all' : 'students';
+}
+
+function isAllowedAudience(role: RequestContext['role'], audience: TargetAudience): boolean {
+  if (role === 'super_admin') return true;
+  if (role === 'admin') return audience !== 'admins';
+  return role === 'teacher' && audience === 'students';
 }

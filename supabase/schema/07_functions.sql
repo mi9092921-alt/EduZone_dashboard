@@ -2454,6 +2454,10 @@ BEGIN
 END;
 $$;
 
+-- Keep a single public signature. Having both (text, jsonb) and (text, text)
+-- makes PostgREST report an ambiguous function when p_value is sent as JSON.
+DROP FUNCTION IF EXISTS public.set_setting(text, text);
+
 CREATE OR REPLACE FUNCTION public.set_setting(p_key text, p_value jsonb)
 RETURNS void
 LANGUAGE plpgsql
@@ -2503,17 +2507,6 @@ BEGIN
   VALUES ('settings:' || p_key, 'settings', jsonb_build_object('key', p_key));
 END;
 $$;
-
-CREATE OR REPLACE FUNCTION public.set_setting(p_key text, p_value text)
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER SET search_path = public, pg_temp
-AS $$
-BEGIN
-  PERFORM public.set_setting(p_key, p_value::jsonb);
-END;
-$$;
-
 
 CREATE OR REPLACE FUNCTION public.check_rate_limit(
   p_action text,
@@ -4036,15 +4029,22 @@ RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
+DECLARE
+  v_changed_by uuid := auth.uid();
 BEGIN
-  IF NEW.is_published <> OLD.is_published THEN
+  -- Course deletion is performed through the server's service-role client.
+  -- Its cascade sets lessons to unpublished, but service_role has no caller
+  -- JWT, so auth.uid() is NULL. `changed_by` is intentionally NOT NULL;
+  -- skip this per-lesson transition row for that trusted system cascade.
+  -- The parent course deletion is still recorded by DeleteCourseUseCase.
+  IF NEW.is_published <> OLD.is_published AND v_changed_by IS NOT NULL THEN
     INSERT INTO audit.lesson_state_transitions (
       lesson_id, old_state, new_state, changed_by
     ) VALUES (
       NEW.id,
       CASE WHEN OLD.is_published THEN 'published' ELSE 'draft' END,
       CASE WHEN NEW.is_published THEN 'published' ELSE 'draft' END,
-      auth.uid()
+      v_changed_by
     );
   END IF;
   RETURN NEW;
@@ -5222,8 +5222,14 @@ DECLARE
   v_parent regclass;
   v_year integer := coalesce(p_year, pg_catalog.date_part('year', pg_catalog.now())::integer + 1);
   v_partition_name text := p_table || '_' || v_year::text;
+  v_future_name text := p_table || '_future';
   v_start date := pg_catalog.make_date(v_year, 1, 1);
   v_end date := pg_catalog.make_date(v_year + 1, 1, 1);
+  v_future regclass;
+  v_future_start date;
+  v_future_start_year integer;
+  v_partition_key text;
+  v_is_attached boolean;
 BEGIN
   IF coalesce(auth.role(), '') <> 'service_role'
      AND current_user NOT IN ('app_executor', 'app_maintenance', 'postgres', 'supabase_admin')
@@ -5237,6 +5243,65 @@ BEGIN
   END IF;
 
   IF to_regclass(format('%I.%I', p_schema, v_partition_name)) IS NULL THEN
+    /*
+     * A MAXVALUE catch-all overlaps every future range, so PostgreSQL will
+     * reject CREATE TABLE ... PARTITION OF while it is attached.  Roll that
+     * catch-all forward one year at a time before creating the requested
+     * partition.  Keeping the same relation preserves its RLS policies and
+     * grants, while the row move makes this safe even if a future-dated row
+     * was inserted before the maintenance tick ran.
+     */
+    v_future := to_regclass(format('%I.%I', p_schema, v_future_name));
+
+    IF v_future IS NOT NULL THEN
+      SELECT EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_inherits
+        WHERE inhparent = v_parent
+          AND inhrelid = v_future
+      )
+      INTO v_is_attached;
+
+      IF v_is_attached THEN
+        SELECT (
+          pg_catalog.regexp_match(
+            pg_catalog.pg_get_expr(c.relpartbound, c.oid),
+            $partition_bound$FROM \('([0-9]{4})-[0-9]{2}-[0-9]{2}[^']*'\) TO \(MAXVALUE\)$partition_bound$
+          )
+        )[1]::integer
+        INTO v_future_start_year
+        FROM pg_catalog.pg_class c
+        WHERE c.oid = v_future;
+
+        v_future_start := pg_catalog.make_date(v_future_start_year, 1, 1);
+
+        IF v_future_start IS NOT NULL AND v_start >= v_future_start THEN
+          SELECT a.attname
+          INTO v_partition_key
+          FROM pg_catalog.pg_partitioned_table pt
+          CROSS JOIN LATERAL pg_catalog.unnest(pt.partattrs)
+            WITH ORDINALITY AS key(attnum, ordinal)
+          JOIN pg_catalog.pg_attribute a
+            ON a.attrelid = pt.partrelid
+           AND a.attnum = key.attnum
+          WHERE pt.partrelid = v_parent
+            AND key.ordinal = 1;
+
+          IF v_partition_key IS NULL THEN
+            RAISE EXCEPTION 'UNSUPPORTED_PARTITION_KEY %.%', p_schema, p_table;
+          END IF;
+
+          EXECUTE format(
+            'ALTER TABLE %I.%I DETACH PARTITION %I.%I',
+            p_schema,
+            p_table,
+            p_schema,
+            v_future_name
+          );
+        END IF;
+      END IF;
+    END IF;
+
     EXECUTE format(
       'CREATE TABLE %I.%I PARTITION OF %I.%I FOR VALUES FROM (%L) TO (%L)',
       p_schema,
@@ -5246,6 +5311,40 @@ BEGIN
       v_start,
       v_end
     );
+
+    IF v_future IS NOT NULL
+       AND v_is_attached
+       AND v_future_start IS NOT NULL
+       AND v_start >= v_future_start THEN
+      EXECUTE format(
+        'INSERT INTO %I.%I SELECT * FROM %I.%I WHERE %I >= %L AND %I < %L',
+        p_schema,
+        p_table,
+        p_schema,
+        v_future_name,
+        v_partition_key,
+        v_start,
+        v_partition_key,
+        v_end
+      );
+      EXECUTE format(
+        'DELETE FROM %I.%I WHERE %I >= %L AND %I < %L',
+        p_schema,
+        v_future_name,
+        v_partition_key,
+        v_start,
+        v_partition_key,
+        v_end
+      );
+      EXECUTE format(
+        'ALTER TABLE %I.%I ATTACH PARTITION %I.%I FOR VALUES FROM (%L) TO (MAXVALUE)',
+        p_schema,
+        p_table,
+        p_schema,
+        v_future_name,
+        v_end
+      );
+    END IF;
   END IF;
 
   EXECUTE format('ALTER TABLE %I.%I ENABLE ROW LEVEL SECURITY', p_schema, v_partition_name);
@@ -5303,6 +5402,88 @@ BEGIN
       'manage_partitions',
       '0 3 1 * *',
       'SELECT maintenance.manage_partitions();'
+    );
+  END IF;
+END $$;
+
+-- Nightly telemetry retention. Partition creation (manage_partitions) only
+-- ever ADDS partitions — nothing retired rows, so activity_logs, video_views,
+-- user_location_logs, rate_limits, push_deliveries and download_logs grew
+-- without bound. These deletes run from the postgres role (pg_cron), so RLS
+-- does not apply. Retention windows (documented, adjust deliberately):
+--   rate_limits 90d · activity_log_queue (flushed rows only) 90d ·
+--   user_location_logs 180d (privacy minimization) · push_deliveries 180d ·
+--   download_logs 365d · activity_logs / video_views 730d.
+-- session_snapshots is deliberately NOT cleaned: one small row per real
+-- login is the security audit trail.
+CREATE OR REPLACE FUNCTION maintenance.apply_telemetry_retention()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_cutoff timestamptz;
+BEGIN
+  v_cutoff := pg_catalog.now() - interval '730 days';
+  DELETE FROM public.activity_logs WHERE logged_at < v_cutoff;
+  DELETE FROM public.video_views WHERE viewed_at < v_cutoff;
+
+  v_cutoff := pg_catalog.now() - interval '180 days';
+  DELETE FROM public.user_location_logs WHERE accessed_at < v_cutoff;
+  DELETE FROM public.push_deliveries WHERE created_at < v_cutoff;
+
+  v_cutoff := pg_catalog.now() - interval '90 days';
+  DELETE FROM public.rate_limits WHERE window_start < v_cutoff;
+  -- Only rows the queue worker already flushed are safe to remove; an
+  -- unflushed row is pending work, never garbage.
+  DELETE FROM public.activity_log_queue
+   WHERE flushed_at IS NOT NULL AND flushed_at < v_cutoff;
+
+  v_cutoff := pg_catalog.now() - interval '365 days';
+  DELETE FROM public.download_logs WHERE downloaded_at < v_cutoff;
+END;
+$$;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_extension WHERE extname = 'pg_cron'
+  ) THEN
+    IF EXISTS (
+      SELECT 1 FROM pg_tables WHERE schemaname = 'cron' AND tablename = 'job'
+    ) THEN
+      PERFORM cron.unschedule(jobid)
+      FROM cron.job
+      WHERE jobname = 'telemetry-retention';
+    END IF;
+
+    PERFORM cron.schedule(
+      'telemetry-retention',
+      '30 4 * * *',
+      'SELECT maintenance.apply_telemetry_retention();'
+    );
+  END IF;
+END $$;
+
+-- internal.cleanup_old_jobs() has existed unscheduled: processed
+-- internal.job_queue rows past retention are only removed here.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_extension WHERE extname = 'pg_cron'
+  ) THEN
+    IF EXISTS (
+      SELECT 1 FROM pg_tables WHERE schemaname = 'cron' AND tablename = 'job'
+    ) THEN
+      PERFORM cron.unschedule(jobid)
+      FROM cron.job
+      WHERE jobname = 'job-queue-cleanup';
+    END IF;
+
+    PERFORM cron.schedule(
+      'job-queue-cleanup',
+      '40 4 * * *',
+      'SELECT internal.cleanup_old_jobs(30);'
     );
   END IF;
 END $$;
@@ -5920,24 +6101,74 @@ SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_count integer := 0;
+  v_job internal.job_queue%ROWTYPE;
   v_course_id uuid;
-  v_last_checked timestamptz;
+  v_worker_id text := 'enrollment-totals-' || gen_random_uuid()::text;
 BEGIN
-  SELECT last_processed_at INTO v_last_checked
-  FROM internal.job_progress
-  WHERE job_type = 'UPDATE_ENROLLMENT_TOTALS';
-  
-  v_last_checked := COALESCE(v_last_checked, '1970-01-01'::timestamptz);
+  IF coalesce(auth.role(), current_user) NOT IN
+      ('service_role', 'postgres', 'supabase_admin') THEN
+    RAISE EXCEPTION 'PERMISSION_DENIED';
+  END IF;
 
-  -- Aggregate courses that need updating based on recent lesson changes
-  FOR v_course_id IN 
-    SELECT DISTINCT course_id 
-    FROM public.lessons 
-    WHERE updated_at > v_last_checked
-    LIMIT p_limit
+  IF coalesce(p_limit, 100) <= 0 THEN
+    RETURN 0;
+  END IF;
+
+  -- The lesson trigger enqueues one job per affected course. Dequeue those
+  -- rows explicitly; a timestamp checkpoint can never acknowledge the queue
+  -- row and leaves it pending forever.
+  FOR v_job IN
+    SELECT *
+    FROM internal.dequeue_job(
+      v_worker_id,
+      ARRAY[p_job_type],
+      300,
+      greatest(1, least(coalesce(p_limit, 100), 500))
+    )
   LOOP
-    PERFORM internal.apply_update_enrollment_totals_course(v_course_id);
-    v_count := v_count + 1;
+    BEGIN
+      IF nullif(pg_catalog.btrim(v_job.payload ->> 'course_id'), '') IS NULL THEN
+        RAISE EXCEPTION 'MISSING_COURSE_ID';
+      END IF;
+
+      v_course_id := (v_job.payload ->> 'course_id')::uuid;
+      PERFORM internal.apply_update_enrollment_totals_course(v_course_id);
+
+      UPDATE internal.job_queue
+      SET status = 'done',
+          result = jsonb_build_object('course_id', v_course_id),
+          error_message = NULL,
+          next_retry_at = NULL,
+          locked_by_worker_id = NULL,
+          locked_at = NULL,
+          lock_expires_at = NULL,
+          finished_at = pg_catalog.now(),
+          updated_at = pg_catalog.now()
+      WHERE id = v_job.id;
+
+      v_count := v_count + 1;
+    EXCEPTION WHEN OTHERS THEN
+      UPDATE internal.job_queue
+      SET status = CASE WHEN attempts >= max_attempts THEN 'failed' ELSE 'pending' END,
+          next_retry_at = CASE
+            WHEN attempts >= max_attempts THEN NULL
+            ELSE pg_catalog.now() + least(
+              interval '15 minutes',
+              greatest(
+                interval '30 seconds',
+                pg_catalog.make_interval(
+                  secs => power(2, greatest(attempts - 1, 0))::integer * 30
+                )
+              )
+            )
+          END,
+          error_message = left(SQLERRM, 1000),
+          locked_by_worker_id = NULL,
+          locked_at = NULL,
+          lock_expires_at = NULL,
+          updated_at = pg_catalog.now()
+      WHERE id = v_job.id;
+    END;
   END LOOP;
 
   INSERT INTO internal.job_progress (job_type, checkpoint_key, last_processed_at, processed_count)
@@ -7886,6 +8117,32 @@ BEGIN
   )
   RETURNING id INTO v_session_id;
 
+  -- Immutable audit snapshot of the user's authoritative state at the
+  -- moment this session began. Fills public.session_snapshots (one row
+  -- per real login, FK-tied to this exact session row) so forensics can
+  -- answer "who was this account when this session started" even after
+  -- the live users row changes (token_version bump, role change, ban).
+  -- Deliberately written here — the only trusted session-creation path —
+  -- and NOT cleaned by telemetry retention (it is the audit trail).
+  INSERT INTO public.session_snapshots (session_id, started_at, tenant_id, user_snapshot)
+  SELECT s.id,
+         s.started_at,
+         s.tenant_id,
+         jsonb_build_object(
+           'email', u.email,
+           'first_name', u.first_name,
+           'last_name', u.last_name,
+           'primary_role', u.primary_role,
+           'account_status', u.account_status,
+           'region_id', u.region_id,
+           'token_version', u.token_version,
+           'device_id', s.device_id,
+           'ip_address', host(s.ip_address)
+         )
+    FROM public.sessions s
+    JOIN public.users u ON u.id = s.user_id
+   WHERE s.id = v_session_id;
+
   RETURN v_session_id;
 END;
 $$;
@@ -8034,7 +8291,7 @@ DECLARE
   v_session jsonb := public._session_status();
   v_role text := v_session ->> 'role';
   v_tenant_id text := v_session ->> 'tenant_id';
-  v_token_version text := v_session ->> 'token_version';
+  v_token_version integer := (v_session ->> 'token_version')::integer;
   v_maintenance_excluded_roles text[] := ARRAY[]::text[];
   v_maintenance_excluded_users uuid[] := ARRAY[]::uuid[];
 BEGIN

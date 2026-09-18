@@ -422,7 +422,7 @@ export function WarningsPage() {
                       '&:hover': { backgroundColor: 'text.secondary' },
                     }}
                   >
-                    {issueMutation.isPending ? <CircularProgress size={20} sx={{ color: '#fff' }} /> : t('btn_submit')}
+                    {issueMutation.isPending ? <CircularProgress size={20} sx={{ color: 'common.white' }} /> : t('btn_submit')}
                   </Button>
                 </Box>
               </form>
@@ -588,7 +588,7 @@ export function WarningsPage() {
                             </Box>
                           </TableCell>
                           <TableCell sx={{ maxWidth: { xs: 140, sm: 250 } }}>
-                            <Typography variant="body2" noWrap>
+                            <Typography variant="body2" noWrap title={row.reason}>
                               {row.reason}
                             </Typography>
                           </TableCell>
@@ -676,7 +676,7 @@ export function WarningsPage() {
                     height: 16,
                     position: 'absolute',
                     top: 8,
-                    right: 8,
+                    insetInlineEnd: 8,
                     backgroundColor: 'primary.main',
                     color: 'white'
                   }}
@@ -709,7 +709,7 @@ export function WarningsPage() {
                     height: 16,
                     position: 'absolute',
                     top: 8,
-                    right: 8,
+                    insetInlineEnd: 8,
                     backgroundColor: 'success.main',
                     color: 'white'
                   }}
@@ -742,7 +742,7 @@ export function WarningsPage() {
                     height: 16,
                     position: 'absolute',
                     top: 8,
-                    right: 8,
+                    insetInlineEnd: 8,
                     backgroundColor: 'error.main',
                     color: 'white'
                   }}

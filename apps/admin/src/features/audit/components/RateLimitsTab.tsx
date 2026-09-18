@@ -55,77 +55,123 @@ function ActiveBlocksSection() {
         <p className="text-[10px] text-muted-foreground">{t('auto_refresh_label')}</p>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border bg-muted/10">
-              <th className="text-start px-4 py-2.5 font-semibold text-muted-foreground text-xs">
-                {t('header_user_ip')}
-              </th>
-              <th className="text-start px-4 py-2.5 font-semibold text-muted-foreground text-xs">
-                {t('header_actions')}
-              </th>
-              <th className="text-start px-4 py-2.5 font-semibold text-muted-foreground text-xs">
-                {t('header_hits')}
-              </th>
-              <th className="text-start px-4 py-2.5 font-semibold text-muted-foreground text-xs">
-                {t('header_blocked_until')}
-              </th>
-              <th className="text-end px-4 py-2.5 font-semibold text-muted-foreground text-xs">
-                {t('header_row_actions')}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {(blocks ?? []).map((block: RateLimitWithEmail) => (
-              <tr
-                key={block.id}
-                className="border-b border-border/50 hover:bg-muted/20 transition-colors"
-              >
-                <td className="px-4 py-2.5 text-xs">
-                  {block.user_email && (
-                    <span className="text-foreground font-medium">{block.user_email}</span>
-                  )}
-                  {block.ip_address && (
-                    <span className="font-mono text-muted-foreground ms-2">{block.ip_address}</span>
-                  )}
-                  {!block.user_email && !block.ip_address && (
-                    <span className="text-muted-foreground">—</span>
-                  )}
-                </td>
-                <td className="px-4 py-2.5">
-                  <span className="text-xs font-medium bg-muted px-2 py-0.5 rounded-md text-foreground">
-                    {block.action}
-                  </span>
-                </td>
-                <td className="px-4 py-2.5 text-xs font-semibold text-foreground">
-                  {block.hit_count}
-                </td>
-                <td className="px-4 py-2.5">
-                  {block.blocked_until && <CountdownTimer until={block.blocked_until} />}
-                </td>
-                <td className="px-4 py-2.5 text-end">
-                  <Tooltip title={t('tooltip_clear_block')}>
-                    <button
-                      onClick={() => clearBlock.mutate(block.id)}
-                      className="p-1.5 rounded-lg hover:bg-destructive/10 text-destructive transition-colors"
-                    >
-                      <Delete className="text-sm" />
-                    </button>
-                  </Tooltip>
-                </td>
+      {/* DESKTOP (≥md): full table */}
+      <div className="hidden md:block">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border bg-muted/10">
+                <th className="text-start px-4 py-2.5 font-semibold text-muted-foreground text-xs">
+                  {t('header_user_ip')}
+                </th>
+                <th className="text-start px-4 py-2.5 font-semibold text-muted-foreground text-xs">
+                  {t('header_actions')}
+                </th>
+                <th className="text-start px-4 py-2.5 font-semibold text-muted-foreground text-xs">
+                  {t('header_hits')}
+                </th>
+                <th className="text-start px-4 py-2.5 font-semibold text-muted-foreground text-xs">
+                  {t('header_blocked_until')}
+                </th>
+                <th className="text-end px-4 py-2.5 font-semibold text-muted-foreground text-xs">
+                  {t('header_row_actions')}
+                </th>
               </tr>
-            ))}
-            {!isLoading && (blocks ?? []).length === 0 && (
-              <tr>
-                <td colSpan={5} className="text-center py-8 text-muted-foreground text-sm">
-                  <Shield className="text-3xl opacity-30 mb-2" />
-                  <p>{t('no_active_blocks')}</p>
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {(blocks ?? []).map((block: RateLimitWithEmail) => (
+                <tr
+                  key={block.id}
+                  className="border-b border-border/50 hover:bg-muted/20 transition-colors"
+                >
+                  <td className="px-4 py-2.5 text-xs">
+                    {block.user_email && (
+                      <span className="text-foreground font-medium break-all">{block.user_email}</span>
+                    )}
+                    {block.ip_address && (
+                      <span className="font-mono text-muted-foreground ms-2 break-all">{block.ip_address}</span>
+                    )}
+                    {!block.user_email && !block.ip_address && (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <span className="text-xs font-medium bg-muted px-2 py-0.5 rounded-md text-foreground">
+                      {block.action}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2.5 text-xs font-semibold text-foreground">
+                    {block.hit_count}
+                  </td>
+                  <td className="px-4 py-2.5">
+                    {block.blocked_until && <CountdownTimer until={block.blocked_until} />}
+                  </td>
+                  <td className="px-4 py-2.5 text-end">
+                    <Tooltip title={t('tooltip_clear_block')}>
+                      <button
+                        onClick={() => clearBlock.mutate(block.id)}
+                        className="p-1.5 rounded-lg hover:bg-destructive/10 text-destructive transition-colors"
+                      >
+                        <Delete className="text-sm" />
+                      </button>
+                    </Tooltip>
+                  </td>
+                </tr>
+              ))}
+              {!isLoading && (blocks ?? []).length === 0 && (
+                <tr>
+                  <td colSpan={5} className="text-center py-8 text-muted-foreground text-sm">
+                    <Shield className="text-3xl opacity-30 mb-2" />
+                    <p>{t('no_active_blocks')}</p>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* MOBILE (<md): stacked block cards */}
+      <div className="md:hidden divide-y divide-border/50">
+        {(blocks ?? []).map((block: RateLimitWithEmail) => (
+          <div key={block.id} className="p-4 space-y-2">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                {block.user_email && (
+                  <p className="text-xs text-foreground font-medium break-all">{block.user_email}</p>
+                )}
+                {block.ip_address && (
+                  <p className="text-[11px] font-mono text-muted-foreground break-all">{block.ip_address}</p>
+                )}
+                {!block.user_email && !block.ip_address && (
+                  <span className="text-xs text-muted-foreground">—</span>
+                )}
+              </div>
+              <Tooltip title={t('tooltip_clear_block')}>
+                <button
+                  onClick={() => clearBlock.mutate(block.id)}
+                  aria-label={t('tooltip_clear_block')}
+                  className="p-2 rounded-lg hover:bg-destructive/10 text-destructive transition-colors shrink-0"
+                >
+                  <Delete className="text-sm" />
+                </button>
+              </Tooltip>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] font-medium bg-muted px-2 py-0.5 rounded-md text-foreground">
+                {block.action}
+              </span>
+              <span className="text-[11px] font-semibold text-foreground">{block.hit_count}</span>
+              {block.blocked_until && <CountdownTimer until={block.blocked_until} />}
+            </div>
+          </div>
+        ))}
+        {!isLoading && (blocks ?? []).length === 0 && (
+          <div className="text-center py-8 text-muted-foreground text-sm">
+            <Shield className="text-3xl opacity-30 mb-2" />
+            <p>{t('no_active_blocks')}</p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -172,10 +218,10 @@ function TopOffendersSection() {
                 </td>
                 <td className="px-4 py-2.5 text-xs">
                   {o.user_email && (
-                    <span className="text-foreground font-medium">{o.user_email}</span>
+                    <span className="text-foreground font-medium break-all">{o.user_email}</span>
                   )}
                   {o.ip_address && (
-                    <span className="font-mono text-muted-foreground ms-2">{o.ip_address}</span>
+                    <span className="font-mono text-muted-foreground ms-2 break-all">{o.ip_address}</span>
                   )}
                   {!o.user_email && !o.ip_address && (
                     <span className="text-muted-foreground">{t('label_unknown')}</span>

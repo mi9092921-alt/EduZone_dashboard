@@ -79,7 +79,7 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
   if (!course) {
     return (
       <Box sx={{ py: 8, textAlign: 'center' }}>
-        <Typography variant="h6" sx={{ color: '#94A3B8', mb: 2 }}>
+        <Typography variant="h6" sx={{ color: 'text.secondary', mb: 2 }}>
           {t('course_not_found')}
         </Typography>
         <Button
@@ -94,9 +94,9 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
   }
 
   const STATUS_COLORS: Record<string, { color: string; bg: string }> = {
-    published: { color: '#059669', bg: '#ECFDF5' },
-    draft: { color: '#D97706', bg: '#FFFBEB' },
-    archived: { color: '#64748B', bg: '#F1F5F9' },
+    published: { color: 'success.dark', bg: 'success.light' },
+    draft: { color: 'warning.dark', bg: 'warning.light' },
+    archived: { color: 'text.secondary', bg: 'action.selected' },
   };
   const statusStyle = STATUS_COLORS[course.status || 'draft'] ?? STATUS_COLORS.draft;
 
@@ -119,7 +119,7 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
             variant="h4"
             sx={{
               fontWeight: 800,
-              color: '#0F172A',
+              color: 'text.primary',
               letterSpacing: '-0.025em',
               fontSize: { xs: '1.25rem', md: '1.5rem' },
               minWidth: 0,
@@ -136,8 +136,8 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
               fontSize: '0.625rem',
               fontWeight: 700,
               letterSpacing: '0.04em',
-              backgroundColor: statusStyle?.bg ?? '#FFFBEB',
-              color: statusStyle?.color ?? '#D97706',
+              backgroundColor: statusStyle?.bg ?? 'warning.light',
+              color: statusStyle?.color ?? 'warning.dark',
               borderRadius: 5,
             }}
           />
@@ -157,8 +157,8 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
                 fontSize: '0.625rem',
                 fontWeight: 700,
                 letterSpacing: '0.04em',
-                backgroundColor: '#FFFBEB',
-                color: '#D97706',
+                backgroundColor: 'warning.light',
+                color: 'warning.dark',
                 borderRadius: 5,
               }}
             />
@@ -181,9 +181,9 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
               textTransform: 'none',
               fontWeight: 600,
               borderRadius: 2,
-              borderColor: '#E2E8F0',
-              color: '#475569',
-              '&:hover': { borderColor: '#CBD5E1', backgroundColor: '#F8FAFC' },
+              borderColor: 'divider',
+              color: 'text.secondary',
+              '&:hover': { borderColor: 'text.secondary', backgroundColor: 'action.hover' },
             }}
           >
             {t('back')}
@@ -194,7 +194,8 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
       {/* Tabs */}
       <Box
         sx={{
-          borderBottom: '1px solid #E2E8F0',
+          borderBottom: '1px solid',
+          borderColor: 'divider',
           mb: 4,
         }}
       >
@@ -209,13 +210,13 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
               textTransform: 'none',
               fontWeight: 600,
               fontSize: { xs: '0.8125rem', sm: '0.875rem' },
-              color: '#64748B',
+              color: 'text.secondary',
               minHeight: 48,
               minWidth: { xs: 'auto', sm: 120 },
               px: { xs: 1.5, sm: 2 },
-              '&.Mui-selected': { color: '#6366F1' },
+              '&.Mui-selected': { color: 'primary.main' },
             },
-            '& .MuiTabs-indicator': { backgroundColor: '#6366F1', height: 2 },
+            '& .MuiTabs-indicator': { backgroundColor: 'primary.main', height: 2 },
           }}
         >
           <Tab label={t('general_info_tab')} />
@@ -225,8 +226,9 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
         </Tabs>
       </Box>
 
-      {/* Tab Content */}
-      <Box sx={{ maxWidth: '100%', minWidth: 0, overflowX: 'clip' }}>
+      {/* Tab Content — minWidth: 0 lets children shrink; no overflow clip here
+          because it would break position:sticky inside the tab bodies */}
+      <Box sx={{ maxWidth: '100%', minWidth: 0 }}>
         {activeTab === 0 && <CourseInfoForm course={course} />}
         {activeTab === 1 && <CurriculumBuilder courseId={course.id} sections={course.sections} />}
         {activeTab === 2 && <CourseEnrollmentsTab courseId={course.id} />}

@@ -75,3 +75,4 @@ pw3/
 supabase/backups/
 
 .vercel
+.env*

@@ -170,14 +170,14 @@ export function TenantDetailPage({ tenantId }: { tenantId: string }) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <button type="button" onClick={() => router.push('/tenants')} aria-label={tCommon('back')} className="p-2 rounded-xl hover:bg-muted transition-colors">
+      <div className="flex items-start gap-3 flex-wrap">
+        <button type="button" onClick={() => router.push('/tenants')} aria-label={tCommon('back')} className="p-2 rounded-xl hover:bg-muted transition-colors shrink-0">
           <ArrowBack className="text-sm text-muted-foreground" />
         </button>
-        <div className="flex-1">
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold text-foreground">{tenant.name}</h1>
-            <span className="text-xs font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded-md">{tenant.slug}</span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap min-w-0">
+            <h1 className="text-xl font-bold text-foreground break-words min-w-0">{tenant.name}</h1>
+            <span className="text-xs font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded-md break-all">{tenant.slug}</span>
           </div>
           <p className="text-xs text-muted-foreground">
             {t('plan_shard_region', {
@@ -187,34 +187,34 @@ export function TenantDetailPage({ tenantId }: { tenantId: string }) {
             })}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           {tenant.status === 'active' ? (
-            <Button variant="outline" size="sm" onClick={() => setShowSuspend(true)} className="gap-1 text-amber-600 border-amber-200 hover:bg-amber-50">
+            <Button variant="outline" size="sm" onClick={() => setShowSuspend(true)} className="gap-1 text-amber-600 border-amber-200 hover:bg-amber-50 flex-1 sm:flex-none">
               <Block className="text-xs" />{t('tooltip_suspend')}
             </Button>
           ) : tenant.status === 'suspended' ? (
-            <Button variant="outline" size="sm" onClick={handleActivate} isLoading={updateMut.isPending} className="gap-1 text-emerald-600 border-emerald-200 hover:bg-emerald-50">
+            <Button variant="outline" size="sm" onClick={handleActivate} isLoading={updateMut.isPending} className="gap-1 text-emerald-600 border-emerald-200 hover:bg-emerald-50 flex-1 sm:flex-none">
               <CheckCircle className="text-xs" />{t('btn_activate')}
             </Button>
           ) : null}
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs — horizontally scrollable when 4 labels don't fit */}
       <div className="border-b border-border">
-        <div className="flex gap-1">
+        <div className="flex gap-1 overflow-x-auto no-scrollbar">
           {TABS.map((t_tab) => (
             <button
               key={t_tab.id}
               onClick={() => handleTabChange(t_tab.id)}
               className={cn(
-                'flex items-center gap-1.5 px-4 py-2.5 text-xs font-bold transition-colors border-b-2 -mb-[1px]',
+                'flex items-center gap-1.5 px-3 sm:px-4 py-2.5 text-xs font-bold transition-colors border-b-2 -mb-[1px] whitespace-nowrap',
                 tab === t_tab.id
                   ? 'border-primary text-primary'
                   : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border',
               )}
             >
-              <t_tab.icon className="text-sm" />
+              <t_tab.icon className="text-sm shrink-0" />
               {t(t_tab.labelKey)}
             </button>
           ))}

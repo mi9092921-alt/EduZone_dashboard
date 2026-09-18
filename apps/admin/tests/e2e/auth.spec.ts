@@ -1,8 +1,14 @@
 import { test, expect } from '@playwright/test';
 
+// Keep these auth-flow tests away from both the shared tenant-admin session
+// created by auth.setup.ts and the super-admin session used by settings.spec.ts.
+// The local QA seed includes this independent test-tenant admin account.
+const AUTH_FLOW_EMAIL = 'admin@test.eduzone.local';
+const AUTH_FLOW_PASSWORD = 'Admin@12345';
+
 test.describe('Authentication & Session Heartbeat', () => {
   // Login flow, Logout flow, and Token version mismatch below each do
-  // their own independent fresh login as super_admin@eduzone-test.com
+  // their own independent fresh login as admin@test.eduzone.local
   // (see the isolation comments on each block). With fullyParallel:
   // true (playwright.config.ts) and 2 CI workers, Playwright is free to
   // schedule any of these three on different workers at the same time --
@@ -37,16 +43,16 @@ test.describe('Authentication & Session Heartbeat', () => {
       // the shared 'playwright/.auth/user.json' session (the same
       // admin@eduzone-test.com account) that users.spec.ts, a11y.spec.ts
       // and ux-regression.spec.ts all depend on, redirecting them to
-      // /login mid-run. super_admin@eduzone-test.com is a separate QA
-      // account (same tenant, supabase/AGENTS.md QA accounts table) so
+      // /login mid-run. admin@test.eduzone.local is a separate QA
+      // account (test tenant, supabase/AGENTS.md QA accounts table) so
       // this test's own login/logout cycle can never step on that
       // shared session, however the two run relative to each other.
-      await page.getByLabel(/email/i).fill('super_admin@eduzone-test.com');
+      await page.getByLabel(/email/i).fill(AUTH_FLOW_EMAIL);
       // Canonical QA seed password (supabase/schema/11_seed_reference.sql,
       // supabase/AGENTS.md QA accounts table) -- "Password123" was never
       // a valid credential and always failed with "Invalid email or
       // password", which is why this test never got past /login.
-      await page.getByLabel(/password/i).fill('Admin@12345');
+      await page.getByLabel(/password/i).fill(AUTH_FLOW_PASSWORD);
       // The button's accessible name is "Sign In" (see
       // src/features/auth/components/LoginPage.tsx) -- "login" never
       // matched, which is why this click used to time out after 30s.
@@ -92,14 +98,14 @@ test.describe('Authentication & Session Heartbeat', () => {
     // just on logout -- so logging in fresh here with
     // admin@eduzone-test.com would still kill the shared setup session
     // the instant this test's login completes, before logout is even
-    // called. super_admin@eduzone-test.com (same tenant, supabase/AGENTS.md
-    // QA accounts table) avoids that collision entirely.
+    // called. admin@test.eduzone.local (a separate seeded test-tenant account)
+    // avoids that collision entirely.
     test.use({ storageState: { cookies: [], origins: [] } });
 
     test('logs out successfully', async ({ page }) => {
       await page.goto('/login');
-      await page.getByLabel(/email/i).fill('super_admin@eduzone-test.com');
-      await page.getByLabel(/password/i).fill('Admin@12345');
+      await page.getByLabel(/email/i).fill(AUTH_FLOW_EMAIL);
+      await page.getByLabel(/password/i).fill(AUTH_FLOW_PASSWORD);
       await page.getByRole('button', { name: /sign in/i }).click();
       await expect(page).toHaveURL(/\/(en|ar)\/?$/);
 
@@ -123,7 +129,7 @@ test.describe('Authentication & Session Heartbeat', () => {
     // 'playwright/.auth/user.json' session (admin@eduzone-test.com)
     // would kill users.spec.ts/a11y.spec.ts/ux-regression.spec.ts
     // mid-run under fullyParallel: true, exactly like the logout test
-    // above. super_admin@eduzone-test.com keeps it isolated.
+    // above. admin@test.eduzone.local keeps it isolated.
     test.use({ storageState: { cookies: [], origins: [] } });
 
     // check_dashboard_access is only re-checked for token_version
@@ -143,8 +149,8 @@ test.describe('Authentication & Session Heartbeat', () => {
       test.setTimeout(90_000);
 
       await page.goto('/login');
-      await page.getByLabel(/email/i).fill('super_admin@eduzone-test.com');
-      await page.getByLabel(/password/i).fill('Admin@12345');
+      await page.getByLabel(/email/i).fill(AUTH_FLOW_EMAIL);
+      await page.getByLabel(/password/i).fill(AUTH_FLOW_PASSWORD);
       await page.getByRole('button', { name: /sign in/i }).click();
       await expect(page).toHaveURL(/\/(en|ar)\/?$/);
 
@@ -163,7 +169,7 @@ test.describe('Authentication & Session Heartbeat', () => {
         route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({ allowed: true, role: 'super_admin', token_version: 999999 }),
+          body: JSON.stringify({ allowed: true, role: 'admin', token_version: 999999 }),
         }),
       );
 

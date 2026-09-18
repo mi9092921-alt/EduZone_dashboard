@@ -259,6 +259,7 @@ export function CoursesTable({
                         <div className="flex items-center gap-4 min-w-0">
                           <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center overflow-hidden border border-primary/10 shadow-sm shrink-0">
                             {course.thumbnail_url ? (
+                              // eslint-disable-next-line @next/next/no-img-element -- The thumbnail needs a native onError fallback for unavailable course images.
                               <img
                                 src={course.thumbnail_url}
                                 alt=""
@@ -437,6 +438,7 @@ export function CoursesTable({
                     />
                     <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center overflow-hidden border border-primary/10 shadow-sm shrink-0">
                       {course.thumbnail_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- The thumbnail needs a native onError fallback for unavailable course images.
                         <img
                           src={course.thumbnail_url}
                           alt=""

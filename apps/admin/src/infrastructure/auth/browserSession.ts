@@ -1,3 +1,5 @@
+import { createBrowserId } from '@/lib/browser-id';
+
 const SESSION_KEY = 'eduzone.admin.session_id';
 
 export function getBrowserSessionId() {
@@ -6,7 +8,7 @@ export function getBrowserSessionId() {
   const existing = window.localStorage.getItem(SESSION_KEY);
   if (existing) return existing;
 
-  const sessionId = crypto.randomUUID();
+  const sessionId = createBrowserId();
   window.localStorage.setItem(SESSION_KEY, sessionId);
   return sessionId;
 }

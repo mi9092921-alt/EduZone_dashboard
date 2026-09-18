@@ -52,7 +52,7 @@ echo "[run-security-gate] starting harness..."
 bash "$HARNESS_DIR/ensure-db.sh" || { echo "[run-security-gate] harness failed to start"; exit 1; }
 
 echo "[run-security-gate] applying canonical supabase/schema/*.sql..."
-node "$HARNESS_DIR/apply-schema.mjs" || { echo "[run-security-gate] schema apply FAILED"; exit 1; }
+node "$HARNESS_DIR/apply-schema.mjs" --with-qa-seed || { echo "[run-security-gate] schema apply FAILED"; exit 1; }
 
 STATUS=0
 

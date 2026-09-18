@@ -19,6 +19,7 @@ vi.mock('@/container', () => ({
   container: {
     supabase: {
       from: vi.fn(),
+      rpc: vi.fn().mockResolvedValue({ error: null }),
       auth: { getUser: vi.fn() },
     },
   },
@@ -26,6 +27,7 @@ vi.mock('@/container', () => ({
 
 describe('settings.service', () => {
   const mockFrom = container.supabase.from as any;
+  const mockRpc = container.supabase.rpc as any;
   const mockAuth = container.supabase.auth.getUser as any;
 
   beforeEach(() => {
@@ -94,13 +96,9 @@ describe('settings.service', () => {
 
   it('setSetting updates successfully', async () => {
     mockAuth.mockResolvedValue({ data: { user: { id: 'admin1' } } });
-    const q = setupMockQuery({ data: null, error: null });
-    q.eq.mockResolvedValue({ error: null });
 
     await setSetting('k', 'v', 'string');
-    expect(q.update).toHaveBeenCalledWith(
-      expect.objectContaining({ value: 'v', updated_by: 'admin1' }),
-    );
+    expect(mockRpc).toHaveBeenCalledWith('set_setting', { p_key: 'k', p_value: 'v' });
   });
 
   it('createSetting and deleteSetting', async () => {
@@ -117,32 +115,27 @@ describe('settings.service', () => {
 
   it('maintenance mode toggles', async () => {
     mockAuth.mockResolvedValue({ data: { user: { id: 'u' } } });
-    const q = setupMockQuery({ error: null });
     await enableMaintenanceMode({
       message: 'off',
       ends_at: 'now',
       exclude_roles: ['admin'],
       exclude_users: ['1'],
     });
-    expect(q.upsert).toHaveBeenCalledTimes(5);
+    expect(mockRpc).toHaveBeenCalledWith('enable_maintenance_mode', expect.objectContaining({
+      p_message: 'off',
+      p_ends_at: 'now',
+    }));
 
     await disableMaintenanceMode();
-    expect(q.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({ key: 'maintenance_mode', value: false }),
-      { onConflict: 'key' },
-    );
+    expect(mockRpc).toHaveBeenCalledWith('disable_maintenance_mode');
   });
 
   it('app locks', async () => {
     mockAuth.mockResolvedValue({ data: { user: { id: 'u' } } });
-    const q = setupMockQuery({ error: null });
     await lockApp('locked');
-    expect(q.upsert).toHaveBeenCalledTimes(2);
+    expect(mockRpc).toHaveBeenCalledWith('lock_app_for_all', { p_message: 'locked' });
 
     await unlockApp();
-    expect(q.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({ key: 'app_locked', value: false }),
-      { onConflict: 'key' },
-    );
+    expect(mockRpc).toHaveBeenCalledWith('unlock_app');
   });
 });

@@ -18,9 +18,9 @@ export const SEVERITY_LABELS: Record<WarningSeverity, string> = {
 };
 
 export const SEVERITY_COLORS: Record<WarningSeverity, { bg: string; text: string; dot: string }> = {
-  1: { bg: '#DCFCE7', text: '#15803D', dot: '#22C55E' },
-  2: { bg: '#FEF3C7', text: '#B45309', dot: '#F59E0B' },
-  3: { bg: '#FEE2E2', text: '#B91C1C', dot: '#EF4444' },
+  1: { bg: 'success.light', text: 'success.dark', dot: 'success.main' },
+  2: { bg: 'warning.light', text: 'warning.dark', dot: 'warning.main' },
+  3: { bg: 'error.light', text: 'error.dark', dot: 'error.main' },
 };
 
 // ── Warning entity ───────────────────────────────────────────────

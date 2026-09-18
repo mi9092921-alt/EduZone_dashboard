@@ -37,6 +37,13 @@ const ctx = createRequestContext({
   requestId: 'req_test_notif',
 });
 
+const teacherCtx = createRequestContext({
+  userId: 'teacher-1',
+  tenantId: 'tenant-1',
+  role: 'teacher',
+  permissions: ['notifications.send'],
+});
+
 describe('SendNotificationUseCase', () => {
   let audit: IAuditLogger;
 
@@ -46,6 +53,19 @@ describe('SendNotificationUseCase', () => {
   });
 
   const input: SendNotificationInput = { title: 'Hello', body: 'World' };
+
+  it('rejects a teacher attempt to target users outside the student role', async () => {
+    const repo = makeRepo();
+
+    await expect(
+      new SendNotificationUseCase(repo, audit).execute(teacherCtx, {
+        ...input,
+        target_audience: 'admins',
+      }),
+    ).rejects.toThrow('outside the sender role scope');
+    expect(repo.resolveTargetUserIds).not.toHaveBeenCalled();
+    expect(repo.insertNotification).not.toHaveBeenCalled();
+  });
 
   it('throws when the caller has no tenant context', async () => {
     const repo = makeRepo();
@@ -68,8 +88,12 @@ describe('SendNotificationUseCase', () => {
     const result = await new SendNotificationUseCase(repo, audit).execute(ctx, input);
 
     expect(result).toBe('notif-1');
-    expect(repo.resolveTargetUserIds).toHaveBeenCalledWith(input, 'tenant-1');
-    expect(repo.insertNotification).toHaveBeenCalledWith(input, 'tenant-1', 'admin-1');
+    const scopedInput = { ...input, target_audience: 'students' as const };
+    expect(repo.resolveTargetUserIds).toHaveBeenCalledWith(scopedInput, 'tenant-1', [
+      'student',
+      'teacher',
+    ]);
+    expect(repo.insertNotification).toHaveBeenCalledWith(scopedInput, 'tenant-1', 'admin-1');
     expect(repo.attachNotificationTargets).not.toHaveBeenCalled();
     expect(repo.fanoutToUsers).not.toHaveBeenCalled();
   });
@@ -112,7 +136,11 @@ describe('SendNotificationUseCase', () => {
 
     await new SendNotificationUseCase(repo, audit).execute(ctx, explicitInput);
 
-    expect(repo.resolveTargetUserIds).toHaveBeenCalledWith(explicitInput, 'tenant-1');
+    expect(repo.resolveTargetUserIds).toHaveBeenCalledWith(
+      { ...explicitInput, target_audience: 'students' },
+      'tenant-1',
+      ['student', 'teacher'],
+    );
   });
 
   it('rejects an empty explicit users selection instead of defaulting to all', async () => {

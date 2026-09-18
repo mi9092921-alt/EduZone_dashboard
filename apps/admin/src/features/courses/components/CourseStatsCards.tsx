@@ -1,7 +1,8 @@
 'use client';
 
 import { School, Publish, EditNote, Archive } from '@mui/icons-material';
-import { Typography, Box } from '@mui/material';
+import { Typography, Box, useTheme } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import { useTranslations } from 'next-intl';
 
 import { useCoursesOverviewStats } from '@/adapters/queries/courses.queries';
@@ -9,6 +10,7 @@ import { StatsCard, StatsCardContent, StatsCardIcon } from '@/components/ui/Card
 
 export function CourseStatsCards() {
   const t = useTranslations('common');
+  const theme = useTheme();
   const { data: stats } = useCoursesOverviewStats();
 
   const STAT_CARDS = [
@@ -16,43 +18,44 @@ export function CourseStatsCards() {
       key: 'total',
       label: t('total_courses'),
       icon: School,
-      bg: '#EEF2FF',
-      color: '#4F46E5',
+      tone: 'primary' as const,
     },
     {
       key: 'published',
       label: t('published'),
       icon: Publish,
-      bg: '#ECFDF5',
-      color: '#10B981',
+      tone: 'success' as const,
     },
     {
       key: 'draft',
       label: t('draft'),
       icon: EditNote,
-      bg: '#FFFBEB',
-      color: '#D97706',
+      tone: 'warning' as const,
     },
     {
       key: 'archived',
       label: t('archived'),
       icon: Archive,
-      bg: '#F1F5F9',
-      color: '#475569',
+      tone: 'neutral' as const,
     },
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 sm:gap-6 mb-6">
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mb-6">
       {STAT_CARDS.map((card) => {
         const Icon = card.icon;
         const val = stats?.[card.key as keyof typeof stats];
+        const accent =
+          card.tone === 'neutral' ? theme.palette.text.secondary : theme.palette[card.tone].main;
 
         return (
           <StatsCard key={card.key} className="transition-colors hover:bg-muted/20">
             <StatsCardContent className="flex flex-row items-center gap-4 p-5">
               <StatsCardIcon
-                style={{ backgroundColor: card.bg, color: card.color }}
+                style={{
+                  backgroundColor: alpha(accent, theme.palette.mode === 'dark' ? 0.18 : 0.1),
+                  color: accent,
+                }}
                 className="w-10 h-10 rounded-lg shrink-0 flex items-center justify-center"
               >
                 <Icon fontSize="small" />
@@ -90,7 +93,7 @@ export function CourseStatsCards() {
                       sx={{
                         height: 24,
                         width: 48,
-                        bgcolor: 'neutral.100',
+                        bgcolor: 'action.hover',
                         animation: 'pulse 1.5s infinite',
                         borderRadius: 1,
                         display: 'block',

@@ -361,7 +361,7 @@ export function StudentProgressPage() {
                           </Box>
                         </TableCell>
                         <TableCell>
-                          <Box sx={{ minWidth: 140 }}>
+                          <Box sx={{ minWidth: { xs: 0, sm: 140 } }}>
                             <Typography
                               variant="overline"
                               sx={{

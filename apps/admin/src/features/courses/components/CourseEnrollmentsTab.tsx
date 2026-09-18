@@ -198,9 +198,10 @@ export function CourseEnrollmentsTab({ courseId }: CourseEnrollmentsTabProps) {
         </Box>
       </Box>
 
-      {/* Table */}
-      <TableContainer sx={{ overflowX: 'auto', mx: { xs: -1, sm: 0 }, width: { xs: 'calc(100% + 8px)', sm: '100%' } }}>
-        <Table sx={{ minWidth: 800 }}>
+      {/* Table — DESKTOP (≥md): full 5-column table (horizontal scroll stays inside) */}
+      <Box className="hidden md:block">
+        <TableContainer sx={{ overflowX: 'auto' }}>
+          <Table sx={{ minWidth: 800 }}>
           <TableHead>
             <TableRow sx={{ backgroundColor: 'background.default' }}>
               <TableCell
@@ -413,7 +414,161 @@ export function CourseEnrollmentsTab({ courseId }: CourseEnrollmentsTabProps) {
             )}
           </TableBody>
         </Table>
-      </TableContainer>
+        </TableContainer>
+      </Box>
+
+      {/* MOBILE (<md): stacked enrollment cards */}
+      <Box className="md:hidden" sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+        {isLoading ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} variant="rounded" height={96} sx={{ borderRadius: 3 }} />
+          ))
+        ) : filtered.length === 0 ? (
+          <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 6 }}>
+            {t('no_student_data')}
+          </Typography>
+        ) : (
+          filtered.map((enrollment) => {
+            const name = getEnrollmentStudentName(enrollment);
+            const initials = name
+              .split(' ')
+              .map((w) => w[0])
+              .join('')
+              .toUpperCase()
+              .slice(0, 2);
+            const progress = enrollment.progress_pct ?? 0;
+            const statusColor = STATUS_CONFIG[enrollment.status] ?? 'default';
+            return (
+              <Box
+                key={enrollment.id}
+                sx={{
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  borderRadius: 3,
+                  backgroundColor: 'background.paper',
+                  p: 2,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 1.25,
+                  minWidth: 0,
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
+                  <Avatar
+                    src={enrollment.user_avatar_url || ''}
+                    sx={{
+                      width: 36,
+                      height: 36,
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      backgroundColor: 'action.selected',
+                      color: 'text.secondary',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {initials}
+                  </Avatar>
+                  <Box sx={{ minWidth: 0, flex: 1 }}>
+                    <Typography
+                      variant="body2"
+                      sx={{ fontWeight: 600, fontSize: '0.875rem', color: 'text.primary', overflowWrap: 'anywhere' }}
+                    >
+                      {name}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      sx={{ color: 'text.secondary', fontSize: '0.75rem', overflowWrap: 'anywhere', display: 'block' }}
+                    >
+                      {enrollment.user_email ?? '—'}
+                    </Typography>
+                  </Box>
+                  <Chip
+                    label={(enrollment.status || 'active').toUpperCase()}
+                    size="small"
+                    color={statusColor as 'success' | 'primary' | 'error' | 'warning' | 'default'}
+                    variant="outlined"
+                    sx={{
+                      height: 22,
+                      fontSize: '0.625rem',
+                      letterSpacing: '0.04em',
+                      fontWeight: 600,
+                      borderRadius: 5,
+                      flexShrink: 0,
+                    }}
+                  />
+                </Box>
+
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography
+                    variant="caption"
+                    sx={{ fontWeight: 700, fontSize: '0.625rem', color: 'text.secondary', display: 'block', mb: 0.5 }}
+                  >
+                    {t('progress_header')}: {progress}%
+                  </Typography>
+                  <LinearProgress
+                    variant="determinate"
+                    value={progress}
+                    sx={{
+                      height: 6,
+                      borderRadius: 3,
+                      backgroundColor: 'action.disabledBackground',
+                      '& .MuiLinearProgress-bar': {
+                        borderRadius: 3,
+                        backgroundColor: progress >= 100 ? 'success.main' : 'primary.main',
+                      },
+                    }}
+                  />
+                </Box>
+
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 1,
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.75rem' }}>
+                    {new Date(enrollment.enrolled_at).toLocaleDateString(undefined, {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })}
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+                    <Tooltip title={t('extend')}>
+                      <span>
+                        <IconButton
+                          size="small"
+                          disabled={enrollment.status === 'completed'}
+                          onClick={() => setExtendTarget(enrollment)}
+                          aria-label={t('extend')}
+                          sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}
+                        >
+                          <UpdateOutlined sx={{ fontSize: 18 }} />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                    {enrollment.status === 'active' && (
+                      <Tooltip title={t('revoke')}>
+                        <IconButton
+                          size="small"
+                          onClick={() => setRevokeTarget(enrollment)}
+                          aria-label={t('revoke')}
+                          sx={{ color: 'text.secondary', '&:hover': { color: 'error.main' } }}
+                        >
+                          <Block sx={{ fontSize: 18 }} />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                  </Box>
+                </Box>
+              </Box>
+            );
+          })
+        )}
+      </Box>
 
       {/* Pagination component */}
       <TablePagination

@@ -9,9 +9,10 @@
 //
 // Order: 00_stub_auth.sql (harness-only: auth/storage schemas + roles) ->
 // schema_paths (the real, canonical schema, unmodified) ->
+// optional 12_seed_qa_demo.sql (only with --with-qa-seed) ->
 // 01_test_session_helpers.sql (harness-only: test.login_as/test.logout).
 //
-// Usage: node apply-schema.mjs [--skip-validation]
+// Usage: node apply-schema.mjs [--skip-validation] [--with-qa-seed]
 
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -45,6 +46,7 @@ async function applyFile(client, label, absPath) {
 
 async function main() {
   const skipValidation = process.argv.includes('--skip-validation');
+  const withQaSeed = process.argv.includes('--with-qa-seed');
   const client = new pg.Client({
     host: '127.0.0.1',
     port: 54329,
@@ -63,6 +65,19 @@ async function main() {
 
     if (!skipValidation) {
       await applyFile(client, 'schema/VALIDATION.sql', join(supabaseDir, 'schema', 'VALIDATION.sql'));
+    }
+
+    // QA fixtures are intentionally opt-in. They are not part of
+    // config.toml's production schema_paths because they contain known
+    // passwords and disposable tenant data. The fast security gate opts in
+    // explicitly so its impersonation tests have the canonical test users,
+    // tenants, courses, and permissions available.
+    if (withQaSeed) {
+      await applyFile(
+        client,
+        'schema/12_seed_qa_demo.sql',
+        join(supabaseDir, 'schema', '12_seed_qa_demo.sql'),
+      );
     }
 
     await applyFile(

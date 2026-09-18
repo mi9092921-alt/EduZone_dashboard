@@ -229,128 +229,81 @@ export function TenantsPage() {
       {/* Tenants Table */}
       <QueryErrorBanner isError={isError} refetch={refetch} />
       <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-start border-collapse">
-            <thead>
-              <tr className="border-b border-border/60 bg-muted/40">
-                <th className="px-4 py-3 text-[11px] font-extrabold text-foreground/80 uppercase text-start tracking-wider">{t('header_tenant')}</th>
-                <th className="px-4 py-3 text-[11px] font-extrabold text-foreground/80 uppercase text-start tracking-wider">{t('header_plan')}</th>
-                <th className="px-4 py-3 text-[11px] font-extrabold text-foreground/80 uppercase text-start tracking-wider">{t('header_status')}</th>
-                <th className="px-4 py-3 text-[11px] font-extrabold text-foreground/80 uppercase text-start tracking-wider">{t('header_region')}</th>
-                <th className="px-4 py-3 text-[11px] font-extrabold text-foreground/80 uppercase text-start tracking-wider">{t('header_users')}</th>
-                <th className="px-4 py-3 text-[11px] font-extrabold text-foreground/80 uppercase text-start tracking-wider">{t('header_courses')}</th>
-                <th className="px-4 py-3 text-[11px] font-extrabold text-foreground/80 uppercase text-start tracking-wider">{t('header_storage')}</th>
-                <th className="px-4 py-3 text-[11px] font-extrabold text-foreground/80 uppercase text-end tracking-wider">{tCommon('actions')}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/40">
-              {isLoading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i} className="animate-pulse">
-                    {Array.from({ length: 8 }).map((_, j) => (
-                      <td key={j} className="px-4 py-3">
-                        <div className="h-4 bg-muted rounded" />
-                      </td>
-                    ))}
-                  </tr>
-                ))
-              ) : tenants.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-muted-foreground text-sm">
-                    {t('no_tenants_found')}
-                  </td>
+        {/* DESKTOP (≥md): full 8-column table (horizontal scroll stays inside) */}
+        <div className="hidden md:block">
+          <div className="table-scroll">
+            <table className="w-full text-start border-collapse">
+              <thead>
+                <tr className="border-b border-border/60 bg-muted/40">
+                  <th className="px-4 py-3 text-[11px] font-extrabold text-foreground/80 uppercase text-start tracking-wider">{t('header_tenant')}</th>
+                  <th className="px-4 py-3 text-[11px] font-extrabold text-foreground/80 uppercase text-start tracking-wider">{t('header_plan')}</th>
+                  <th className="px-4 py-3 text-[11px] font-extrabold text-foreground/80 uppercase text-start tracking-wider">{t('header_status')}</th>
+                  <th className="px-4 py-3 text-[11px] font-extrabold text-foreground/80 uppercase text-start tracking-wider">{t('header_region')}</th>
+                  <th className="px-4 py-3 text-[11px] font-extrabold text-foreground/80 uppercase text-start tracking-wider">{t('header_users')}</th>
+                  <th className="px-4 py-3 text-[11px] font-extrabold text-foreground/80 uppercase text-start tracking-wider">{t('header_courses')}</th>
+                  <th className="px-4 py-3 text-[11px] font-extrabold text-foreground/80 uppercase text-start tracking-wider">{t('header_storage')}</th>
+                  <th className="px-4 py-3 text-[11px] font-extrabold text-foreground/80 uppercase text-end tracking-wider">{tCommon('actions')}</th>
                 </tr>
-              ) : (
-                tenants.map((t_item) => {
-                  const planKey = (t_item.plan ?? 'free') as TenantPlan;
-                  const statusKey = (t_item.status ?? 'active') as TenantStatus;
-                  const plan = PLAN_CONFIG[planKey] ?? PLAN_CONFIG.free;
-                  const status = STATUS_CONFIG[statusKey] ?? STATUS_CONFIG.active;
-                  const usage = t_item as typeof t_item & { current_users?: number | null; current_courses?: number | null; current_storage_bytes?: number | null };
-                  const currentUsers = Number(usage.current_users ?? 0);
-                  const currentCourses = Number(usage.current_courses ?? 0);
-                  const currentStorageBytes = Number(usage.current_storage_bytes ?? 0);
-                  const userPct = t_item.max_users > 0 ? (currentUsers / t_item.max_users) * 100 : 0;
-                  const coursePct = t_item.max_courses > 0 ? (currentCourses / t_item.max_courses) * 100 : 0;
-                  const storagePct = t_item.max_storage_bytes > 0 ? (currentStorageBytes / t_item.max_storage_bytes) * 100 : 0;
-
-                  return (
-                    <tr
-                      key={t_item.id}
-                      onClick={() => router.push(`/tenants/${t_item.id}`)}
-                      className="hover:bg-muted/30 transition-colors cursor-pointer group"
-                    >
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-bold text-sm shrink-0">
-                            <Business className="text-base" />
-                          </div>
-                          <div>
-                            <div className="text-sm font-bold text-foreground">{t_item.name}</div>
-                            <div className="text-[10px] text-muted-foreground font-mono">{t_item.slug}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={cn('px-2 py-0.5 rounded-md border text-[10px] font-extrabold uppercase', plan.bg, plan.text)}>
-                          {t(`plan_${planKey}` as 'plan_free' | 'plan_starter' | 'plan_pro' | 'plan_enterprise')}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className={cn('inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase border', status.bg, status.text)}>
-                          <div className={cn('h-1.5 w-1.5 rounded-full', status.dot)} />
-                          {t(`status_${statusKey}` as 'status_active' | 'status_suspended' | 'status_deleted')}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground font-mono">{t_item.region_id}</td>
-                      <td className="px-4 py-3">
-                        <ResourceBar current={currentUsers} max={t_item.max_users} pct={userPct} />
-                      </td>
-                      <td className="px-4 py-3">
-                        <ResourceBar current={currentCourses} max={t_item.max_courses} pct={coursePct} />
-                      </td>
-                      <td className="px-4 py-3">
-                        <ResourceBar current={currentStorageBytes} max={t_item.max_storage_bytes} pct={storagePct} formatFn={formatBytes} />
-                      </td>
-                      <td className="px-4 py-3 text-end" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            type="button"
-                            onClick={() => router.push(`/tenants/${t_item.id}`)}
-                            className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                            title={t('tooltip_edit')}
-                            aria-label={t('tooltip_edit')}
-                          >
-                            <Edit className="text-sm" />
-                          </button>
-                          {t_item.status === 'active' && (
-                            <button
-                              type="button"
-                              onClick={() => setSuspendTarget(t_item)}
-                              className="p-1.5 rounded-lg hover:bg-amber-500/10 text-muted-foreground hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
-                              title={t('tooltip_suspend')}
-                              aria-label={t('tooltip_suspend')}
-                            >
-                              <Block className="text-sm" />
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => setDeleteTarget(t_item)}
-                            className="p-1.5 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-600 dark:hover:text-red-400 transition-colors"
-                            title={t('tooltip_delete')}
-                            aria-label={t('tooltip_delete')}
-                          >
-                            <Delete className="text-sm" />
-                          </button>
-                        </div>
-                      </td>
+              </thead>
+              <tbody className="divide-y divide-border/40">
+                {isLoading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <tr key={i} className="animate-pulse">
+                      {Array.from({ length: 8 }).map((_, j) => (
+                        <td key={j} className="px-4 py-3">
+                          <div className="h-4 bg-muted rounded" />
+                        </td>
+                      ))}
                     </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                  ))
+                ) : tenants.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-12 text-center text-muted-foreground text-sm">
+                      {t('no_tenants_found')}
+                    </td>
+                  </tr>
+                ) : (
+                  tenants.map((t_item) => (
+                    <TenantRow
+                      key={t_item.id}
+                      tenant={t_item}
+                      onOpen={() => router.push(`/tenants/${t_item.id}`)}
+                      onSuspend={() => setSuspendTarget(t_item)}
+                      onDelete={() => setDeleteTarget(t_item)}
+                    />
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* MOBILE (<md): stacked tenant cards */}
+        <div className="md:hidden divide-y divide-border/40">
+          {isLoading ? (
+            Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="p-4 flex items-start gap-3 animate-pulse">
+                <div className="h-9 w-9 bg-muted rounded-xl shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 w-36 bg-muted rounded" />
+                  <div className="h-3 w-24 bg-muted rounded" />
+                  <div className="h-2 w-full bg-muted rounded" />
+                </div>
+              </div>
+            ))
+          ) : tenants.length === 0 ? (
+            <p className="px-4 py-12 text-center text-muted-foreground text-sm">{t('no_tenants_found')}</p>
+          ) : (
+            tenants.map((t_item) => (
+              <TenantCard
+                key={t_item.id}
+                tenant={t_item}
+                onOpen={() => router.push(`/tenants/${t_item.id}`)}
+                onSuspend={() => setSuspendTarget(t_item)}
+                onDelete={() => setDeleteTarget(t_item)}
+              />
+            ))
+          )}
         </div>
 
         {/* Pagination */}
@@ -463,6 +416,192 @@ function ResourceBar({ current, max, pct, formatFn }: {
       </div>
       <div className="h-1.5 bg-muted rounded-full overflow-hidden">
         <div className={cn('h-full rounded-full transition-all', color)} style={{ width: `${Math.min(safePct, 100)}%` }} />
+      </div>
+    </div>
+  );
+}
+
+// ── Shared tenant usage computation ─────────────────────────────
+function getTenantUsage(t_item: Tenant) {
+  const planKey = (t_item.plan ?? 'free') as TenantPlan;
+  const statusKey = (t_item.status ?? 'active') as TenantStatus;
+  const usage = t_item as Tenant & { current_users?: number | null; current_courses?: number | null; current_storage_bytes?: number | null };
+  const currentUsers = Number(usage.current_users ?? 0);
+  const currentCourses = Number(usage.current_courses ?? 0);
+  const currentStorageBytes = Number(usage.current_storage_bytes ?? 0);
+  return {
+    planKey,
+    statusKey,
+    plan: PLAN_CONFIG[planKey] ?? PLAN_CONFIG.free,
+    status: STATUS_CONFIG[statusKey] ?? STATUS_CONFIG.active,
+    currentUsers,
+    currentCourses,
+    currentStorageBytes,
+    userPct: t_item.max_users > 0 ? (currentUsers / t_item.max_users) * 100 : 0,
+    coursePct: t_item.max_courses > 0 ? (currentCourses / t_item.max_courses) * 100 : 0,
+    storagePct: t_item.max_storage_bytes > 0 ? (currentStorageBytes / t_item.max_storage_bytes) * 100 : 0,
+  };
+}
+
+// ── Desktop row (≥md) ────────────────────────────────────────────
+function TenantRow({
+  tenant,
+  onOpen,
+  onSuspend,
+  onDelete,
+}: {
+  tenant: Tenant;
+  onOpen: () => void;
+  onSuspend: () => void;
+  onDelete: () => void;
+}) {
+  const t = useTranslations('tenants');
+  const u = getTenantUsage(tenant);
+
+  return (
+    <tr onClick={onOpen} className="hover:bg-muted/30 transition-colors cursor-pointer group">
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-3">
+          <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-bold text-sm shrink-0">
+            <Business className="text-base" />
+          </div>
+          <div>
+            <div className="text-sm font-bold text-foreground">{tenant.name}</div>
+            <div className="text-[10px] text-muted-foreground font-mono">{tenant.slug}</div>
+          </div>
+        </div>
+      </td>
+      <td className="px-4 py-3">
+        <span className={cn('px-2 py-0.5 rounded-md border text-[10px] font-extrabold uppercase', u.plan.bg, u.plan.text)}>
+          {t(`plan_${u.planKey}` as 'plan_free' | 'plan_starter' | 'plan_pro' | 'plan_enterprise')}
+        </span>
+      </td>
+      <td className="px-4 py-3">
+        <div className={cn('inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase border', u.status.bg, u.status.text)}>
+          <div className={cn('h-1.5 w-1.5 rounded-full', u.status.dot)} />
+          {t(`status_${u.statusKey}` as 'status_active' | 'status_suspended' | 'status_deleted')}
+        </div>
+      </td>
+      <td className="px-4 py-3 text-xs text-muted-foreground font-mono">{tenant.region_id}</td>
+      <td className="px-4 py-3">
+        <ResourceBar current={u.currentUsers} max={tenant.max_users} pct={u.userPct} />
+      </td>
+      <td className="px-4 py-3">
+        <ResourceBar current={u.currentCourses} max={tenant.max_courses} pct={u.coursePct} />
+      </td>
+      <td className="px-4 py-3">
+        <ResourceBar current={u.currentStorageBytes} max={tenant.max_storage_bytes} pct={u.storagePct} formatFn={formatBytes} />
+      </td>
+      <td className="px-4 py-3 text-end" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-end gap-1">
+          <button
+            type="button"
+            onClick={onOpen}
+            className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+            title={t('tooltip_edit')}
+            aria-label={t('tooltip_edit')}
+          >
+            <Edit className="text-sm" />
+          </button>
+          {tenant.status === 'active' && (
+            <button
+              type="button"
+              onClick={onSuspend}
+              className="p-1.5 rounded-lg hover:bg-amber-500/10 text-muted-foreground hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
+              title={t('tooltip_suspend')}
+              aria-label={t('tooltip_suspend')}
+            >
+              <Block className="text-sm" />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onDelete}
+            className="p-1.5 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-600 dark:hover:text-red-400 transition-colors"
+            title={t('tooltip_delete')}
+            aria-label={t('tooltip_delete')}
+          >
+            <Delete className="text-sm" />
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+// ── Mobile card (<md) — name/plan/status + 3 resource bars ──────
+function TenantCard({
+  tenant,
+  onOpen,
+  onSuspend,
+  onDelete,
+}: {
+  tenant: Tenant;
+  onOpen: () => void;
+  onSuspend: () => void;
+  onDelete: () => void;
+}) {
+  const t = useTranslations('tenants');
+  const u = getTenantUsage(tenant);
+
+  return (
+    <div onClick={onOpen} className="p-4 cursor-pointer hover:bg-muted/30 transition-colors">
+      <div className="flex items-start gap-3">
+        <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-bold text-sm shrink-0">
+          <Business className="text-base" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-sm font-bold text-foreground truncate min-w-0">{tenant.name}</p>
+            <div className="shrink-0 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                onClick={onOpen}
+                className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                title={t('tooltip_edit')}
+                aria-label={t('tooltip_edit')}
+              >
+                <Edit className="text-sm" />
+              </button>
+              {tenant.status === 'active' && (
+                <button
+                  type="button"
+                  onClick={onSuspend}
+                  className="p-2 rounded-lg hover:bg-amber-500/10 text-muted-foreground hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
+                  title={t('tooltip_suspend')}
+                  aria-label={t('tooltip_suspend')}
+                >
+                  <Block className="text-sm" />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onDelete}
+                className="p-2 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                title={t('tooltip_delete')}
+                aria-label={t('tooltip_delete')}
+              >
+                <Delete className="text-sm" />
+              </button>
+            </div>
+          </div>
+          <p className="text-[10px] text-muted-foreground font-mono truncate">{tenant.slug}</p>
+          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+            <span className={cn('px-2 py-0.5 rounded-md border text-[10px] font-extrabold uppercase', u.plan.bg, u.plan.text)}>
+              {t(`plan_${u.planKey}` as 'plan_free' | 'plan_starter' | 'plan_pro' | 'plan_enterprise')}
+            </span>
+            <div className={cn('inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase border', u.status.bg, u.status.text)}>
+              <div className={cn('h-1.5 w-1.5 rounded-full', u.status.dot)} />
+              {t(`status_${u.statusKey}` as 'status_active' | 'status_suspended' | 'status_deleted')}
+            </div>
+            <span className="text-[10px] text-muted-foreground font-mono">{tenant.region_id}</span>
+          </div>
+          <div className="grid grid-cols-1 gap-1.5 mt-2.5" onClick={(e) => e.stopPropagation()}>
+            <ResourceBar current={u.currentUsers} max={tenant.max_users} pct={u.userPct} />
+            <ResourceBar current={u.currentCourses} max={tenant.max_courses} pct={u.coursePct} />
+            <ResourceBar current={u.currentStorageBytes} max={tenant.max_storage_bytes} pct={u.storagePct} formatFn={formatBytes} />
+          </div>
+        </div>
       </div>
     </div>
   );

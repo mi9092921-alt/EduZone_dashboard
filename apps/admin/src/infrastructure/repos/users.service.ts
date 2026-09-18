@@ -323,7 +323,7 @@ export async function searchUsers(
   query: string,
   limit = 20,
   tenantId?: string,
-  role?: string,
+  role?: string | readonly string[],
 ): Promise<UserSearchResult[]> {
   const { supabase } = container;
 
@@ -334,7 +334,7 @@ export async function searchUsers(
 
   // Filter by role if provided
   if (role) {
-    q = q.eq('primary_role', role);
+    q = Array.isArray(role) ? q.in('primary_role', [...role]) : q.eq('primary_role', role);
   }
 
   // If query provided, apply search filters
@@ -343,7 +343,9 @@ export async function searchUsers(
     // an unescaped ',' or '(' / ')' could inject additional filter
     // conditions into the query PostgREST actually executes.
     const safeQuery = sanitizePostgrestSearchTerm(query);
-    q = q.or(`first_name.ilike.%${safeQuery}%,last_name.ilike.%${safeQuery}%,email.ilike.%${safeQuery}%`);
+    q = q.or(
+      `first_name.ilike.%${safeQuery}%,last_name.ilike.%${safeQuery}%,email.ilike.%${safeQuery}%`,
+    );
   }
 
   // Filter by tenant if provided

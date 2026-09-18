@@ -7,7 +7,8 @@ name: E2E (Playwright)
 # Variables). This follows the repo precedent of keeping gates meaningful
 # instead of permanently red (see the dependency-audit note in ci.yml): the
 # specs sign in with real credentials against a real Supabase (canonical QA
-# seed users from supabase/schema/11_seed_reference.sql), so this gate needs
+# seed users from supabase/schema/11_seed_reference.sql and
+# supabase/schema/12_seed_qa_demo.sql), so this gate needs
 # a live local stack — a placeholder backend would fail every run.
 #
 # Activation checklist (M15 report — project_documents/milestone_reports/
@@ -124,6 +125,7 @@ jobs:
             schema/09_rls.sql \
             schema/10_permissions.sql \
             schema/11_seed_reference.sql \
+            schema/12_seed_qa_demo.sql \
           ; do
             echo "Applying $f ..."
             psql "$DB_URL" -v ON_ERROR_STOP=1 -f "$f"
@@ -168,7 +170,8 @@ jobs:
         # run against the freshly-seeded local stack. Any breach exits
         # non-zero and fails this job BEFORE Playwright starts, so the
         # required "e2e" check blocks the merge.
-        # All 8 QA seed accounts share one bcrypt hash (11_seed_reference.sql)
+        # All QA seed accounts share one bcrypt hash (11_seed_reference.sql /
+        # 12_seed_qa_demo.sql)
         # whose documented plaintext is Admin@12345 (auth.setup.ts, M15).
         working-directory: apps/admin
         run: |
@@ -192,6 +195,11 @@ jobs:
 
       - name: Run Playwright (chromium)
         env:
+          # Keep the shared setup session separate from auth.spec.ts.
+          # auth.spec.ts intentionally signs in as super_admin and the local
+          # session trigger invalidates the previous session for that user.
+          # Using the tenant admin here prevents the auth tests from logging
+          # out every page test while they run in parallel.
           E2E_EMAIL: admin@eduzone-test.com
           E2E_PASSWORD: Admin@12345
         run: pnpm --filter @eduzone/admin exec playwright test --project=chromium
