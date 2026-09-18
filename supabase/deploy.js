@@ -81,16 +81,25 @@ async function main() {
       'schema/09_rls.sql',
       'schema/10_permissions.sql',
       'schema/11_seed_reference.sql',
+      'schema/12_seed_qa_demo.sql',
       'schema/VALIDATION.sql',
     ];
 
-    // F-01 (P0, review 2026-09-13): 11_seed_reference.sql plants the QA
-    // accounts (*@eduzone-test.com) whose shared bcrypt password
+    // F-01 (P0, review 2026-09-13; split 2026-09-18): the seed used to be a
+    // single file mixing production-required reference data (roles,
+    // permissions, constants, rate-limit rules) with QA/demo data —
+    // including @eduzone-test.com accounts whose shared bcrypt password
     // (Admin@12345) is documented in git (.github/workflows/e2e.yml).
-    // Applying it to a real project would create a known-password
-    // super_admin — an open backdoor. The seed is therefore OPT-IN and
-    // must only ever be enabled for a DISPOSABLE local/QA database;
-    // the schema files themselves still apply unconditionally.
+    // Applying the whole thing to a real project would create known-password
+    // accounts — an open backdoor — while skipping it left a fresh project
+    // without its reference data. The file is now split:
+    //   11_seed_reference.sql — reference/config + ONE bootstrap super_admin
+    //     (owner-approved so a new project is administrable; its seeded
+    //     password must be rotated immediately after first login — see the
+    //     warning in the file). Applies unconditionally.
+    //   12_seed_qa_demo.sql — ALL disposable QA/demo data. OPT-IN via the
+    //     flag below, and only ever against a DISPOSABLE local/QA database.
+    // The schema files themselves still apply unconditionally.
     const allowQaSeed = process.env.ALLOW_QA_SEED_DATA === 'true';
 
     for (const file of files) {
@@ -104,11 +113,12 @@ async function main() {
         process.exit(1);
       }
 
-      if (file === 'schema/11_seed_reference.sql' && !allowQaSeed) {
-        console.warn('⏭ SKIPPED: QA seed (11_seed_reference.sql).');
+      if (file === 'schema/12_seed_qa_demo.sql' && !allowQaSeed) {
+        console.warn('⏭ SKIPPED: QA/demo seed (12_seed_qa_demo.sql).');
         console.warn('   It plants @eduzone-test.com accounts whose passwords are documented');
-        console.warn('   in git — NEVER against staging/production. To apply it to a disposable');
-        console.warn('   local/QA database only, re-run with ALLOW_QA_SEED_DATA=true.');
+        console.warn('   in git plus demo tenants/courses — NEVER against staging/production.');
+        console.warn('   To apply it to a disposable local/QA database only, re-run with');
+        console.warn('   ALLOW_QA_SEED_DATA=true.');
         continue;
       }
 
