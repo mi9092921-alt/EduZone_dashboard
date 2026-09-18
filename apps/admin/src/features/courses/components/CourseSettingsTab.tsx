@@ -35,10 +35,10 @@ export function CourseSettingsTab({ course }: CourseSettingsTabProps) {
 
   return (
     <Box sx={{ maxWidth: 640, width: '100%', minWidth: 0 }}>
-      <Typography sx={{ fontWeight: 700, fontSize: '1.125rem', color: '#0F172A', mb: 0.5 }}>
+      <Typography sx={{ fontWeight: 700, fontSize: '1.125rem', color: 'text.primary', mb: 0.5 }}>
         {t('course_settings_title')}
       </Typography>
-      <Typography variant="body2" sx={{ color: '#64748B', mb: 3 }}>
+      <Typography variant="body2" sx={{ color: 'text.secondary', mb: 3 }}>
         {t('course_settings_desc')}
       </Typography>
 
@@ -52,14 +52,15 @@ export function CourseSettingsTab({ course }: CourseSettingsTabProps) {
       <Box
         sx={{
           p: { xs: 2, sm: 3 },
-          border: '1px solid #E2E8F0',
+          border: '1px solid',
+          borderColor: 'divider',
           borderRadius: 3,
-          backgroundColor: '#F8FAFC',
+          backgroundColor: 'action.hover',
           mb: 3,
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
-          <Typography variant="body2" sx={{ fontWeight: 600, color: '#475569' }}>
+          <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
             {t('current_status_label')}
           </Typography>
           <Chip
@@ -71,16 +72,16 @@ export function CourseSettingsTab({ course }: CourseSettingsTabProps) {
               letterSpacing: '0.04em',
               backgroundColor:
                 course.status === 'published'
-                  ? '#ECFDF5'
+                  ? 'success.light'
                   : course.status === 'draft'
-                    ? '#FFFBEB'
-                    : '#F1F5F9',
+                    ? 'warning.light'
+                    : 'action.selected',
               color:
                 course.status === 'published'
-                  ? '#059669'
+                  ? 'success.dark'
                   : course.status === 'draft'
-                    ? '#D97706'
-                    : '#64748B',
+                    ? 'warning.dark'
+                    : 'text.secondary',
               borderRadius: 5,
             }}
           />
@@ -97,10 +98,10 @@ export function CourseSettingsTab({ course }: CourseSettingsTabProps) {
                 textTransform: 'none',
                 fontWeight: 600,
                 borderRadius: 2,
-                backgroundColor: '#059669',
-                '&:hover': { backgroundColor: '#047857' },
+                backgroundColor: 'success.main',
+                '&:hover': { backgroundColor: 'success.dark' },
                 boxShadow: 'none',
-                '&.Mui-disabled': { backgroundColor: '#E2E8F0' },
+                '&.Mui-disabled': { backgroundColor: 'action.disabledBackground' },
               }}
             >
               {t('publish_course_btn')}
@@ -116,9 +117,9 @@ export function CourseSettingsTab({ course }: CourseSettingsTabProps) {
                 textTransform: 'none',
                 fontWeight: 600,
                 borderRadius: 2,
-                borderColor: '#E2E8F0',
-                color: '#64748B',
-                '&:hover': { borderColor: '#CBD5E1', backgroundColor: '#F8FAFC' },
+                borderColor: 'divider',
+                color: 'text.secondary',
+                '&:hover': { borderColor: 'text.secondary', backgroundColor: 'action.hover' },
               }}
             >
               {t('archive_course_btn')}
@@ -133,9 +134,9 @@ export function CourseSettingsTab({ course }: CourseSettingsTabProps) {
                 textTransform: 'none',
                 fontWeight: 600,
                 borderRadius: 2,
-                borderColor: '#E2E8F0',
-                color: '#64748B',
-                '&:hover': { borderColor: '#CBD5E1', backgroundColor: '#F8FAFC' },
+                borderColor: 'divider',
+                color: 'text.secondary',
+                '&:hover': { borderColor: 'text.secondary', backgroundColor: 'action.hover' },
               }}
             >
               {t('revert_to_draft_btn')}
@@ -144,7 +145,7 @@ export function CourseSettingsTab({ course }: CourseSettingsTabProps) {
         </Box>
 
         {!canPublish && course.status !== 'published' && (
-          <Typography variant="caption" sx={{ color: '#D97706', display: 'block', mt: 1.5 }}>
+          <Typography variant="caption" sx={{ color: 'warning.main', display: 'block', mt: 1.5 }}>
             {t('publish_requirements')}
           </Typography>
         )}
@@ -154,12 +155,13 @@ export function CourseSettingsTab({ course }: CourseSettingsTabProps) {
       <Box
         sx={{
           p: { xs: 2, sm: 3 },
-          border: '1px solid #E2E8F0',
+          border: '1px solid',
+          borderColor: 'divider',
           borderRadius: 3,
-          backgroundColor: '#fff',
+          backgroundColor: 'background.paper',
         }}
       >
-        <Typography variant="body2" sx={{ fontWeight: 600, color: '#475569', mb: 2 }}>
+        <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', mb: 2 }}>
           {t('course_details_label')}
         </Typography>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, minWidth: 0 }}>
@@ -171,13 +173,13 @@ export function CourseSettingsTab({ course }: CourseSettingsTabProps) {
               gap: { xs: 0.25, sm: 2 },
             }}
           >
-            <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, flexShrink: 0 }}>
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, flexShrink: 0 }}>
               {t('id_label')}
             </Typography>
             <Typography
               variant="caption"
               sx={{
-                color: '#475569',
+                color: 'text.primary',
                 fontFamily: 'JetBrains Mono',
                 overflowWrap: 'anywhere',
                 wordBreak: 'break-all',
@@ -195,12 +197,12 @@ export function CourseSettingsTab({ course }: CourseSettingsTabProps) {
               gap: { xs: 0.25, sm: 2 },
             }}
           >
-            <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, flexShrink: 0 }}>
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, flexShrink: 0 }}>
               {t('url_slug')}
             </Typography>
             <Typography
               variant="caption"
-              sx={{ color: '#475569', overflowWrap: 'anywhere', textAlign: { xs: 'start', sm: 'end' } }}
+              sx={{ color: 'text.primary', overflowWrap: 'anywhere', textAlign: { xs: 'start', sm: 'end' } }}
             >
               {course.slug ?? '—'}
             </Typography>
@@ -213,12 +215,12 @@ export function CourseSettingsTab({ course }: CourseSettingsTabProps) {
               gap: { xs: 0.25, sm: 2 },
             }}
           >
-            <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, flexShrink: 0 }}>
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, flexShrink: 0 }}>
               {t('region_label')}
             </Typography>
             <Typography
               variant="caption"
-              sx={{ color: '#475569', overflowWrap: 'anywhere', textAlign: { xs: 'start', sm: 'end' } }}
+              sx={{ color: 'text.primary', overflowWrap: 'anywhere', textAlign: { xs: 'start', sm: 'end' } }}
             >
               {course.region_id}
             </Typography>
@@ -231,10 +233,10 @@ export function CourseSettingsTab({ course }: CourseSettingsTabProps) {
               gap: { xs: 0.25, sm: 2 },
             }}
           >
-            <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, flexShrink: 0 }}>
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, flexShrink: 0 }}>
               {t('created_label')}
             </Typography>
-            <Typography variant="caption" sx={{ color: '#475569', textAlign: { xs: 'start', sm: 'end' } }}>
+            <Typography variant="caption" sx={{ color: 'text.primary', textAlign: { xs: 'start', sm: 'end' } }}>
               {new Date(course.created_at).toLocaleString()}
             </Typography>
           </Box>
@@ -246,10 +248,10 @@ export function CourseSettingsTab({ course }: CourseSettingsTabProps) {
               gap: { xs: 0.25, sm: 2 },
             }}
           >
-            <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, flexShrink: 0 }}>
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, flexShrink: 0 }}>
               {t('updated_label')}
             </Typography>
-            <Typography variant="caption" sx={{ color: '#475569', textAlign: { xs: 'start', sm: 'end' } }}>
+            <Typography variant="caption" sx={{ color: 'text.primary', textAlign: { xs: 'start', sm: 'end' } }}>
               {new Date(course.updated_at).toLocaleString()}
             </Typography>
           </Box>

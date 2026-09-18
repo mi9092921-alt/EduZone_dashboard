@@ -233,6 +233,8 @@
     "course_settings_title": "Course Settings",
     "course_settings_desc": "Manage visibility, status, and other course configurations.",
     "current_status_label": "Current Status",
+    "publish_course_btn": "Publish Course",
+    "status_updated_success": "Course status updated successfully.",
     "archive_course_btn": "Archive Course",
     "revert_to_draft_btn": "Revert to Draft",
     "course_details_label": "Course Details",

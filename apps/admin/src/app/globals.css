@@ -37,6 +37,12 @@
   --color-accent-foreground: hsl(var(--accent-foreground));
   --color-destructive: hsl(var(--destructive));
   --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-success: hsl(var(--success));
+  --color-success-foreground: hsl(var(--success-foreground));
+  --color-warning: hsl(var(--warning));
+  --color-warning-foreground: hsl(var(--warning-foreground));
+  --color-info: hsl(var(--info));
+  --color-info-foreground: hsl(var(--info-foreground));
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
@@ -102,6 +108,14 @@
                                      white text, below the 4.5:1 WCAG AA text minimum */
   --destructive-foreground: 210 40% 98%;
 
+  /* Semantic status colors. Keep these in HSL so alpha utilities work in both themes. */
+  --success: 142 71% 35%;
+  --success-foreground: 144 61% 18%;
+  --warning: 32 95% 42%;
+  --warning-foreground: 24 80% 18%;
+  --info: 199 89% 42%;
+  --info-foreground: 201 80% 18%;
+
   --border: 214.3 32% 82%;
   --input: 214.3 31.8% 91.4%;
   --ring: 221.2 83.2% 53.3%;
@@ -163,6 +177,13 @@
                                      touching every bg-destructive call site blind. */
   --destructive-foreground: 210 40% 98%;
 
+  --success: 142 69% 52%;
+  --success-foreground: 142 76% 85%;
+  --warning: 38 92% 58%;
+  --warning-foreground: 40 90% 86%;
+  --info: 199 89% 65%;
+  --info-foreground: 199 90% 88%;
+
   --border: 217.2 32.6% 22.5%; /* Slightly lighter borders for better definition */
   --input: 217.2 32.6% 17.5%;
   --ring: 224.3 76.3% 56%;       /* Brightened from 48% — 48% only hit ~2.9:1 against
@@ -196,6 +217,15 @@ body,
   body {
     @apply bg-background text-foreground font-sans antialiased overflow-hidden min-h-[100dvh];
     line-height: 1.6;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    color: hsl(var(--foreground));
   }
 
   main {

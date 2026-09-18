@@ -112,7 +112,8 @@ export function ErrorPage({ error, reset }: { error?: Error | undefined; reset?:
               sx={{
                 fontFamily: 'monospace',
                 p: 2,
-                bgcolor: '#f1f1f1',
+                bgcolor: 'action.hover',
+                color: 'text.primary',
                 display: 'block',
                 borderRadius: 1,
               }}

@@ -233,6 +233,8 @@
     "course_settings_title": "إعدادات الدورة",
     "course_settings_desc": "إدارة الإتاحة والحالة وتكوينات الدورة الأخرى.",
     "current_status_label": "الحالة الحالية",
+    "publish_course_btn": "نشر الدورة",
+    "status_updated_success": "تم تحديث حالة الدورة بنجاح.",
     "archive_course_btn": "أرشفة الدورة",
     "revert_to_draft_btn": "إعادة إلى المسودة",
     "course_details_label": "تفاصيل الدورة",

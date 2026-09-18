@@ -422,7 +422,7 @@ export function WarningsPage() {
                       '&:hover': { backgroundColor: 'text.secondary' },
                     }}
                   >
-                    {issueMutation.isPending ? <CircularProgress size={20} sx={{ color: '#fff' }} /> : t('btn_submit')}
+                    {issueMutation.isPending ? <CircularProgress size={20} sx={{ color: 'common.white' }} /> : t('btn_submit')}
                   </Button>
                 </Box>
               </form>

@@ -1,7 +1,8 @@
 'use client';
 
 import { People, School, TrendingUp, Warning } from '@mui/icons-material';
-import { Typography, Box } from '@mui/material';
+import { Typography, Box, useTheme } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 
@@ -18,6 +19,7 @@ import {
 
 export function TeacherDashboard() {
   const t = useTranslations('common');
+  const theme = useTheme();
   const { data: stats, isLoading } = useTeacherDashboardStats();
 
   const engagementMetrics = [
@@ -32,29 +34,25 @@ export function TeacherDashboard() {
       label: t('total_students'),
       value: stats?.totalUsers ?? '—',
       icon: People,
-      bg: '#EEF2FF',
-      color: '#4F46E5',
+      tone: 'primary' as const,
     },
     {
       label: t('published_courses'),
       value: stats?.activeCourses ?? '—',
       icon: School,
-      bg: '#EEF2FF',
-      color: '#10B981',
+      tone: 'success' as const,
     },
     {
       label: t('dashboard_sessions_today'),
       value: stats?.dailySessions ?? '—',
       icon: TrendingUp,
-      bg: '#EEF2FF',
-      color: '#6366F1',
+      tone: 'primary' as const,
     },
     {
       label: t('warnings'),
       value: stats?.pendingWarnings ?? '—',
       icon: Warning,
-      bg: '#FEF2F2',
-      color: '#EF4444',
+      tone: 'error' as const,
     },
   ];
 
@@ -69,6 +67,7 @@ export function TeacherDashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {statCards.map((stat) => {
           const Icon = stat.icon;
+          const accent = theme.palette[stat.tone].main;
 
           return (
             <StatsCard
@@ -77,7 +76,10 @@ export function TeacherDashboard() {
             >
               <StatsCardContent className="flex flex-row items-center gap-4 p-5">
                 <StatsCardIcon
-                  style={{ backgroundColor: stat.color + '1A', color: stat.color }}
+                  style={{
+                    backgroundColor: alpha(accent, theme.palette.mode === 'dark' ? 0.18 : 0.1),
+                    color: accent,
+                  }}
                   className="w-10 h-10 rounded-lg shrink-0 flex items-center justify-center"
                 >
                   <Icon sx={{ fontSize: 20 }} />
@@ -109,7 +111,7 @@ export function TeacherDashboard() {
                         sx={{
                           height: 24,
                           width: 48,
-                          bgcolor: 'neutral.100',
+                          bgcolor: 'action.hover',
                           display: 'inline-block',
                           animation: 'pulse 1.5s infinite',
                           borderRadius: 1,

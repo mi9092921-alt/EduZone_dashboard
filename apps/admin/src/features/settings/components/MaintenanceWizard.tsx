@@ -125,7 +125,8 @@ export function MaintenanceWizard({ settings, canEdit = true }: MaintenanceWizar
       elevation={0}
       sx={{
         borderRadius: 3,
-        border: '1px solid #E2E8F0',
+        border: '1px solid',
+        borderColor: 'divider',
         p: 3,
         mb: 3,
       }}
@@ -137,21 +138,19 @@ export function MaintenanceWizard({ settings, canEdit = true }: MaintenanceWizar
             width: 40,
             height: 40,
             borderRadius: 2,
-            background: isCurrentlyEnabled
-              ? 'linear-gradient(135deg, #DC2626, #EF4444)'
-              : 'linear-gradient(135deg, #6366F1, #818CF8)',
+            backgroundColor: isCurrentlyEnabled ? 'error.main' : 'primary.main',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          <Build sx={{ color: '#fff', fontSize: 20 }} />
+          <Build sx={{ color: 'common.white', fontSize: 20 }} />
         </Box>
         <Box>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: '#0F172A' }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: 'text.primary' }}>
             معالج وضع الصيانة
           </Typography>
-          <Typography variant="body2" sx={{ color: '#64748B' }}>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
             {isCurrentlyEnabled ? 'وضع الصيانة مفعل حالياً' : 'وضع الصيانة معطل'}
           </Typography>
         </Box>
@@ -161,8 +160,8 @@ export function MaintenanceWizard({ settings, canEdit = true }: MaintenanceWizar
             size="small"
             sx={{
               ml: 'auto',
-              backgroundColor: '#FEE2E2',
-              color: '#DC2626',
+              backgroundColor: 'error.light',
+              color: 'error.dark',
               fontWeight: 700,
             }}
           />
@@ -191,8 +190,8 @@ export function MaintenanceWizard({ settings, canEdit = true }: MaintenanceWizar
             <StepLabel
               sx={{
                 '& .MuiStepLabel-label': { fontSize: '0.8rem', fontWeight: 600 },
-                '& .MuiStepIcon-root.Mui-active': { color: '#6366F1' },
-                '& .MuiStepIcon-root.Mui-completed': { color: '#16A34A' },
+                '& .MuiStepIcon-root.Mui-active': { color: 'primary.main' },
+                '& .MuiStepIcon-root.Mui-completed': { color: 'success.main' },
               }}
             >
               {label}
@@ -266,7 +265,7 @@ export function MaintenanceWizard({ settings, canEdit = true }: MaintenanceWizar
               InputLabelProps={{ shrink: true }}
               sx={{ width: 300, maxWidth: '100%' }}
             />
-            <Typography variant="body2" sx={{ color: '#64748B' }}>
+            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
               {t('deadline_desc')}
             </Typography>
           </Box>
@@ -314,7 +313,7 @@ export function MaintenanceWizard({ settings, canEdit = true }: MaintenanceWizar
                 })
               }
             />
-            <Typography variant="body2" sx={{ color: '#64748B', mt: 1 }}>
+            <Typography variant="body2" sx={{ color: 'text.secondary', mt: 1 }}>
               {t('roles_desc')}
             </Typography>
           </Box>
@@ -372,8 +371,8 @@ export function MaintenanceWizard({ settings, canEdit = true }: MaintenanceWizar
               textTransform: 'none',
               fontWeight: 600,
               borderRadius: 2,
-              backgroundColor: '#6366F1',
-              '&:hover': { backgroundColor: '#4F46E5' },
+              backgroundColor: 'primary.main',
+              '&:hover': { backgroundColor: 'primary.dark' },
             }}
           >
             {t('btn_next')}
@@ -388,8 +387,8 @@ export function MaintenanceWizard({ settings, canEdit = true }: MaintenanceWizar
               textTransform: 'none',
               fontWeight: 600,
               borderRadius: 2,
-              backgroundColor: enabled ? '#DC2626' : '#16A34A',
-              '&:hover': { backgroundColor: enabled ? '#B91C1C' : '#15803D' },
+              backgroundColor: enabled ? 'error.main' : 'success.main',
+              '&:hover': { backgroundColor: enabled ? 'error.dark' : 'success.dark' },
             }}
           >
             {enabled ? t('btn_finish_enable') : t('btn_finish_disable')}

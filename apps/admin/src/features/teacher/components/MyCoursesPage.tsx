@@ -12,7 +12,9 @@ import {
   CircularProgress,
   Tabs,
   Tab,
+  useTheme,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useState, useCallback } from 'react';
@@ -23,14 +25,16 @@ import { CreateCourseDialog } from '@/features/courses/components/CreateCourseDi
 import { ImportCourseDialog } from '@/features/courses/components/ImportCourseDialog';
 import { usePathname, useRouter } from '@/i18n/routing';
 
-const getStatusColors = (status: string, opacity: string = '1A') => {
+type StatusTone = 'success' | 'error' | 'text';
+
+const getStatusColors = (status: string): StatusTone => {
   switch (status) {
     case 'published':
-      return { bg: 'success.main', text: 'success.main', alpha: 'success.main' + opacity };
+      return 'success';
     case 'archived':
-      return { bg: 'error.main', text: 'error.main', alpha: 'error.main' + opacity };
+      return 'error';
     default:
-      return { bg: 'text.secondary', text: 'text.secondary', alpha: 'text.secondary' + '1A' };
+      return 'text';
   }
 };
 
@@ -39,6 +43,7 @@ export function MyCoursesPage() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const t = useTranslations('common');
+  const theme = useTheme();
 
   const setSearchParam = useCallback(
     (key: string, value: string | null) => {
@@ -189,7 +194,7 @@ export function MyCoursesPage() {
       </Box>
 
       {/* Filter tabs */}
-      <Box sx={{ borderBottom: '1px solid #E2E8F0', mb: 3 }}>
+          <Box sx={{ borderBottom: '1px solid', borderColor: 'divider', mb: 3 }}>
         <Tabs
           value={tabValue}
           onChange={handleTabChange}
@@ -233,6 +238,9 @@ export function MyCoursesPage() {
           }}
         >
           {courses.map((course) => {
+            const statusTone = getStatusColors(course.status);
+            const statusColor =
+              statusTone === 'text' ? theme.palette.text.secondary : theme.palette[statusTone].main;
             return (
               <Card
                 key={course.id}
@@ -295,8 +303,8 @@ export function MyCoursesPage() {
                         fontSize: '0.65rem',
                         textTransform: 'uppercase',
                         letterSpacing: '0.05em',
-                        backgroundColor: getStatusColors(course.status).alpha,
-                        color: getStatusColors(course.status).text,
+                        backgroundColor: alpha(statusColor, theme.palette.mode === 'dark' ? 0.18 : 0.1),
+                        color: statusColor,
                         height: 24,
                       }}
                     />
@@ -379,11 +387,11 @@ export function MyCoursesPage() {
       {/* Empty state */}
       {!isLoading && courses.length === 0 && (
         <Box sx={{ textAlign: 'center', py: 8 }}>
-          <School sx={{ fontSize: 64, color: '#E2E8F0', mb: 2 }} />
-          <Typography variant="h6" sx={{ fontWeight: 600, color: '#64748B', mb: 1 }}>
+          <School sx={{ fontSize: 64, color: 'divider', mb: 2 }} />
+          <Typography variant="h6" sx={{ fontWeight: 600, color: 'text.secondary', mb: 1 }}>
             {t('no_courses_title')}
           </Typography>
-          <Typography variant="body2" sx={{ color: '#94A3B8', mb: 3 }}>
+          <Typography variant="body2" sx={{ color: 'text.secondary', mb: 3 }}>
             {t('no_courses_desc')}
           </Typography>
           <Button
