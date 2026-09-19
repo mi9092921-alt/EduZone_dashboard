@@ -2636,6 +2636,131 @@ BEGIN
 END;
 $$;
 
+-- ============================================================================
+-- Client RASP telemetry ingestion (2026-09-19).
+--
+-- The ONLY client write path into public.security_incidents: direct INSERT
+-- was revoked from every client role (see 10_permissions.sql). Accepts
+-- pre-auth callers (anon — user_id stays NULL, precisely preserving the
+-- pre-auth nature of the event) and authenticated callers (user_id pinned
+-- to auth.uid() server-side; a client-supplied user id is never trusted).
+--
+-- Validation is shape-based, deliberately NOT a threat-name whitelist: the
+-- detector set evolves with the RASP SDK, and a whitelist would silently
+-- drop future detector names — a false negative in security telemetry,
+-- the exact failure mode this table exists to prevent. Malformed payloads
+-- RAISE (surfacing as 400 via PostgREST); abusive-but-well-formed volume
+-- is absorbed SILENTLY (returns success — never reveal throttling to a
+-- caller probing the endpoint).
+--
+-- Trust tier: telemetry only. This table is never an authorization
+-- boundary (see the table comment in 03_tables.sql) — no blocking decision
+-- may be driven by these rows alone.
+--
+-- Rate limiting note: public.check_and_increment_rate_limit() was evaluated
+-- and deliberately NOT reused — its uniqueness key includes tenant_id (and
+-- user_id), which are NULL for pre-auth telemetry, and NULL keys never
+-- collide in the rate_limits upsert, so the counter could never increment
+-- for exactly the flood class this path must absorb. The per-source probe
+-- below counts this table itself (indexed: idx_security_incidents_ip_detected).
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.report_security_incident(
+  p_threat text,
+  p_platform text,
+  p_platform_version text DEFAULT NULL,
+  p_is_release_build boolean DEFAULT false,
+  p_device_fingerprint text DEFAULT NULL,
+  p_app_version text DEFAULT NULL,
+  p_app_build_number text DEFAULT NULL,
+  p_details jsonb DEFAULT NULL
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_user_id     uuid := auth.uid();
+  v_client_ip   inet;
+  v_recent      int;
+  v_recent_anon int;
+BEGIN
+  -- ── Shape validation (fail loud → 400) ──────────────────────────────────
+  p_threat := btrim(coalesce(p_threat, ''));
+  IF p_threat = '' OR length(p_threat) > 128 THEN
+    RAISE EXCEPTION 'INVALID_INCIDENT_THREAT';
+  END IF;
+  IF p_platform NOT IN
+     ('android', 'ios', 'linux', 'macos', 'windows', 'fuchsia') THEN
+    RAISE EXCEPTION 'INVALID_INCIDENT_PLATFORM';
+  END IF;
+  IF p_platform_version IS NOT NULL AND length(p_platform_version) > 64 THEN
+    RAISE EXCEPTION 'INVALID_INCIDENT_PLATFORM_VERSION';
+  END IF;
+  IF p_device_fingerprint IS NOT NULL AND length(p_device_fingerprint) > 128 THEN
+    RAISE EXCEPTION 'INVALID_INCIDENT_FINGERPRINT';
+  END IF;
+  IF p_app_version IS NOT NULL AND length(p_app_version) > 32 THEN
+    RAISE EXCEPTION 'INVALID_INCIDENT_APP_VERSION';
+  END IF;
+  IF p_app_build_number IS NOT NULL AND length(p_app_build_number) > 32 THEN
+    RAISE EXCEPTION 'INVALID_INCIDENT_APP_BUILD';
+  END IF;
+  IF p_details IS NOT NULL AND
+     (jsonb_typeof(p_details) <> 'object' OR pg_column_size(p_details) > 4096) THEN
+    RAISE EXCEPTION 'INVALID_INCIDENT_DETAILS';
+  END IF;
+
+  -- ── Client IP: server-derived only, from the PostgREST-injected proxy
+  -- headers. A client-supplied IP is never accepted. ──────────────────────
+  BEGIN
+    v_client_ip := btrim(split_part(
+      coalesce(current_setting('request.headers', true)::json
+               ->> 'x-forwarded-for', ''),
+      ',', 1
+    ))::inet;
+  EXCEPTION WHEN OTHERS THEN
+    v_client_ip := NULL;  -- missing/unparseable header: telemetry still lands
+  END;
+
+  -- ── Volume absorption. Probes run as the definer through the
+  -- security_incidents_definer_select policy (09_rls.sql) — FORCE ROW LEVEL
+  -- SECURITY applies to the table owner too. Per-source threshold applies
+  -- only when a source key actually exists; an IP-less caller is bounded by
+  -- the global anonymous breaker below instead. ──────────────────────────
+  IF v_client_ip IS NOT NULL THEN
+    SELECT count(*) INTO v_recent
+      FROM public.security_incidents
+     WHERE source_ip = v_client_ip
+       AND detected_at > pg_catalog.now() - interval '1 hour';
+    IF v_recent >= 30 THEN
+      RETURN;  -- silently absorbed
+    END IF;
+  END IF;
+
+  -- Global breaker for anonymous-originated rows only (pre-auth flood):
+  IF v_user_id IS NULL THEN
+    SELECT count(*) INTO v_recent_anon
+      FROM public.security_incidents
+     WHERE user_id IS NULL
+       AND detected_at > pg_catalog.now() - interval '5 minutes';
+    IF v_recent_anon >= 100 THEN
+      RETURN;  -- silently absorbed
+    END IF;
+  END IF;
+
+  INSERT INTO public.security_incidents (
+    user_id, threat, platform, platform_version, detected_at,
+    is_release_build, device_fingerprint, app_version, app_build_number,
+    source_ip, details
+  ) VALUES (
+    v_user_id, p_threat, p_platform, p_platform_version, pg_catalog.now(),
+    coalesce(p_is_release_build, false), p_device_fingerprint, p_app_version,
+    p_app_build_number, v_client_ip, p_details
+  );
+END;
+$$;
+
 CREATE OR REPLACE FUNCTION public.log_security_alert(
   p_query_name text,
   p_error text DEFAULT NULL,
@@ -5411,11 +5536,14 @@ END $$;
 -- user_location_logs, rate_limits, push_deliveries and download_logs grew
 -- without bound. These deletes run from the postgres role (pg_cron), so RLS
 -- does not apply. Retention windows (documented, adjust deliberately):
---   rate_limits 90d · activity_log_queue (flushed rows only) 90d ·
+--   rate_limits 90d · security_incidents 90d ·
+--   activity_log_queue (flushed rows only) 90d ·
 --   user_location_logs 180d (privacy minimization) · push_deliveries 180d ·
 --   download_logs 365d · activity_logs / video_views 730d.
 -- session_snapshots is deliberately NOT cleaned: one small row per real
--- login is the security audit trail.
+-- login is the security audit trail. security_incidents IS cleaned: RASP
+-- telemetry is high-volume, not a per-login audit trail, and 90d matches
+-- rate_limits — enough for repackaging/abuse trend analysis.
 CREATE OR REPLACE FUNCTION maintenance.apply_telemetry_retention()
 RETURNS void
 LANGUAGE plpgsql
@@ -5438,6 +5566,7 @@ BEGIN
   -- unflushed row is pending work, never garbage.
   DELETE FROM public.activity_log_queue
    WHERE flushed_at IS NOT NULL AND flushed_at < v_cutoff;
+  DELETE FROM public.security_incidents WHERE detected_at < v_cutoff;
 
   v_cutoff := pg_catalog.now() - interval '365 days';
   DELETE FROM public.download_logs WHERE downloaded_at < v_cutoff;

@@ -2186,7 +2186,81 @@ BEGIN
   );
 END $$;
 
--- Display Results (includes Checks 27-42 above)
+-- Check 43 (security telemetry, 2026-09-19): report_security_incident is
+-- the ONLY client write path into public.security_incidents — the direct
+-- INSERT grant to authenticated must be gone, the RPC must be executable
+-- by anon (pre-auth RASP events: user_id stays NULL) and authenticated
+-- alike, and the definer-context RLS policies (FORCE RLS + postgres role)
+-- must exist so the RPC can actually count and insert.
+DO $$
+DECLARE
+  v_rpc_anon boolean;
+  v_rpc_auth boolean;
+  v_direct_insert_gone boolean;
+  v_definer_policies int;
+  v_insert_policies int;
+BEGIN
+  SELECT has_function_privilege(
+    'anon', 'public.report_security_incident(text, text, text, boolean, text, text, text, jsonb)', 'EXECUTE'
+  ) INTO v_rpc_anon;
+  SELECT has_function_privilege(
+    'authenticated', 'public.report_security_incident(text, text, text, boolean, text, text, text, jsonb)', 'EXECUTE'
+  ) INTO v_rpc_auth;
+  SELECT NOT has_table_privilege('authenticated', 'public.security_incidents', 'INSERT')
+     AND NOT has_table_privilege('anon', 'public.security_incidents', 'INSERT')
+    INTO v_direct_insert_gone;
+  SELECT count(*) INTO v_definer_policies
+    FROM pg_policies
+   WHERE schemaname = 'public' AND tablename = 'security_incidents'
+     AND policyname IN ('security_incidents_definer_select', 'security_incidents_definer_insert');
+  SELECT count(*) INTO v_insert_policies
+    FROM pg_policies
+   WHERE schemaname = 'public' AND tablename = 'security_incidents'
+     AND policyname = 'security_incidents_insert';
+
+  INSERT INTO validation_results VALUES (
+    'Security Incident Telemetry Path',
+    CASE WHEN v_rpc_anon AND v_rpc_auth AND v_direct_insert_gone
+       AND v_definer_policies = 2 AND v_insert_policies = 1
+      THEN 'PASS' ELSE 'FAIL' END,
+    format(
+      'rpc anon=%s, rpc authenticated=%s, direct-insert revoked=%s, definer policies=%s/2, legacy insert policy present=%s/1',
+      v_rpc_anon, v_rpc_auth, v_direct_insert_gone, v_definer_policies, v_insert_policies
+    )
+  );
+END $$;
+
+-- Check 44 (orphan audit, 2026-09-19): every auth.users account must have a
+-- corresponding public.users row. A missing row is a "ghost" account whose
+-- password grant fails inside the custom_access_token hook
+-- (USER_NOT_PROVISIONED_OR_INACTIVE) — correct fail-closed behavior, but a
+-- nonzero count means a provisioning path leaked and real users are stuck
+-- in a 500 loop with no signal anywhere. Expected steady state: zero.
+DO $$
+DECLARE
+  v_ghosts bigint;
+  v_total bigint;
+BEGIN
+  SELECT
+    (SELECT count(*) FROM auth.users au
+      LEFT JOIN public.users pu ON pu.id = au.id
+     WHERE pu.id IS NULL OR pu.deleted_at IS NOT NULL)
+  INTO v_ghosts;
+  SELECT count(*) INTO v_total FROM auth.users;
+
+  INSERT INTO validation_results VALUES (
+    'Orphan Auth Users (ghost accounts)',
+    CASE WHEN v_ghosts = 0 THEN 'PASS' ELSE 'FAIL' END,
+    format(
+      '%s orphaned auth user(s) without an active public.users row (of %s total). ' ||
+      'Nonzero = a provisioning path leaked; provision or remove them — ' ||
+      'each one fails login with a GoTrue 500 (fail-closed by design).',
+      v_ghosts, v_total
+    )
+  );
+END $$;
+
+-- Display Results (includes Checks 27-44 above)
 SELECT * FROM validation_results ORDER BY check_name;
 
 -- Summary

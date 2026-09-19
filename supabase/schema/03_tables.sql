@@ -55,8 +55,22 @@ CREATE TABLE IF NOT EXISTS public.security_incidents (
   is_release_build boolean NOT NULL DEFAULT false,
   device_fingerprint text,
   app_version text,
-  app_build_number text
+  app_build_number text,
+  -- Stampeded by report_security_incident() from the PostgREST-injected
+  -- x-forwarded-for header (trusted proxy chain) — the rate-limit key for
+  -- pre-auth (user_id IS NULL) volume absorption. Client-supplied IPs are
+  -- never accepted: only this column, written server-side.
+  source_ip inet,
+  -- Optional structured context (e.g. {'step': 'freerasp'} for startup-step
+  -- failures). Size-capped and object-only in report_security_incident().
+  details jsonb
 );
+
+-- Columns added for the centralized telemetry write path
+-- (report_security_incident, 2026-09-19); IF NOT EXISTS keeps existing
+-- databases idempotent under deploy_schema.js re-runs.
+ALTER TABLE public.security_incidents ADD COLUMN IF NOT EXISTS source_ip inet;
+ALTER TABLE public.security_incidents ADD COLUMN IF NOT EXISTS details jsonb;
 
 -- ============================================================================
 -- 000_core_settings.sql

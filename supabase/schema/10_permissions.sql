@@ -92,7 +92,19 @@ GRANT SELECT ON public.tenants                  TO authenticated;
 -- tenants_select_merged is scoped `TO authenticated` only; the grant was dead.
 GRANT SELECT ON public.users                    TO authenticated;
 GRANT SELECT ON public.roles, public.permissions, public.role_permissions, public.user_roles TO authenticated;
-GRANT SELECT ON public.settings_kv, public.settings_cache, public.security_settings TO authenticated, service_role;
+-- settings_kv is the ONLY settings table anon may read: the student app's
+-- forced-update gate queries it (latest_version / min_app_version /
+-- force_update / update_message / store links / support_link) on every cold
+-- start BEFORE any session exists, by design — a force update must block
+-- pre-login access. RLS row-scoping is handled by the `settings_select`
+-- policy (09_rls.sql, "patch 9"), which exposes anon only `is_public = true`
+-- rows; all seven update keys are seeded is_public (11_seed_reference.sql).
+-- Production evidence (supabase_logs 2026-09-19): every cold start hit
+-- 401/42501 "permission denied for table settings_kv" as anon, silently
+-- disabling the pre-login forced-update gate app-wide.
+-- settings_cache and security_settings stay authenticated+service_role only.
+GRANT SELECT ON public.settings_kv              TO authenticated, service_role, anon;
+GRANT SELECT ON public.settings_cache, public.security_settings TO authenticated, service_role;
 -- Feature-flag tables are granted below, in the dedicated "Feature Flags —
 -- least-privilege grants" section, which resets privileges with REVOKE ALL
 -- before re-granting; that is the canonical definition for these 4 tables.
@@ -102,7 +114,18 @@ GRANT SELECT, INSERT, UPDATE ON public.enrollments TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.user_progress TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.course_ratings TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.devices TO authenticated;
-GRANT INSERT ON public.security_incidents TO authenticated;
+-- security_incidents: direct client INSERT was revoked (2026-09-19). Two
+-- problems with the old authenticated-only grant, both seen in production
+-- (supabase_logs 2026-09-19): pre-auth RASP events could never be written
+-- (401/42501 — the most valuable signals, from callers who never log in),
+-- and an authenticated client could flood the table with zero rate limiting
+-- or payload validation. All client telemetry — pre-auth (user_id stays
+-- NULL) and authenticated (user_id pinned server-side to auth.uid()) —
+-- flows through public.report_security_incident() (grants below, next to
+-- the log_activity_async section), which validates payload shape and
+-- absorbs volume abuse server-side. Telemetry only: never an authorization
+-- boundary.
+REVOKE INSERT ON public.security_incidents FROM authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.sessions TO authenticated;
 GRANT SELECT, INSERT ON public.video_views TO authenticated;
 GRANT SELECT, INSERT ON public.todos TO authenticated;
@@ -180,6 +203,19 @@ REVOKE ALL ON FUNCTION public.log_activity_async(uuid, text, jsonb, inet, uuid, 
   FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.log_activity_async(uuid, text, jsonb, inet, uuid, text, uuid)
   TO authenticated, service_role;
+
+-- Client RASP telemetry ingestion (the ONLY client write path into
+-- public.security_incidents — direct INSERT was revoked above). anon is
+-- granted deliberately: pre-auth threat events (repackaging, hooks, root —
+-- fired before any login) are exactly the signals this table exists to
+-- capture, and the RPC absorbs abusive volume server-side (per-IP 30/hour
+-- probe + global 100/5min anonymous breaker, both silent) and validates
+-- payload shape. user_id is pinned server-side (auth.uid(), NULL for anon);
+-- a caller-supplied user id is never accepted. See 07_functions.sql.
+REVOKE ALL ON FUNCTION public.report_security_incident(text, text, text, boolean, text, text, text, jsonb)
+  FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.report_security_incident(text, text, text, boolean, text, text, text, jsonb)
+  TO anon, authenticated, service_role;
 
 REVOKE ALL ON internal.job_queue FROM anon, authenticated, public;
 REVOKE ALL ON audit.slow_query_log FROM anon, authenticated, public;

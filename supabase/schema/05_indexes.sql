@@ -34,6 +34,14 @@ CREATE INDEX IF NOT EXISTS idx_users_last_login ON public.users (last_login DESC
 
 CREATE INDEX IF NOT EXISTS idx_users_region ON public.users (region_id);
 
+-- security_incidents: per-IP recency probe inside report_security_incident()
+-- (volume absorption) and the nightly telemetry-retention cutoff scan.
+CREATE INDEX IF NOT EXISTS idx_security_incidents_ip_detected
+  ON public.security_incidents (source_ip, detected_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_security_incidents_detected_at
+  ON public.security_incidents (detected_at);
+
 CREATE INDEX IF NOT EXISTS idx_users_search ON public.users USING GIN (search_vector) WHERE deleted_at IS NULL;
 
 -- NOTE: idx_users_id is intentionally omitted - users.id is a PRIMARY KEY,

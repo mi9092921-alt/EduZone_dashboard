@@ -30,6 +30,12 @@ CREATE POLICY offline_entitlements_service_all
 ALTER TABLE public.security_incidents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.security_incidents FORCE ROW LEVEL SECURITY;
 
+-- The table-level INSERT grant to authenticated was revoked (2026-09-19,
+-- see 10_permissions.sql): all client telemetry flows through
+-- public.report_security_incident(), which is the only write path. This
+-- legacy policy is retained (dead, but referenced by VALIDATION.sql) so a
+-- future direct-grant regression still cannot skip the user_id pinning it
+-- enforces.
 DROP POLICY IF EXISTS security_incidents_insert ON public.security_incidents;
 CREATE POLICY security_incidents_insert ON public.security_incidents
   FOR INSERT TO authenticated
@@ -39,6 +45,24 @@ DROP POLICY IF EXISTS security_incidents_admin_select ON public.security_inciden
 CREATE POLICY security_incidents_admin_select ON public.security_incidents
   FOR SELECT TO authenticated
   USING (public.is_admin_with_session_validation());
+
+-- Definer-context policies for report_security_incident() — the only write
+-- path. FORCE ROW LEVEL SECURITY subjects the function's definer (postgres)
+-- to RLS as well, so these two policies are the narrow, explicit owner
+-- access the FORCE model requires: count recent per-source volume (the rate
+-- limit probe) and insert the incident row. Client-facing rules are
+-- unchanged and unchanged in strength: authenticated has no INSERT grant at
+-- all anymore, anon never did, and neither policy grants any client role
+-- anything.
+DROP POLICY IF EXISTS security_incidents_definer_select ON public.security_incidents;
+CREATE POLICY security_incidents_definer_select ON public.security_incidents
+  FOR SELECT TO postgres
+  USING (true);
+
+DROP POLICY IF EXISTS security_incidents_definer_insert ON public.security_incidents;
+CREATE POLICY security_incidents_definer_insert ON public.security_incidents
+  FOR INSERT TO postgres
+  WITH CHECK (true);
 
 ALTER TABLE public.setting_definitions ENABLE ROW LEVEL SECURITY;
 
