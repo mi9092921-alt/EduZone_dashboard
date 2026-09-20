@@ -112,6 +112,8 @@ async function main() {
       'schema/09_rls.sql',
       'schema/10_permissions.sql',
       'schema/11_seed_reference.sql',
+      // QA/demo data is intentionally excluded from this deployment.
+      // Never apply 12_seed_qa_demo.sql to a shared or production database.
       'schema/VALIDATION.sql',
     ];
 

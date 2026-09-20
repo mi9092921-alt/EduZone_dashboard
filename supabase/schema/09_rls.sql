@@ -479,6 +479,11 @@ CREATE POLICY role_permissions_select ON public.role_permissions
     )
   );
 
+-- NOTE: this DROP only clears any pre-patch version of the policy; the
+-- canonical `settings_select` definition for settings_kv (granted to
+-- authenticated + anon, scoped to is_public rows) lives further down in
+-- this file, in the "C. Settings RLS fix (patch 9)" section. Do not treat
+-- this DROP as the effective policy statement.
 DROP POLICY IF EXISTS settings_select ON public.settings_kv;
 
 DROP POLICY IF EXISTS settings_cache_select ON public.settings_cache;
