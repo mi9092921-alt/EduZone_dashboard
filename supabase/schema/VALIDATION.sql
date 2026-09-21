@@ -1521,12 +1521,10 @@ END $$;
 -- or partially-named call becomes ambiguous ("function ... is not unique").
 -- This is a real defect distinct from exact-duplicate definitions (Check 27):
 -- both bodies survive, but calling the function can error at runtime.
--- Known outstanding case at time of writing: public.get_course_stats has a
--- 3-optional-argument jsonb-summary overload and a 1-required-argument
--- per-course TABLE overload; calling get_course_stats(<uuid>) is ambiguous.
--- Neither overload is currently GRANTed to `authenticated` (see
--- 10_permissions.sql), so it is not client-reachable today, but it must be
--- resolved (by renaming one overload) before either is ever granted.
+-- PHASE 6 FIX (2026-09-21): the previously outstanding case is resolved —
+-- the redundant 1-arg per-course TABLE overload of public.get_course_stats
+-- was removed (no callers in either repository), so only the 3-optional-
+-- argument invoker summary variant remains and no ambiguity survives.
 DO $$
 DECLARE
   v_ambiguous text[];
@@ -1663,6 +1661,12 @@ END $$;
 -- workaround for a recursion or permission error. This is an outright ban,
 -- not a heuristic -- any such policy on a client-reachable table is
 -- treated as a critical failure regardless of table sensitivity.
+-- PHASE 6 FIX (2026-09-21): policies scoped TO platform/bypass-RLS roles
+-- only (postgres / service_role / supabase_admin) are excluded. Those are
+-- the definer-context policies FORCE ROW LEVEL SECURITY requires (see the
+-- security_incidents_definer_select/insert pair on public.security_incidents
+-- in 09_rls.sql): they can never match a client role, so a literal true
+-- inside them grants nothing and is the correct pattern, not a bypass.
 DO $$
 DECLARE
   v_bad text[];
@@ -1676,6 +1680,10 @@ BEGIN
       AND (
         regexp_replace(coalesce(qual, ''), '\s+', '', 'g') = 'true'
         OR regexp_replace(coalesce(with_check, ''), '\s+', '', 'g') = 'true'
+      )
+      AND (
+        SELECT bool_and(r NOT IN ('postgres', 'service_role', 'supabase_admin'))
+        FROM unnest(roles) r
       )
   ) bad_policies;
 
@@ -2358,7 +2366,72 @@ BEGIN
   );
 END $$;
 
--- Display Results (includes Checks 27-46 above)
+
+-- Check 47 (Phase 6 EXECUTE sweep, 2026-09-21): the Phase 6 sweep in
+-- 10_permissions.sql revoked default PUBLIC/anon EXECUTE from every remaining
+-- public-schema function that predates the default-privileges REVOKE
+-- (worker_* bulk RPCs, body-guarded helpers, trigger functions, RLS-policy
+-- helpers). Fail if anon can EXECUTE any of them, or if a trigger function
+-- can be invoked by a client role via PostgREST.
+DO $$
+DECLARE
+  v_leaks int;
+BEGIN
+  SELECT count(*) INTO v_leaks
+  FROM (
+    VALUES ('public.worker_update_bulk_job(uuid,text,text,timestamptz,boolean,jsonb,boolean)'),
+           ('public.worker_fail_bulk_job(uuid,text)'),
+           ('public.worker_issue_warning(uuid,uuid,text,integer)'),
+           ('public.worker_reset_user_device(uuid,uuid)'),
+           ('public.reset_user_device(uuid)'),
+           ('public.increment_warning_count(uuid,uuid)'),
+           ('public.rebuild_permission_cache(uuid,uuid)'),
+           ('public.get_my_students(uuid)'),
+           ('public.log_app_open_location(double precision,double precision,double precision,text,uuid,jsonb)'),
+           ('public.notify_enrolled_students_for_course(uuid,text,text)'),
+           ('public.check_schema_naming_conventions()'),
+           ('public.enforce_jwt_tenant()'),
+           ('public.set_updated_at()'),
+           ('public.update_updated_at()'),
+           ('public.update_user_last_location()'),
+           ('public.fanout_notification()'),
+           ('public.audit_access_rule_change()'),
+           ('public.prevent_audit_mutation()'),
+           ('public.prevent_physical_delete()'),
+           ('public.terminate_sessions_on_status_change()'),
+           ('public.offline_entitlement_transition_guard()'),
+           ('public.trg_apply_course_rating_agg()'),
+           ('public.trg_audit_feature_flag_change()'),
+           ('public.trg_audit_lesson_state_change()'),
+           ('public.trg_cascade_course_soft_delete()'),
+           ('public.trg_cascade_section_deletes()'),
+           ('public.trg_enforce_permission_scope()'),
+           ('public.trg_enforce_single_active_session()'),
+           ('public.trg_enrollment_notify()'),
+           ('public.trg_hash_chain_activity_logs()'),
+           ('public.trg_increment_token_version_on_role_change()'),
+           ('public.trg_invalidate_perm_cache_on_role_permissions()'),
+           ('public.trg_invalidate_user_validity_cache()'),
+           ('public.trg_lessons_publish_notify()'),
+           ('public.trg_log_pii_access()'),
+           ('public.trg_prevent_prerequisite_cycles()'),
+           ('public.trg_rebuild_perm_cache()'),
+           ('public.trg_refresh_enrollment_totals_stmt()'),
+           ('public.trg_touch_feature_flag_row()')
+  ) AS fns(sig)
+  WHERE has_function_privilege('anon', sig::regprocedure, 'EXECUTE');
+
+  INSERT INTO validation_results VALUES (
+    'Phase 6 EXECUTE sweep (anon/PUBLIC)',
+    CASE WHEN v_leaks = 0 THEN 'PASS' ELSE 'FAIL' END,
+    COALESCE(NULLIF(v_leaks::text, '0') || ' Phase 6 function(s) still EXECUTE-able by anon '
+      || '— the 10_permissions.sql sweep signatures no longer match a definition.',
+      'No Phase 6 function is EXECUTE-able by anon or PUBLIC')
+  );
+END $$;
+
+
+-- Display Results (includes Checks 27-47 above)
 SELECT * FROM validation_results ORDER BY check_name;
 
 -- Summary
@@ -2369,13 +2442,13 @@ DECLARE
   v_fail int;
   v_warn int;
 BEGIN
-  SELECT COUNT(*), 
+  SELECT COUNT(*),
          COUNT(*) FILTER (WHERE status = 'PASS'),
          COUNT(*) FILTER (WHERE status = 'FAIL'),
          COUNT(*) FILTER (WHERE status = 'WARN')
   INTO v_total, v_pass, v_fail, v_warn
   FROM validation_results;
-  
+
   RAISE NOTICE '';
   RAISE NOTICE '========== VALIDATION SUMMARY ==========';
   RAISE NOTICE 'Total Checks: %', v_total;
@@ -2383,7 +2456,7 @@ BEGIN
   RAISE NOTICE 'Failed:       % ✗', v_fail;
   RAISE NOTICE 'Warnings:     % ⚠', v_warn;
   RAISE NOTICE '========================================';
-  
+
   IF v_fail > 0 THEN
     RAISE WARNING 'Schema validation failed - fix errors before deploying';
   END IF;

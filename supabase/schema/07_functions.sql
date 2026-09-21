@@ -4248,6 +4248,27 @@ LANGUAGE plpgsql
 SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
 BEGIN
+  -- PHASE 6 FIX (2026-09-21): narrow trusted-path exemption so the
+  -- retention jobs can actually work. maintenance.archive_soft_deleted_data()
+  -- and internal.purge_soft_deleted_records() issue physical DELETEs by
+  -- design (move-to-archive / end-of-retention purge) but this guard made
+  -- every one of those DELETEs raise, so archival was silently copy-only
+  -- and the purge job failed hard on its first due row. The exemption
+  -- requires BOTH the transaction-local GUC (set by the job itself via
+  -- set_config(..., true)) AND a trusted server context (the pg_cron
+  -- postgres/supabase_admin role, or an explicit service_role JWT).
+  -- anon/authenticated can set arbitrary GUCs but can never satisfy the
+  -- role half, and the role half alone (service_role) is not enough
+  -- without the GUC — so direct service-role deletes stay blocked unless
+  -- the job's own code path opted in.
+  IF pg_catalog.current_setting('eduzone.allow_physical_delete', true) = 'on'
+     AND (
+       current_user IN ('postgres', 'supabase_admin')
+       OR pg_catalog.current_setting('request.jwt.claim.role', true) = 'service_role'
+     )
+  THEN
+    RETURN OLD;
+  END IF;
   RAISE EXCEPTION 'Physical DELETE not allowed on %. Use soft_delete_*() functions instead.', TG_TABLE_NAME;
 END;
 $$;
@@ -5561,25 +5582,59 @@ SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_cutoff timestamptz;
+  -- PHASE 6 FIX (2026-09-21): each DELETE runs in its own subtransaction so
+  -- a single failing target (bad column, trigger, FK) can no longer abort
+  -- the whole nightly job and silently disable retention for every table.
+  -- Before this fix the job raised 42703 on its first statement every night
+  -- (activity_logs has no logged_at column; user_location_logs has no
+  -- accessed_at column), so NOTHING below it ever ran.
+  v_errors text := '';
 BEGIN
-  v_cutoff := pg_catalog.now() - interval '730 days';
-  DELETE FROM public.activity_logs WHERE logged_at < v_cutoff;
-  DELETE FROM public.video_views WHERE viewed_at < v_cutoff;
+  -- activity_logs is deliberately NOT deleted here: trg_audit_mutation
+  -- (prevent_audit_mutation) blocks all UPDATE/DELETE on the hash-chained
+  -- audit trail by design, so retention for that table is partition-based
+  -- (see maintenance.archive_old_partitions / manage_partitions), not
+  -- row-based. The previous attempt to DELETE FROM it here was doubly
+  -- broken: wrong column name AND blocked by the immutability trigger.
+  BEGIN
+    v_cutoff := pg_catalog.now() - interval '730 days';
+    DELETE FROM public.video_views WHERE viewed_at < v_cutoff;
+  EXCEPTION WHEN OTHERS THEN
+    v_errors := v_errors || 'video_views: ' || SQLERRM || '; ';
+  END;
 
-  v_cutoff := pg_catalog.now() - interval '180 days';
-  DELETE FROM public.user_location_logs WHERE accessed_at < v_cutoff;
-  DELETE FROM public.push_deliveries WHERE created_at < v_cutoff;
+  BEGIN
+    v_cutoff := pg_catalog.now() - interval '180 days';
+    -- PHASE 6 FIX: partition key is logged_at (there is no accessed_at
+    -- column on user_location_logs).
+    DELETE FROM public.user_location_logs WHERE logged_at < v_cutoff;
+    DELETE FROM public.push_deliveries WHERE created_at < v_cutoff;
+  EXCEPTION WHEN OTHERS THEN
+    v_errors := v_errors || '180d targets: ' || SQLERRM || '; ';
+  END;
 
-  v_cutoff := pg_catalog.now() - interval '90 days';
-  DELETE FROM public.rate_limits WHERE window_start < v_cutoff;
-  -- Only rows the queue worker already flushed are safe to remove; an
-  -- unflushed row is pending work, never garbage.
-  DELETE FROM public.activity_log_queue
-   WHERE flushed_at IS NOT NULL AND flushed_at < v_cutoff;
-  DELETE FROM public.security_incidents WHERE detected_at < v_cutoff;
+  BEGIN
+    v_cutoff := pg_catalog.now() - interval '90 days';
+    DELETE FROM public.rate_limits WHERE window_start < v_cutoff;
+    -- Only rows the queue worker already flushed are safe to remove; an
+    -- unflushed row is pending work, never garbage.
+    DELETE FROM public.activity_log_queue
+     WHERE flushed_at IS NOT NULL AND flushed_at < v_cutoff;
+    DELETE FROM public.security_incidents WHERE detected_at < v_cutoff;
+  EXCEPTION WHEN OTHERS THEN
+    v_errors := v_errors || '90d targets: ' || SQLERRM || '; ';
+  END;
 
-  v_cutoff := pg_catalog.now() - interval '365 days';
-  DELETE FROM public.download_logs WHERE downloaded_at < v_cutoff;
+  BEGIN
+    v_cutoff := pg_catalog.now() - interval '365 days';
+    DELETE FROM public.download_logs WHERE downloaded_at < v_cutoff;
+  EXCEPTION WHEN OTHERS THEN
+    v_errors := v_errors || 'download_logs: ' || SQLERRM || '; ';
+  END;
+
+  IF v_errors <> '' THEN
+    RAISE WARNING 'apply_telemetry_retention partial failures: %', v_errors;
+  END IF;
 END;
 $$;
 
@@ -6026,28 +6081,15 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.get_course_stats(p_tenant_id uuid)
-RETURNS TABLE (
-  id uuid,
-  title text,
-  category text,
-  active_students bigint,
-  completed_students bigint,
-  avg_progress_pct numeric,
-  last_enrollment_at timestamptz
-)
-LANGUAGE plpgsql
-STABLE
-SECURITY DEFINER SET search_path = public, pg_temp
-AS $$
-BEGIN
-  RETURN QUERY
-  SELECT v.id, v.title, v.category, v.active_students, v.completed_students, v.avg_progress_pct, v.last_enrollment_at
-  FROM private.vw_course_stats v
-  WHERE v.tenant_id = p_tenant_id
-    AND public.tenant_matches_jwt(p_tenant_id);
-END;
-$$;
+-- PHASE 6 FIX (2026-09-21): the redundant 1-arg SECURITY DEFINER overload is
+-- removed. It made every untyped/positional call ambiguous against the
+-- 3-arg invoker variant below (whose trailing parameters all carry defaults
+-- — "function public.get_course_stats(uuid) is not unique"), a defect
+-- VALIDATION Check 28 has been warning about. Neither overload has any
+-- caller (grep-verified across EduZone_dashboard and EduZone_App,
+-- 2026-09-21); the 3-arg SECURITY INVOKER variant is the canonical
+-- definition because invoker rights let course RLS apply natively.
+DROP FUNCTION IF EXISTS public.get_course_stats(uuid);
 
 CREATE OR REPLACE FUNCTION public.get_student_progress_timeline(p_tenant_id uuid, p_student_id uuid DEFAULT NULL)
 RETURNS TABLE (
@@ -6062,6 +6104,22 @@ STABLE
 SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
 BEGIN
+  -- PHASE 6 FIX (2026-09-21): tenant_matches_jwt() only proves the caller
+  -- belongs to p_tenant_id — it says nothing about WHICH student's rows the
+  -- caller may read, so any in-tenant user could previously fetch any other
+  -- user's aggregate progress timeline (active/completed counts, average
+  -- progress) by passing an arbitrary p_student_id. Restrict to holders of
+  -- the reports.read permission, tenant admins, or the student themselves.
+  -- p_student_id IS NULL (whole-tenant reporting) stays reports.read/admin
+  -- only. No caller in EduZone_dashboard or EduZone_App reaches this RPC
+  -- without one of those grants (grep-verified 2026-09-21).
+  IF p_student_id IS DISTINCT FROM auth.uid()
+     AND auth.role() <> 'service_role'
+     AND NOT public.user_has_permission(auth.uid(), 'reports.read', p_tenant_id)
+     AND NOT public.is_current_user_admin_lite() THEN
+    RAISE EXCEPTION 'PERMISSION_DENIED';
+  END IF;
+
   RETURN QUERY
   SELECT v.student_id, v.active_courses, v.completed_courses, v.overall_progress_pct, v.last_activity_at
   FROM private.vw_student_progress_timeline v
@@ -7063,6 +7121,12 @@ BEGIN
     RAISE EXCEPTION 'PERMISSION_DENIED: Only service_role can purge';
   END IF;
 
+  -- PHASE 6 FIX (2026-09-21): transaction-local opt-in for the physical
+  -- delete guard. Without it, trg_prevent_physical_delete_users raised on
+  -- the first due user row and this whole job aborted; see
+  -- prevent_physical_delete() for the carve-out contract.
+  PERFORM pg_catalog.set_config('eduzone.allow_physical_delete', 'on', true);
+
   v_retention_days := coalesce((public.get_setting('retention_deleted_user_days') #>> '{}')::integer, 90);
   DELETE FROM public.users
   WHERE deleted_at IS NOT NULL
@@ -7317,6 +7381,12 @@ DECLARE
   v_progress_count integer := 0;
   v_cutoff timestamptz;
 BEGIN
+  -- PHASE 6 FIX (2026-09-21): transaction-local opt-in for the physical
+  -- delete guard (see prevent_physical_delete()). Without it the DELETE
+  -- half of every archive block below raised
+  -- "Physical DELETE not allowed on ..." and archival was copy-only.
+  PERFORM pg_catalog.set_config('eduzone.allow_physical_delete', 'on', true);
+
   -- Set cutoff time to exactly 6 months ago
   v_cutoff := pg_catalog.now() - interval '6 months';
 

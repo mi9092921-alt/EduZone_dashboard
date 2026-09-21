@@ -82,6 +82,21 @@ REVOKE ALL ON ALL TABLES IN SCHEMA internal FROM PUBLIC, anon, authenticated;
 -- reach the MV through this tenant-filtered view.
 GRANT SELECT ON public.vw_course_stats TO authenticated, anon, service_role;
 
+-- PHASE 6 FIX (2026-09-21): the Section 12 block at the very top of this
+-- file granted SELECT on offline_download_entitlements BEFORE the blanket
+-- "REVOKE ALL ON ALL TABLES IN SCHEMA public" sweep below — the exact
+-- dead-on-arrival ordering the note above that sweep warns about. In every
+-- database deployed from this source, authenticated therefore could not
+-- read its own entitlement rows at all and the
+-- offline_entitlements_select_own RLS policy (09_rls.sql) was unreachable
+-- (verified live against production 2026-09-21: zero authenticated grants
+-- on this table). Writes remain RPC-only; this restores the documented
+-- Section 12 read contract ("the client may read only its own server
+-- entitlement rows"). The app currently reads entitlements only through
+-- authorize_offline_download/revalidate_offline_entitlement, so this is
+-- fail-closed contract repair, not a widening of any reachable path.
+GRANT SELECT ON TABLE public.offline_download_entitlements TO authenticated;
+
 -- Core read access
 GRANT SELECT ON public.regions                  TO authenticated;
 -- anon intentionally excluded: RLS policy regions_select is scoped `TO authenticated`
@@ -180,6 +195,18 @@ REVOKE DELETE ON public.todos FROM authenticated;
 REVOKE UPDATE, DELETE ON public.activity_logs FROM authenticated;
 REVOKE UPDATE, DELETE ON public.warnings FROM authenticated;
 REVOKE UPDATE ON public.users FROM authenticated;
+-- PHASE 6 FIX (2026-09-21): INSERT/DELETE on public.users are not client
+-- operations. Accounts are provisioned exclusively through the service-role
+-- create-user Edge Function, and physical DELETE is blocked by
+-- trg_prevent_physical_delete_users regardless. Leaving INSERT granted was
+-- a live privilege-escalation surface: users_admin_insert (09_rls.sql)
+-- validates the CALLER's role, never the inserted row's primary_role value,
+-- so a tenant-scoped admin could bind an orphaned auth.users UUID (email
+-- uniqueness is the only remaining guard) as a NEW profile with
+-- primary_role='super_admin' — which is_current_user_super_admin() then
+-- treats as fully cross-tenant. service_role is unaffected (blanket
+-- GRANT ALL ON ALL TABLES IN SCHEMA public below).
+REVOKE INSERT, DELETE ON public.users FROM authenticated;
 -- Backward compatibility for released clients. RLS still limits the row to
 -- the current user, and column privileges limit the mutation to telemetry.
 GRANT UPDATE (last_login, last_seen_at) ON public.users TO authenticated;
@@ -1234,3 +1261,157 @@ REVOKE EXECUTE ON FUNCTION public.normalize_email(text)
   FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.normalize_email(text)
   TO authenticated, service_role;
+
+-- ═════════════════════════════════════════════════════════════════════════════
+-- SECURITY FIX (2026-09-21) — Phase 6 (Database/RLS) EXECUTE grant sweep
+-- ═════════════════════════════════════════════════════════════════════════════
+-- Cross-check of every public-schema function defined in 07_functions.sql
+-- against this file found the following functions still carrying PostgreSQL's
+-- default EXECUTE TO PUBLIC: they are defined BEFORE the ALTER DEFAULT
+-- PRIVILEGES REVOKE and never received an explicit REVOKE/GRANT pair. The
+-- production database was hardened out-of-band (no public-schema function in
+-- production carries PUBLIC/anon EXECUTE — verified live 2026-09-21), so
+-- source and production had drifted; this block closes the source-side gap so
+-- a fresh deployment matches the hardened production state instead of
+-- reopening it. Three groups:
+--
+--   1. service_role-only worker RPCs (bodies already fail closed for every
+--      other role; grant hygiene makes the grant layer agree):
+REVOKE ALL ON FUNCTION public.worker_update_bulk_job(uuid, text, text, timestamptz, boolean, jsonb, boolean)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.worker_update_bulk_job(uuid, text, text, timestamptz, boolean, jsonb, boolean)
+  TO service_role;
+
+REVOKE ALL ON FUNCTION public.worker_fail_bulk_job(uuid, text)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.worker_fail_bulk_job(uuid, text)
+  TO service_role;
+
+REVOKE ALL ON FUNCTION public.worker_issue_warning(uuid, uuid, text, integer)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.worker_issue_warning(uuid, uuid, text, integer)
+  TO service_role;
+
+REVOKE ALL ON FUNCTION public.worker_reset_user_device(uuid, uuid)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.worker_reset_user_device(uuid, uuid)
+  TO service_role;
+
+--   2. body-guarded user-facing helpers (reachable by authenticated callers
+--      only; all fail closed for anon inside the body as defense-in-depth):
+REVOKE ALL ON FUNCTION public.reset_user_device(uuid)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.reset_user_device(uuid)
+  TO authenticated, service_role;
+
+REVOKE ALL ON FUNCTION public.increment_warning_count(uuid, uuid)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.increment_warning_count(uuid, uuid)
+  TO authenticated, service_role;
+
+REVOKE ALL ON FUNCTION public.rebuild_permission_cache(uuid, uuid)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.rebuild_permission_cache(uuid, uuid)
+  TO authenticated, service_role;
+
+-- (public.get_course_stats(uuid) was removed with its redundant 3-arg
+-- default-args overload during Phase 6 — see 07_functions.sql. Its grant
+-- pair was removed with it.)
+
+REVOKE ALL ON FUNCTION public.get_my_students(uuid)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_my_students(uuid)
+  TO authenticated, service_role;
+
+REVOKE ALL ON FUNCTION public.log_app_open_location(double precision, double precision, double precision, text, uuid, jsonb)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.log_app_open_location(double precision, double precision, double precision, text, uuid, jsonb)
+  TO authenticated, service_role;
+
+REVOKE ALL ON FUNCTION public.notify_enrolled_students_for_course(uuid, text, text)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.notify_enrolled_students_for_course(uuid, text, text)
+  TO authenticated, service_role;
+
+REVOKE ALL ON FUNCTION public.check_schema_naming_conventions()
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.check_schema_naming_conventions()
+  TO authenticated, service_role;
+
+REVOKE ALL ON FUNCTION public.enforce_jwt_tenant()
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.enforce_jwt_tenant()
+  TO authenticated, service_role;
+
+--   3. RLS-policy helpers invoked from WITH CHECK/USING expressions of
+--      authenticated policies — authenticated EXECUTE is REQUIRED for policy
+--      evaluation and must not be revoked:
+REVOKE ALL ON FUNCTION public.get_own_primary_role()
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_own_primary_role()
+  TO authenticated, service_role;
+
+REVOKE ALL ON FUNCTION public.is_current_user_admin_lite()
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.is_current_user_admin_lite()
+  TO authenticated, service_role;
+
+--   4. trigger functions. Trigger FIRING does not require the DML user to
+--      hold EXECUTE (verified live: production revokes these and every
+--      business flow works); the revoke exists to stop direct zero-arg RPC
+--      invocation through PostgREST, which can only error or no-op but must
+--      not be reachable at all:
+REVOKE ALL ON FUNCTION public.set_updated_at()
+  FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.update_updated_at()
+  FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.update_user_last_location()
+  FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.fanout_notification()
+  FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.audit_access_rule_change()
+  FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.prevent_audit_mutation()
+  FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.prevent_physical_delete()
+  FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.terminate_sessions_on_status_change()
+  FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.offline_entitlement_transition_guard()
+  FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.trg_apply_course_rating_agg()
+  FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.trg_audit_feature_flag_change()
+  FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.trg_audit_lesson_state_change()
+  FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.trg_cascade_course_soft_delete()
+  FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.trg_cascade_section_deletes()
+  FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.trg_enforce_permission_scope()
+  FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.trg_enforce_single_active_session()
+  FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.trg_enrollment_notify()
+  FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.trg_hash_chain_activity_logs()
+  FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.trg_increment_token_version_on_role_change()
+  FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.trg_invalidate_perm_cache_on_role_permissions()
+  FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.trg_invalidate_user_validity_cache()
+  FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.trg_lessons_publish_notify()
+  FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.trg_log_pii_access()
+  FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.trg_prevent_prerequisite_cycles()
+  FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.trg_rebuild_perm_cache()
+  FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.trg_refresh_enrollment_totals_stmt()
+  FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.trg_touch_feature_flag_row()
+  FROM PUBLIC, anon, authenticated;
