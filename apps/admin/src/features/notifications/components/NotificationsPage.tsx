@@ -61,7 +61,7 @@ import {
   useDeleteNotification,
   type SendNotificationInput,
 } from '@/adapters/mutations/notifications.mutations';
-import { useNotifications, type TargetAudience } from '@/adapters/queries/notifications.queries';
+import { useNotifications, type TargetAudience, type TargetingMode } from '@/adapters/queries/notifications.queries';
 import { useAuthUser } from '@/adapters/stores/auth.store';
 import { useToastStore } from '@/adapters/stores/toast.store';
 import { StatsCard, StatsCardContent } from '@/components/ui/Card';
@@ -113,7 +113,7 @@ function AudienceChip({
   audience: TargetAudience;
   permission?: string | null;
   usersCount?: number | null;
-  targetingMode?: 'audience' | 'users' | null | undefined;
+  targetingMode?: TargetingMode | null | undefined;
 }) {
   const t = useTranslations('notifications');
   const icons: Record<TargetAudience, React.ReactNode> = {
@@ -135,6 +135,19 @@ function AudienceChip({
       <Chip
         icon={<PermissionIcon sx={{ fontSize: 14 }} />}
         label={t('audience_permission', { permission })}
+        color="info"
+        size="small"
+        variant="outlined"
+        sx={{ fontWeight: 600 }}
+      />
+    );
+  }
+
+  if (targetingMode === 'course') {
+    return (
+      <Chip
+        icon={<SchoolIcon sx={{ fontSize: 14 }} />}
+        label={t('course_announcement_chip')}
         color="info"
         size="small"
         variant="outlined"

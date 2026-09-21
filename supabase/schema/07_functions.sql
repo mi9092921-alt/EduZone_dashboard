@@ -4061,7 +4061,17 @@ AS $$
     FROM public.courses c
     WHERE c.deleted_at IS NULL
       AND c.status = 'published'
-      AND c.tenant_id = coalesce(p_tenant_id, public.get_current_tenant_id())
+      -- PHASE-5 FIX (2026-09-21): p_tenant_id is honored only for tenant
+      -- admins. Previously any caller could pass an arbitrary tenant id and
+      -- enumerate every tenant's published catalog cross-tenant; non-admin
+      -- callers are now pinned to their own JWT tenant (and anon gets a
+      -- NULL tenant → empty result). Admins keep the explicit-tenant
+      -- override for cross-tenant dashboard search.
+      AND c.tenant_id = CASE
+        WHEN public.is_admin_with_session_validation()
+          THEN coalesce(p_tenant_id, public.get_current_tenant_id())
+        ELSE public.get_current_tenant_id()
+      END
       AND c.search_vector @@ pg_catalog.plainto_tsquery('simple', p_query)
     ORDER BY rank DESC, c.created_at DESC
     LIMIT least(greatest(coalesce(p_limit, 20), 1), 100)
@@ -7494,7 +7504,7 @@ BEGIN
             WHERE nt.notification_id = v_notif_id AND nt.user_id = u.id
           )
           OR (
-            coalesce(v_targeting_mode, 'audience') <> 'users'
+            coalesce(v_targeting_mode, 'audience') NOT IN ('users', 'course')
             AND NOT EXISTS (
               SELECT 1 FROM public.notification_targets nt
               WHERE nt.notification_id = v_notif_id

@@ -219,6 +219,7 @@
     "back": "Back",
     "students_tab": "Students",
     "curriculum_tab": "Curriculum",
+    "announcements_tab": "Announcements",
     "analytics_tab": "Analytics",
     "details_tab": "Course Details",
     "general_info_tab": "General Info",
@@ -632,7 +633,19 @@
     "no_new_notifications": "No new notifications",
     "view_all_notifications": "View all notifications",
     "mark_all_read": "Mark all as read",
-    "notifications": "Notifications"
+    "notifications": "Notifications",
+    "course_announcement_chip": "Course Announcement",
+    "course_announcements_title": "Course Announcements",
+    "course_announcements_desc": "Broadcast direct announcements to all enrolled students in this course.",
+    "new_announcement_title": "Send New Announcement",
+    "send_to_students": "Send to {count} Students",
+    "send_announcement_btn": "Broadcast to Students",
+    "past_announcements": "Announcement History",
+    "no_announcements": "No announcements sent yet for this course.",
+    "announcement_sent_success": "Announcement sent successfully to {count} students!",
+    "no_active_students": "No active students enrolled in this course.",
+    "announcement_title_placeholder": "e.g. Unit 2 Grammar Quiz Next Lecture...",
+    "announcement_body_placeholder": "Write your announcement details here (e.g. materials to prepare, date, instructions)..."
   },
   "audit": {
     "page_title": "Audit Logs",

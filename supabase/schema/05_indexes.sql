@@ -279,6 +279,11 @@ CREATE INDEX IF NOT EXISTS idx_notifications_tenant_region_created
   ON public.notifications(tenant_id, region_id, created_at DESC)
   WHERE deleted_at IS NULL;
 
+-- Course Announcements index
+CREATE INDEX IF NOT EXISTS idx_notifications_course_id
+  ON public.notifications(course_id, created_at DESC)
+  WHERE course_id IS NOT NULL AND deleted_at IS NULL;
+
 -- MEDIUM-03: Composite index for course discovery
 CREATE INDEX IF NOT EXISTS idx_courses_tenant_category_published
   ON public.courses(tenant_id, category, status)

@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowBack, MenuBook, People, BarChart, Settings } from '@mui/icons-material';
+import { ArrowBack, MenuBook, People, BarChart, Settings, Campaign as CampaignIcon } from '@mui/icons-material';
 import {
   Box,
   Typography,
@@ -16,6 +16,7 @@ import { useTranslations } from 'next-intl';
 import { useState, useEffect } from 'react';
 
 import { CourseAnalyticsPage } from './CourseAnalyticsPage';
+import { CourseAnnouncementsTab } from './CourseAnnouncementsTab';
 import { StudentProgressPage } from './StudentProgressPage';
 
 import { useCourseById } from '@/adapters/queries/courses.queries';
@@ -24,7 +25,7 @@ import { CourseInfoForm } from '@/features/courses/components/CourseInfoForm';
 import { CurriculumBuilder } from '@/features/courses/components/CurriculumBuilder';
 import { useRouter } from '@/i18n/routing';
 
-const COURSE_TAB_SLUGS = ['students', 'curriculum', 'analytics', 'details'] as const;
+const COURSE_TAB_SLUGS = ['students', 'curriculum', 'announcements', 'analytics', 'details'] as const;
 
 /** Maps a ?tab= slug to a tab index; unknown/missing slugs fall back to 0. */
 function courseTabIndexFromSlug(slug: string | null): number {
@@ -175,6 +176,11 @@ export function TeacherCourseDetailPage() {
             label={t('curriculum_tab')}
           />
           <Tab
+            icon={<CampaignIcon sx={{ fontSize: 20 }} />}
+            iconPosition="start"
+            label={t('announcements_tab')}
+          />
+          <Tab
             icon={<BarChart sx={{ fontSize: 20 }} />}
             iconPosition="start"
             label={t('analytics_tab')}
@@ -218,11 +224,18 @@ export function TeacherCourseDetailPage() {
         {activeTab === 2 && (
           <Fade in timeout={400}>
             <Box>
-              <CourseAnalyticsPage />
+              <CourseAnnouncementsTab courseId={courseId} />
             </Box>
           </Fade>
         )}
         {activeTab === 3 && (
+          <Fade in timeout={400}>
+            <Box>
+              <CourseAnalyticsPage />
+            </Box>
+          </Fade>
+        )}
+        {activeTab === 4 && (
           <Fade in timeout={400}>
             <Box sx={{ maxWidth: 800, width: '100%', minWidth: 0 }}>
               <CourseInfoForm course={course!} hideTeacherSelect={true} />

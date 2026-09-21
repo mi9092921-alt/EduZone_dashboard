@@ -20,8 +20,9 @@ import {
   DeleteNotificationUseCase,
   ListNotificationsUseCase,
 } from '@/application/use-cases/notifications/manage-notifications.use-case';
+import { SendCourseAnnouncementUseCase } from '@/application/use-cases/notifications/send-course-announcement.use-case';
 import { SendNotificationUseCase } from '@/application/use-cases/notifications/send-notification.use-case';
-import { toClientMessage } from '@/domain/errors';
+import { toClientMessage, ValidationError } from '@/domain/errors';
 import type { UpsertAccessRuleInput } from '@/domain/schemas/settings.schema';
 import type { CourseWithStats } from '@/domain/types/analytics.types';
 import type { ActivityLogQueueEntry } from '@/domain/types/audit.types';
@@ -35,6 +36,7 @@ import type {
 import type { Job, JobFilters, JobStatusCounts } from '@/domain/types/job.types';
 import type {
   MyNotificationsResult,
+  Notification,
   NotificationListResult,
   SendNotificationInput,
   TargetAudience,
@@ -320,6 +322,41 @@ export async function sendNotificationAction(input: SendNotificationInput): Prom
   return new SendNotificationUseCase(makeNotificationAdminRepository(), makeAuditLogger()).execute(
     ctx,
     input,
+  );
+}
+
+export async function sendCourseAnnouncementAction(input: {
+  courseId: string;
+  title: string;
+  body: string;
+}): Promise<{ notificationId: string; recipientCount: number }> {
+  const ctx = await requirePermission([
+    'course_announcements.send',
+    'notifications.send',
+    'courses.write',
+  ]);
+  return new SendCourseAnnouncementUseCase(
+    makeNotificationAdminRepository(),
+    makeAuditLogger(),
+  ).execute(ctx, input);
+}
+
+export async function getCourseAnnouncementsAction(
+  courseId: string,
+  page = 1,
+  pageSize = 10,
+): Promise<{ data: Notification[]; count: number }> {
+  const ctx = await requirePermission([
+    'course_announcements.send',
+    'notifications.send',
+    'courses.read',
+  ]);
+  if (!ctx.tenantId) throw new ValidationError('Tenant context is missing');
+  return makeNotificationAdminRepository().listCourseAnnouncements(
+    courseId,
+    ctx.tenantId,
+    page,
+    pageSize,
   );
 }
 

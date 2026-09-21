@@ -216,27 +216,24 @@ serve(async (req) => {
     //
     // Section 12/13 follow-up: callers that know which lesson they're
     // acting on (the downloads subsystem: initial format lookup, resume
-    // link-refresh, and mid-download link-refresh) now pass `lesson_id`
-    // below. When present, this function re-runs the exact same
-    // authorization RPC get-lesson-content/index.ts uses
-    // (get_lesson_content, audited, enrollment/preview/teacher/admin-aware)
-    // and then discards the client-supplied `url` entirely in favor of the
-    // URL the lesson record itself points to — an authenticated user can no
-    // longer resolve formats for a lesson they don't have access to, even
-    // if they already know its YouTube URL by other means.
+    // link-refresh, and mid-download link-refresh) pass `lesson_id`
+    // below. This function re-runs the exact same authorization RPC
+    // get-lesson-content/index.ts uses (get_lesson_content, audited,
+    // enrollment/preview/teacher/admin-aware) and then resolves the video
+    // URL from the lesson record itself instead of trusting any
+    // client-supplied `url` — an authenticated user cannot resolve formats
+    // for a lesson they don't have access to, even if they already know
+    // its YouTube URL by other means.
     //
     // Verified 2026-08-24: Player4RemoteDataSource (streaming playback)
     // also forwards `lesson_id` now — its sole caller, Player4Wrapper, holds
     // `lessonId` as a required (non-nullable) constructor field and sets
     // player4PendingLessonIdProvider from it before every
     // player4VideoInfoProvider read, so every production code path already
-    // reaches this branch lesson-scoped. `lesson_id` stays an optional
-    // parameter at the API/DTO level (defensive contract, not a live gap):
-    // it lets this function keep serving a request safely with the
-    // authenticated+rate-limited-only gate below if some future caller
-    // genuinely has no lesson context yet, without a hard failure. Do not
-    // reinterpret "optional field" as "unauthorized path in current use" —
-    // re-check both call sites above before loosening this comment further.
+    // reaches this branch lesson-scoped. PHASE-5 FIX (2026-09-21):
+    // `lesson_id` is REQUIRED — the authenticated+rate-limited-only
+    // fallback (resolving an arbitrary caller-supplied url) has been
+    // removed; see the mandatory-lesson_id gate below.
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return jsonBody(req, { error: 'Missing Authorization header' }, 401);
@@ -294,28 +291,37 @@ serve(async (req) => {
       const text = await req.text();
       if (text) {
         const params = new URLSearchParams(text);
-        body.url = params.get('url') ?? undefined;
         body.lesson_id = params.get('lesson_id') ?? undefined;
       }
     }
 
-    let videoUrl: string | undefined = typeof body?.url === 'string' ? body.url : undefined;
+    let videoUrl: string | undefined;
     const lessonId: string | undefined =
       typeof body?.lesson_id === 'string' && body.lesson_id.trim().length > 0
         ? body.lesson_id.trim()
         : undefined;
 
-    // ── Lesson-scoped authorization ─────────────────────────────────────────
-    // When the caller identifies which lesson this request is for, verify
-    // access to *that lesson* the same way get-lesson-content/index.ts does
-    // (get_lesson_content is SECURITY DEFINER, enrollment/preview/teacher/
-    // admin-aware, and audit-logs the decision), then resolve the video URL
-    // from the lesson record itself rather than trusting the client-supplied
-    // `url` — this is what actually closes the "authenticated but not
-    // entitled to this specific lesson" gap described above. A denial here
-    // is intentionally reported the same way get-lesson-content reports it
-    // (403/404, no internal detail leaked).
-    if (lessonId) {
+    // ── Lesson-scoped authorization (mandatory) ────────────────────────────
+    // PHASE-5 FIX (2026-09-21): lesson_id is now REQUIRED. The previous
+    // fallback — resolving whatever `url` the caller posted — let any
+    // authenticated user run arbitrary YouTube URLs through the paid
+    // external extraction API (rate-limited, but with zero entitlement
+    // coupling). Every production caller (Player4RemoteDataSource,
+    // lesson_downloads_gateway_impl, download_link_refresher,
+    // sections_accordion) already forwards lesson_id (re-verified
+    // 2026-09-21), so the fallback path had no legitimate user left; it is
+    // removed entirely rather than left as an unauthenticated-entitlement
+    // door. Authorization now ALWAYS re-runs the same RPC get-lesson-content
+    // uses (get_lesson_content — audited, enrollment/preview/teacher/admin-
+    // aware) and the video URL is ALWAYS resolved from the lesson record
+    // itself; the client-supplied `url` is not read at all. A missing or
+    // malformed lesson_id is a 400; a lesson the caller may not access is
+    // the same 403/404 get-lesson-content reports (no internal detail
+    // leaked).
+    if (!lessonId) {
+      return jsonBody(req, { error: 'lesson_id is required' }, 400);
+    }
+    {
       const { data: lessonContent, error: accessError } = await authClient.rpc(
         'get_lesson_content',
         { p_lesson_id: lessonId },
@@ -341,16 +347,11 @@ serve(async (req) => {
         return jsonBody(req, { error: 'Access denied' }, 403);
       }
 
-      // Server-authoritative from here on: use the lesson's own stored
-      // reference, never the client-supplied url, once lesson_id has been
-      // verified against it.
+      // Server-authoritative: use the lesson's own stored reference, never
+      // a client-supplied url.
       videoUrl = videoPath.startsWith('http')
         ? videoPath
         : `https://www.youtube.com/watch?v=${videoPath}`;
-    }
-
-    if (!videoUrl) {
-      return jsonBody(req, { error: 'Video URL is required' }, 400);
     }
 
     const urlHash = await hashUrl(videoUrl);

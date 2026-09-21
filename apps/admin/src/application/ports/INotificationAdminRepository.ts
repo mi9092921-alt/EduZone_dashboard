@@ -1,5 +1,6 @@
 import type {
   MyNotificationsResult,
+  Notification,
   NotificationListResult,
   SendNotificationInput,
   TargetAudience,
@@ -64,6 +65,28 @@ export interface INotificationAdminRepository {
   /** Soft-deletes a broadcast notification, scoped to the tenant when known. */
   softDelete(id: string, tenantId: string | null): Promise<void>;
 
+  // ── Course announcements ────────────────────────────────────────
+  /** Checks whether a teacher owns a specific course within the given tenant. */
+  verifyTeacherCourseOwnership(
+    courseId: string,
+    teacherId: string,
+    tenantId: string,
+  ): Promise<{ ownsCourse: boolean }>;
+
+  /** Resolves active enrolled student user IDs for a given course. */
+  resolveEnrolledStudentIds(
+    courseId: string,
+    tenantId: string,
+  ): Promise<string[]>;
+
+  /** Paginated list of course announcements for a specific course. */
+  listCourseAnnouncements(
+    courseId: string,
+    tenantId: string,
+    page: number,
+    pageSize: number,
+  ): Promise<{ data: Notification[]; count: number }>;
+
   // ── Per-user inbox ──────────────────────────────────────────────
   /** Lists the user's inbox rows mapped to the domain shape, newest first. */
   listMine(userId: string, limit: number, unreadOnly: boolean): Promise<UserNotification[]>;
@@ -81,6 +104,7 @@ export interface INotificationAdminRepository {
 /** Type re-export convenience for use cases */
 export type {
   MyNotificationsResult,
+  Notification,
   NotificationListResult,
   SendNotificationInput,
   TargetAudience,

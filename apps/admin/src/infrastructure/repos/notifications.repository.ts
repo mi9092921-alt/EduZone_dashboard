@@ -8,6 +8,7 @@ import type {
 } from '@/application/ports/INotificationAdminRepository';
 import { mapDbError } from '@/domain/errors';
 import type {
+  Notification,
   NotificationListResult,
   SendNotificationInput,
   TargetAudience,
@@ -123,6 +124,14 @@ export function makeNotificationAdminRepository(
       tenantId: string,
       createdBy: string,
     ): Promise<string> {
+      const mode =
+        input.targeting_mode ??
+        (input.course_id
+          ? 'course'
+          : input.target_user_ids?.length
+            ? 'users'
+            : 'audience');
+
       const { data: notification, error: notificationError } = await admin
         .from('notifications')
         .insert({
@@ -130,8 +139,9 @@ export function makeNotificationAdminRepository(
           title: input.title.trim(),
           body: input.body.trim(),
           target_audience: input.target_audience ?? 'all',
-          targeting_mode: input.target_user_ids?.length ? 'users' : 'audience',
+          targeting_mode: mode,
           target_permission: input.target_permission || null,
+          course_id: input.course_id ?? null,
           created_by: createdBy,
         })
         .select('id')
@@ -284,6 +294,58 @@ export function makeNotificationAdminRepository(
 
       const { error } = await query;
       if (error) throw mapDbError(error, 'notifications.repository.ts');
+    },
+
+    async verifyTeacherCourseOwnership(
+      courseId: string,
+      teacherId: string,
+      tenantId: string,
+    ): Promise<{ ownsCourse: boolean }> {
+      const { data, error } = await admin
+        .from('courses')
+        .select('id')
+        .eq('id', courseId)
+        .eq('teacher_id', teacherId)
+        .eq('tenant_id', tenantId)
+        .is('deleted_at', null)
+        .maybeSingle();
+      if (error) throw mapDbError(error, 'notifications.repository.ts');
+      return { ownsCourse: data !== null };
+    },
+
+    async resolveEnrolledStudentIds(
+      courseId: string,
+      tenantId: string,
+    ): Promise<string[]> {
+      const { data, error } = await admin
+        .from('enrollments')
+        .select('user_id')
+        .eq('course_id', courseId)
+        .eq('tenant_id', tenantId)
+        .eq('status', 'active')
+        .is('deleted_at', null);
+      if (error) throw mapDbError(error, 'notifications.repository.ts');
+      return Array.from(new Set((data ?? []).map((r) => r.user_id as string)));
+    },
+
+    async listCourseAnnouncements(
+      courseId: string,
+      tenantId: string,
+      page: number,
+      pageSize: number,
+    ): Promise<{ data: Notification[]; count: number }> {
+      const from = (page - 1) * pageSize;
+      const { data, error, count } = await admin
+        .from('notifications')
+        .select('*', { count: 'exact' })
+        .eq('course_id', courseId)
+        .eq('tenant_id', tenantId)
+        .eq('targeting_mode', 'course')
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false })
+        .range(from, from + pageSize - 1);
+      if (error) throw mapDbError(error, 'notifications.repository.ts');
+      return { data: (data ?? []) as Notification[], count: count ?? 0 };
     },
 
     async listMine(

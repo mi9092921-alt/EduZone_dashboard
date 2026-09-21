@@ -2260,7 +2260,105 @@ BEGIN
   );
 END $$;
 
--- Display Results (includes Checks 27-44 above)
+-- Check 45 (RPC EXECUTE least privilege, 2026-09-21): the Phase 5 sweep in
+-- 10_permissions.sql locked soft_delete_user to service_role and revoked
+-- anon/PUBLIC EXECUTE from every body-guarded SECURITY DEFINER function
+-- that predated the default-privileges REVOKE. Fail if anon can EXECUTE any
+-- of them (a leak here means either a new unguarded RPC was added without
+-- grant management, or the sweep statements no longer match a signature).
+DO $$
+DECLARE
+  v_leaks int;
+BEGIN
+  SELECT count(*) INTO v_leaks
+  FROM (
+    VALUES ('public.soft_delete_user(uuid,uuid)'),
+           ('public.get_course_outline(uuid)'),
+           ('public.get_course_lessons_with_access(uuid)'),
+           ('public.get_my_enrolled_courses()'),
+           ('public.get_my_recent_courses()'),
+           ('public.get_my_resume_lesson()'),
+           ('public.get_course_progress_summary(uuid)'),
+           ('public.search_courses_ranked(text,uuid,integer)'),
+           ('public.has_course_access(uuid,uuid)'),
+           ('public.has_course_access(uuid)'),
+           ('public.user_has_permission(uuid,text,uuid)'),
+           ('public.is_user_valid_cached(uuid,uuid)'),
+           ('public.get_auth_user_tenant_id()'),
+           ('public._get_tenant_fallback()'),
+           ('public.increment_token_version(uuid)'),
+           ('public.get_setting(text)'),
+           ('public.set_setting(text,jsonb)'),
+           ('public.get_valid_constant_values(text)'),
+           ('public.send_notification(text,text,text,text,uuid[])'),
+           ('public.send_notification(text,text,text,uuid[])'),
+           ('public.delete_notification(uuid)'),
+           ('public.enroll_student(uuid,uuid,timestamptz)'),
+           ('public.revoke_enrollment(uuid,uuid,text)'),
+           ('public.issue_warning(uuid,text,integer,text)'),
+           ('public.reorder_course_sections(uuid,uuid[])'),
+           ('public.reorder_section_lessons(uuid,uuid[])'),
+           ('public.get_dashboard_stats(uuid)'),
+           ('public.get_users_paginated(text,uuid,text,text,text,integer,timestamptz,timestamptz,integer,integer,text)'),
+           ('public.get_user_stats_summary(uuid,text)'),
+           ('public.get_daily_activity(uuid,integer,text,text)'),
+           ('public.get_student_progress_timeline(uuid,uuid)'),
+           ('public.get_system_health()'),
+           ('public.verify_audit_chain(bigint,int)'),
+           ('public.flush_activity_logs(integer)'),
+           ('public.release_stale_job_locks()'),
+           ('public.admin_get_jobs(int,int,text,text,timestamptz)'),
+           ('public.admin_get_job_counts()'),
+           ('public.admin_get_job(uuid)'),
+           ('public.admin_retry_job(uuid)'),
+           ('public.admin_cancel_job(uuid)'),
+           ('public.admin_enqueue_bulk_job(text,jsonb,uuid)'),
+           ('public.normalize_email(text)')
+  ) AS fns(sig)
+  WHERE has_function_privilege('anon', sig::regprocedure, 'EXECUTE');
+
+  INSERT INTO validation_results VALUES (
+    'RPC EXECUTE least privilege (anon)',
+    CASE WHEN v_leaks = 0 THEN 'PASS' ELSE 'FAIL' END,
+    format(
+      '%s public function(s) still EXECUTE-able by anon. ' ||
+      'Every SECURITY DEFINER RPC must carry an explicit REVOKE/GRANT pair ' ||
+      'in 10_permissions.sql (default PUBLIC EXECUTE is a launch blocker).',
+      v_leaks
+    )
+  );
+END $$;
+
+-- Check 46 (user_progress entitlement gate, 2026-09-21): the direct
+-- PostgREST write path on user_progress must be entitlement-gated, not
+-- merely owner-scoped. Verify the hardened WITH CHECK branches exist on
+-- the two policies (a drift back to ownership-only scoping re-opens
+-- fabricated-progress writes for non-entitled courses).
+DO $$
+DECLARE
+  v_missing int;
+BEGIN
+  -- Expect BOTH policies to exist AND carry the has_course_access branch;
+  -- 2 minus the number that do = number of gaps (missing policy counts).
+  SELECT 2 - count(*) INTO v_missing
+  FROM pg_policy p
+  WHERE p.polrelid = 'public.user_progress'::regclass
+    AND p.polname IN ('user_progress_insert_merged', 'user_progress_update_merged')
+    AND coalesce(pg_get_expr(p.polwithcheck, p.polrelid), '') LIKE '%has_course_access%';
+
+  INSERT INTO validation_results VALUES (
+    'user_progress entitlement gate',
+    CASE WHEN v_missing = 0 THEN 'PASS' ELSE 'FAIL' END,
+    format(
+      '%s user_progress INSERT/UPDATE polic(y/ies) missing the ' ||
+      'has_course_access entitlement branch — direct progress writes are ' ||
+      'no longer gated on course entitlement.',
+      v_missing
+    )
+  );
+END $$;
+
+-- Display Results (includes Checks 27-46 above)
 SELECT * FROM validation_results ORDER BY check_name;
 
 -- Summary

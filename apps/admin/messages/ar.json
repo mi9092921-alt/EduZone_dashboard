@@ -219,6 +219,7 @@
     "back": "رجوع",
     "students_tab": "الطلاب",
     "curriculum_tab": "المنهج الدراسي",
+    "announcements_tab": "الإعلانات",
     "analytics_tab": "التحليلات",
     "details_tab": "تفاصيل الدورة",
     "general_info_tab": "المعلومات العامة",
@@ -632,7 +633,19 @@
     "no_new_notifications": "لا توجد تنبيهات جديدة",
     "view_all_notifications": "عرض جميع التنبيهات",
     "mark_all_read": "تحديد الكل كمقروء",
-    "notifications": "التنبيهات"
+    "notifications": "التنبيهات",
+    "course_announcement_chip": "إعلان كورس",
+    "course_announcements_title": "إعلانات الكورس",
+    "course_announcements_desc": "إرسال إعلانات وتنبيهات مباشرة لجميع الطلاب المشتركين في هذا الكورس.",
+    "new_announcement_title": "إرسال إعلان جديد للطلاب",
+    "send_to_students": "إرسال إلى {count} طالب",
+    "send_announcement_btn": "إرسال الإعلان للطلاب",
+    "past_announcements": "سجل الإعلانات السابقة",
+    "no_announcements": "لم يتم إرسال أي إعلانات لهذا الكورس حتى الآن.",
+    "announcement_sent_success": "تم إرسال الإعلان بنجاح إلى {count} طالب!",
+    "no_active_students": "لا يوجد طلاب مشتركون بشكل فعّال في هذا الكورس حالياً.",
+    "announcement_title_placeholder": "مثال: امتحان سريع في Grammar الحصة القادمة...",
+    "announcement_body_placeholder": "اكتب تفاصيل الإعلان هنا (موعد الامتحان، الأجزاء المطلوبة، التعليمات)..."
   },
   "audit": {
     "page_title": "سجلات النشاط",

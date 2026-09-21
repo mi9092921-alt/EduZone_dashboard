@@ -105,7 +105,8 @@ VALUES
   ('feature_flags.tenant_manage', 'features', 'tenant_manage', 'tenant', now()),
   ('tenants.manage', 'tenants', 'manage', 'global', now()),
   ('notifications.send', 'notifications', 'send', 'tenant', now()),
-  ('notifications.delete', 'notifications', 'delete', 'tenant', now())
+  ('notifications.delete', 'notifications', 'delete', 'tenant', now()),
+  ('course_announcements.send', 'notifications', 'send', 'tenant', now())
 ON CONFLICT (name) DO NOTHING;
 
 -- Super Admin gets ALL permissions
@@ -158,7 +159,8 @@ WHERE r.tenant_id = '00000000-0000-0000-0000-000000000001'
   AND p.name IN (
     'courses.read', 'courses.write', 'courses.manage', 
     'users.read', 'warnings.write', 'reports.read',
-    'notifications.send', 'notifications.delete'
+    'notifications.send', 'notifications.delete',
+    'course_announcements.send'
   )
 ON CONFLICT DO NOTHING;
 

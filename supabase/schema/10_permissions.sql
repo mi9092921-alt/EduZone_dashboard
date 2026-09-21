@@ -982,3 +982,255 @@ GRANT SELECT ON public.audit_chain_state TO authenticated;
 -- this file; anon stays revoked.
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.access_rules      TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_access_rules TO authenticated;
+
+-- ═════════════════════════════════════════════════════════════════════════════
+-- SECURITY FIX (2026-09-21) — Phase 5 authorization sweep (student app audit)
+-- ═════════════════════════════════════════════════════════════════════════════
+-- Two gaps found by the Phase 5 (Authorization & Access Control) audit, same
+-- root cause class as the DB-1..DB-5 sweep above: functions defined in
+-- 07_functions.sql BEFORE the ALTER DEFAULT PRIVILEGES REVOKE retain
+-- PostgreSQL's default `EXECUTE TO PUBLIC` and never received an explicit
+-- REVOKE/GRANT pair in this file.
+--
+-- PHASE5-1 (BLOCKER): soft_delete_user(uuid, uuid)
+--   SECURITY DEFINER, NO body guard, NO grant management, and ZERO callers
+--   anywhere in apps/admin/, supabase/functions/, or the student app
+--   (grep-verified 2026-09-21). It soft-deletes a user AND cascades
+--   enrollment revocation, progress deletion, role deletion, and session
+--   revocation — anonymously invocable via POST /rest/v1/rpc/soft_delete_user
+--   against ANY (p_user_id, p_tenant_id) pair. Locked to service_role only
+--   (DB-1/DB-2 pattern: no legitimate client caller exists; when GDPR
+--   deletion is eventually wired up, it must go through a service-role or
+--   body-guarded path).
+REVOKE ALL ON FUNCTION public.soft_delete_user(uuid, uuid)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.soft_delete_user(uuid, uuid)
+  TO service_role;
+
+-- PHASE5-2 (MEDIUM): anon-reachability sweep for body-guarded SECURITY
+-- DEFINER functions that still carried default PUBLIC EXECUTE.
+-- Every function below fails closed for anon via its own body guard (or is
+-- a self-scoped helper), so this is least-privilege hardening rather than a
+-- live exploit — but anonymous reachability contradicts the file's
+-- least-privilege model, and two of them (user_has_permission,
+-- has_course_access) double as arbitrary-argument oracles for a caller who
+-- knows their signatures. Each is re-granted to authenticated + service_role
+-- so every legitimate caller (dashboard browser client, edge functions,
+-- RLS policy evaluation of has_course_access/user_has_permission inside
+-- policies applied to authenticated sessions) keeps working; only PUBLIC
+-- and anon lose EXECUTE. Signatures verified against 07_functions.sql.
+--
+--   Course/lesson/progress readers (students fail closed inside the body):
+REVOKE EXECUTE ON FUNCTION public.get_course_outline(uuid)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_course_outline(uuid)
+  TO authenticated, service_role;
+
+REVOKE EXECUTE ON FUNCTION public.get_course_lessons_with_access(uuid)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_course_lessons_with_access(uuid)
+  TO authenticated, service_role;
+
+REVOKE EXECUTE ON FUNCTION public.get_my_enrolled_courses()
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_my_enrolled_courses()
+  TO authenticated, service_role;
+
+REVOKE EXECUTE ON FUNCTION public.get_my_recent_courses()
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_my_recent_courses()
+  TO authenticated, service_role;
+
+REVOKE EXECUTE ON FUNCTION public.get_my_resume_lesson()
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_my_resume_lesson()
+  TO authenticated, service_role;
+
+REVOKE EXECUTE ON FUNCTION public.get_course_progress_summary(uuid)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_course_progress_summary(uuid)
+  TO authenticated, service_role;
+
+REVOKE EXECUTE ON FUNCTION public.search_courses_ranked(text, uuid, integer)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.search_courses_ranked(text, uuid, integer)
+  TO authenticated, service_role;
+
+REVOKE EXECUTE ON FUNCTION public.has_course_access(uuid, uuid)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.has_course_access(uuid, uuid)
+  TO authenticated, service_role;
+
+REVOKE EXECUTE ON FUNCTION public.has_course_access(uuid)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.has_course_access(uuid)
+  TO authenticated, service_role;
+
+--   Permission/identity helpers (needed by RLS policy evaluation for
+--   authenticated sessions; anon evaluation is now impossible by policy
+--   CASE-wrapping — see settings_select in 09_rls.sql):
+REVOKE EXECUTE ON FUNCTION public.user_has_permission(uuid, text, uuid)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.user_has_permission(uuid, text, uuid)
+  TO authenticated, service_role;
+
+REVOKE EXECUTE ON FUNCTION public.is_user_valid_cached(uuid, uuid)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.is_user_valid_cached(uuid, uuid)
+  TO authenticated, service_role;
+
+REVOKE EXECUTE ON FUNCTION public.get_auth_user_tenant_id()
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_auth_user_tenant_id()
+  TO authenticated, service_role;
+
+REVOKE EXECUTE ON FUNCTION public._get_tenant_fallback()
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public._get_tenant_fallback()
+  TO authenticated, service_role;
+
+REVOKE EXECUTE ON FUNCTION public.increment_token_version(uuid)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.increment_token_version(uuid)
+  TO authenticated, service_role;
+
+--   Settings:
+REVOKE EXECUTE ON FUNCTION public.get_setting(text)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_setting(text)
+  TO authenticated, service_role;
+
+REVOKE EXECUTE ON FUNCTION public.set_setting(text, jsonb)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.set_setting(text, jsonb)
+  TO authenticated, service_role;
+
+REVOKE EXECUTE ON FUNCTION public.get_valid_constant_values(text)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_valid_constant_values(text)
+  TO authenticated, service_role;
+
+--   Notifications:
+REVOKE EXECUTE ON FUNCTION public.send_notification(text, text, text, text, uuid[])
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.send_notification(text, text, text, text, uuid[])
+  TO authenticated, service_role;
+
+REVOKE EXECUTE ON FUNCTION public.send_notification(text, text, text, uuid[])
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.send_notification(text, text, text, uuid[])
+  TO authenticated, service_role;
+
+REVOKE EXECUTE ON FUNCTION public.delete_notification(uuid)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.delete_notification(uuid)
+  TO authenticated, service_role;
+
+--   Admin/teacher enrollment & moderation (body-guarded):
+REVOKE EXECUTE ON FUNCTION public.enroll_student(uuid, uuid, timestamptz)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.enroll_student(uuid, uuid, timestamptz)
+  TO authenticated, service_role;
+
+REVOKE EXECUTE ON FUNCTION public.revoke_enrollment(uuid, uuid, text)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.revoke_enrollment(uuid, uuid, text)
+  TO authenticated, service_role;
+
+REVOKE EXECUTE ON FUNCTION public.issue_warning(uuid, text, integer, text)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.issue_warning(uuid, text, integer, text)
+  TO authenticated, service_role;
+
+REVOKE EXECUTE ON FUNCTION public.reorder_course_sections(uuid, uuid[])
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.reorder_course_sections(uuid, uuid[])
+  TO authenticated, service_role;
+
+REVOKE EXECUTE ON FUNCTION public.reorder_section_lessons(uuid, uuid[])
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.reorder_section_lessons(uuid, uuid[])
+  TO authenticated, service_role;
+
+--   Admin analytics/users/jobs (body-guarded; dashboard browser client is
+--   `authenticated`, so authenticated EXECUTE must stay):
+REVOKE EXECUTE ON FUNCTION public.get_dashboard_stats(uuid)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_dashboard_stats(uuid)
+  TO authenticated, service_role;
+
+REVOKE EXECUTE ON FUNCTION public.get_users_paginated(text, uuid, text, text, text, integer, timestamptz, timestamptz, integer, integer, text)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_users_paginated(text, uuid, text, text, text, integer, timestamptz, timestamptz, integer, integer, text)
+  TO authenticated, service_role;
+
+REVOKE EXECUTE ON FUNCTION public.get_user_stats_summary(uuid, text)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_user_stats_summary(uuid, text)
+  TO authenticated, service_role;
+
+REVOKE EXECUTE ON FUNCTION public.get_daily_activity(uuid, integer, text, text)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_daily_activity(uuid, integer, text, text)
+  TO authenticated, service_role;
+
+REVOKE EXECUTE ON FUNCTION public.get_student_progress_timeline(uuid, uuid)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_student_progress_timeline(uuid, uuid)
+  TO authenticated, service_role;
+
+REVOKE EXECUTE ON FUNCTION public.get_system_health()
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_system_health()
+  TO authenticated, service_role;
+
+REVOKE EXECUTE ON FUNCTION public.verify_audit_chain(bigint, int)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.verify_audit_chain(bigint, int)
+  TO authenticated, service_role;
+
+REVOKE EXECUTE ON FUNCTION public.flush_activity_logs(integer)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.flush_activity_logs(integer)
+  TO authenticated, service_role;
+
+REVOKE EXECUTE ON FUNCTION public.release_stale_job_locks()
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.release_stale_job_locks()
+  TO authenticated, service_role;
+
+REVOKE EXECUTE ON FUNCTION public.admin_get_jobs(int, int, text, text, timestamptz)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.admin_get_jobs(int, int, text, text, timestamptz)
+  TO authenticated, service_role;
+
+REVOKE EXECUTE ON FUNCTION public.admin_get_job_counts()
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.admin_get_job_counts()
+  TO authenticated, service_role;
+
+REVOKE EXECUTE ON FUNCTION public.admin_get_job(uuid)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.admin_get_job(uuid)
+  TO authenticated, service_role;
+
+REVOKE EXECUTE ON FUNCTION public.admin_retry_job(uuid)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.admin_retry_job(uuid)
+  TO authenticated, service_role;
+
+REVOKE EXECUTE ON FUNCTION public.admin_cancel_job(uuid)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.admin_cancel_job(uuid)
+  TO authenticated, service_role;
+
+REVOKE EXECUTE ON FUNCTION public.admin_enqueue_bulk_job(text, jsonb, uuid)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.admin_enqueue_bulk_job(text, jsonb, uuid)
+  TO authenticated, service_role;
+
+--   PII normalization helper (body-scoped, no direct client caller):
+REVOKE EXECUTE ON FUNCTION public.normalize_email(text)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.normalize_email(text)
+  TO authenticated, service_role;
