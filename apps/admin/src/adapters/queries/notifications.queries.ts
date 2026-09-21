@@ -14,8 +14,8 @@ import { useEffect, useRef } from 'react';
 
 import { queryKeys } from './keys';
 
-import type { TargetAudience } from '@/domain/types/notification.types';
 import { getCourseAnnouncementsAction } from '@/adapters/actions/admin.actions';
+import type { TargetAudience } from '@/domain/types/notification.types';
 import {
   getNotifications,
   getMyNotifications,

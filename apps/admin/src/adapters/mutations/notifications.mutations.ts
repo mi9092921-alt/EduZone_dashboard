@@ -2,8 +2,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { queryKeys } from '../queries/keys';
 
-import type { SendNotificationInput, UserNotification } from '@/domain/types/notification.types';
 import { sendCourseAnnouncementAction } from '@/adapters/actions/admin.actions';
+import type { SendNotificationInput, UserNotification } from '@/domain/types/notification.types';
 import {
   sendNotification,
   deleteNotification,

@@ -6,7 +6,6 @@ import {
   Send as SendIcon,
   PeopleAlt as PeopleIcon,
   History as HistoryIcon,
-  CheckCircle as CheckCircleIcon,
   AccessTime as AccessTimeIcon,
   School as SchoolIcon,
 } from '@mui/icons-material';
@@ -22,7 +21,6 @@ import {
   CircularProgress,
   Skeleton,
   Fade,
-  Divider,
   Pagination,
   Alert,
 } from '@mui/material';
