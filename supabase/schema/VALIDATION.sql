@@ -2386,6 +2386,7 @@ BEGIN
            ('public.reset_user_device(uuid)'),
            ('public.increment_warning_count(uuid,uuid)'),
            ('public.rebuild_permission_cache(uuid,uuid)'),
+           ('public.get_course_stats(uuid,uuid,text)'),
            ('public.get_my_students(uuid)'),
            ('public.log_app_open_location(double precision,double precision,double precision,text,uuid,jsonb)'),
            ('public.notify_enrolled_students_for_course(uuid,text,text)'),

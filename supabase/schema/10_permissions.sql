@@ -1318,6 +1318,17 @@ GRANT EXECUTE ON FUNCTION public.rebuild_permission_cache(uuid, uuid)
 -- default-args overload during Phase 6 — see 07_functions.sql. Its grant
 -- pair was removed with it.)
 
+-- PHASE 6.5 FIX (live-verification catch): the surviving 3-arg invoker
+-- variant is also defined BEFORE the default-privileges REVOKE and was
+-- missed by the Phase 6 sweep — production's live anon-EXECUTE listing
+-- exposed it (body-guarded by reports.read, so fail-closed, but reachable
+-- grant surface under this file's model). Same pair as the other
+-- body-guarded helpers.
+REVOKE ALL ON FUNCTION public.get_course_stats(uuid, uuid, text)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_course_stats(uuid, uuid, text)
+  TO authenticated, service_role;
+
 REVOKE ALL ON FUNCTION public.get_my_students(uuid)
   FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.get_my_students(uuid)
