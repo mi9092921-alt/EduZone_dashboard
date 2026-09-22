@@ -502,7 +502,9 @@ BEGIN
     ('worker_control_user_account'),
     ('logout_current_user'),
     ('reset_user_device'),
-    ('worker_reset_user_device')
+    ('worker_reset_user_device'),
+    ('terminate_user_sessions'),
+    ('worker_terminate_user_sessions')
   ) AS expected(routine_name)
   WHERE NOT EXISTS (
     SELECT 1
@@ -2383,6 +2385,7 @@ BEGIN
            ('public.worker_fail_bulk_job(uuid,text)'),
            ('public.worker_issue_warning(uuid,uuid,text,integer)'),
            ('public.worker_reset_user_device(uuid,uuid)'),
+           ('public.worker_terminate_user_sessions(uuid,uuid,text)'),
            ('public.reset_user_device(uuid)'),
            ('public.increment_warning_count(uuid,uuid)'),
            ('public.rebuild_permission_cache(uuid,uuid)'),

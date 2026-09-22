@@ -3001,6 +3001,23 @@ BEGIN
     AND tenant_id = v_actor_tenant_id;
 
   GET DIAGNOSTICS v_count = ROW_COUNT;
+
+  -- FORCE-SIGN-OUT FIX (same as worker_terminate_user_sessions below):
+  -- "terminate sessions" must actually revoke — token_version bump (kills
+  -- the current JWT for the app's Realtime/poll detection) plus auth-
+  -- session deletion (kills the refresh token). Currently reached only
+  -- via service_role from control_user_account, which already performs
+  -- both steps itself, so this is a self-contained safety net if any new
+  -- caller routes here directly.
+  UPDATE public.users
+  SET token_version = token_version + 1,
+      updated_at = pg_catalog.now()
+  WHERE id = p_user_id
+    AND tenant_id = v_actor_tenant_id
+    AND deleted_at IS NULL;
+
+  PERFORM private.revoke_auth_sessions(p_user_id);
+
   RETURN v_count;
 END;
 $$;
@@ -5268,6 +5285,26 @@ BEGIN
     AND tenant_id = v_tenant_id;
 
   GET DIAGNOSTICS v_count = ROW_COUNT;
+
+  -- FORCE-SIGN-OUT FIX: closing the telemetry rows above only hides the
+  -- sessions from the admin UI — the student app kept its valid JWT and
+  -- stayed signed in (public.sessions.is_active is read by nothing in the
+  -- auth path; validate_user_session() checks users.token_version and
+  -- auth.sessions). "Force Sign Out" must cross the same AUTH-REV-02
+  -- boundary as reset_user_device / control_user_account: bump
+  -- token_version (the app's Realtime users-table watcher and
+  -- check_student_app_access poll both treat a bump as forced logout) and
+  -- delete the Supabase Auth sessions (otherwise a still-live refresh
+  -- token mints a fresh, version-matching JWT and the user returns).
+  UPDATE public.users
+  SET token_version = token_version + 1,
+      updated_at = pg_catalog.now()
+  WHERE id = p_user_id
+    AND tenant_id = v_tenant_id
+    AND deleted_at IS NULL;
+
+  PERFORM private.revoke_auth_sessions(p_user_id);
+
   RETURN v_count;
 END;
 $$;
