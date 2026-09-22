@@ -334,7 +334,7 @@ export function CourseAnalyticsPage() {
                     height: 20,
                     position: 'absolute',
                     top: 12,
-                    right: 12,
+                    insetInlineEnd: 12,
                   }}
                 />
               </Box>
@@ -441,10 +441,10 @@ export function CourseAnalyticsPage() {
                     sx={{
                       position: 'absolute',
                       bottom: 20,
-                      left: 24,
-                      right: 24,
+                      insetInline: 24,
                       display: 'flex',
                       justifyContent: 'space-between',
+                      direction: 'ltr',
                     }}
                   >
                     {[1, 10, 20, 30].map((d) => (

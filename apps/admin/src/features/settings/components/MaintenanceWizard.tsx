@@ -20,11 +20,14 @@ import {
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 
+import { useLayout } from '../../layout/hooks/useLayout';
+
 import {
   useEnableMaintenanceMode,
   useDisableMaintenanceMode,
 } from '@/adapters/mutations/settings.mutations';
 import { useRoles } from '@/adapters/queries/settings.queries';
+import { LtrIsland } from '@/components/ui/LtrIsland';
 import { parseRpcError } from '@/domain/errors';
 import type { MaintenanceModeParams, SettingsByCategory } from '@/domain/types/settings.types';
 
@@ -38,12 +41,14 @@ const getSteps = (t: ReturnType<typeof useTranslations>) => [
 
 interface MaintenanceWizardProps {
   settings?: SettingsByCategory;
+  canEdit?: boolean;
 }
 
-export function MaintenanceWizard({ settings }: MaintenanceWizardProps) {
+export function MaintenanceWizard({ settings, canEdit = true }: MaintenanceWizardProps) {
   const t = useTranslations('settings.maintenance_wizard');
   const tVal = useTranslations('validation');
   const STEPS = getSteps(t);
+  const { isDesktop } = useLayout();
 
   const maintenanceSettings = settings?.maintenance ?? [];
   const isCurrentlyEnabled =
@@ -117,12 +122,15 @@ export function MaintenanceWizard({ settings }: MaintenanceWizardProps) {
 
   const isPending = enableMutation.isPending || disableMutation.isPending;
 
+  if (!canEdit) return null;
+
   return (
     <Paper
       elevation={0}
       sx={{
         borderRadius: 3,
-        border: '1px solid #E2E8F0',
+        border: '1px solid',
+        borderColor: 'divider',
         p: 3,
         mb: 3,
       }}
@@ -134,21 +142,19 @@ export function MaintenanceWizard({ settings }: MaintenanceWizardProps) {
             width: 40,
             height: 40,
             borderRadius: 2,
-            background: isCurrentlyEnabled
-              ? 'linear-gradient(135deg, #DC2626, #EF4444)'
-              : 'linear-gradient(135deg, #6366F1, #818CF8)',
+            backgroundColor: isCurrentlyEnabled ? 'error.main' : 'primary.main',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          <Build sx={{ color: '#fff', fontSize: 20 }} />
+          <Build sx={{ color: 'common.white', fontSize: 20 }} />
         </Box>
         <Box>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: '#0F172A' }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: 'text.primary' }}>
             معالج وضع الصيانة
           </Typography>
-          <Typography variant="body2" sx={{ color: '#64748B' }}>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
             {isCurrentlyEnabled ? 'وضع الصيانة مفعل حالياً' : 'وضع الصيانة معطل'}
           </Typography>
         </Box>
@@ -157,9 +163,9 @@ export function MaintenanceWizard({ settings }: MaintenanceWizardProps) {
             label="مفعل"
             size="small"
             sx={{
-              ml: 'auto',
-              backgroundColor: '#FEE2E2',
-              color: '#DC2626',
+              marginInlineStart: 'auto',
+              backgroundColor: 'error.light',
+              color: 'error.dark',
               fontWeight: 700,
             }}
           />
@@ -181,22 +187,52 @@ export function MaintenanceWizard({ settings }: MaintenanceWizardProps) {
         </Alert>
       )}
 
-      {/* Stepper */}
-      <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 4 }}>
-        {STEPS.map((label) => (
-          <Step key={label}>
-            <StepLabel
-              sx={{
-                '& .MuiStepLabel-label': { fontSize: '0.8rem', fontWeight: 600 },
-                '& .MuiStepIcon-root.Mui-active': { color: '#6366F1' },
-                '& .MuiStepIcon-root.Mui-completed': { color: '#16A34A' },
-              }}
-            >
-              {label}
-            </StepLabel>
-          </Step>
-        ))}
-      </Stepper>
+      {/* Stepper — full labels on desktop; compact dots + current step on
+          phones where 5 alternative-label steps overflow */}
+      {isDesktop ? (
+        <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 4 }}>
+          {STEPS.map((label) => (
+            <Step key={label}>
+              <StepLabel
+                sx={{
+                  '& .MuiStepLabel-label': { fontSize: '0.8rem', fontWeight: 600 },
+                  '& .MuiStepIcon-root.Mui-active': { color: 'primary.main' },
+                  '& .MuiStepIcon-root.Mui-completed': { color: 'success.main' },
+                }}
+              >
+                {label}
+              </StepLabel>
+            </Step>
+          ))}
+        </Stepper>
+      ) : (
+        <Box sx={{ mb: 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 1 }}>
+            {STEPS.map((label, i) => (
+              <Box
+                key={label}
+                sx={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  backgroundColor:
+                    i < activeStep
+                      ? 'success.main'
+                      : i === activeStep
+                        ? 'primary.main'
+                        : 'divider',
+                }}
+              />
+            ))}
+          </Box>
+          <Typography
+            variant="caption"
+            sx={{ display: 'block', textAlign: 'center', fontWeight: 700, color: 'text.primary' }}
+          >
+            {STEPS[activeStep]}
+          </Typography>
+        </Box>
+      )}
 
       {error && (
         <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
@@ -211,12 +247,14 @@ export function MaintenanceWizard({ settings }: MaintenanceWizardProps) {
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
             <FormControlLabel
               control={
-                <Switch
-                  checked={enabled}
-                  onChange={(e) => setEnabled(e.target.checked)}
-                  color="warning"
-                  sx={{ transform: 'scale(1.3)' }}
-                />
+                <LtrIsland>
+                  <Switch
+                    checked={enabled}
+                    onChange={(e) => setEnabled(e.target.checked)}
+                    color="warning"
+                    sx={{ transform: 'scale(1.3)' }}
+                  />
+                </LtrIsland>
               }
               label={
                 <Typography sx={{ fontWeight: 600, fontSize: '1.1rem' }}>
@@ -263,7 +301,7 @@ export function MaintenanceWizard({ settings }: MaintenanceWizardProps) {
               InputLabelProps={{ shrink: true }}
               sx={{ width: 300, maxWidth: '100%' }}
             />
-            <Typography variant="body2" sx={{ color: '#64748B' }}>
+            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
               {t('deadline_desc')}
             </Typography>
           </Box>
@@ -311,7 +349,7 @@ export function MaintenanceWizard({ settings }: MaintenanceWizardProps) {
                 })
               }
             />
-            <Typography variant="body2" sx={{ color: '#64748B', mt: 1 }}>
+            <Typography variant="body2" sx={{ color: 'text.secondary', mt: 1 }}>
               {t('roles_desc')}
             </Typography>
           </Box>
@@ -369,8 +407,8 @@ export function MaintenanceWizard({ settings }: MaintenanceWizardProps) {
               textTransform: 'none',
               fontWeight: 600,
               borderRadius: 2,
-              backgroundColor: '#6366F1',
-              '&:hover': { backgroundColor: '#4F46E5' },
+              backgroundColor: 'primary.main',
+              '&:hover': { backgroundColor: 'primary.dark' },
             }}
           >
             {t('btn_next')}
@@ -385,8 +423,8 @@ export function MaintenanceWizard({ settings }: MaintenanceWizardProps) {
               textTransform: 'none',
               fontWeight: 600,
               borderRadius: 2,
-              backgroundColor: enabled ? '#DC2626' : '#16A34A',
-              '&:hover': { backgroundColor: enabled ? '#B91C1C' : '#15803D' },
+              backgroundColor: enabled ? 'error.main' : 'success.main',
+              '&:hover': { backgroundColor: enabled ? 'error.dark' : 'success.dark' },
             }}
           >
             {enabled ? t('btn_finish_enable') : t('btn_finish_disable')}

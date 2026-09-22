@@ -130,6 +130,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           (p) => p.permission_name,
         ) as PermissionName[];
 
+        // A successful query with no row means the auth record was deleted or
+        // deactivated. Do not hydrate a synthetic user in that case: it lets
+        // the UI render and then makes every Server Action fail with
+        // "User profile not found or inactive". The fallback is only safe for
+        // a query error caused by RLS/claims visibility.
+        if (!userRecord && !userError) {
+          throw new Error('User profile not found or inactive');
+        }
+
         // Fallback: if RLS still blocks the direct query, build from RPC result
         const resolvedUser = userRecord ?? {
           id: session.user.id,
@@ -138,10 +147,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           acting_tenant_id: null,
           token_version: accessResult.token_version ?? 1,
         };
-
-        if (userError && !resolvedUser) {
-          console.error('[AuthProvider] User record fetch failed:', userError);
-          throw userError;
+        if (userError) {
+          console.warn('[AuthProvider] User record fetch was not visible; using dashboard access data:', userError);
         }
 
         if (isMounted) {

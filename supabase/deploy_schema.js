@@ -37,6 +37,18 @@ async function main() {
     process.exit(1);
   }
 
+  // Accept a mistakenly duplicated assignment prefix such as
+  // DATABASE_URL=DATABASE_URL=postgresql://... from db_url.txt.
+  while (dbUrl.startsWith('DATABASE_URL=')) {
+    dbUrl = dbUrl.substring('DATABASE_URL='.length).trim();
+  }
+
+  if (!/^postgres(?:ql)?:\/\//i.test(dbUrl)) {
+    throw new Error(
+      'Invalid database URL. Expected a PostgreSQL URL beginning with postgres:// or postgresql://.',
+    );
+  }
+
   // Ensure unencoded '#' in password does not break connection URL parsing
   const urlMatch = dbUrl.match(/^(postgres(?:ql)?:\/\/[^:]+:)(.*)(@.+)$/);
   if (urlMatch) {
@@ -100,6 +112,8 @@ async function main() {
       'schema/09_rls.sql',
       'schema/10_permissions.sql',
       'schema/11_seed_reference.sql',
+      // QA/demo data is intentionally excluded from this deployment.
+      // Never apply 12_seed_qa_demo.sql to a shared or production database.
       'schema/VALIDATION.sql',
     ];
 

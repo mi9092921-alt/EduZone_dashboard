@@ -840,15 +840,22 @@ BEGIN
       ADD COLUMN targeting_mode text NOT NULL DEFAULT 'audience';
   END IF;
 
-  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'notifications')
-     AND NOT EXISTS (
-       SELECT 1 FROM pg_constraint
-       WHERE conname = 'chk_notification_targeting_mode'
-         AND conrelid = 'public.notifications'::regclass
-     ) THEN
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'notifications') THEN
+    ALTER TABLE public.notifications
+      DROP CONSTRAINT IF EXISTS chk_notification_targeting_mode;
     ALTER TABLE public.notifications
       ADD CONSTRAINT chk_notification_targeting_mode
-      CHECK (targeting_mode IN ('audience', 'users'));
+      CHECK (targeting_mode IN ('audience', 'users', 'course'));
+
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_constraint
+      WHERE conname = 'fk_notifications_course'
+        AND conrelid = 'public.notifications'::regclass
+    ) THEN
+      ALTER TABLE public.notifications
+        ADD CONSTRAINT fk_notifications_course
+        FOREIGN KEY (course_id) REFERENCES public.courses(id) ON DELETE SET NULL;
+    END IF;
   END IF;
 
   -- notifications: chk_target_audience remains the public audience enum.
@@ -1055,15 +1062,22 @@ BEGIN
       ADD COLUMN targeting_mode text NOT NULL DEFAULT 'audience';
   END IF;
 
-  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'notifications')
-     AND NOT EXISTS (
-       SELECT 1 FROM pg_constraint
-       WHERE conname = 'chk_notification_targeting_mode'
-         AND conrelid = 'public.notifications'::regclass
-     ) THEN
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'notifications') THEN
+    ALTER TABLE public.notifications
+      DROP CONSTRAINT IF EXISTS chk_notification_targeting_mode;
     ALTER TABLE public.notifications
       ADD CONSTRAINT chk_notification_targeting_mode
-      CHECK (targeting_mode IN ('audience', 'users'));
+      CHECK (targeting_mode IN ('audience', 'users', 'course'));
+
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_constraint
+      WHERE conname = 'fk_notifications_course'
+        AND conrelid = 'public.notifications'::regclass
+    ) THEN
+      ALTER TABLE public.notifications
+        ADD CONSTRAINT fk_notifications_course
+        FOREIGN KEY (course_id) REFERENCES public.courses(id) ON DELETE SET NULL;
+    END IF;
   END IF;
 
   -- notifications: chk_target_audience remains the public audience enum.

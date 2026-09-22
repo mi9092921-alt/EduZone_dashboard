@@ -20,7 +20,9 @@ import {
   DeleteNotificationUseCase,
   ListNotificationsUseCase,
 } from '@/application/use-cases/notifications/manage-notifications.use-case';
+import { SendCourseAnnouncementUseCase } from '@/application/use-cases/notifications/send-course-announcement.use-case';
 import { SendNotificationUseCase } from '@/application/use-cases/notifications/send-notification.use-case';
+import { toClientMessage, ValidationError } from '@/domain/errors';
 import type { UpsertAccessRuleInput } from '@/domain/schemas/settings.schema';
 import type { CourseWithStats } from '@/domain/types/analytics.types';
 import type { ActivityLogQueueEntry } from '@/domain/types/audit.types';
@@ -34,6 +36,7 @@ import type {
 import type { Job, JobFilters, JobStatusCounts } from '@/domain/types/job.types';
 import type {
   MyNotificationsResult,
+  Notification,
   NotificationListResult,
   SendNotificationInput,
   TargetAudience,
@@ -322,6 +325,41 @@ export async function sendNotificationAction(input: SendNotificationInput): Prom
   );
 }
 
+export async function sendCourseAnnouncementAction(input: {
+  courseId: string;
+  title: string;
+  body: string;
+}): Promise<{ notificationId: string; recipientCount: number }> {
+  const ctx = await requirePermission([
+    'course_announcements.send',
+    'notifications.send',
+    'courses.write',
+  ]);
+  return new SendCourseAnnouncementUseCase(
+    makeNotificationAdminRepository(),
+    makeAuditLogger(),
+  ).execute(ctx, input);
+}
+
+export async function getCourseAnnouncementsAction(
+  courseId: string,
+  page = 1,
+  pageSize = 10,
+): Promise<{ data: Notification[]; count: number }> {
+  const ctx = await requirePermission([
+    'course_announcements.send',
+    'notifications.send',
+    'courses.read',
+  ]);
+  if (!ctx.tenantId) throw new ValidationError('Tenant context is missing');
+  return makeNotificationAdminRepository().listCourseAnnouncements(
+    courseId,
+    ctx.tenantId,
+    page,
+    pageSize,
+  );
+}
+
 export async function deleteNotificationAction(id: string): Promise<void> {
   const ctx = await requirePermission([
     'notifications.delete',
@@ -471,10 +509,18 @@ export async function getCourseStatsAction(courseId: string): Promise<CourseStat
 export async function deleteCourseAction(
   id: string,
 ): Promise<{ success: boolean; error?: string }> {
-  const ctx = await requirePermission(['courses.manage', 'courses.write']);
-  // IDOR/BOLA guard: deleteCourse goes through the service-role client
-  // (bypasses RLS), so tenant scoping MUST be enforced here at the
-  // boundary — same pattern as deleteUserAction / assertSameTenant.
-  assertSameTenant(ctx, await coursesService.getCourseTenantId(id));
-  return new DeleteCourseUseCase(makeCourseAdminRepository(), makeAuditLogger()).execute(ctx, id);
+  try {
+    const ctx = await requirePermission(['courses.manage', 'courses.write']);
+    // IDOR/BOLA guard: deleteCourse goes through the service-role client
+    // (bypasses RLS), so tenant scoping MUST be enforced here at the
+    // boundary — same pattern as deleteUserAction / assertSameTenant.
+    assertSameTenant(ctx, await coursesService.getCourseTenantId(id));
+    return await new DeleteCourseUseCase(makeCourseAdminRepository(), makeAuditLogger()).execute(ctx, id);
+  } catch (error: unknown) {
+    // Server Actions hide uncaught production errors behind a generic
+    // "unexpected error" page. Return the safe taxonomy message instead so
+    // the dialog can keep the user in context and show the actionable reason.
+    console.error('[deleteCourseAction] failed:', error);
+    return { success: false, error: toClientMessage(error) };
+  }
 }

@@ -12,7 +12,7 @@ export function QueueHealthPanel() {
 
   return (
     <Card className="border-border/40 overflow-hidden relative">
-      <div className="absolute top-0 w-full h-1 bg-gradient-to-r from-blue-500 via-emerald-400 to-indigo-500" />
+      <div className="absolute top-0 w-full h-1 bg-gradient-to-r rtl:bg-gradient-to-l from-blue-500 via-emerald-400 to-indigo-500" />
       <CardHeader className="p-3 pb-2 border-b border-border/20">
         <div className="flex items-center gap-2">
           <Dns className="text-blue-500 w-5 h-5" />

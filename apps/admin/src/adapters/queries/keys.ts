@@ -102,6 +102,8 @@ export const queryKeys = {
     mine: (limit: number, unreadOnly: boolean) =>
       ['notifications', 'mine', limit, unreadOnly] as const,
     unreadCount: ['notifications', 'unreadCount'] as const,
+    courseAnnouncements: (courseId: string, page?: number, pageSize?: number) =>
+      ['notifications', 'course', courseId, page, pageSize] as const,
   },
   dashboard: {
     securityAlerts: ['dashboard', 'security-alerts'] as const,

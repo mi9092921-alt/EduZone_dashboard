@@ -26,6 +26,7 @@ import { useState, useEffect } from 'react';
 import { useUpdateLesson, useDeleteLesson } from '@/adapters/mutations/courses.mutations';
 import { useToast } from '@/adapters/stores/toast.store';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { LtrIsland } from '@/components/ui/LtrIsland';
 import { type Lesson } from '@/domain/types/course.types';
 
 // ── Helpers ─────────────────────────────────────────────
@@ -84,6 +85,7 @@ export function LessonRow({
 }) {
   const theme = useTheme();
   const t = useTranslations('common');
+  const isRtl = theme.direction === 'rtl';
   const { showToast } = useToast();
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(lesson.title);
@@ -246,15 +248,17 @@ export function LessonRow({
               } 
             }}
           />
-          <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 1 }}>
-            <Typography variant="caption" sx={{ color: 'text.secondary', flexGrow: 1 }}>
+          <Stack direction="row" alignItems="center" spacing={1.5} sx={{ px: 1, minWidth: 0 }}>
+            <Typography variant="caption" sx={{ color: 'text.secondary', flexGrow: 1, minWidth: 0 }}>
               {t('is_preview_label') || 'Free Preview'}
             </Typography>
-            <Switch
-              size="small"
-              checked={localPreview}
-              onChange={() => { void handleTogglePreview(); }}
-            />
+            <LtrIsland>
+              <Switch
+                size="small"
+                checked={localPreview}
+                onChange={() => { void handleTogglePreview(); }}
+              />
+            </LtrIsland>
           </Stack>
           <Box sx={{ display: 'flex', flexDirection: { xs: 'column-reverse', sm: 'row' }, gap: 1, justifyContent: 'flex-end' }}>
             <Button
@@ -304,7 +308,8 @@ export function LessonRow({
         '&:hover': {
           borderColor: 'primary.main',
           backgroundColor: 'action.hover',
-          transform: 'translateX(4px)',
+          // Shift toward the reading direction (right in LTR, left in RTL)
+          transform: isRtl ? 'translateX(-4px)' : 'translateX(4px)',
           '& .lesson-actions': { opacity: 1 },
         },
       }}
@@ -313,9 +318,20 @@ export function LessonRow({
         <Box
           {...attributes}
           {...listeners}
-          sx={{ display: 'flex', cursor: 'grab', touchAction: 'none' }}
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'grab',
+            touchAction: 'none',
+            // Enlarged hit area: ≥40px touch target for phones
+            p: 1,
+            m: -1,
+            borderRadius: 1.5,
+            '&:hover': { backgroundColor: 'action.hover' },
+          }}
         >
-          <DragIndicator sx={{ fontSize: 16, color: 'text.disabled' }} />
+          <DragIndicator sx={{ fontSize: 18, color: 'text.disabled' }} />
         </Box>
         <Box
           sx={{
@@ -375,36 +391,40 @@ export function LessonRow({
       <Stack
         direction="row"
         alignItems="center"
-        spacing={0.5}
+        spacing={1.25}
         flexWrap="wrap"
         rowGap={1}
         sx={{ width: { xs: '100%', sm: 'auto' }, justifyContent: { xs: 'flex-start', sm: 'flex-end' } }}
       >
-        <Box sx={{ mr: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <Typography variant="caption" sx={{ fontSize: '0.6rem', color: 'text.disabled', fontWeight: 700, mb: -0.5 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.25, minWidth: 58, flexShrink: 0 }}>
+          <Typography variant="caption" sx={{ fontSize: '0.65rem', color: 'text.secondary', fontWeight: 700, lineHeight: 1.2, whiteSpace: 'nowrap' }}>
             {t('is_preview_label') || 'PREVIEW'}
           </Typography>
-          <Switch
-            size="small"
-            checked={localPreview}
-            onChange={() => { void handleTogglePreview(); }}
-            onClick={(e) => e.stopPropagation()}
-            sx={{
-              '& .MuiSwitch-switchBase.Mui-checked': { color: 'success.main' },
-              '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: 'success.main' },
-            }}
-          />
+          <LtrIsland>
+            <Switch
+              size="small"
+              checked={localPreview}
+              onChange={() => { void handleTogglePreview(); }}
+              onClick={(e) => e.stopPropagation()}
+              sx={{
+                '& .MuiSwitch-switchBase.Mui-checked': { color: 'success.main' },
+                '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: 'success.main' },
+              }}
+            />
+          </LtrIsland>
         </Box>
-        <Box sx={{ mr: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <Typography variant="caption" sx={{ fontSize: '0.6rem', color: 'text.disabled', fontWeight: 700, mb: -0.5 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.25, minWidth: 58, flexShrink: 0 }}>
+          <Typography variant="caption" sx={{ fontSize: '0.65rem', color: 'text.secondary', fontWeight: 700, lineHeight: 1.2, whiteSpace: 'nowrap' }}>
             {t('is_published_label') || 'PUBLIC'}
           </Typography>
-          <Switch
-            size="small"
-            checked={localPublished}
-            onChange={() => { void handleTogglePublish(); }}
-            onClick={(e) => e.stopPropagation()}
-          />
+          <LtrIsland>
+            <Switch
+              size="small"
+              checked={localPublished}
+              onChange={() => { void handleTogglePublish(); }}
+              onClick={(e) => e.stopPropagation()}
+            />
+          </LtrIsland>
         </Box>
         <Box
           className="lesson-actions"

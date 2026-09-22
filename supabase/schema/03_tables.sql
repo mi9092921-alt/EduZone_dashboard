@@ -55,8 +55,22 @@ CREATE TABLE IF NOT EXISTS public.security_incidents (
   is_release_build boolean NOT NULL DEFAULT false,
   device_fingerprint text,
   app_version text,
-  app_build_number text
+  app_build_number text,
+  -- Stampeded by report_security_incident() from the PostgREST-injected
+  -- x-forwarded-for header (trusted proxy chain) — the rate-limit key for
+  -- pre-auth (user_id IS NULL) volume absorption. Client-supplied IPs are
+  -- never accepted: only this column, written server-side.
+  source_ip inet,
+  -- Optional structured context (e.g. {'step': 'freerasp'} for startup-step
+  -- failures). Size-capped and object-only in report_security_incident().
+  details jsonb
 );
+
+-- Columns added for the centralized telemetry write path
+-- (report_security_incident, 2026-09-19); IF NOT EXISTS keeps existing
+-- databases idempotent under deploy_schema.js re-runs.
+ALTER TABLE public.security_incidents ADD COLUMN IF NOT EXISTS source_ip inet;
+ALTER TABLE public.security_incidents ADD COLUMN IF NOT EXISTS details jsonb;
 
 -- ============================================================================
 -- 000_core_settings.sql
@@ -1315,8 +1329,9 @@ CREATE TABLE IF NOT EXISTS public.notifications (
   -- fanout cannot fall back to a tenant-wide audience while target rows are
   -- being attached by the caller.
   targeting_mode text NOT NULL DEFAULT 'audience'
-    CHECK (targeting_mode IN ('audience', 'users')),
+    CHECK (targeting_mode IN ('audience', 'users', 'course')),
   target_permission text REFERENCES public.permissions(name) ON DELETE RESTRICT,
+  course_id uuid REFERENCES public.courses(id) ON DELETE SET NULL,
   deleted_at timestamptz,
   created_by uuid REFERENCES public.users(id) ON DELETE SET NULL,
   updated_by uuid REFERENCES public.users(id) ON DELETE SET NULL,
@@ -1339,8 +1354,17 @@ BEGIN
       AND column_name = 'targeting_mode'
   ) THEN
     ALTER TABLE public.notifications
-      ADD COLUMN targeting_mode text NOT NULL DEFAULT 'audience'
-      CHECK (targeting_mode IN ('audience', 'users'));
+      ADD COLUMN targeting_mode text NOT NULL DEFAULT 'audience';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'notifications'
+      AND column_name = 'course_id'
+  ) THEN
+    ALTER TABLE public.notifications
+      ADD COLUMN course_id uuid REFERENCES public.courses(id) ON DELETE SET NULL;
   END IF;
 END $$;
 

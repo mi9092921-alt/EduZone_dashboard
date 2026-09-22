@@ -155,108 +155,73 @@ export function JobsPage() {
           </div>
         )}
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted/30">
-                <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">{t('header_job_type')}</th>
-                <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">{t('header_status')}</th>
-                <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">{t('header_priority')}</th>
-                <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">{t('header_attempts')}</th>
-                <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">{t('header_run_at')}</th>
-                <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">{t('header_locked_by')}</th>
-                <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">{t('header_error')}</th>
-                <th className="text-end px-4 py-3 font-semibold text-muted-foreground text-xs">{t('header_actions')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {jobs.map((job: Job) => {
-                const statusStyle = STATUS_CHIPS[job.status] ?? STATUS_CHIPS.pending;
-                return (
-                  <tr key={job.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
-                    <td className="px-4 py-2.5">
-                      <span className="text-xs font-semibold text-foreground">{job.job_type}</span>
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <span className={cn('text-[10px] font-bold uppercase px-2 py-0.5 rounded-md', statusStyle.bg, statusStyle.text)}>
-                        {t(`status_${job.status}`)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <PriorityBadge priority={job.priority} />
-                    </td>
-                    <td className="px-4 py-2.5 text-xs font-mono text-foreground">
-                      {job.attempts}/{job.max_attempts}
-                    </td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
-                      {job.run_at ? new Date(job.run_at).toLocaleString(undefined, {
-                        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
-                      }) : '—'}
-                    </td>
-                    <td className="px-4 py-2.5 text-xs font-mono text-muted-foreground">
-                      {job.locked_by_worker_id ? job.locked_by_worker_id.slice(0, 12) + (job.locked_by_worker_id.length > 12 ? '…' : '') : '—'}
-                    </td>
-                    <td className="px-4 py-2.5 max-w-[200px]">
-                      {job.error_message ? (
-                        <Tooltip title={job.error_message}>
-                          <span className="text-xs text-destructive truncate block cursor-help">
-                            {job.error_message.slice(0, 50)}{job.error_message.length > 50 ? '…' : ''}
-                          </span>
-                        </Tooltip>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5 text-end">
-                      <div className="flex items-center justify-end gap-1">
-                        {(job.status === 'failed' || job.status === 'dead') && (
-                          <Tooltip title={t('tooltip_retry')}>
-                            <button
-                              type="button"
-                              onClick={() => retryJob.mutate(job.id)}
-                              aria-label={t('tooltip_retry')}
-                              className="p-1.5 rounded-lg hover:bg-primary/10 text-primary transition-colors"
-                            >
-                              <Replay className="text-sm" />
-                            </button>
-                          </Tooltip>
-                        )}
-                        {(job.status === 'pending' || job.status === 'processing') && (
-                          <Tooltip title={t('tooltip_cancel')}>
-                            <button
-                              type="button"
-                              onClick={() => cancelJob.mutate(job.id)}
-                              aria-label={t('tooltip_cancel')}
-                              className="p-1.5 rounded-lg hover:bg-destructive/10 text-destructive transition-colors"
-                            >
-                              <Cancel className="text-sm" />
-                            </button>
-                          </Tooltip>
-                        )}
-                        <Tooltip title={t('tooltip_payload')}>
-                          <button type="button" aria-label={t('tooltip_payload')} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
-                            <Info className="text-sm" />
-                          </button>
-                        </Tooltip>
-                      </div>
+        {/* DESKTOP (≥md): full 8-column table (horizontal scroll stays inside) */}
+        <div className="hidden md:block">
+          <div className="table-scroll">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/30">
+                  <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">{t('header_job_type')}</th>
+                  <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">{t('header_status')}</th>
+                  <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">{t('header_priority')}</th>
+                  <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">{t('header_attempts')}</th>
+                  <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">{t('header_run_at')}</th>
+                  <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">{t('header_locked_by')}</th>
+                  <th className="text-start px-4 py-3 font-semibold text-muted-foreground text-xs">{t('header_error')}</th>
+                  <th className="text-end px-4 py-3 font-semibold text-muted-foreground text-xs">{t('header_actions')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {jobs.map((job: Job) => (
+                  <JobRow
+                    key={job.id}
+                    job={job}
+                    onRetry={() => retryJob.mutate(job.id)}
+                    onCancel={() => cancelJob.mutate(job.id)}
+                  />
+                ))}
+                {!isLoading && jobs.length === 0 && (
+                  <tr>
+                    <td colSpan={8} className="text-center py-12 text-muted-foreground">
+                      <WorkOutline className="text-3xl opacity-30 mb-2" />
+                      <p className="text-sm">
+                        {activeTab === 'all'
+                          ? t('no_jobs_found')
+                          : t('no_jobs_with_status', { status: t(`status_${activeTab}`) })}
+                      </p>
                     </td>
                   </tr>
-                );
-              })}
-              {!isLoading && jobs.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="text-center py-12 text-muted-foreground">
-                    <WorkOutline className="text-3xl opacity-30 mb-2" />
-                    <p className="text-sm">
-                      {activeTab === 'all'
-                        ? t('no_jobs_found')
-                        : t('no_jobs_with_status', { status: t(`status_${activeTab}`) })}
-                    </p>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* MOBILE (<md): stacked job cards */}
+        <div className="md:hidden divide-y divide-border/50">
+          {(isLoading || isFetching) && jobs.length === 0 ? (
+            <div className="py-10 flex justify-center">
+              <div className="h-6 w-6 rounded-full border-2 border-border border-t-primary animate-spin" />
+            </div>
+          ) : jobs.length === 0 ? (
+            <div className="py-12 text-center text-muted-foreground">
+              <WorkOutline className="text-3xl opacity-30 mb-2" />
+              <p className="text-sm">
+                {activeTab === 'all'
+                  ? t('no_jobs_found')
+                  : t('no_jobs_with_status', { status: t(`status_${activeTab}`) })}
+              </p>
+            </div>
+          ) : (
+            jobs.map((job: Job) => (
+              <JobCard
+                key={job.id}
+                job={job}
+                onRetry={() => retryJob.mutate(job.id)}
+                onCancel={() => cancelJob.mutate(job.id)}
+              />
+            ))
+          )}
         </div>
 
         <TablePagination
@@ -269,6 +234,171 @@ export function JobsPage() {
             setPage(1);
           }}
         />
+      </div>
+    </div>
+  );
+}
+
+// ── Desktop row ─────────────────────────────────────────────
+function JobRow({
+  job,
+  onRetry,
+  onCancel,
+}: {
+  job: Job;
+  onRetry: () => void;
+  onCancel: () => void;
+}) {
+  const t = useTranslations('jobs');
+  const statusStyle = STATUS_CHIPS[job.status] ?? STATUS_CHIPS.pending;
+
+  return (
+    <tr className="border-b border-border/50 hover:bg-muted/20 transition-colors">
+      <td className="px-4 py-2.5">
+        <span className="text-xs font-semibold text-foreground">{job.job_type}</span>
+      </td>
+      <td className="px-4 py-2.5">
+        <span className={cn('text-[10px] font-bold uppercase px-2 py-0.5 rounded-md', statusStyle.bg, statusStyle.text)}>
+          {t(`status_${job.status}`)}
+        </span>
+      </td>
+      <td className="px-4 py-2.5">
+        <PriorityBadge priority={job.priority} />
+      </td>
+      <td className="px-4 py-2.5 text-xs font-mono text-foreground">
+        {job.attempts}/{job.max_attempts}
+      </td>
+      <td className="px-4 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
+        {job.run_at ? new Date(job.run_at).toLocaleString(undefined, {
+          month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
+        }) : '—'}
+      </td>
+      <td className="px-4 py-2.5 text-xs font-mono text-muted-foreground">
+        {job.locked_by_worker_id ? job.locked_by_worker_id.slice(0, 12) + (job.locked_by_worker_id.length > 12 ? '…' : '') : '—'}
+      </td>
+      <td className="px-4 py-2.5 max-w-[200px]">
+        {job.error_message ? (
+          <Tooltip title={job.error_message}>
+            <span className="text-xs text-destructive truncate block cursor-help">
+              {job.error_message.slice(0, 50)}{job.error_message.length > 50 ? '…' : ''}
+            </span>
+          </Tooltip>
+        ) : (
+          <span className="text-xs text-muted-foreground">—</span>
+        )}
+      </td>
+      <td className="px-4 py-2.5 text-end">
+        <div className="flex items-center justify-end gap-1">
+          {(job.status === 'failed' || job.status === 'dead') && (
+            <Tooltip title={t('tooltip_retry')}>
+              <button
+                type="button"
+                onClick={onRetry}
+                aria-label={t('tooltip_retry')}
+                className="p-1.5 rounded-lg hover:bg-primary/10 text-primary transition-colors"
+              >
+                <Replay className="text-sm" />
+              </button>
+            </Tooltip>
+          )}
+          {(job.status === 'pending' || job.status === 'processing') && (
+            <Tooltip title={t('tooltip_cancel')}>
+              <button
+                type="button"
+                onClick={onCancel}
+                aria-label={t('tooltip_cancel')}
+                className="p-1.5 rounded-lg hover:bg-destructive/10 text-destructive transition-colors"
+              >
+                <Cancel className="text-sm" />
+              </button>
+            </Tooltip>
+          )}
+          <Tooltip title={t('tooltip_payload')}>
+            <button type="button" aria-label={t('tooltip_payload')} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
+              <Info className="text-sm" />
+            </button>
+          </Tooltip>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+// ── Mobile card (<md) — same data stacked ───────────────────
+function JobCard({
+  job,
+  onRetry,
+  onCancel,
+}: {
+  job: Job;
+  onRetry: () => void;
+  onCancel: () => void;
+}) {
+  const t = useTranslations('jobs');
+  const statusStyle = STATUS_CHIPS[job.status] ?? STATUS_CHIPS.pending;
+
+  return (
+    <div className="p-4 space-y-2">
+      <div className="flex items-start justify-between gap-2">
+        <span className="text-xs font-semibold text-foreground break-all min-w-0">{job.job_type}</span>
+        <span className={cn('shrink-0 text-[10px] font-bold uppercase px-2 py-0.5 rounded-md', statusStyle.bg, statusStyle.text)}>
+          {t(`status_${job.status}`)}
+        </span>
+      </div>
+
+      <div className="flex items-center gap-2 flex-wrap">
+        <PriorityBadge priority={job.priority} />
+        <span className="text-[11px] font-mono text-foreground">
+          {job.attempts}/{job.max_attempts}
+        </span>
+        {job.run_at && (
+          <span className="text-[11px] text-muted-foreground">
+            {new Date(job.run_at).toLocaleString(undefined, {
+              month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
+            })}
+          </span>
+        )}
+        {job.locked_by_worker_id && (
+          <span className="text-[11px] font-mono text-muted-foreground truncate max-w-[120px]">
+            {job.locked_by_worker_id.slice(0, 12)}{job.locked_by_worker_id.length > 12 ? '…' : ''}
+          </span>
+        )}
+      </div>
+
+      {job.error_message && (
+        <p className="text-xs text-destructive break-words">{job.error_message}</p>
+      )}
+
+      <div className="flex items-center justify-end gap-1 pt-0.5">
+        {(job.status === 'failed' || job.status === 'dead') && (
+          <Tooltip title={t('tooltip_retry')}>
+            <button
+              type="button"
+              onClick={onRetry}
+              aria-label={t('tooltip_retry')}
+              className="p-2 rounded-lg hover:bg-primary/10 text-primary transition-colors"
+            >
+              <Replay className="text-sm" />
+            </button>
+          </Tooltip>
+        )}
+        {(job.status === 'pending' || job.status === 'processing') && (
+          <Tooltip title={t('tooltip_cancel')}>
+            <button
+              type="button"
+              onClick={onCancel}
+              aria-label={t('tooltip_cancel')}
+              className="p-2 rounded-lg hover:bg-destructive/10 text-destructive transition-colors"
+            >
+              <Cancel className="text-sm" />
+            </button>
+          </Tooltip>
+        )}
+        <Tooltip title={t('tooltip_payload')}>
+          <button type="button" aria-label={t('tooltip_payload')} className="p-2 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
+            <Info className="text-sm" />
+          </button>
+        </Tooltip>
       </div>
     </div>
   );

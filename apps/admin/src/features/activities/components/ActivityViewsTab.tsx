@@ -55,6 +55,12 @@ export function ActivityViewsTab({ userId }: ActivityViewsTabProps) {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const formatViewedAt = (value: string | null | undefined, options: Intl.DateTimeFormatOptions) => {
+    if (!value) return '—';
+    const date = new Date(value);
+    return Number.isFinite(date.getTime()) ? new Intl.DateTimeFormat(locale, options).format(date) : '—';
+  };
+
   return (
     <div className="space-y-3">
       <div className="overflow-hidden rounded-2xl border border-border/50 bg-card shadow-sm shadow-inner-glow">
@@ -102,14 +108,10 @@ export function ActivityViewsTab({ userId }: ActivityViewsTabProps) {
                   <td className="px-5 py-4 whitespace-nowrap">
                     <div className="flex flex-col text-[11px]">
                       <span className="text-foreground font-bold">
-                        {new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(
-                          new Date(view.viewed_at),
-                        )}
+                        {formatViewedAt(view.viewed_at, { dateStyle: 'medium' })}
                       </span>
                       <span className="text-muted-foreground mt-0.5 uppercase">
-                        {new Intl.DateTimeFormat(locale, { timeStyle: 'short' }).format(
-                          new Date(view.viewed_at),
-                        )}
+                        {formatViewedAt(view.viewed_at, { timeStyle: 'short' })}
                       </span>
                     </div>
                   </td>

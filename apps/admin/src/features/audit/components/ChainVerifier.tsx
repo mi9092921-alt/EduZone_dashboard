@@ -79,7 +79,7 @@ export function ChainVerifier({ dateFrom, dateTo }: ChainVerifierProps) {
     <div className="flex flex-col gap-3">
       {/* Chain state info */}
       {chainState && (
-        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground min-w-0">
           <span>
             {t('label_last_seq')}{' '}
             <strong className="text-foreground font-mono">{chainState.last_seq}</strong>

@@ -5,6 +5,7 @@
 export type {
   Notification,
   TargetAudience,
+  TargetingMode,
   UserNotification,
 } from '@/domain/types/notification.types';
 
@@ -13,6 +14,7 @@ import { useEffect, useRef } from 'react';
 
 import { queryKeys } from './keys';
 
+import { getCourseAnnouncementsAction } from '@/adapters/actions/admin.actions';
 import type { TargetAudience } from '@/domain/types/notification.types';
 import {
   getNotifications,
@@ -32,6 +34,15 @@ export function useNotifications(
   return useQuery({
     queryKey: queryKeys.notifications.list(page, pageSize, audience),
     queryFn: () => getNotifications(page, pageSize, audience),
+  });
+}
+
+/** Paginated course announcements query for a specific course */
+export function useCourseAnnouncements(courseId: string, page = 1, pageSize = 10) {
+  return useQuery({
+    queryKey: queryKeys.notifications.courseAnnouncements(courseId, page, pageSize),
+    queryFn: () => getCourseAnnouncementsAction(courseId, page, pageSize),
+    enabled: !!courseId,
   });
 }
 

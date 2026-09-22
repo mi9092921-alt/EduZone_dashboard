@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { queryKeys } from '../queries/keys';
 
+import { sendCourseAnnouncementAction } from '@/adapters/actions/admin.actions';
 import type { SendNotificationInput, UserNotification } from '@/domain/types/notification.types';
 import {
   sendNotification,
@@ -11,6 +12,22 @@ import {
 } from '@/infrastructure/repos/notifications.service';
 
 export type { SendNotificationInput } from '@/domain/types/notification.types';
+
+export function useSendCourseAnnouncement(courseId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { title: string; body: string }) =>
+      sendCourseAnnouncementAction({ courseId, ...input }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.notifications.courseAnnouncements(courseId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.notifications.all,
+      });
+    },
+  });
+}
 
 export function useSendNotification() {
   const queryClient = useQueryClient();

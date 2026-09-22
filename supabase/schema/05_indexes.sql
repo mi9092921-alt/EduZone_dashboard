@@ -34,6 +34,14 @@ CREATE INDEX IF NOT EXISTS idx_users_last_login ON public.users (last_login DESC
 
 CREATE INDEX IF NOT EXISTS idx_users_region ON public.users (region_id);
 
+-- security_incidents: per-IP recency probe inside report_security_incident()
+-- (volume absorption) and the nightly telemetry-retention cutoff scan.
+CREATE INDEX IF NOT EXISTS idx_security_incidents_ip_detected
+  ON public.security_incidents (source_ip, detected_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_security_incidents_detected_at
+  ON public.security_incidents (detected_at);
+
 CREATE INDEX IF NOT EXISTS idx_users_search ON public.users USING GIN (search_vector) WHERE deleted_at IS NULL;
 
 -- NOTE: idx_users_id is intentionally omitted - users.id is a PRIMARY KEY,
@@ -270,6 +278,11 @@ CREATE INDEX IF NOT EXISTS idx_alert_log_user ON audit.alert_log (user_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_tenant_region_created
   ON public.notifications(tenant_id, region_id, created_at DESC)
   WHERE deleted_at IS NULL;
+
+-- Course Announcements index
+CREATE INDEX IF NOT EXISTS idx_notifications_course_id
+  ON public.notifications(course_id, created_at DESC)
+  WHERE course_id IS NOT NULL AND deleted_at IS NULL;
 
 -- MEDIUM-03: Composite index for course discovery
 CREATE INDEX IF NOT EXISTS idx_courses_tenant_category_published

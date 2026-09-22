@@ -421,12 +421,16 @@ function SectionHeader({
         {refreshedAt && (
           <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
             <AccessTime className="text-xs" />
-            {ta('updated_label', {
-              time: new Date(refreshedAt).toLocaleTimeString(locale, {
-                hour: '2-digit',
-                minute: '2-digit',
-              }),
-            })}
+            {(() => {
+              const date = new Date(refreshedAt);
+              if (!Number.isFinite(date.getTime())) return ta('updated_label', { time: '—' });
+              return ta('updated_label', {
+                time: date.toLocaleTimeString(locale, {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                }),
+              });
+            })()}
           </span>
         )}
         {onExport && (
@@ -703,11 +707,19 @@ function MiniLineChart({
   const peakIdx = data.reduce((best, d, i) => (d.count > data[best]!.count ? i : best), 0);
 
   const clampPct = (p: number) => Math.min(88, Math.max(12, p));
-  const onMove = (e: React.MouseEvent<SVGRectElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const ratio = (e.clientX - rect.left) / rect.width;
+  // Shared hit-test so the same chart is readable with mouse AND touch —
+  // touch users get a pinned readout (no mouseleave to clear it).
+  const setActiveFromClientX = (rect: DOMRect, clientX: number) => {
+    const ratio = (clientX - rect.left) / rect.width;
     const idx = Math.round(ratio * (data.length - 1));
     setHoverIdx(Math.max(0, Math.min(data.length - 1, idx)));
+  };
+  const onMove = (e: React.MouseEvent<SVGRectElement>) => {
+    setActiveFromClientX(e.currentTarget.getBoundingClientRect(), e.clientX);
+  };
+  const onTouch = (e: React.TouchEvent<SVGRectElement>) => {
+    const touch = e.touches[0];
+    if (touch) setActiveFromClientX(e.currentTarget.getBoundingClientRect(), touch.clientX);
   };
 
   return (
@@ -807,6 +819,8 @@ function MiniLineChart({
           fill="transparent"
           onMouseMove={onMove}
           onMouseLeave={() => setHoverIdx(null)}
+          onTouchStart={onTouch}
+          onTouchMove={onTouch}
         />
       </svg>
 
@@ -850,7 +864,7 @@ function HorizontalBarChart({ data }: { data: CourseWithStats[] }) {
     <div className="space-y-2">
       {data.map((c) => (
         <div key={c.course_id} className="flex items-center gap-3">
-          <span className="text-xs text-foreground font-medium w-40 truncate" title={c.title}>
+          <span className="text-xs text-foreground font-medium w-24 sm:w-40 truncate" title={c.title}>
             {c.title || c.course_id.slice(0, 8)}
           </span>
           <div className="flex-1 h-5 bg-muted rounded-lg overflow-hidden">

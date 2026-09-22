@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { queryKeys } from './keys';
 
+import { getTeacherEngagementStatsAction } from '@/adapters/actions/teacher-dashboard.actions';
 import { useAuthUser } from '@/adapters/stores/auth.store';
 import { container } from '@/container';
 import { getDashboardStats, type DashboardStats } from '@/infrastructure/stats-service';
@@ -52,7 +53,7 @@ export function useTeacherDashboardStats() {
           warningsRes,
           studentsRes,
           lessonsRes,
-          viewsRes,
+          engagementRes,
           enrollmentsRes,
           devicesRes,
         ] = await Promise.all([
@@ -103,13 +104,16 @@ export function useTeacherDashboardStats() {
                 .in('course_id', courseIds)
                 .is('deleted_at', null)
             : Promise.resolve({ count: 0 }),
-          // Count total views
-          courseIds.length > 0
-            ? supabase
-                .from('video_views')
-                .select('id', { count: 'exact', head: true })
-                .in('course_id', courseIds)
-            : Promise.resolve({ count: 0 }),
+          // Total views + sessions today, via the teacher-dashboard server
+          // action: video_views / sessions are partitioned tables that deny
+          // authenticated browser reads (partition_deny_direct in
+          // 09_rls.sql), so a direct browser count always returns 0.
+          // Degrade to zeros if the boundary fails so the rest of the
+          // dashboard keeps rendering.
+          getTeacherEngagementStatsAction().catch(() => ({
+            totalViews: 0,
+            dailySessions: 0,
+          })),
           // Get average progress via enrollments_active
           courseIds.length > 0
             ? supabase
@@ -150,9 +154,9 @@ export function useTeacherDashboardStats() {
           archivedCourses: archivedRes.count ?? 0,
           deletedCourses: deletedRes.count ?? 0,
           totalEnrollments: studentsRes.count ?? 0,
-          dailySessions: 0,
+          dailySessions: engagementRes.dailySessions,
           pendingWarnings: warningsRes.count ?? 0,
-          totalViews: viewsRes.count ?? 0,
+          totalViews: engagementRes.totalViews,
           totalProgress: Math.round(avgProgress),
           totalTenants: 0,
           totalLessons: lessonsRes.count ?? 0,

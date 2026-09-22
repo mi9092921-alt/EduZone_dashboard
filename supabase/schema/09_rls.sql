@@ -30,6 +30,12 @@ CREATE POLICY offline_entitlements_service_all
 ALTER TABLE public.security_incidents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.security_incidents FORCE ROW LEVEL SECURITY;
 
+-- The table-level INSERT grant to authenticated was revoked (2026-09-19,
+-- see 10_permissions.sql): all client telemetry flows through
+-- public.report_security_incident(), which is the only write path. This
+-- legacy policy is retained (dead, but referenced by VALIDATION.sql) so a
+-- future direct-grant regression still cannot skip the user_id pinning it
+-- enforces.
 DROP POLICY IF EXISTS security_incidents_insert ON public.security_incidents;
 CREATE POLICY security_incidents_insert ON public.security_incidents
   FOR INSERT TO authenticated
@@ -39,6 +45,24 @@ DROP POLICY IF EXISTS security_incidents_admin_select ON public.security_inciden
 CREATE POLICY security_incidents_admin_select ON public.security_incidents
   FOR SELECT TO authenticated
   USING (public.is_admin_with_session_validation());
+
+-- Definer-context policies for report_security_incident() — the only write
+-- path. FORCE ROW LEVEL SECURITY subjects the function's definer (postgres)
+-- to RLS as well, so these two policies are the narrow, explicit owner
+-- access the FORCE model requires: count recent per-source volume (the rate
+-- limit probe) and insert the incident row. Client-facing rules are
+-- unchanged and unchanged in strength: authenticated has no INSERT grant at
+-- all anymore, anon never did, and neither policy grants any client role
+-- anything.
+DROP POLICY IF EXISTS security_incidents_definer_select ON public.security_incidents;
+CREATE POLICY security_incidents_definer_select ON public.security_incidents
+  FOR SELECT TO postgres
+  USING (true);
+
+DROP POLICY IF EXISTS security_incidents_definer_insert ON public.security_incidents;
+CREATE POLICY security_incidents_definer_insert ON public.security_incidents
+  FOR INSERT TO postgres
+  WITH CHECK (true);
 
 ALTER TABLE public.setting_definitions ENABLE ROW LEVEL SECURITY;
 
@@ -455,6 +479,11 @@ CREATE POLICY role_permissions_select ON public.role_permissions
     )
   );
 
+-- NOTE: this DROP only clears any pre-patch version of the policy; the
+-- canonical `settings_select` definition for settings_kv (granted to
+-- authenticated + anon, scoped to is_public rows) lives further down in
+-- this file, in the "C. Settings RLS fix (patch 9)" section. Do not treat
+-- this DROP as the effective policy statement.
 DROP POLICY IF EXISTS settings_select ON public.settings_kv;
 
 DROP POLICY IF EXISTS settings_cache_select ON public.settings_cache;
@@ -917,6 +946,17 @@ CREATE POLICY notifications_select ON public.notifications
         WHERE un.notification_id = notifications.id
           AND un.user_id = (select auth.uid())
           AND un.deleted_at IS NULL
+      )
+      OR (
+        targeting_mode = 'course'
+        AND (
+          created_by = (select auth.uid())
+          OR course_id IN (
+            SELECT id FROM public.courses
+            WHERE teacher_id = (SELECT auth.uid())
+              AND deleted_at IS NULL
+          )
+        )
       )
     )
   );
@@ -1496,6 +1536,19 @@ CREATE POLICY enrollments_delete_merged ON public.enrollments
   );
 
 DROP POLICY IF EXISTS user_progress_insert_merged ON public.user_progress;
+-- PHASE-5 FIX (2026-09-21): the INSERT/UPDATE WITH CHECK branches below now
+-- require course entitlement (has_course_access) or a published preview
+-- lesson, not merely row ownership. Ownership-only scoping allowed any
+-- authenticated user to fabricate progress/completions for courses they
+-- were never entitled to via a direct PostgREST upsert — the exact
+-- entitlement check update_lesson_progress() has always enforced on the
+-- RPC path. The RPC itself is unaffected: it is SECURITY DEFINER (runs as
+-- the table owner) and user_progress is deliberately NOT FORCE-RLS'd (see
+-- the comment block at the top of this section), so owner-context writes
+-- bypass these policies entirely. has_course_access() never reads
+-- user_progress, so no policy recursion is introduced. Client parity: the
+-- student app's only former direct-writer (VideoPlayerRemoteDataSource
+-- .syncProgressBatch) was switched to the RPC in the same phase.
 CREATE POLICY user_progress_insert_merged ON public.user_progress
   FOR INSERT TO authenticated
   WITH CHECK (
@@ -1503,7 +1556,21 @@ CREATE POLICY user_progress_insert_merged ON public.user_progress
     AND tenant_id = public.assert_tenant()
     AND (
       public.is_admin_with_session_validation()
-      OR user_id = (select auth.uid())
+      OR (
+        user_id = (select auth.uid())
+        AND (
+          public.has_course_access(course_id)
+          OR EXISTS (
+            SELECT 1
+            FROM public.lessons l
+            WHERE l.id = lesson_id
+              AND l.tenant_id = tenant_id
+              AND l.is_preview
+              AND l.is_published
+              AND l.deleted_at IS NULL
+          )
+        )
+      )
     )
   );
 
@@ -1523,7 +1590,21 @@ CREATE POLICY user_progress_update_merged ON public.user_progress
     AND tenant_id = public.assert_tenant()
     AND (
       public.is_admin_with_session_validation()
-      OR user_id = (select auth.uid())
+      OR (
+        user_id = (select auth.uid())
+        AND (
+          public.has_course_access(course_id)
+          OR EXISTS (
+            SELECT 1
+            FROM public.lessons l
+            WHERE l.id = lesson_id
+              AND l.tenant_id = tenant_id
+              AND l.is_preview
+              AND l.is_published
+              AND l.deleted_at IS NULL
+          )
+        )
+      )
     )
   );
 
@@ -1588,11 +1669,23 @@ CREATE POLICY location_logs_select ON public.user_location_logs
 
 -- -- C. Settings RLS fix (patch 9) --------------------------------------------
 
+-- PHASE-5 FIX (2026-09-21): the permission branch is wrapped in a CASE so
+-- anon readers can never evaluate public.user_has_permission() — CASE is
+-- guaranteed lazy by SQL semantics, unlike AND short-circuiting which the
+-- planner may reorder. This makes the matching EXECUTE revoke in
+-- 10_permissions.sql (anon must not get a permission-probing oracle for
+-- arbitrary user ids) safe for the anon is_public reads this policy still
+-- serves (pre-login force-update gate).
 CREATE POLICY settings_select ON public.settings_kv
   FOR SELECT TO authenticated, anon
   USING (
     is_public
-    OR ((select auth.uid()) IS NOT NULL AND public.user_has_permission((select auth.uid()), 'settings.read'::text, public.get_current_tenant_id()))
+    OR (
+      CASE
+        WHEN (select auth.uid()) IS NULL THEN FALSE
+        ELSE public.user_has_permission((select auth.uid()), 'settings.read'::text, public.get_current_tenant_id())
+      END
+    )
   );
 
 -- CRIT: RLS for reference / session-validity tables exposed via API grants

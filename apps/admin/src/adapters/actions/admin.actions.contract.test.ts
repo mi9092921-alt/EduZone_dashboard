@@ -120,8 +120,11 @@ vi.mock('@/infrastructure/repos/audit.service', () => ({ getQueuedActivities: vi
 vi.mock('@/infrastructure/repos/course-admin.repository', () => ({
   makeCourseAdminRepository: vi.fn(),
 }));
+const mockListCourseAnnouncements = vi.fn();
 vi.mock('@/infrastructure/repos/notifications.repository', () => ({
-  makeNotificationAdminRepository: vi.fn(),
+  makeNotificationAdminRepository: vi.fn(() => ({
+    listCourseAnnouncements: (...args: unknown[]) => mockListCourseAnnouncements(...args),
+  })),
 }));
 
 const mockAuditRecord = vi.fn().mockResolvedValue(undefined);
@@ -148,6 +151,13 @@ const mockSendNotificationExecute = vi.fn();
 vi.mock('@/application/use-cases/notifications/send-notification.use-case', () => ({
   SendNotificationUseCase: class {
     execute = mockSendNotificationExecute;
+  },
+}));
+
+const mockSendCourseAnnouncementExecute = vi.fn();
+vi.mock('@/application/use-cases/notifications/send-course-announcement.use-case', () => ({
+  SendCourseAnnouncementUseCase: class {
+    execute = mockSendCourseAnnouncementExecute;
   },
 }));
 
@@ -190,6 +200,7 @@ import {
   deleteTenantOverrideAction,
   getAllFeatureFlagsAction,
   getAllRolesAction,
+  getCourseAnnouncementsAction,
   getCourseStatsAction,
   getFeatureFlagByIdAction,
   getJobStatusCountsAction,
@@ -205,6 +216,7 @@ import {
   removeUserOverrideAction,
   retryJobAction,
   sendNotificationAction,
+  sendCourseAnnouncementAction,
   toggleAccessRuleAction,
   toggleFeatureFlagAction,
   toggleRateLimitRuleAction,
@@ -265,6 +277,11 @@ describe('admin.actions.ts — remaining action surface', () => {
     mockListNotificationsExecute.mockResolvedValue({ data: [], total: 0, page: 1, pageSize: 20 });
     mockDeleteNotificationExecute.mockResolvedValue(undefined);
     mockSendNotificationExecute.mockResolvedValue('notification-1');
+    mockSendCourseAnnouncementExecute.mockResolvedValue({
+      notificationId: 'announcement-1',
+      recipientCount: 2,
+    });
+    mockListCourseAnnouncements.mockResolvedValue({ data: [], count: 0 });
     mockGetMyNotificationsExecute.mockResolvedValue({ data: [], unread: 0 });
     mockGetUnreadCountExecute.mockResolvedValue(3);
     mockMarkAllReadExecute.mockResolvedValue(undefined);
@@ -566,6 +583,61 @@ describe('admin.actions.ts — remaining action surface', () => {
 
       expect(id).toBe('notification-1');
       expect(mockSendNotificationExecute).toHaveBeenCalledWith(ctxFor(), input);
+    });
+
+    it('sendCourseAnnouncementAction authorizes and delegates to its use case', async () => {
+      mockRequirePermission.mockResolvedValue(ctxFor());
+      const input = {
+        courseId: 'course-1',
+        title: 'Schedule update',
+        body: 'The next lesson starts tomorrow at 10:00.',
+      };
+
+      await expect(sendCourseAnnouncementAction(input)).resolves.toEqual({
+        notificationId: 'announcement-1',
+        recipientCount: 2,
+      });
+
+      expect(mockRequirePermission).toHaveBeenCalledWith([
+        'course_announcements.send',
+        'notifications.send',
+        'courses.write',
+      ]);
+      expect(mockSendCourseAnnouncementExecute).toHaveBeenCalledWith(ctxFor(), input);
+    });
+
+    it('getCourseAnnouncementsAction uses the caller tenant and default pagination', async () => {
+      mockRequirePermission.mockResolvedValue(ctxFor({ tenantId: 'tenant-a' }));
+      mockListCourseAnnouncements.mockResolvedValue({
+        data: [{ id: 'announcement-1' }],
+        count: 1,
+      });
+
+      await expect(getCourseAnnouncementsAction('course-1')).resolves.toEqual({
+        data: [{ id: 'announcement-1' }],
+        count: 1,
+      });
+
+      expect(mockRequirePermission).toHaveBeenCalledWith([
+        'course_announcements.send',
+        'notifications.send',
+        'courses.read',
+      ]);
+      expect(mockListCourseAnnouncements).toHaveBeenCalledWith(
+        'course-1',
+        'tenant-a',
+        1,
+        10,
+      );
+    });
+
+    it('getCourseAnnouncementsAction rejects a missing tenant context', async () => {
+      mockRequirePermission.mockResolvedValue(ctxFor({ tenantId: null }));
+
+      await expect(getCourseAnnouncementsAction('course-1', 2, 25)).rejects.toThrow(
+        'Tenant context is missing',
+      );
+      expect(mockListCourseAnnouncements).not.toHaveBeenCalled();
     });
 
     it('deleteNotificationAction delegates to DeleteNotificationUseCase.execute', async () => {

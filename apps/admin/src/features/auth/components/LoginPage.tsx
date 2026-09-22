@@ -84,8 +84,9 @@ export function LoginPage() {
           setError(t('account_locked'));
         else if (reason === 'account_suspended') {
           const until = accessResult?.until;
-          const formattedUntil = until
-            ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(until))
+          const untilDate = until ? new Date(until) : null;
+          const formattedUntil = untilDate && Number.isFinite(untilDate.getTime())
+            ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(untilDate)
             : '';
           setError(formattedUntil ? t('account_suspended_until', { until: formattedUntil }) : t('account_suspended'));
         } else if (reason === 'maintenance_mode')

@@ -96,20 +96,22 @@ export function Topbar() {
           </button>
         )}
 
-        {/* Breadcrumb / Page Title */}
+        {/* Breadcrumb / Page Title — both the parent link and the sub-page
+            label truncate so a long path can never push the topbar wider
+            than the viewport. */}
         {isSubPage && pageSubtitle ? (
           <nav aria-label="breadcrumb" className="flex items-center gap-1.5 min-w-0">
             <button
               onClick={() => activeItem && router.push(activeItem.path as Parameters<typeof router.push>[0])}
-              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors shrink-0 whitespace-nowrap"
+              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap min-w-0 truncate max-w-[28vw] sm:max-w-none"
             >
               {parentLabel}
             </button>
             <ChevronRight
-              className="text-border/70 shrink-0"
+              className="text-border/70 shrink-0 rtl:-scale-x-100"
               style={{ fontSize: '0.9rem' }}
             />
-            <span className="text-sm font-semibold text-foreground truncate max-w-[280px] sm:max-w-[480px] md:max-w-[600px]">
+            <span className="text-sm font-semibold text-foreground truncate min-w-0 max-w-[38vw] sm:max-w-[480px] md:max-w-[600px]">
               {pageSubtitle}
             </span>
           </nav>

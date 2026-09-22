@@ -502,7 +502,9 @@ BEGIN
     ('worker_control_user_account'),
     ('logout_current_user'),
     ('reset_user_device'),
-    ('worker_reset_user_device')
+    ('worker_reset_user_device'),
+    ('terminate_user_sessions'),
+    ('worker_terminate_user_sessions')
   ) AS expected(routine_name)
   WHERE NOT EXISTS (
     SELECT 1
@@ -1521,12 +1523,10 @@ END $$;
 -- or partially-named call becomes ambiguous ("function ... is not unique").
 -- This is a real defect distinct from exact-duplicate definitions (Check 27):
 -- both bodies survive, but calling the function can error at runtime.
--- Known outstanding case at time of writing: public.get_course_stats has a
--- 3-optional-argument jsonb-summary overload and a 1-required-argument
--- per-course TABLE overload; calling get_course_stats(<uuid>) is ambiguous.
--- Neither overload is currently GRANTed to `authenticated` (see
--- 10_permissions.sql), so it is not client-reachable today, but it must be
--- resolved (by renaming one overload) before either is ever granted.
+-- PHASE 6 FIX (2026-09-21): the previously outstanding case is resolved —
+-- the redundant 1-arg per-course TABLE overload of public.get_course_stats
+-- was removed (no callers in either repository), so only the 3-optional-
+-- argument invoker summary variant remains and no ambiguity survives.
 DO $$
 DECLARE
   v_ambiguous text[];
@@ -1663,6 +1663,12 @@ END $$;
 -- workaround for a recursion or permission error. This is an outright ban,
 -- not a heuristic -- any such policy on a client-reachable table is
 -- treated as a critical failure regardless of table sensitivity.
+-- PHASE 6 FIX (2026-09-21): policies scoped TO platform/bypass-RLS roles
+-- only (postgres / service_role / supabase_admin) are excluded. Those are
+-- the definer-context policies FORCE ROW LEVEL SECURITY requires (see the
+-- security_incidents_definer_select/insert pair on public.security_incidents
+-- in 09_rls.sql): they can never match a client role, so a literal true
+-- inside them grants nothing and is the correct pattern, not a bypass.
 DO $$
 DECLARE
   v_bad text[];
@@ -1676,6 +1682,10 @@ BEGIN
       AND (
         regexp_replace(coalesce(qual, ''), '\s+', '', 'g') = 'true'
         OR regexp_replace(coalesce(with_check, ''), '\s+', '', 'g') = 'true'
+      )
+      AND (
+        SELECT bool_and(r NOT IN ('postgres', 'service_role', 'supabase_admin'))
+        FROM unnest(roles) r
       )
   ) bad_policies;
 
@@ -2186,7 +2196,246 @@ BEGIN
   );
 END $$;
 
--- Display Results (includes Checks 27-42 above)
+-- Check 43 (security telemetry, 2026-09-19): report_security_incident is
+-- the ONLY client write path into public.security_incidents — the direct
+-- INSERT grant to authenticated must be gone, the RPC must be executable
+-- by anon (pre-auth RASP events: user_id stays NULL) and authenticated
+-- alike, and the definer-context RLS policies (FORCE RLS + postgres role)
+-- must exist so the RPC can actually count and insert.
+DO $$
+DECLARE
+  v_rpc_anon boolean;
+  v_rpc_auth boolean;
+  v_direct_insert_gone boolean;
+  v_definer_policies int;
+  v_insert_policies int;
+BEGIN
+  SELECT has_function_privilege(
+    'anon', 'public.report_security_incident(text, text, text, boolean, text, text, text, jsonb)', 'EXECUTE'
+  ) INTO v_rpc_anon;
+  SELECT has_function_privilege(
+    'authenticated', 'public.report_security_incident(text, text, text, boolean, text, text, text, jsonb)', 'EXECUTE'
+  ) INTO v_rpc_auth;
+  SELECT NOT has_table_privilege('authenticated', 'public.security_incidents', 'INSERT')
+     AND NOT has_table_privilege('anon', 'public.security_incidents', 'INSERT')
+    INTO v_direct_insert_gone;
+  SELECT count(*) INTO v_definer_policies
+    FROM pg_policies
+   WHERE schemaname = 'public' AND tablename = 'security_incidents'
+     AND policyname IN ('security_incidents_definer_select', 'security_incidents_definer_insert');
+  SELECT count(*) INTO v_insert_policies
+    FROM pg_policies
+   WHERE schemaname = 'public' AND tablename = 'security_incidents'
+     AND policyname = 'security_incidents_insert';
+
+  INSERT INTO validation_results VALUES (
+    'Security Incident Telemetry Path',
+    CASE WHEN v_rpc_anon AND v_rpc_auth AND v_direct_insert_gone
+       AND v_definer_policies = 2 AND v_insert_policies = 1
+      THEN 'PASS' ELSE 'FAIL' END,
+    format(
+      'rpc anon=%s, rpc authenticated=%s, direct-insert revoked=%s, definer policies=%s/2, legacy insert policy present=%s/1',
+      v_rpc_anon, v_rpc_auth, v_direct_insert_gone, v_definer_policies, v_insert_policies
+    )
+  );
+END $$;
+
+-- Check 44 (orphan audit, 2026-09-19): every auth.users account must have a
+-- corresponding public.users row. A missing row is a "ghost" account whose
+-- password grant fails inside the custom_access_token hook
+-- (USER_NOT_PROVISIONED_OR_INACTIVE) — correct fail-closed behavior, but a
+-- nonzero count means a provisioning path leaked and real users are stuck
+-- in a 500 loop with no signal anywhere. Expected steady state: zero.
+DO $$
+DECLARE
+  v_ghosts bigint;
+  v_total bigint;
+BEGIN
+  SELECT
+    (SELECT count(*) FROM auth.users au
+      LEFT JOIN public.users pu ON pu.id = au.id
+     WHERE pu.id IS NULL OR pu.deleted_at IS NOT NULL)
+  INTO v_ghosts;
+  SELECT count(*) INTO v_total FROM auth.users;
+
+  INSERT INTO validation_results VALUES (
+    'Orphan Auth Users (ghost accounts)',
+    CASE WHEN v_ghosts = 0 THEN 'PASS' ELSE 'FAIL' END,
+    format(
+      '%s orphaned auth user(s) without an active public.users row (of %s total). ' ||
+      'Nonzero = a provisioning path leaked; provision or remove them — ' ||
+      'each one fails login with a GoTrue 500 (fail-closed by design).',
+      v_ghosts, v_total
+    )
+  );
+END $$;
+
+-- Check 45 (RPC EXECUTE least privilege, 2026-09-21): the Phase 5 sweep in
+-- 10_permissions.sql locked soft_delete_user to service_role and revoked
+-- anon/PUBLIC EXECUTE from every body-guarded SECURITY DEFINER function
+-- that predated the default-privileges REVOKE. Fail if anon can EXECUTE any
+-- of them (a leak here means either a new unguarded RPC was added without
+-- grant management, or the sweep statements no longer match a signature).
+DO $$
+DECLARE
+  v_leaks int;
+BEGIN
+  SELECT count(*) INTO v_leaks
+  FROM (
+    VALUES ('public.soft_delete_user(uuid,uuid)'),
+           ('public.get_course_outline(uuid)'),
+           ('public.get_course_lessons_with_access(uuid)'),
+           ('public.get_my_enrolled_courses()'),
+           ('public.get_my_recent_courses()'),
+           ('public.get_my_resume_lesson()'),
+           ('public.get_course_progress_summary(uuid)'),
+           ('public.search_courses_ranked(text,uuid,integer)'),
+           ('public.has_course_access(uuid,uuid)'),
+           ('public.has_course_access(uuid)'),
+           ('public.user_has_permission(uuid,text,uuid)'),
+           ('public.is_user_valid_cached(uuid,uuid)'),
+           ('public.get_auth_user_tenant_id()'),
+           ('public._get_tenant_fallback()'),
+           ('public.increment_token_version(uuid)'),
+           ('public.get_setting(text)'),
+           ('public.set_setting(text,jsonb)'),
+           ('public.get_valid_constant_values(text)'),
+           ('public.send_notification(text,text,text,text,uuid[])'),
+           ('public.send_notification(text,text,text,uuid[])'),
+           ('public.delete_notification(uuid)'),
+           ('public.enroll_student(uuid,uuid,timestamptz)'),
+           ('public.revoke_enrollment(uuid,uuid,text)'),
+           ('public.issue_warning(uuid,text,integer,text)'),
+           ('public.reorder_course_sections(uuid,uuid[])'),
+           ('public.reorder_section_lessons(uuid,uuid[])'),
+           ('public.get_dashboard_stats(uuid)'),
+           ('public.get_users_paginated(text,uuid,text,text,text,integer,timestamptz,timestamptz,integer,integer,text)'),
+           ('public.get_user_stats_summary(uuid,text)'),
+           ('public.get_daily_activity(uuid,integer,text,text)'),
+           ('public.get_student_progress_timeline(uuid,uuid)'),
+           ('public.get_system_health()'),
+           ('public.verify_audit_chain(bigint,int)'),
+           ('public.flush_activity_logs(integer)'),
+           ('public.release_stale_job_locks()'),
+           ('public.admin_get_jobs(int,int,text,text,timestamptz)'),
+           ('public.admin_get_job_counts()'),
+           ('public.admin_get_job(uuid)'),
+           ('public.admin_retry_job(uuid)'),
+           ('public.admin_cancel_job(uuid)'),
+           ('public.admin_enqueue_bulk_job(text,jsonb,uuid)'),
+           ('public.normalize_email(text)')
+  ) AS fns(sig)
+  WHERE has_function_privilege('anon', sig::regprocedure, 'EXECUTE');
+
+  INSERT INTO validation_results VALUES (
+    'RPC EXECUTE least privilege (anon)',
+    CASE WHEN v_leaks = 0 THEN 'PASS' ELSE 'FAIL' END,
+    format(
+      '%s public function(s) still EXECUTE-able by anon. ' ||
+      'Every SECURITY DEFINER RPC must carry an explicit REVOKE/GRANT pair ' ||
+      'in 10_permissions.sql (default PUBLIC EXECUTE is a launch blocker).',
+      v_leaks
+    )
+  );
+END $$;
+
+-- Check 46 (user_progress entitlement gate, 2026-09-21): the direct
+-- PostgREST write path on user_progress must be entitlement-gated, not
+-- merely owner-scoped. Verify the hardened WITH CHECK branches exist on
+-- the two policies (a drift back to ownership-only scoping re-opens
+-- fabricated-progress writes for non-entitled courses).
+DO $$
+DECLARE
+  v_missing int;
+BEGIN
+  -- Expect BOTH policies to exist AND carry the has_course_access branch;
+  -- 2 minus the number that do = number of gaps (missing policy counts).
+  SELECT 2 - count(*) INTO v_missing
+  FROM pg_policy p
+  WHERE p.polrelid = 'public.user_progress'::regclass
+    AND p.polname IN ('user_progress_insert_merged', 'user_progress_update_merged')
+    AND coalesce(pg_get_expr(p.polwithcheck, p.polrelid), '') LIKE '%has_course_access%';
+
+  INSERT INTO validation_results VALUES (
+    'user_progress entitlement gate',
+    CASE WHEN v_missing = 0 THEN 'PASS' ELSE 'FAIL' END,
+    format(
+      '%s user_progress INSERT/UPDATE polic(y/ies) missing the ' ||
+      'has_course_access entitlement branch — direct progress writes are ' ||
+      'no longer gated on course entitlement.',
+      v_missing
+    )
+  );
+END $$;
+
+
+-- Check 47 (Phase 6 EXECUTE sweep, 2026-09-21): the Phase 6 sweep in
+-- 10_permissions.sql revoked default PUBLIC/anon EXECUTE from every remaining
+-- public-schema function that predates the default-privileges REVOKE
+-- (worker_* bulk RPCs, body-guarded helpers, trigger functions, RLS-policy
+-- helpers). Fail if anon can EXECUTE any of them, or if a trigger function
+-- can be invoked by a client role via PostgREST.
+DO $$
+DECLARE
+  v_leaks int;
+BEGIN
+  SELECT count(*) INTO v_leaks
+  FROM (
+    VALUES ('public.worker_update_bulk_job(uuid,text,text,timestamptz,boolean,jsonb,boolean)'),
+           ('public.worker_fail_bulk_job(uuid,text)'),
+           ('public.worker_issue_warning(uuid,uuid,text,integer)'),
+           ('public.worker_reset_user_device(uuid,uuid)'),
+           ('public.worker_terminate_user_sessions(uuid,uuid,text)'),
+           ('public.reset_user_device(uuid)'),
+           ('public.increment_warning_count(uuid,uuid)'),
+           ('public.rebuild_permission_cache(uuid,uuid)'),
+           ('public.get_course_stats(uuid,uuid,text)'),
+           ('public.get_my_students(uuid)'),
+           ('public.log_app_open_location(double precision,double precision,double precision,text,uuid,jsonb)'),
+           ('public.notify_enrolled_students_for_course(uuid,text,text)'),
+           ('public.check_schema_naming_conventions()'),
+           ('public.enforce_jwt_tenant()'),
+           ('public.set_updated_at()'),
+           ('public.update_updated_at()'),
+           ('public.update_user_last_location()'),
+           ('public.fanout_notification()'),
+           ('public.audit_access_rule_change()'),
+           ('public.prevent_audit_mutation()'),
+           ('public.prevent_physical_delete()'),
+           ('public.terminate_sessions_on_status_change()'),
+           ('public.offline_entitlement_transition_guard()'),
+           ('public.trg_apply_course_rating_agg()'),
+           ('public.trg_audit_feature_flag_change()'),
+           ('public.trg_audit_lesson_state_change()'),
+           ('public.trg_cascade_course_soft_delete()'),
+           ('public.trg_cascade_section_deletes()'),
+           ('public.trg_enforce_permission_scope()'),
+           ('public.trg_enforce_single_active_session()'),
+           ('public.trg_enrollment_notify()'),
+           ('public.trg_hash_chain_activity_logs()'),
+           ('public.trg_increment_token_version_on_role_change()'),
+           ('public.trg_invalidate_perm_cache_on_role_permissions()'),
+           ('public.trg_invalidate_user_validity_cache()'),
+           ('public.trg_lessons_publish_notify()'),
+           ('public.trg_log_pii_access()'),
+           ('public.trg_prevent_prerequisite_cycles()'),
+           ('public.trg_rebuild_perm_cache()'),
+           ('public.trg_refresh_enrollment_totals_stmt()'),
+           ('public.trg_touch_feature_flag_row()')
+  ) AS fns(sig)
+  WHERE has_function_privilege('anon', sig::regprocedure, 'EXECUTE');
+
+  INSERT INTO validation_results VALUES (
+    'Phase 6 EXECUTE sweep (anon/PUBLIC)',
+    CASE WHEN v_leaks = 0 THEN 'PASS' ELSE 'FAIL' END,
+    COALESCE(NULLIF(v_leaks::text, '0') || ' Phase 6 function(s) still EXECUTE-able by anon '
+      || '— the 10_permissions.sql sweep signatures no longer match a definition.',
+      'No Phase 6 function is EXECUTE-able by anon or PUBLIC')
+  );
+END $$;
+
+
+-- Display Results (includes Checks 27-47 above)
 SELECT * FROM validation_results ORDER BY check_name;
 
 -- Summary
@@ -2197,13 +2446,13 @@ DECLARE
   v_fail int;
   v_warn int;
 BEGIN
-  SELECT COUNT(*), 
+  SELECT COUNT(*),
          COUNT(*) FILTER (WHERE status = 'PASS'),
          COUNT(*) FILTER (WHERE status = 'FAIL'),
          COUNT(*) FILTER (WHERE status = 'WARN')
   INTO v_total, v_pass, v_fail, v_warn
   FROM validation_results;
-  
+
   RAISE NOTICE '';
   RAISE NOTICE '========== VALIDATION SUMMARY ==========';
   RAISE NOTICE 'Total Checks: %', v_total;
@@ -2211,7 +2460,7 @@ BEGIN
   RAISE NOTICE 'Failed:       % ✗', v_fail;
   RAISE NOTICE 'Warnings:     % ⚠', v_warn;
   RAISE NOTICE '========================================';
-  
+
   IF v_fail > 0 THEN
     RAISE WARNING 'Schema validation failed - fix errors before deploying';
   END IF;

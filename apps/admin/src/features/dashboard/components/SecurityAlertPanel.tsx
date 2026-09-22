@@ -39,7 +39,7 @@ export function SecurityAlertPanel() {
               <div
                 key={alert.id}
                 className={cn(
-                  'p-3 rounded-lg border transition-all hover:translate-x-1 cursor-default',
+                  'p-3 rounded-lg border transition-all hover:translate-x-1 rtl:hover:-translate-x-1 cursor-default',
                   alert.risk_level === 'critical'
                     ? 'bg-red-500/10 border-red-500/20 text-red-900 dark:text-red-100'
                     : 'bg-amber-500/10 border-amber-500/20 text-amber-900 dark:text-amber-100',

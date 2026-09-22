@@ -278,18 +278,16 @@ export function ImportLessonsDialog({
         sx: {
           borderRadius: isMobile ? 0 : 3,
           boxShadow: '0 24px 64px rgba(0,0,0,0.15)',
-          backgroundColor: theme.palette.mode === 'dark' ? '#151521' : '#ffffff',
-          backgroundImage: theme.palette.mode === 'dark'
-            ? 'linear-gradient(145deg, #1e1e2d 0%, #151521 100%)'
-            : 'linear-gradient(145deg, #ffffff 0%, #f7f9fc 100%)',
+          backgroundColor: 'background.paper',
+          backgroundImage: 'none',
         },
       }}
       slotProps={{
         backdrop: {
           sx: {
             backgroundColor: theme.palette.mode === 'dark'
-              ? 'rgba(10, 10, 15, 0.85)'
-              : 'rgba(255, 255, 255, 0.85)',
+              ? 'rgba(9, 14, 26, 0.85)'
+              : 'rgba(15, 23, 42, 0.4)',
             backdropFilter: 'blur(8px)',
           }
         }
@@ -324,7 +322,7 @@ export function ImportLessonsDialog({
           overflowY: 'auto',
           '&::-webkit-scrollbar': { width: '8px' },
           '&::-webkit-scrollbar-thumb': {
-            backgroundColor: 'rgba(0,0,0,0.15)',
+            backgroundColor: 'hsl(var(--border))',
             borderRadius: '4px',
           },
         }}

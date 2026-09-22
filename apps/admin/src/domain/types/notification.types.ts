@@ -9,7 +9,9 @@
 
 export type TargetAudience = 'all' | 'students' | 'teachers' | 'admins';
 
-/** Admin broadcast notification as stored in the `notifications` table */
+export type TargetingMode = 'audience' | 'users' | 'course';
+
+/** Admin broadcast or course announcement notification as stored in the `notifications` table */
 export interface Notification {
   id: string;
   tenant_id: string;
@@ -17,9 +19,10 @@ export interface Notification {
   title: string;
   body: string;
   target_audience: TargetAudience;
-  targeting_mode?: 'audience' | 'users';
+  targeting_mode?: TargetingMode;
   target_permission: string | null;
   target_user_ids: string[] | null;
+  course_id?: string | null;
   is_deleted: boolean;
   created_at: string;
 }
@@ -37,13 +40,15 @@ export interface UserNotification {
   created_at: string;
 }
 
-/** Input for the send-notification use case (admin broadcast) */
+/** Input for the send-notification use case (admin broadcast or course announcement) */
 export interface SendNotificationInput {
   title: string;
   body: string;
   target_audience?: TargetAudience;
   target_permission?: string | null;
   target_user_ids?: string[] | null;
+  course_id?: string | null;
+  targeting_mode?: TargetingMode;
 }
 
 /** Per-audience totals shown on the notifications admin page */

@@ -2454,6 +2454,10 @@ BEGIN
 END;
 $$;
 
+-- Keep a single public signature. Having both (text, jsonb) and (text, text)
+-- makes PostgREST report an ambiguous function when p_value is sent as JSON.
+DROP FUNCTION IF EXISTS public.set_setting(text, text);
+
 CREATE OR REPLACE FUNCTION public.set_setting(p_key text, p_value jsonb)
 RETURNS void
 LANGUAGE plpgsql
@@ -2503,17 +2507,6 @@ BEGIN
   VALUES ('settings:' || p_key, 'settings', jsonb_build_object('key', p_key));
 END;
 $$;
-
-CREATE OR REPLACE FUNCTION public.set_setting(p_key text, p_value text)
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER SET search_path = public, pg_temp
-AS $$
-BEGIN
-  PERFORM public.set_setting(p_key, p_value::jsonb);
-END;
-$$;
-
 
 CREATE OR REPLACE FUNCTION public.check_rate_limit(
   p_action text,
@@ -2639,6 +2632,131 @@ BEGIN
 
   RETURN internal.log_activity_internal(
     p_user_id, p_type, p_details, p_ip, p_device_id, p_risk_level, p_tenant_id
+  );
+END;
+$$;
+
+-- ============================================================================
+-- Client RASP telemetry ingestion (2026-09-19).
+--
+-- The ONLY client write path into public.security_incidents: direct INSERT
+-- was revoked from every client role (see 10_permissions.sql). Accepts
+-- pre-auth callers (anon — user_id stays NULL, precisely preserving the
+-- pre-auth nature of the event) and authenticated callers (user_id pinned
+-- to auth.uid() server-side; a client-supplied user id is never trusted).
+--
+-- Validation is shape-based, deliberately NOT a threat-name whitelist: the
+-- detector set evolves with the RASP SDK, and a whitelist would silently
+-- drop future detector names — a false negative in security telemetry,
+-- the exact failure mode this table exists to prevent. Malformed payloads
+-- RAISE (surfacing as 400 via PostgREST); abusive-but-well-formed volume
+-- is absorbed SILENTLY (returns success — never reveal throttling to a
+-- caller probing the endpoint).
+--
+-- Trust tier: telemetry only. This table is never an authorization
+-- boundary (see the table comment in 03_tables.sql) — no blocking decision
+-- may be driven by these rows alone.
+--
+-- Rate limiting note: public.check_and_increment_rate_limit() was evaluated
+-- and deliberately NOT reused — its uniqueness key includes tenant_id (and
+-- user_id), which are NULL for pre-auth telemetry, and NULL keys never
+-- collide in the rate_limits upsert, so the counter could never increment
+-- for exactly the flood class this path must absorb. The per-source probe
+-- below counts this table itself (indexed: idx_security_incidents_ip_detected).
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.report_security_incident(
+  p_threat text,
+  p_platform text,
+  p_platform_version text DEFAULT NULL,
+  p_is_release_build boolean DEFAULT false,
+  p_device_fingerprint text DEFAULT NULL,
+  p_app_version text DEFAULT NULL,
+  p_app_build_number text DEFAULT NULL,
+  p_details jsonb DEFAULT NULL
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_user_id     uuid := auth.uid();
+  v_client_ip   inet;
+  v_recent      int;
+  v_recent_anon int;
+BEGIN
+  -- ── Shape validation (fail loud → 400) ──────────────────────────────────
+  p_threat := btrim(coalesce(p_threat, ''));
+  IF p_threat = '' OR length(p_threat) > 128 THEN
+    RAISE EXCEPTION 'INVALID_INCIDENT_THREAT';
+  END IF;
+  IF p_platform NOT IN
+     ('android', 'ios', 'linux', 'macos', 'windows', 'fuchsia') THEN
+    RAISE EXCEPTION 'INVALID_INCIDENT_PLATFORM';
+  END IF;
+  IF p_platform_version IS NOT NULL AND length(p_platform_version) > 64 THEN
+    RAISE EXCEPTION 'INVALID_INCIDENT_PLATFORM_VERSION';
+  END IF;
+  IF p_device_fingerprint IS NOT NULL AND length(p_device_fingerprint) > 128 THEN
+    RAISE EXCEPTION 'INVALID_INCIDENT_FINGERPRINT';
+  END IF;
+  IF p_app_version IS NOT NULL AND length(p_app_version) > 32 THEN
+    RAISE EXCEPTION 'INVALID_INCIDENT_APP_VERSION';
+  END IF;
+  IF p_app_build_number IS NOT NULL AND length(p_app_build_number) > 32 THEN
+    RAISE EXCEPTION 'INVALID_INCIDENT_APP_BUILD';
+  END IF;
+  IF p_details IS NOT NULL AND
+     (jsonb_typeof(p_details) <> 'object' OR pg_column_size(p_details) > 4096) THEN
+    RAISE EXCEPTION 'INVALID_INCIDENT_DETAILS';
+  END IF;
+
+  -- ── Client IP: server-derived only, from the PostgREST-injected proxy
+  -- headers. A client-supplied IP is never accepted. ──────────────────────
+  BEGIN
+    v_client_ip := btrim(split_part(
+      coalesce(current_setting('request.headers', true)::json
+               ->> 'x-forwarded-for', ''),
+      ',', 1
+    ))::inet;
+  EXCEPTION WHEN OTHERS THEN
+    v_client_ip := NULL;  -- missing/unparseable header: telemetry still lands
+  END;
+
+  -- ── Volume absorption. Probes run as the definer through the
+  -- security_incidents_definer_select policy (09_rls.sql) — FORCE ROW LEVEL
+  -- SECURITY applies to the table owner too. Per-source threshold applies
+  -- only when a source key actually exists; an IP-less caller is bounded by
+  -- the global anonymous breaker below instead. ──────────────────────────
+  IF v_client_ip IS NOT NULL THEN
+    SELECT count(*) INTO v_recent
+      FROM public.security_incidents
+     WHERE source_ip = v_client_ip
+       AND detected_at > pg_catalog.now() - interval '1 hour';
+    IF v_recent >= 30 THEN
+      RETURN;  -- silently absorbed
+    END IF;
+  END IF;
+
+  -- Global breaker for anonymous-originated rows only (pre-auth flood):
+  IF v_user_id IS NULL THEN
+    SELECT count(*) INTO v_recent_anon
+      FROM public.security_incidents
+     WHERE user_id IS NULL
+       AND detected_at > pg_catalog.now() - interval '5 minutes';
+    IF v_recent_anon >= 100 THEN
+      RETURN;  -- silently absorbed
+    END IF;
+  END IF;
+
+  INSERT INTO public.security_incidents (
+    user_id, threat, platform, platform_version, detected_at,
+    is_release_build, device_fingerprint, app_version, app_build_number,
+    source_ip, details
+  ) VALUES (
+    v_user_id, p_threat, p_platform, p_platform_version, pg_catalog.now(),
+    coalesce(p_is_release_build, false), p_device_fingerprint, p_app_version,
+    p_app_build_number, v_client_ip, p_details
   );
 END;
 $$;
@@ -2883,6 +3001,23 @@ BEGIN
     AND tenant_id = v_actor_tenant_id;
 
   GET DIAGNOSTICS v_count = ROW_COUNT;
+
+  -- FORCE-SIGN-OUT FIX (same as worker_terminate_user_sessions below):
+  -- "terminate sessions" must actually revoke — token_version bump (kills
+  -- the current JWT for the app's Realtime/poll detection) plus auth-
+  -- session deletion (kills the refresh token). Currently reached only
+  -- via service_role from control_user_account, which already performs
+  -- both steps itself, so this is a self-contained safety net if any new
+  -- caller routes here directly.
+  UPDATE public.users
+  SET token_version = token_version + 1,
+      updated_at = pg_catalog.now()
+  WHERE id = p_user_id
+    AND tenant_id = v_actor_tenant_id
+    AND deleted_at IS NULL;
+
+  PERFORM private.revoke_auth_sessions(p_user_id);
+
   RETURN v_count;
 END;
 $$;
@@ -3943,7 +4078,17 @@ AS $$
     FROM public.courses c
     WHERE c.deleted_at IS NULL
       AND c.status = 'published'
-      AND c.tenant_id = coalesce(p_tenant_id, public.get_current_tenant_id())
+      -- PHASE-5 FIX (2026-09-21): p_tenant_id is honored only for tenant
+      -- admins. Previously any caller could pass an arbitrary tenant id and
+      -- enumerate every tenant's published catalog cross-tenant; non-admin
+      -- callers are now pinned to their own JWT tenant (and anon gets a
+      -- NULL tenant → empty result). Admins keep the explicit-tenant
+      -- override for cross-tenant dashboard search.
+      AND c.tenant_id = CASE
+        WHEN public.is_admin_with_session_validation()
+          THEN coalesce(p_tenant_id, public.get_current_tenant_id())
+        ELSE public.get_current_tenant_id()
+      END
       AND c.search_vector @@ pg_catalog.plainto_tsquery('simple', p_query)
     ORDER BY rank DESC, c.created_at DESC
     LIMIT least(greatest(coalesce(p_limit, 20), 1), 100)
@@ -4036,15 +4181,22 @@ RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
+DECLARE
+  v_changed_by uuid := auth.uid();
 BEGIN
-  IF NEW.is_published <> OLD.is_published THEN
+  -- Course deletion is performed through the server's service-role client.
+  -- Its cascade sets lessons to unpublished, but service_role has no caller
+  -- JWT, so auth.uid() is NULL. `changed_by` is intentionally NOT NULL;
+  -- skip this per-lesson transition row for that trusted system cascade.
+  -- The parent course deletion is still recorded by DeleteCourseUseCase.
+  IF NEW.is_published <> OLD.is_published AND v_changed_by IS NOT NULL THEN
     INSERT INTO audit.lesson_state_transitions (
       lesson_id, old_state, new_state, changed_by
     ) VALUES (
       NEW.id,
       CASE WHEN OLD.is_published THEN 'published' ELSE 'draft' END,
       CASE WHEN NEW.is_published THEN 'published' ELSE 'draft' END,
-      auth.uid()
+      v_changed_by
     );
   END IF;
   RETURN NEW;
@@ -4113,6 +4265,27 @@ LANGUAGE plpgsql
 SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
 BEGIN
+  -- PHASE 6 FIX (2026-09-21): narrow trusted-path exemption so the
+  -- retention jobs can actually work. maintenance.archive_soft_deleted_data()
+  -- and internal.purge_soft_deleted_records() issue physical DELETEs by
+  -- design (move-to-archive / end-of-retention purge) but this guard made
+  -- every one of those DELETEs raise, so archival was silently copy-only
+  -- and the purge job failed hard on its first due row. The exemption
+  -- requires BOTH the transaction-local GUC (set by the job itself via
+  -- set_config(..., true)) AND a trusted server context (the pg_cron
+  -- postgres/supabase_admin role, or an explicit service_role JWT).
+  -- anon/authenticated can set arbitrary GUCs but can never satisfy the
+  -- role half, and the role half alone (service_role) is not enough
+  -- without the GUC — so direct service-role deletes stay blocked unless
+  -- the job's own code path opted in.
+  IF pg_catalog.current_setting('eduzone.allow_physical_delete', true) = 'on'
+     AND (
+       current_user IN ('postgres', 'supabase_admin')
+       OR pg_catalog.current_setting('request.jwt.claim.role', true) = 'service_role'
+     )
+  THEN
+    RETURN OLD;
+  END IF;
   RAISE EXCEPTION 'Physical DELETE not allowed on %. Use soft_delete_*() functions instead.', TG_TABLE_NAME;
 END;
 $$;
@@ -5112,6 +5285,26 @@ BEGIN
     AND tenant_id = v_tenant_id;
 
   GET DIAGNOSTICS v_count = ROW_COUNT;
+
+  -- FORCE-SIGN-OUT FIX: closing the telemetry rows above only hides the
+  -- sessions from the admin UI — the student app kept its valid JWT and
+  -- stayed signed in (public.sessions.is_active is read by nothing in the
+  -- auth path; validate_user_session() checks users.token_version and
+  -- auth.sessions). "Force Sign Out" must cross the same AUTH-REV-02
+  -- boundary as reset_user_device / control_user_account: bump
+  -- token_version (the app's Realtime users-table watcher and
+  -- check_student_app_access poll both treat a bump as forced logout) and
+  -- delete the Supabase Auth sessions (otherwise a still-live refresh
+  -- token mints a fresh, version-matching JWT and the user returns).
+  UPDATE public.users
+  SET token_version = token_version + 1,
+      updated_at = pg_catalog.now()
+  WHERE id = p_user_id
+    AND tenant_id = v_tenant_id
+    AND deleted_at IS NULL;
+
+  PERFORM private.revoke_auth_sessions(p_user_id);
+
   RETURN v_count;
 END;
 $$;
@@ -5222,8 +5415,14 @@ DECLARE
   v_parent regclass;
   v_year integer := coalesce(p_year, pg_catalog.date_part('year', pg_catalog.now())::integer + 1);
   v_partition_name text := p_table || '_' || v_year::text;
+  v_future_name text := p_table || '_future';
   v_start date := pg_catalog.make_date(v_year, 1, 1);
   v_end date := pg_catalog.make_date(v_year + 1, 1, 1);
+  v_future regclass;
+  v_future_start date;
+  v_future_start_year integer;
+  v_partition_key text;
+  v_is_attached boolean;
 BEGIN
   IF coalesce(auth.role(), '') <> 'service_role'
      AND current_user NOT IN ('app_executor', 'app_maintenance', 'postgres', 'supabase_admin')
@@ -5237,6 +5436,65 @@ BEGIN
   END IF;
 
   IF to_regclass(format('%I.%I', p_schema, v_partition_name)) IS NULL THEN
+    /*
+     * A MAXVALUE catch-all overlaps every future range, so PostgreSQL will
+     * reject CREATE TABLE ... PARTITION OF while it is attached.  Roll that
+     * catch-all forward one year at a time before creating the requested
+     * partition.  Keeping the same relation preserves its RLS policies and
+     * grants, while the row move makes this safe even if a future-dated row
+     * was inserted before the maintenance tick ran.
+     */
+    v_future := to_regclass(format('%I.%I', p_schema, v_future_name));
+
+    IF v_future IS NOT NULL THEN
+      SELECT EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_inherits
+        WHERE inhparent = v_parent
+          AND inhrelid = v_future
+      )
+      INTO v_is_attached;
+
+      IF v_is_attached THEN
+        SELECT (
+          pg_catalog.regexp_match(
+            pg_catalog.pg_get_expr(c.relpartbound, c.oid),
+            $partition_bound$FROM \('([0-9]{4})-[0-9]{2}-[0-9]{2}[^']*'\) TO \(MAXVALUE\)$partition_bound$
+          )
+        )[1]::integer
+        INTO v_future_start_year
+        FROM pg_catalog.pg_class c
+        WHERE c.oid = v_future;
+
+        v_future_start := pg_catalog.make_date(v_future_start_year, 1, 1);
+
+        IF v_future_start IS NOT NULL AND v_start >= v_future_start THEN
+          SELECT a.attname
+          INTO v_partition_key
+          FROM pg_catalog.pg_partitioned_table pt
+          CROSS JOIN LATERAL pg_catalog.unnest(pt.partattrs)
+            WITH ORDINALITY AS key(attnum, ordinal)
+          JOIN pg_catalog.pg_attribute a
+            ON a.attrelid = pt.partrelid
+           AND a.attnum = key.attnum
+          WHERE pt.partrelid = v_parent
+            AND key.ordinal = 1;
+
+          IF v_partition_key IS NULL THEN
+            RAISE EXCEPTION 'UNSUPPORTED_PARTITION_KEY %.%', p_schema, p_table;
+          END IF;
+
+          EXECUTE format(
+            'ALTER TABLE %I.%I DETACH PARTITION %I.%I',
+            p_schema,
+            p_table,
+            p_schema,
+            v_future_name
+          );
+        END IF;
+      END IF;
+    END IF;
+
     EXECUTE format(
       'CREATE TABLE %I.%I PARTITION OF %I.%I FOR VALUES FROM (%L) TO (%L)',
       p_schema,
@@ -5246,6 +5504,40 @@ BEGIN
       v_start,
       v_end
     );
+
+    IF v_future IS NOT NULL
+       AND v_is_attached
+       AND v_future_start IS NOT NULL
+       AND v_start >= v_future_start THEN
+      EXECUTE format(
+        'INSERT INTO %I.%I SELECT * FROM %I.%I WHERE %I >= %L AND %I < %L',
+        p_schema,
+        p_table,
+        p_schema,
+        v_future_name,
+        v_partition_key,
+        v_start,
+        v_partition_key,
+        v_end
+      );
+      EXECUTE format(
+        'DELETE FROM %I.%I WHERE %I >= %L AND %I < %L',
+        p_schema,
+        v_future_name,
+        v_partition_key,
+        v_start,
+        v_partition_key,
+        v_end
+      );
+      EXECUTE format(
+        'ALTER TABLE %I.%I ATTACH PARTITION %I.%I FOR VALUES FROM (%L) TO (MAXVALUE)',
+        p_schema,
+        p_table,
+        p_schema,
+        v_future_name,
+        v_end
+      );
+    END IF;
   END IF;
 
   EXECUTE format('ALTER TABLE %I.%I ENABLE ROW LEVEL SECURITY', p_schema, v_partition_name);
@@ -5312,11 +5604,14 @@ END $$;
 -- user_location_logs, rate_limits, push_deliveries and download_logs grew
 -- without bound. These deletes run from the postgres role (pg_cron), so RLS
 -- does not apply. Retention windows (documented, adjust deliberately):
---   rate_limits 90d · activity_log_queue (flushed rows only) 90d ·
+--   rate_limits 90d · security_incidents 90d ·
+--   activity_log_queue (flushed rows only) 90d ·
 --   user_location_logs 180d (privacy minimization) · push_deliveries 180d ·
 --   download_logs 365d · activity_logs / video_views 730d.
 -- session_snapshots is deliberately NOT cleaned: one small row per real
--- login is the security audit trail.
+-- login is the security audit trail. security_incidents IS cleaned: RASP
+-- telemetry is high-volume, not a per-login audit trail, and 90d matches
+-- rate_limits — enough for repackaging/abuse trend analysis.
 CREATE OR REPLACE FUNCTION maintenance.apply_telemetry_retention()
 RETURNS void
 LANGUAGE plpgsql
@@ -5324,24 +5619,59 @@ SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_cutoff timestamptz;
+  -- PHASE 6 FIX (2026-09-21): each DELETE runs in its own subtransaction so
+  -- a single failing target (bad column, trigger, FK) can no longer abort
+  -- the whole nightly job and silently disable retention for every table.
+  -- Before this fix the job raised 42703 on its first statement every night
+  -- (activity_logs has no logged_at column; user_location_logs has no
+  -- accessed_at column), so NOTHING below it ever ran.
+  v_errors text := '';
 BEGIN
-  v_cutoff := pg_catalog.now() - interval '730 days';
-  DELETE FROM public.activity_logs WHERE logged_at < v_cutoff;
-  DELETE FROM public.video_views WHERE viewed_at < v_cutoff;
+  -- activity_logs is deliberately NOT deleted here: trg_audit_mutation
+  -- (prevent_audit_mutation) blocks all UPDATE/DELETE on the hash-chained
+  -- audit trail by design, so retention for that table is partition-based
+  -- (see maintenance.archive_old_partitions / manage_partitions), not
+  -- row-based. The previous attempt to DELETE FROM it here was doubly
+  -- broken: wrong column name AND blocked by the immutability trigger.
+  BEGIN
+    v_cutoff := pg_catalog.now() - interval '730 days';
+    DELETE FROM public.video_views WHERE viewed_at < v_cutoff;
+  EXCEPTION WHEN OTHERS THEN
+    v_errors := v_errors || 'video_views: ' || SQLERRM || '; ';
+  END;
 
-  v_cutoff := pg_catalog.now() - interval '180 days';
-  DELETE FROM public.user_location_logs WHERE accessed_at < v_cutoff;
-  DELETE FROM public.push_deliveries WHERE created_at < v_cutoff;
+  BEGIN
+    v_cutoff := pg_catalog.now() - interval '180 days';
+    -- PHASE 6 FIX: partition key is logged_at (there is no accessed_at
+    -- column on user_location_logs).
+    DELETE FROM public.user_location_logs WHERE logged_at < v_cutoff;
+    DELETE FROM public.push_deliveries WHERE created_at < v_cutoff;
+  EXCEPTION WHEN OTHERS THEN
+    v_errors := v_errors || '180d targets: ' || SQLERRM || '; ';
+  END;
 
-  v_cutoff := pg_catalog.now() - interval '90 days';
-  DELETE FROM public.rate_limits WHERE window_start < v_cutoff;
-  -- Only rows the queue worker already flushed are safe to remove; an
-  -- unflushed row is pending work, never garbage.
-  DELETE FROM public.activity_log_queue
-   WHERE flushed_at IS NOT NULL AND flushed_at < v_cutoff;
+  BEGIN
+    v_cutoff := pg_catalog.now() - interval '90 days';
+    DELETE FROM public.rate_limits WHERE window_start < v_cutoff;
+    -- Only rows the queue worker already flushed are safe to remove; an
+    -- unflushed row is pending work, never garbage.
+    DELETE FROM public.activity_log_queue
+     WHERE flushed_at IS NOT NULL AND flushed_at < v_cutoff;
+    DELETE FROM public.security_incidents WHERE detected_at < v_cutoff;
+  EXCEPTION WHEN OTHERS THEN
+    v_errors := v_errors || '90d targets: ' || SQLERRM || '; ';
+  END;
 
-  v_cutoff := pg_catalog.now() - interval '365 days';
-  DELETE FROM public.download_logs WHERE downloaded_at < v_cutoff;
+  BEGIN
+    v_cutoff := pg_catalog.now() - interval '365 days';
+    DELETE FROM public.download_logs WHERE downloaded_at < v_cutoff;
+  EXCEPTION WHEN OTHERS THEN
+    v_errors := v_errors || 'download_logs: ' || SQLERRM || '; ';
+  END;
+
+  IF v_errors <> '' THEN
+    RAISE WARNING 'apply_telemetry_retention partial failures: %', v_errors;
+  END IF;
 END;
 $$;
 
@@ -5788,28 +6118,15 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.get_course_stats(p_tenant_id uuid)
-RETURNS TABLE (
-  id uuid,
-  title text,
-  category text,
-  active_students bigint,
-  completed_students bigint,
-  avg_progress_pct numeric,
-  last_enrollment_at timestamptz
-)
-LANGUAGE plpgsql
-STABLE
-SECURITY DEFINER SET search_path = public, pg_temp
-AS $$
-BEGIN
-  RETURN QUERY
-  SELECT v.id, v.title, v.category, v.active_students, v.completed_students, v.avg_progress_pct, v.last_enrollment_at
-  FROM private.vw_course_stats v
-  WHERE v.tenant_id = p_tenant_id
-    AND public.tenant_matches_jwt(p_tenant_id);
-END;
-$$;
+-- PHASE 6 FIX (2026-09-21): the redundant 1-arg SECURITY DEFINER overload is
+-- removed. It made every untyped/positional call ambiguous against the
+-- 3-arg invoker variant below (whose trailing parameters all carry defaults
+-- — "function public.get_course_stats(uuid) is not unique"), a defect
+-- VALIDATION Check 28 has been warning about. Neither overload has any
+-- caller (grep-verified across EduZone_dashboard and EduZone_App,
+-- 2026-09-21); the 3-arg SECURITY INVOKER variant is the canonical
+-- definition because invoker rights let course RLS apply natively.
+DROP FUNCTION IF EXISTS public.get_course_stats(uuid);
 
 CREATE OR REPLACE FUNCTION public.get_student_progress_timeline(p_tenant_id uuid, p_student_id uuid DEFAULT NULL)
 RETURNS TABLE (
@@ -5824,6 +6141,22 @@ STABLE
 SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
 BEGIN
+  -- PHASE 6 FIX (2026-09-21): tenant_matches_jwt() only proves the caller
+  -- belongs to p_tenant_id — it says nothing about WHICH student's rows the
+  -- caller may read, so any in-tenant user could previously fetch any other
+  -- user's aggregate progress timeline (active/completed counts, average
+  -- progress) by passing an arbitrary p_student_id. Restrict to holders of
+  -- the reports.read permission, tenant admins, or the student themselves.
+  -- p_student_id IS NULL (whole-tenant reporting) stays reports.read/admin
+  -- only. No caller in EduZone_dashboard or EduZone_App reaches this RPC
+  -- without one of those grants (grep-verified 2026-09-21).
+  IF p_student_id IS DISTINCT FROM auth.uid()
+     AND auth.role() <> 'service_role'
+     AND NOT public.user_has_permission(auth.uid(), 'reports.read', p_tenant_id)
+     AND NOT public.is_current_user_admin_lite() THEN
+    RAISE EXCEPTION 'PERMISSION_DENIED';
+  END IF;
+
   RETURN QUERY
   SELECT v.student_id, v.active_courses, v.completed_courses, v.overall_progress_pct, v.last_activity_at
   FROM private.vw_student_progress_timeline v
@@ -6002,24 +6335,74 @@ SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_count integer := 0;
+  v_job internal.job_queue%ROWTYPE;
   v_course_id uuid;
-  v_last_checked timestamptz;
+  v_worker_id text := 'enrollment-totals-' || gen_random_uuid()::text;
 BEGIN
-  SELECT last_processed_at INTO v_last_checked
-  FROM internal.job_progress
-  WHERE job_type = 'UPDATE_ENROLLMENT_TOTALS';
-  
-  v_last_checked := COALESCE(v_last_checked, '1970-01-01'::timestamptz);
+  IF coalesce(auth.role(), current_user) NOT IN
+      ('service_role', 'postgres', 'supabase_admin') THEN
+    RAISE EXCEPTION 'PERMISSION_DENIED';
+  END IF;
 
-  -- Aggregate courses that need updating based on recent lesson changes
-  FOR v_course_id IN 
-    SELECT DISTINCT course_id 
-    FROM public.lessons 
-    WHERE updated_at > v_last_checked
-    LIMIT p_limit
+  IF coalesce(p_limit, 100) <= 0 THEN
+    RETURN 0;
+  END IF;
+
+  -- The lesson trigger enqueues one job per affected course. Dequeue those
+  -- rows explicitly; a timestamp checkpoint can never acknowledge the queue
+  -- row and leaves it pending forever.
+  FOR v_job IN
+    SELECT *
+    FROM internal.dequeue_job(
+      v_worker_id,
+      ARRAY[p_job_type],
+      300,
+      greatest(1, least(coalesce(p_limit, 100), 500))
+    )
   LOOP
-    PERFORM internal.apply_update_enrollment_totals_course(v_course_id);
-    v_count := v_count + 1;
+    BEGIN
+      IF nullif(pg_catalog.btrim(v_job.payload ->> 'course_id'), '') IS NULL THEN
+        RAISE EXCEPTION 'MISSING_COURSE_ID';
+      END IF;
+
+      v_course_id := (v_job.payload ->> 'course_id')::uuid;
+      PERFORM internal.apply_update_enrollment_totals_course(v_course_id);
+
+      UPDATE internal.job_queue
+      SET status = 'done',
+          result = jsonb_build_object('course_id', v_course_id),
+          error_message = NULL,
+          next_retry_at = NULL,
+          locked_by_worker_id = NULL,
+          locked_at = NULL,
+          lock_expires_at = NULL,
+          finished_at = pg_catalog.now(),
+          updated_at = pg_catalog.now()
+      WHERE id = v_job.id;
+
+      v_count := v_count + 1;
+    EXCEPTION WHEN OTHERS THEN
+      UPDATE internal.job_queue
+      SET status = CASE WHEN attempts >= max_attempts THEN 'failed' ELSE 'pending' END,
+          next_retry_at = CASE
+            WHEN attempts >= max_attempts THEN NULL
+            ELSE pg_catalog.now() + least(
+              interval '15 minutes',
+              greatest(
+                interval '30 seconds',
+                pg_catalog.make_interval(
+                  secs => power(2, greatest(attempts - 1, 0))::integer * 30
+                )
+              )
+            )
+          END,
+          error_message = left(SQLERRM, 1000),
+          locked_by_worker_id = NULL,
+          locked_at = NULL,
+          lock_expires_at = NULL,
+          updated_at = pg_catalog.now()
+      WHERE id = v_job.id;
+    END;
   END LOOP;
 
   INSERT INTO internal.job_progress (job_type, checkpoint_key, last_processed_at, processed_count)
@@ -6775,6 +7158,12 @@ BEGIN
     RAISE EXCEPTION 'PERMISSION_DENIED: Only service_role can purge';
   END IF;
 
+  -- PHASE 6 FIX (2026-09-21): transaction-local opt-in for the physical
+  -- delete guard. Without it, trg_prevent_physical_delete_users raised on
+  -- the first due user row and this whole job aborted; see
+  -- prevent_physical_delete() for the carve-out contract.
+  PERFORM pg_catalog.set_config('eduzone.allow_physical_delete', 'on', true);
+
   v_retention_days := coalesce((public.get_setting('retention_deleted_user_days') #>> '{}')::integer, 90);
   DELETE FROM public.users
   WHERE deleted_at IS NOT NULL
@@ -7029,6 +7418,12 @@ DECLARE
   v_progress_count integer := 0;
   v_cutoff timestamptz;
 BEGIN
+  -- PHASE 6 FIX (2026-09-21): transaction-local opt-in for the physical
+  -- delete guard (see prevent_physical_delete()). Without it the DELETE
+  -- half of every archive block below raised
+  -- "Physical DELETE not allowed on ..." and archival was copy-only.
+  PERFORM pg_catalog.set_config('eduzone.allow_physical_delete', 'on', true);
+
   -- Set cutoff time to exactly 6 months ago
   v_cutoff := pg_catalog.now() - interval '6 months';
 
@@ -7216,7 +7611,7 @@ BEGIN
             WHERE nt.notification_id = v_notif_id AND nt.user_id = u.id
           )
           OR (
-            coalesce(v_targeting_mode, 'audience') <> 'users'
+            coalesce(v_targeting_mode, 'audience') NOT IN ('users', 'course')
             AND NOT EXISTS (
               SELECT 1 FROM public.notification_targets nt
               WHERE nt.notification_id = v_notif_id
@@ -8142,7 +8537,7 @@ DECLARE
   v_session jsonb := public._session_status();
   v_role text := v_session ->> 'role';
   v_tenant_id text := v_session ->> 'tenant_id';
-  v_token_version text := v_session ->> 'token_version';
+  v_token_version integer := (v_session ->> 'token_version')::integer;
   v_maintenance_excluded_roles text[] := ARRAY[]::text[];
   v_maintenance_excluded_users uuid[] := ARRAY[]::uuid[];
 BEGIN
