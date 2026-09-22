@@ -22,7 +22,7 @@ import {
 } from '@/application/use-cases/notifications/manage-notifications.use-case';
 import { SendCourseAnnouncementUseCase } from '@/application/use-cases/notifications/send-course-announcement.use-case';
 import { SendNotificationUseCase } from '@/application/use-cases/notifications/send-notification.use-case';
-import { toClientMessage, ValidationError } from '@/domain/errors';
+import { ForbiddenError, toClientMessage, ValidationError } from '@/domain/errors';
 import type { UpsertAccessRuleInput } from '@/domain/schemas/settings.schema';
 import type { CourseWithStats } from '@/domain/types/analytics.types';
 import type { ActivityLogQueueEntry } from '@/domain/types/audit.types';
@@ -352,6 +352,18 @@ export async function getCourseAnnouncementsAction(
     'courses.read',
   ]);
   if (!ctx.tenantId) throw new ValidationError('Tenant context is missing');
+  // IDOR guard (parity with SendCourseAnnouncementUseCase): a teacher may
+  // only list announcements for a course they own. Admins/super_admins see
+  // every course in the tenant.
+  if (ctx.role === 'teacher') {
+    const { ownsCourse } =
+      await makeNotificationAdminRepository().verifyTeacherCourseOwnership(
+        courseId,
+        ctx.userId,
+        ctx.tenantId,
+      );
+    if (!ownsCourse) throw new ForbiddenError('You do not own this course');
+  }
   return makeNotificationAdminRepository().listCourseAnnouncements(
     courseId,
     ctx.tenantId,
@@ -361,11 +373,11 @@ export async function getCourseAnnouncementsAction(
 }
 
 export async function deleteNotificationAction(id: string): Promise<void> {
-  const ctx = await requirePermission([
-    'notifications.delete',
-    'notifications.send',
-    'settings.write',
-  ]);
+  // Delete requires the dedicated permission — NOT notifications.send.
+  // The previous OR-list (notifications.send / settings.write) let any
+  // sender-capable role delete arbitrary tenant broadcasts, which the
+  // database RPC (delete_notification) never allowed.
+  const ctx = await requirePermission('notifications.delete');
   return new DeleteNotificationUseCase(makeNotificationAdminRepository(), makeAuditLogger()).execute(
     ctx,
     id,
@@ -377,9 +389,11 @@ export async function getMyNotificationsAction(
   unreadOnly = false,
 ): Promise<MyNotificationsResult> {
   const userId = await requireUser();
+  // Clamp: a crafted call must not turn the inbox into a bulk export.
+  const safeLimit = Math.min(100, Math.max(1, Math.floor(limit) || 20));
   return new GetMyNotificationsUseCase(makeNotificationAdminRepository()).execute(
     userId,
-    limit,
+    safeLimit,
     unreadOnly,
   );
 }

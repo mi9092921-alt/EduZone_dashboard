@@ -2001,6 +2001,8 @@ DECLARE
   v_tenant_id uuid;
   v_id uuid;
   v_final_user_ids uuid[] := p_target_user_ids;
+  v_sender_role text;
+  v_allowed_roles text[];
   v_targeting_mode text := CASE
     WHEN cardinality(coalesce(p_target_user_ids, ARRAY[]::uuid[])) > 0 THEN 'users'
     ELSE 'audience'
@@ -2013,6 +2015,34 @@ BEGIN
   END IF;
 
   IF NOT public.user_has_permission(v_uid, 'notifications.send', v_tenant_id) THEN
+    RAISE EXCEPTION 'PERMISSION_DENIED';
+  END IF;
+
+  -- Role-scope matrix (parity with the dashboard's SendNotificationUseCase):
+  -- who a sender may target depends on the sender's own role. Without this,
+  -- any holder of notifications.send (e.g. a teacher) could broadcast
+  -- directly to admins via this RPC even though the dashboard blocks it.
+  -- The lookup is deliberately tenant-agnostic: a switched super_admin's
+  -- profile row lives in their HOME tenant, not the acting one. Recipient
+  -- scoping below remains strictly bound to v_tenant_id, so this only
+  -- decides the sender's allowed recipient roles — never widens reach.
+  SELECT primary_role INTO v_sender_role
+  FROM public.users
+  WHERE id = v_uid
+    AND deleted_at IS NULL;
+
+  IF v_sender_role IS NULL THEN
+    RAISE EXCEPTION 'AUTH_REQUIRED';
+  END IF;
+
+  v_allowed_roles := CASE v_sender_role
+    WHEN 'super_admin' THEN ARRAY['student','teacher','admin','super_admin']::text[]
+    WHEN 'admin'       THEN ARRAY['student','teacher']::text[]
+    WHEN 'teacher'     THEN ARRAY['student']::text[]
+    ELSE ARRAY[]::text[]
+  END;
+
+  IF cardinality(v_allowed_roles) = 0 THEN
     RAISE EXCEPTION 'PERMISSION_DENIED';
   END IF;
 
@@ -2041,7 +2071,10 @@ BEGIN
   )
   RETURNING id INTO v_id;
 
-  -- 2. Fanout immediately to in-app notifications
+  -- 2. Fanout immediately to in-app notifications. The sender's role-scope
+  -- applies to BOTH explicit ids and permission-resolved ids — out-of-scope
+  -- ids are silently dropped, never rejected wholesale (matches the
+  -- dashboard's resolveTargetUserIds filtering).
   IF v_final_user_ids IS NOT NULL AND array_length(v_final_user_ids, 1) IS NOT NULL THEN
     INSERT INTO public.notification_targets (notification_id, user_id)
     SELECT v_id, u.id
@@ -2049,6 +2082,7 @@ BEGIN
     WHERE u.id = ANY(v_final_user_ids)
       AND u.tenant_id = v_tenant_id
       AND u.deleted_at IS NULL
+      AND u.primary_role = ANY(v_allowed_roles)
     ON CONFLICT DO NOTHING;
 
     INSERT INTO public.user_notifications (user_id, notification_id, tenant_id, is_read)
@@ -2057,6 +2091,7 @@ BEGIN
     WHERE u.id = ANY(v_final_user_ids)
       AND u.tenant_id = v_tenant_id
       AND u.deleted_at IS NULL
+      AND u.primary_role = ANY(v_allowed_roles)
     ON CONFLICT (user_id, notification_id) DO NOTHING;
   ELSE
     INSERT INTO public.user_notifications (user_id, notification_id, tenant_id, is_read)
@@ -2065,6 +2100,7 @@ BEGIN
     WHERE u.tenant_id = v_tenant_id
       AND u.deleted_at IS NULL
       AND u.account_status = 'active'
+      AND u.primary_role = ANY(v_allowed_roles)
       AND (
             coalesce(p_target_audience, 'all') = 'all'
         OR (p_target_audience = 'students' AND u.primary_role = 'student')
@@ -2112,6 +2148,25 @@ BEGIN
     NULL;
   END;
 
+  -- M13 parity: RPC-originated sends must be audited like dashboard sends.
+  -- Details carry counts/ids only — never the notification body. NULL
+  -- tenant_id lets log_activity_internal derive the pair from the actor
+  -- row (explicit override is service_role-only).
+  PERFORM internal.log_activity_internal(
+    v_uid,
+    'notification_sent',
+    jsonb_build_object(
+      'notification_id', v_id,
+      'target_audience', coalesce(p_target_audience, 'all'),
+      'targeting_mode', v_targeting_mode,
+      'source', 'rpc',
+      'recipient_count', (
+        SELECT count(*) FROM public.user_notifications WHERE notification_id = v_id
+      )
+    ),
+    NULL, NULL, 'medium', NULL
+  );
+
   RETURN v_id;
 END;
 $$;
@@ -2153,6 +2208,14 @@ BEGIN
   IF NOT FOUND THEN
     RAISE EXCEPTION 'NOTIFICATION_NOT_FOUND';
   END IF;
+
+  -- M13 parity: RPC-originated deletes must be audited like dashboard deletes.
+  PERFORM internal.log_activity_internal(
+    v_uid,
+    'notification_deleted',
+    jsonb_build_object('notification_id', p_notification_id, 'source', 'rpc'),
+    NULL, NULL, 'medium', NULL
+  );
 END;
 $$;
 

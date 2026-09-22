@@ -121,9 +121,12 @@ vi.mock('@/infrastructure/repos/course-admin.repository', () => ({
   makeCourseAdminRepository: vi.fn(),
 }));
 const mockListCourseAnnouncements = vi.fn();
+const mockVerifyTeacherCourseOwnership = vi.fn().mockResolvedValue({ ownsCourse: true });
 vi.mock('@/infrastructure/repos/notifications.repository', () => ({
   makeNotificationAdminRepository: vi.fn(() => ({
     listCourseAnnouncements: (...args: unknown[]) => mockListCourseAnnouncements(...args),
+    verifyTeacherCourseOwnership: (...args: unknown[]) =>
+      mockVerifyTeacherCourseOwnership(...args),
   })),
 }));
 
@@ -231,11 +234,14 @@ const ADMIN_CTX = {
   permissions: ['settings.write', 'feature_flags.manage', 'jobs.manage'],
 };
 
-function ctxFor(overrides: { tenantId?: string | null; permissions?: string[] } = {}) {
+function ctxFor(
+  overrides: { tenantId?: string | null; permissions?: string[]; role?: string } = {},
+) {
   return {
     ...ADMIN_CTX,
     tenantId: overrides.tenantId === undefined ? ADMIN_CTX.tenantId : overrides.tenantId,
     permissions: overrides.permissions ?? ADMIN_CTX.permissions,
+    role: overrides.role ?? ADMIN_CTX.role,
   };
 }
 
@@ -640,17 +646,45 @@ describe('admin.actions.ts — remaining action surface', () => {
       expect(mockListCourseAnnouncements).not.toHaveBeenCalled();
     });
 
-    it('deleteNotificationAction delegates to DeleteNotificationUseCase.execute', async () => {
+    it('deleteNotificationAction requires the dedicated delete permission and delegates', async () => {
       mockRequirePermission.mockResolvedValue(ctxFor());
 
       await deleteNotificationAction('notification-1');
 
-      expect(mockRequirePermission).toHaveBeenCalledWith([
-        'notifications.delete',
-        'notifications.send',
-        'settings.write',
-      ]);
+      expect(mockRequirePermission).toHaveBeenCalledWith('notifications.delete');
       expect(mockDeleteNotificationExecute).toHaveBeenCalledWith(ctxFor(), 'notification-1');
+    });
+
+    it('getCourseAnnouncementsAction IDOR-guards a teacher against a foreign course', async () => {
+      mockRequirePermission.mockResolvedValue(ctxFor({ role: 'teacher' }));
+      mockVerifyTeacherCourseOwnership.mockResolvedValue({ ownsCourse: false });
+
+      await expect(getCourseAnnouncementsAction('course-1')).rejects.toThrow(
+        'You do not own this course',
+      );
+      expect(mockVerifyTeacherCourseOwnership).toHaveBeenCalledWith(
+        'course-1',
+        'user-1',
+        'tenant-a',
+      );
+      expect(mockListCourseAnnouncements).not.toHaveBeenCalled();
+    });
+
+    it('getCourseAnnouncementsAction lets a teacher list their own course', async () => {
+      mockRequirePermission.mockResolvedValue(ctxFor({ role: 'teacher' }));
+      mockVerifyTeacherCourseOwnership.mockResolvedValue({ ownsCourse: true });
+      mockListCourseAnnouncements.mockResolvedValue({ data: [], count: 0 });
+
+      await expect(getCourseAnnouncementsAction('course-1')).resolves.toEqual({
+        data: [],
+        count: 0,
+      });
+      expect(mockListCourseAnnouncements).toHaveBeenCalledWith('course-1', 'tenant-a', 1, 10);
+    });
+
+    it('getMyNotificationsAction clamps a crafted oversized limit to 100', async () => {
+      await getMyNotificationsAction(999_999);
+      expect(mockGetMyNotificationsExecute).toHaveBeenLastCalledWith('user-1', 100, false);
     });
 
     it('inbox actions authenticate with requireUser and use default limit/unreadOnly', async () => {

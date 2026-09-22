@@ -505,3 +505,30 @@ AFTER INSERT OR UPDATE OR DELETE ON public.feature_flag_roles
 FOR EACH ROW
 EXECUTE FUNCTION public.trg_audit_feature_flag_change();
 
+
+-- ============================================================================
+-- Realtime publication (2026-09-23): user_notifications must stream
+--
+-- Both clients depend on live events for this table:
+--  - Dashboard   : NotificationBell's postgres_changes subscription
+--                  (features/layout/components/NotificationBell.tsx via
+--                  useRealtimeNotifications)
+--  - Student app : NotificationsRemoteDataSource.watchChanges (.stream)
+-- Without membership in supabase_realtime the subscriptions attach but
+-- never emit, silently degrading both UIs to their polling fallbacks.
+-- Guarded: re-running is a no-op; a missing publication (self-hosted
+-- without realtime) is skipped rather than failing the schema run.
+-- ============================================================================
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime')
+     AND NOT EXISTS (
+      SELECT 1 FROM pg_publication_tables
+      WHERE pubname = 'supabase_realtime'
+        AND schemaname = 'public'
+        AND tablename = 'user_notifications'
+    ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.user_notifications;
+  END IF;
+END
+$$;

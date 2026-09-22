@@ -156,11 +156,17 @@ export function makeNotificationAdminRepository(
         notification_id: notificationId,
         user_id: targetUserId,
       }));
-      const { error: targetError } = await admin.from('notification_targets').upsert(targetRows, {
-        onConflict: 'notification_id,user_id',
-        ignoreDuplicates: true,
-      });
-      if (targetError) throw targetError;
+      // Chunked: a tenant-wide broadcast can resolve thousands of recipients;
+      // one giant PostgREST payload fails at the network/statement boundary.
+      for (const batch of chunk(targetRows, UPSERT_CHUNK_SIZE)) {
+        const { error: targetError } = await admin
+          .from('notification_targets')
+          .upsert(batch, {
+            onConflict: 'notification_id,user_id',
+            ignoreDuplicates: true,
+          });
+        if (targetError) throw targetError;
+      }
     },
 
     async fanoutToUsers(
@@ -175,11 +181,15 @@ export function makeNotificationAdminRepository(
         is_read: false,
       }));
 
-      const { error: fanoutError } = await admin.from('user_notifications').upsert(rows, {
-        onConflict: 'user_id,notification_id',
-        ignoreDuplicates: true,
-      });
-      if (fanoutError) throw fanoutError;
+      for (const batch of chunk(rows, UPSERT_CHUNK_SIZE)) {
+        const { error: fanoutError } = await admin
+          .from('user_notifications')
+          .upsert(batch, {
+            onConflict: 'user_id,notification_id',
+            ignoreDuplicates: true,
+          });
+        if (fanoutError) throw fanoutError;
+      }
     },
 
     async triggerInstantPush(): Promise<void> {
@@ -296,6 +306,41 @@ export function makeNotificationAdminRepository(
       if (error) throw mapDbError(error, 'notifications.repository.ts');
     },
 
+    async getNotificationOwnershipMeta(
+      id: string,
+      tenantId: string | null,
+    ): Promise<{
+      created_by: string | null;
+      targeting_mode: string;
+      course_id: string | null;
+    } | null> {
+      let query = admin
+        .from('notifications')
+        .select('created_by, targeting_mode, course_id')
+        .eq('id', id)
+        .is('deleted_at', null);
+
+      if (tenantId) {
+        query = query.eq('tenant_id', tenantId);
+      }
+
+      const { data, error } = await query.maybeSingle();
+      if (error) throw mapDbError(error, 'notifications.repository.ts');
+      return (data as {
+        created_by: string | null;
+        targeting_mode: string;
+        course_id: string | null;
+      } | null) ?? null;
+    },
+
+    async detachNotificationTargets(notificationId: string): Promise<void> {
+      const { error } = await admin
+        .from('notification_targets')
+        .delete()
+        .eq('notification_id', notificationId);
+      if (error) throw mapDbError(error, 'notifications.repository.ts');
+    },
+
     async verifyTeacherCourseOwnership(
       courseId: string,
       teacherId: string,
@@ -400,7 +445,7 @@ export function makeNotificationAdminRepository(
     async markRead(userId: string, id: string): Promise<void> {
       const { error } = await admin
         .from('user_notifications')
-        .update({ is_read: true })
+        .update({ is_read: true, read_at: new Date().toISOString() })
         .eq('id', id)
         .eq('user_id', userId);
       if (error) throw mapDbError(error, 'notifications.repository.ts');
@@ -409,12 +454,23 @@ export function makeNotificationAdminRepository(
     async markAllRead(userId: string): Promise<void> {
       const { error } = await admin
         .from('user_notifications')
-        .update({ is_read: true })
+        .update({ is_read: true, read_at: new Date().toISOString() })
         .eq('user_id', userId)
         .eq('is_read', false);
       if (error) throw mapDbError(error, 'notifications.repository.ts');
     },
   };
+}
+
+/** Batch size for fanout upserts — keeps each PostgREST payload bounded. */
+const UPSERT_CHUNK_SIZE = 500;
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const batches: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    batches.push(items.slice(i, i + size));
+  }
+  return batches;
 }
 
 const AUDIENCE_ROLES: Record<TargetAudience, readonly string[]> = {

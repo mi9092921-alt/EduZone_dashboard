@@ -267,7 +267,10 @@ export function NotificationBell() {
 
   const handleViewAll = useCallback(() => {
     setOpen(false);
-    router.push('/notifications');
+    // Personal inbox — every authenticated user. /notifications is the
+    // admin broadcast management page (permission-gated) and would render
+    // an error banner for non-senders.
+    router.push('/inbox');
   }, [router]);
 
   const grouped = groupByDate(notifications, locale);

@@ -106,6 +106,7 @@ export class SendCourseAnnouncementUseCase {
       // Compensation rollback
       try {
         await this.notifications.softDelete(notificationId, tenantId);
+        await this.notifications.detachNotificationTargets(notificationId);
       } catch (cleanupError) {
         console.error('[COURSE_ANNOUNCEMENT_COMPENSATION_FAILED]', cleanupError);
       }
