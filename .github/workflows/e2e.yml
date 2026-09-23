@@ -36,6 +36,9 @@ jobs:
     if: vars.E2E_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: read
     steps:
       - uses: actions/checkout@v5
 
@@ -58,6 +61,17 @@ jobs:
         uses: supabase/setup-cli@v3
         with:
           version: latest
+          github-token: ${{ github.token }}
+
+      - name: Authenticate Docker to GHCR
+        # setup-cli points Supabase's internal image registry at GHCR on
+        # GitHub-hosted runners. Authenticate the Docker client so shared
+        # runner egress does not hit GHCR's anonymous pull throttle.
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
 
       - name: Clean up stale local Supabase state
         working-directory: supabase
@@ -110,7 +124,26 @@ jobs:
         # need for incremental migration generation here.
         working-directory: supabase
         run: |
-          supabase start
+          # Studio, postgres-meta, and the analytics pipeline are not needed
+          # by the app/security checks. Excluding them materially reduces the
+          # number of GHCR pulls; the backoff also handles transient registry
+          # throttling on shared GitHub-hosted runner IPs.
+          started=0
+          for attempt in 1 2 3; do
+            if supabase start --exclude studio,postgres-meta,logflare,vector; then
+              started=1
+              break
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              delay=$((attempt * 30))
+              echo "Supabase start failed; retrying in ${delay}s (attempt ${attempt}/3)..."
+              sleep "$delay"
+            fi
+          done
+          if [ "$started" -ne 1 ]; then
+            echo "Supabase failed to start after 3 attempts."
+            exit 1
+          fi
           supabase db reset
           eval "$(supabase status -o env)"
           for f in \
