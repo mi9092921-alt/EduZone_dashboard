@@ -1045,7 +1045,14 @@ DROP POLICY IF EXISTS lesson_access_log_select ON audit.lesson_access_log;
 CREATE POLICY lesson_access_log_select ON audit.lesson_access_log
   FOR SELECT TO authenticated
   USING (
-    tenant_id = public.get_current_tenant_id()
+    -- DBSEC-009 (2026-09-23): session-validity invariant. This table lives
+    -- outside the public schema, so the AUTH SESSION BASELINE loop (which
+    -- covers public only) never added the restrictive auth_session_required_*
+    -- policy here; the audit.read branch otherwise let a holder with a
+    -- revoked/invalid session keep reading. validate_user_session() is the
+    -- same invariant every public table enforces.
+    public.validate_user_session()
+    AND tenant_id = public.get_current_tenant_id()
     AND (user_id = (select auth.uid()) OR public.user_has_permission((select auth.uid()), 'audit.read'::text, public.get_current_tenant_id()))
   );
 
@@ -1669,23 +1676,32 @@ CREATE POLICY location_logs_select ON public.user_location_logs
 
 -- -- C. Settings RLS fix (patch 9) --------------------------------------------
 
--- PHASE-5 FIX (2026-09-21): the permission branch is wrapped in a CASE so
--- anon readers can never evaluate public.user_has_permission() — CASE is
--- guaranteed lazy by SQL semantics, unlike AND short-circuiting which the
--- planner may reorder. This makes the matching EXECUTE revoke in
--- 10_permissions.sql (anon must not get a permission-probing oracle for
--- arbitrary user ids) safe for the anon is_public reads this policy still
--- serves (pre-login force-update gate).
+-- DBSEC-011 (2026-09-23, Phase 1 security audit): the combined
+-- TO authenticated+anon policy was split. The original PHASE-5 CASE wrapper
+-- assumed lazy evaluation keeps anon from ever CALLING user_has_permission,
+-- but PostgreSQL checks EXECUTE on every function in a policy expression at
+-- plan/setup time regardless of which CASE branch runs — verified on
+-- PostgreSQL 17.6: an anon SELECT on settings_kv raised
+-- "permission denied for function user_has_permission", silently breaking
+-- the pre-login forced-update gate (the Student App reads settings_kv
+-- directly as anon on every cold start; its fail-safe path treats the error
+-- as "assume up to date", so the gate degraded open). Splitting the policies
+-- gives anon an expression with no user-defined functions at all, while
+-- authenticated keeps the settings.read permission branch (it holds EXECUTE
+-- on both helpers). The permission-probing oracle stays closed for anon.
+DROP POLICY IF EXISTS settings_select ON public.settings_kv;
+
 CREATE POLICY settings_select ON public.settings_kv
-  FOR SELECT TO authenticated, anon
+  FOR SELECT TO anon
+  USING (is_public);
+
+DROP POLICY IF EXISTS settings_select_authenticated ON public.settings_kv;
+
+CREATE POLICY settings_select_authenticated ON public.settings_kv
+  FOR SELECT TO authenticated
   USING (
     is_public
-    OR (
-      CASE
-        WHEN (select auth.uid()) IS NULL THEN FALSE
-        ELSE public.user_has_permission((select auth.uid()), 'settings.read'::text, public.get_current_tenant_id())
-      END
-    )
+    OR public.user_has_permission((select auth.uid()), 'settings.read'::text, public.get_current_tenant_id())
   );
 
 -- CRIT: RLS for reference / session-validity tables exposed via API grants

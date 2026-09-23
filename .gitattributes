@@ -1,0 +1,3 @@
+# Pin schema SQL files to LF so Dashboard and Student App stay byte-for-byte
+# identical regardless of core.autocrlf (Phase 1.18 dual-repository sync).
+supabase/schema/*.sql text eol=lf
