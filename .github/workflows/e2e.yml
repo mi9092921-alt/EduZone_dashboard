@@ -126,8 +126,12 @@ jobs:
         run: |
           # Studio, postgres-meta, and the analytics pipeline are not needed
           # by the app/security checks. Excluding them materially reduces the
-          # number of GHCR pulls; the backoff also handles transient registry
-          # throttling on shared GitHub-hosted runner IPs.
+          # number of image pulls. setup-cli exports
+          # SUPABASE_INTERNAL_IMAGE_REGISTRY=ghcr.io, which intentionally
+          # selects one registry; unset it here so current CLI versions can
+          # use their ECR -> GHCR -> Docker Hub fallback when a shared runner
+          # IP is throttled by one registry.
+          unset SUPABASE_INTERNAL_IMAGE_REGISTRY
           started=0
           for attempt in 1 2 3; do
             if supabase start --exclude studio,postgres-meta,logflare,vector; then
