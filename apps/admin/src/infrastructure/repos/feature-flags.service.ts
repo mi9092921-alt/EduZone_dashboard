@@ -1,3 +1,5 @@
+import 'server-only';
+
 import { container } from '@/container';
 import { ConflictError, ForbiddenError, mapDbError, NotFoundError } from '@/domain/errors';
 import type {

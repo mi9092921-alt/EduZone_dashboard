@@ -1,7 +1,8 @@
 import { createBrowserClient as createClient } from '@supabase/ssr';
 
+import { sessionCookieOptions } from '@/infrastructure/supabase/cookie-options';
 import { createBrowserId } from '@/lib/browser-id';
-import { env } from '@/lib/env';
+import { env } from '@/lib/env.client';
 
 let client: ReturnType<typeof createClient> | null = null;
 
@@ -20,6 +21,7 @@ export function createBrowserClient() {
       env.NEXT_PUBLIC_SUPABASE_URL,
       env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
       {
+        cookieOptions: sessionCookieOptions(),
         global: {
           headers: {
             'X-Request-ID': SESSION_ID,

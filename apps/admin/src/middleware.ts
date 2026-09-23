@@ -25,8 +25,14 @@ export async function middleware(request: NextRequest) {
     }
     const { user, response } = await getApiUser(request);
     if (!user) {
-      return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+      const unauthorized = NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+      // PHASE 2.24 (G12): auth-gated responses must never be cached.
+      unauthorized.headers.set('Cache-Control', 'no-store');
+      return unauthorized;
     }
+    // PHASE 2.24 (G12): every admin API response carries user-specific data —
+    // forbid shared/private caches from storing or replaying it.
+    response.headers.set('Cache-Control', 'no-store');
     return response;
   }
 
@@ -59,6 +65,11 @@ export async function middleware(request: NextRequest) {
   // components that need to inject <script> tags directly (e.g. MUI's
   // Emotion cache) can read it without an extra round trip.
   authedResponse.headers.set(NONCE_REQUEST_HEADER, nonce);
+  // PHASE 2.24 (G12): this is a session-scoped admin console — HTML and RSC
+  // payloads render user-specific data and must not be cached anywhere.
+  // Static assets are excluded by the matcher, so this never fights the
+  // immutable caching of /_next/static.
+  authedResponse.headers.set('Cache-Control', 'private, no-store');
 
   return authedResponse;
 }

@@ -1,3 +1,5 @@
+import 'server-only';
+
 import type { AuditEventInput, IAuditLogger } from '@/application/ports/IAuditLogger';
 import type { RequestContext } from '@/domain/types/context.types';
 import { logActivityAsync } from '@/infrastructure/repos/jobs-rpc.service';

@@ -1,14 +1,9 @@
-import { http, HttpResponse } from 'msw';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-
-import { server } from '../../../tests/mocks/server';
 
 import {
   getCourses,
   getCourseById,
   createCourse,
-  deleteCourse,
-  getCourseTenantId,
   getCourseSections,
   createSection,
   updateSection,
@@ -25,14 +20,9 @@ import {
   enrollStudent,
   revokeEnrollment,
   extendEnrollment,
-  getCourseStats,
 } from './courses.service';
 
 import { container } from '@/container';
-
-vi.mock('@/lib/env', () => ({
-  getServerEnv: () => ({ YOUTUBE_API_KEY: 'test-youtube-key' }),
-}));
 
 vi.mock('@/container', () => ({
   container: {
@@ -44,11 +34,14 @@ vi.mock('@/container', () => ({
   },
 }));
 
-const mockAdminFrom = vi.fn();
-vi.mock('@/infrastructure/supabase/admin', () => ({
-  createAdminClient: () => ({
-    from: mockAdminFrom,
-  }),
+// P1 (server/client boundary): YouTube metadata resolves through the
+// `video.actions` server boundary — never a direct API call from this
+// client-safe module. The HTTP-level YouTube contract stays covered by
+// `youtube.service.test.ts` (MSW).
+const mockBatchAction = vi.fn();
+vi.mock('@/adapters/actions/video.actions', () => ({
+  getYoutubeMetadataAction: vi.fn(),
+  getYoutubeMetadataBatchAction: (...args: unknown[]) => mockBatchAction(...args),
 }));
 
 
@@ -140,38 +133,6 @@ describe('courses.service', () => {
     expect(c.id).toBe('cnew');
   });
 
-  it('deleteCourse updates deleted_at using admin client', async () => {
-    const q = setupQuery({ data: null, error: null });
-    mockAdminFrom.mockReturnValue(q);
-    await deleteCourse('c1');
-    expect(mockAdminFrom).toHaveBeenCalledWith('courses');
-    expect(q.update).toHaveBeenCalledWith(
-      expect.objectContaining({ deleted_at: expect.any(String) }),
-    );
-    expect(q.eq).toHaveBeenCalledWith('id', 'c1');
-  });
-
-  describe('getCourseTenantId (cross-tenant IDOR guard support)', () => {
-    it('returns the owning tenant_id for an existing course', async () => {
-      mockAdminFrom.mockReturnValue(setupQuery({ data: { tenant_id: 't-1' }, error: null }));
-      const result = await getCourseTenantId('c1');
-      expect(mockAdminFrom).toHaveBeenCalledWith('courses');
-      expect(result).toBe('t-1');
-    });
-
-    it('returns null when the course does not exist', async () => {
-      mockAdminFrom.mockReturnValue(setupQuery({ data: null, error: null }));
-      const result = await getCourseTenantId('missing');
-      expect(result).toBeNull();
-    });
-
-    it('returns null on query error (fails closed)', async () => {
-      mockAdminFrom.mockReturnValue(setupQuery({ data: null, error: { message: 'db down' } }));
-      const result = await getCourseTenantId('c1');
-      expect(result).toBeNull();
-    });
-  });
-
 
   it('enrollStudent success and duplicate handling', async () => {
     // 1. Success case
@@ -261,28 +222,25 @@ describe('courses.service', () => {
   });
 
   // ── PERF-06: one failed video of 10 must not fail the import batch ──
+  // Durations resolve through the `video.actions` server boundary (mocked
+  // here); the HTTP-level YouTube contract is covered by
+  // `youtube.service.test.ts`.
   it('createLessons — isolates a dead video as a partial failure and still creates all lessons', async () => {
     const makeId = (i: number) => `testid${String(i).padStart(5, '0')}`;
     const ids = Array.from({ length: 10 }, (_, i) => makeId(i));
     const missing = ids[9]!;
     const lessons = ids.map((_, i) => ({ id: `lesson-${i}` }));
 
-    // YouTube API answers with 9 of the 10 requested videos.
-    server.use(
-      http.get('https://www.googleapis.com/youtube/v3/videos', ({ request }) => {
-        const url = new URL(request.url);
-        const requested = (url.searchParams.get('id') ?? '').split(',').filter(Boolean);
-        return HttpResponse.json({
-          items: requested
-            .filter((id) => id !== missing)
-            .map((id) => ({
-              id,
-              contentDetails: { duration: 'PT30S' },
-              snippet: { title: `Video ${id}` },
-            })),
-        });
-      }),
-    );
+    // Server boundary answers with 9 of the 10 requested videos.
+    mockBatchAction.mockResolvedValue({
+      success: true,
+      results: ids
+        .filter((id) => id !== missing)
+        .map((id) => ({ id, title: `Video ${id}`, duration_sec: 30 })),
+      partial_failures: [
+        { url_or_id: `https://www.youtube.com/watch?v=${missing}`, reason: 'video_not_found' },
+      ],
+    });
 
     const sectionQ = setupQuery({ data: { course_id: 'c1', tenant_id: 'tenant-123' }, error: null });
     const mainQ = setupQuery({ data: lessons, error: null });
@@ -436,17 +394,5 @@ describe('courses.service', () => {
         p_course_id: 'c1',
       }),
     );
-  });
-
-  it('getCourseStats handles success and catch block', async () => {
-    const qSuccess = setupQuery({ data: { course_id: 'c1' }, error: null });
-    mockAdminFrom.mockReturnValueOnce(qSuccess);
-    const stats = await getCourseStats('c1');
-    expect(stats!.course_id).toBe('c1');
-
-    const qFail = setupQuery({ data: null, error: new Error('fail') });
-    mockAdminFrom.mockReturnValueOnce(qFail);
-    const stats2 = await getCourseStats('c1');
-    expect(stats2).toBeNull();
   });
 });

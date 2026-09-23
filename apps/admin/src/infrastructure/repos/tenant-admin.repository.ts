@@ -1,3 +1,5 @@
+import 'server-only';
+
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { ITenantAdminRepository, NewTenantRow } from '@/application/ports/ITenantAdminRepository';

@@ -6,7 +6,6 @@ import {
   getPrecedingLogEntryHash,
   getAuditChainState,
   flushActivityLogs,
-  getQueuedActivities,
 } from './audit.service';
 
 import { container } from '@/container';
@@ -20,14 +19,6 @@ vi.mock('@/container', () => ({
     },
   },
 }));
-
-const mockAdminFrom = vi.fn();
-vi.mock('@/infrastructure/supabase/admin', () => ({
-  createAdminClient: () => ({
-    from: mockAdminFrom,
-  }),
-}));
-
 
 describe('audit.service', () => {
   const mockFrom = container.supabase.from as any;
@@ -147,37 +138,6 @@ describe('audit.service', () => {
       expect(err.code).toBe('LOCK_CONTENTION');
     }
     expect(errorThrown).toBe(true);
-  });
-
-  it('getQueuedActivities queries activity_log_queue via admin client', async () => {
-    const rows = [{ id: 'q1' }];
-    const q = setupQuery({ data: rows, error: null });
-    mockAdminFrom.mockReturnValue(q);
-
-    const res = await getQueuedActivities(50);
-    expect(mockAdminFrom).toHaveBeenCalledWith('activity_log_queue');
-    expect(q.limit).toHaveBeenCalledWith(50);
-    expect(q.eq).not.toHaveBeenCalled();
-    expect(res).toEqual(rows);
-  });
-
-  it('getQueuedActivities filters by tenant_id when provided (IDOR guard)', async () => {
-    const rows = [{ id: 'q1', tenant_id: 'tenant-a' }];
-    const q = setupQuery({ data: rows, error: null });
-    mockAdminFrom.mockReturnValue(q);
-
-    await getQueuedActivities(50, 'tenant-a');
-
-    expect(q.eq).toHaveBeenCalledWith('tenant_id', 'tenant-a');
-  });
-
-  it('getQueuedActivities does not filter when tenantId is omitted (super_admin path)', async () => {
-    const q = setupQuery({ data: [], error: null });
-    mockAdminFrom.mockReturnValue(q);
-
-    await getQueuedActivities(50);
-
-    expect(q.eq).not.toHaveBeenCalled();
   });
 });
 

@@ -192,7 +192,7 @@ describe('AuthorizationService', () => {
       rpcResult: false,
     });
 
-    await expect(authorizeCaller(supabase, 'users.delete')).rejects.toMatchObject({
+    await expect(authorizeCaller(supabase, 'users.lock')).rejects.toMatchObject({
       code: 'FORBIDDEN',
       status: 403,
     });

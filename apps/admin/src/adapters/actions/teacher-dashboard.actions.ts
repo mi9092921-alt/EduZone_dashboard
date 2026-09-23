@@ -1,10 +1,10 @@
 'use server';
 
+import type { PermissionName } from '@eduzone/types';
+
 import { requirePermission } from '@/adapters/actions/boundary';
-import {
-  getTeacherEngagementStatsAdmin,
-  type TeacherEngagementStats,
-} from '@/infrastructure/stats-service';
+import type { TeacherEngagementStats } from '@/infrastructure/stats-service';
+import { getTeacherEngagementStatsAdmin } from '@/infrastructure/stats.admin';
 
 /**
  * Thin Server-Action boundary for the Teacher Dashboard engagement metrics
@@ -19,7 +19,7 @@ import {
  * ever count engagement for their own courses.
  */
 
-const TEACHER_DASHBOARD_READ_PERMISSIONS = ['courses.read', 'reports.read'];
+const TEACHER_DASHBOARD_READ_PERMISSIONS: PermissionName[] = ['courses.read', 'reports.read'];
 
 export async function getTeacherEngagementStatsAction(): Promise<TeacherEngagementStats> {
   const ctx = await requirePermission(TEACHER_DASHBOARD_READ_PERMISSIONS);

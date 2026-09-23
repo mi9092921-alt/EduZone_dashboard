@@ -41,7 +41,7 @@ vi.mock('@/adapters/actions/boundary', () => ({
 const mockGetAccessRuleTenantId = vi.fn();
 const mockDeleteAccessRuleAdmin = vi.fn();
 const mockToggleAccessRuleAdmin = vi.fn();
-vi.mock('@/infrastructure/repos/access-rules.service', () => ({
+vi.mock('@/infrastructure/repos/access-rules.admin', () => ({
   getAccessRulesAdmin: vi.fn(),
   upsertAccessRuleAdmin: vi.fn(),
   getAccessRuleTenantId: (...args: unknown[]) => mockGetAccessRuleTenantId(...args),
@@ -108,7 +108,7 @@ vi.mock('@/infrastructure/repos/rate-limits.service', () => ({
 
 const mockGetCourseTenantId = vi.fn();
 const mockGetCourseStats = vi.fn();
-vi.mock('@/infrastructure/repos/courses.service', () => ({
+vi.mock('@/infrastructure/repos/courses.admin', () => ({
   getCourseTenantId: (...args: unknown[]) => mockGetCourseTenantId(...args),
   getCourseStats: (...args: unknown[]) => mockGetCourseStats(...args),
 }));
@@ -116,7 +116,7 @@ vi.mock('@/infrastructure/repos/courses.service', () => ({
 // Imported by admin.actions.ts but not exercised in this file — stubbed so
 // the module under test resolves cleanly (no createAdminClient anywhere).
 vi.mock('@/infrastructure/repos/analytics.service', () => ({ getCourseStats: vi.fn() }));
-vi.mock('@/infrastructure/repos/audit.service', () => ({ getQueuedActivities: vi.fn() }));
+vi.mock('@/infrastructure/repos/audit.admin', () => ({ getQueuedActivities: vi.fn() }));
 vi.mock('@/infrastructure/repos/course-admin.repository', () => ({
   makeCourseAdminRepository: vi.fn(),
 }));
@@ -231,7 +231,7 @@ const ADMIN_CTX = {
   userId: 'user-1',
   tenantId: 'tenant-a',
   role: 'admin',
-  permissions: ['settings.write', 'feature_flags.manage', 'jobs.manage'],
+  permissions: ['settings.write', 'feature_flags.manage', 'audit.read'],
 };
 
 function ctxFor(
@@ -304,7 +304,6 @@ describe('admin.actions.ts — remaining action surface', () => {
       await deleteAccessRuleAction('rule-1');
 
       expect(mockRequirePermission).toHaveBeenCalledWith([
-        'settings.manage',
         'settings.write',
         'tenants.manage',
       ]);
@@ -342,7 +341,8 @@ describe('admin.actions.ts — remaining action surface', () => {
   describe('feature flag CRUD', () => {
     it('createFeatureFlagAction delegates and audits with the created flag key', async () => {
       mockRequirePermission.mockResolvedValue(ctxFor());
-      const input = { key: 'new-flag', enabled: false };
+      // Schema-valid fixture (PHASE 2.9): snake_case key + is_enabled field.
+      const input = { key: 'new_flag', is_enabled: false };
 
       const flag = await createFeatureFlagAction(input as never);
 
@@ -358,10 +358,10 @@ describe('admin.actions.ts — remaining action surface', () => {
     it('updateFeatureFlagAction delegates and audits with the updated flag key', async () => {
       mockRequirePermission.mockResolvedValue(ctxFor());
 
-      const flag = await updateFeatureFlagAction('flag-1', { enabled: true } as never);
+      const flag = await updateFeatureFlagAction('flag-1', { is_enabled: true } as never);
 
       expect(flag).toEqual({ id: 'flag-1', key: 'flag' });
-      expect(mockUpdateFeatureFlagAdmin).toHaveBeenCalledWith('flag-1', { enabled: true });
+      expect(mockUpdateFeatureFlagAdmin).toHaveBeenCalledWith('flag-1', { is_enabled: true });
       expect(mockAuditRecord).toHaveBeenCalledWith(
         ctxFor(),
         expect.objectContaining({ type: 'feature_flag_updated' }),
@@ -508,12 +508,13 @@ describe('admin.actions.ts — remaining action surface', () => {
 
   describe('jobs', () => {
     it('getJobsAction scopes to the caller tenant; super_admin sees across tenants', async () => {
-      const filters = { status: 'queued' } as never;
+      // 'pending' is a real DB job status (03_tables.sql CHECK); the boundary
+      // schema rejects anything outside pending/processing/done/failed/dead.
+      const filters = { status: 'pending' } as never;
 
       mockRequirePermission.mockResolvedValue(ctxFor({ tenantId: 'tenant-a' }));
       await getJobsAction(filters, 1, 20);
       expect(mockRequirePermission).toHaveBeenCalledWith([
-        'jobs.manage',
         'audit.read',
         'settings.write',
       ]);
@@ -594,7 +595,7 @@ describe('admin.actions.ts — remaining action surface', () => {
     it('sendCourseAnnouncementAction authorizes and delegates to its use case', async () => {
       mockRequirePermission.mockResolvedValue(ctxFor());
       const input = {
-        courseId: 'course-1',
+        courseId: '44444444-4444-4444-8444-444444444444',
         title: 'Schedule update',
         body: 'The next lesson starts tomorrow at 10:00.',
       };

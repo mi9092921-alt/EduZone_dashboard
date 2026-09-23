@@ -1,21 +1,17 @@
+import 'server-only';
+
 import { z } from 'zod';
 
-const defaultAppEnv = process.env['NODE_ENV'] === 'production' ? 'production' : 'development';
+import { defaultAppEnv, env } from '@/lib/env.client';
 
 /**
- * Public client-safe environment variables.
- * Safe to be bundled and exposed in the browser.
- */
-const publicEnvSchema = z.object({
-  NEXT_PUBLIC_SUPABASE_URL: z.string().url('NEXT_PUBLIC_SUPABASE_URL must be a valid URL'),
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1, 'NEXT_PUBLIC_SUPABASE_ANON_KEY is required'),
-  NEXT_PUBLIC_APP_ENV: z.enum(['development', 'staging', 'production']).default(defaultAppEnv),
-  NEXT_PUBLIC_SENTRY_DSN: z.string().url().optional(),
-});
-
-/**
- * Server-only environment variables and secrets.
- * MUST NEVER be bundled or accessed client-side.
+ * Server-only environment (secrets).
+ *
+ * P1 FIX (server/client boundary): this module is server-only — importing it
+ * from any client-bundled module fails the production build via the
+ * `server-only` guard. Client-safe `NEXT_PUBLIC_*` variables live in
+ * `./env.client`; this module re-exports them (`env`, `PublicEnv`, `Env`)
+ * so existing server-side imports keep working from a single path.
  *
  * SECURITY FIX (2026-09-12): `SUPABASE_SERVICE_ROLE_KEY` and `CRON_SECRET`
  * were previously marked `.optional()` despite their error messages saying
@@ -36,6 +32,10 @@ const publicEnvSchema = z.object({
  * production deployments fail-fast at the first call from
  * `instrumentation.ts register()` rather than degrading silently.
  */
+
+export { env };
+export type { Env, PublicEnv } from '@/lib/env.client';
+
 const serverEnvSchemaDev = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
   YOUTUBE_API_KEY: z.string().min(1).optional(),
@@ -52,25 +52,7 @@ const serverEnvSchemaProd = z.object({
   SENTRY_DSN: z.string().url().optional(),
 });
 
-export type PublicEnv = z.infer<typeof publicEnvSchema>;
 export type ServerEnv = z.infer<typeof serverEnvSchemaDev>;
-export type Env = PublicEnv;
-
-function validatePublicEnv(): PublicEnv {
-  const parsed = publicEnvSchema.safeParse({
-    NEXT_PUBLIC_SUPABASE_URL: process.env['NEXT_PUBLIC_SUPABASE_URL'],
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env['NEXT_PUBLIC_SUPABASE_ANON_KEY'],
-    NEXT_PUBLIC_APP_ENV: process.env['NEXT_PUBLIC_APP_ENV'],
-    NEXT_PUBLIC_SENTRY_DSN: process.env['NEXT_PUBLIC_SENTRY_DSN'],
-  });
-
-  if (!parsed.success) {
-    console.error('❌ Invalid public environment variables:', parsed.error.flatten().fieldErrors);
-    throw new Error('Invalid environment variables. Check your .env.local file.');
-  }
-
-  return parsed.data;
-}
 
 export function getServerEnv(opts?: { enforceBrowserCheck?: boolean }): ServerEnv {
   const isBrowser = typeof window !== 'undefined' && (process.env.NODE_ENV !== 'test' || opts?.enforceBrowserCheck);
@@ -79,10 +61,10 @@ export function getServerEnv(opts?: { enforceBrowserCheck?: boolean }): ServerEn
   }
 
   // SECURITY FIX (2026-09-12): pick the strict schema when running in
-  // production. `NEXT_PUBLIC_APP_ENV` is validated by `publicEnvSchema`
-  // (which is parsed at module load — see `env` export below), so by the
-  // time `getServerEnv()` runs the value is either 'development',
-  // 'staging', or 'production'.
+  // production. `NEXT_PUBLIC_APP_ENV` is validated by the public schema
+  // (parsed at module load in `./env.client`), so by the time
+  // `getServerEnv()` runs the value is either 'development', 'staging',
+  // or 'production'.
   const appEnv = process.env['NEXT_PUBLIC_APP_ENV'] ?? defaultAppEnv;
   const schema = appEnv === 'production' ? serverEnvSchemaProd : serverEnvSchemaDev;
 
@@ -100,9 +82,3 @@ export function getServerEnv(opts?: { enforceBrowserCheck?: boolean }): ServerEn
 
   return parsed.data;
 }
-
-/**
- * Validated public environment variables.
- * Safe for both client and server consumption.
- */
-export const env = validatePublicEnv();

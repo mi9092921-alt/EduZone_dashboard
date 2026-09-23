@@ -1,3 +1,4 @@
+import type { PermissionName } from '@eduzone/types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import {
@@ -31,9 +32,16 @@ import { createServerClient } from '@/infrastructure/supabase/server';
  */
 export type PermissionContext = Readonly<RequestContext> & { supabase: SupabaseClient };
 
-/** Authenticates the caller and requires one of the given permissions. */
+/**
+ * Authenticates the caller and requires one of the given permissions.
+ *
+ * Typed as `PermissionName` (the DB-backed catalog in
+ * `packages/types/src/permissions.types.ts`) so a permission key that does
+ * not exist in `public.permissions` fails compilation instead of silently
+ * becoming a dead OR-branch nobody can ever hold.
+ */
 export async function requirePermission(
-  permission: string | string[],
+  permission: PermissionName | PermissionName[],
 ): Promise<PermissionContext> {
   const supabase = await createServerClient();
   const ctx = await authorizeCaller(supabase, permission);

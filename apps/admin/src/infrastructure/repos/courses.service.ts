@@ -1,11 +1,13 @@
+import { z } from 'zod';
+
 import { container } from '@/container';
 import { mapDbError } from '@/domain/errors';
 import { ConflictError, InfrastructureError, UnauthorizedError } from '@/domain/errors';
+import { createCourseSchema, updateCourseSchema } from '@/domain/schemas/course.schema';
 import type {
   Course,
   CourseDetail,
   CourseFilters,
-  CourseStats,
   CoursesOverviewStats,
   Section,
   Lesson,
@@ -20,29 +22,79 @@ import type {
   CoursePrerequisite,
 } from '@/domain/types/course.types';
 import { parseVideoUrl } from '@/domain/video.utils';
-import { createAdminClient } from '@/infrastructure/supabase/admin';
-import {
-  extractYoutubeId,
-  getYoutubeVideoDetails,
-  getYoutubeVideoDetailsBatch,
-} from '@/infrastructure/youtube.service';
+import { extractYoutubeId } from '@/infrastructure/youtube.utils';
 
 /**
- * Courses service — all Supabase queries for the courses domain.
+ * Courses service — browser-safe Supabase queries for the courses domain.
  * No UI, no React — pure async functions.
  *
- * NOTE on YouTube lookups: `youtube.service` reads YOUTUBE_API_KEY via
- * `getServerEnv()`, which throws when executed in the browser. The client
- * mutation hooks (`adapters/mutations/courses.mutations.ts`) therefore
- * resolve durations through the `video.actions` server boundary BEFORE
- * calling these functions. The `try/catch` + browser guards below are
- * defense-in-depth so a direct browser call degrades to duration 0 (and a
- * recorded partial failure) instead of crashing the UI with the
- * "server environment variables in the browser" error.
+ * P1 FIX (server/client boundary): this module MUST NOT import the
+ * service-role client or the server-only YouTube API client — it is bundled
+ * for client components/mutations/queries. Privileged reads/writes
+ * (`getCourseTenantId`, `deleteCourse`, `getCourseStats`,
+ * `getVideoViewsByUserAdmin`) live in `./courses.admin` (server-only).
+ *
+ * NOTE on YouTube lookups: durations are resolved through the
+ * `video.actions` server boundary — the client mutation hooks
+ * (`adapters/mutations/courses.mutations.ts`) pre-resolve them BEFORE
+ * calling these functions, and the fallbacks below invoke the same server
+ * action (never the API key directly). A failed lookup degrades to
+ * duration 0 (and a recorded partial failure) instead of crashing the UI.
  */
 
-function isBrowserContextGuardError(err: unknown): boolean {
-  return err instanceof Error && err.message.includes('browser context');
+/**
+ * Resolves a YouTube duration via the `video.actions` server boundary.
+ * Returns null when the duration cannot be resolved; callers fall back to
+ * duration 0 and record an explicit partial failure.
+ */
+async function resolveYoutubeDuration(videoUrl: string, logTag: string): Promise<number | null> {
+  try {
+    const { getYoutubeMetadataAction } = await import('@/adapters/actions/video.actions');
+    const result = await getYoutubeMetadataAction(videoUrl);
+    if (result.success && result.data) return result.data.duration_sec;
+    console.warn(`[${logTag}] YouTube metadata unavailable. Using duration 0.`);
+    return null;
+  } catch (err) {
+    console.warn(`[${logTag}] YouTube lookup failed. Using duration 0:`, err);
+    return null;
+  }
+}
+
+/**
+ * Batch counterpart of {@link resolveYoutubeDuration} — returns durations
+ * keyed by input URL plus per-input failure reasons, mirroring the shapes
+ * the lesson import path consumes.
+ */
+async function resolveYoutubeDurationsBatch(
+  videoUrls: string[],
+  logTag: string,
+): Promise<{ durations: Map<string, number>; failures: Map<string, string> }> {
+  const durations = new Map<string, number>();
+  const failures = new Map<string, string>();
+  if (videoUrls.length === 0) return { durations, failures };
+  try {
+    const { getYoutubeMetadataBatchAction } = await import('@/adapters/actions/video.actions');
+    const batch = await getYoutubeMetadataBatchAction(videoUrls);
+    if (!batch.success) {
+      console.warn(`[${logTag}] YouTube batch lookup rejected. Using duration 0:`, batch.error);
+      for (const url of videoUrls) failures.set(url, 'youtube_metadata_unavailable');
+      return { durations, failures };
+    }
+    for (const metadata of batch.results) {
+      // Metadata is keyed by video ID; re-attach it to every input URL that
+      // resolves to that ID (dedupe-safe).
+      for (const url of videoUrls) {
+        if (extractYoutubeId(url) === metadata.id) durations.set(url, metadata.duration_sec);
+      }
+    }
+    for (const failure of batch.partial_failures) failures.set(failure.url_or_id, failure.reason);
+  } catch (err) {
+    console.warn(`[${logTag}] YouTube batch lookup failed. Using duration 0:`, err);
+    for (const url of videoUrls) {
+      if (!failures.has(url)) failures.set(url, 'youtube_metadata_unavailable');
+    }
+  }
+  return { durations, failures };
 }
 
 // ══════════════════════════════════════════════════
@@ -166,6 +218,13 @@ export async function getCourseById(id: string): Promise<CourseDetail | null> {
 export async function createCourse(data: CreateCourseInput): Promise<Course> {
   const { supabase } = container;
 
+  // PHASE 2.9 (G13): this service is invoked from client mutation hooks via
+  // the browser Supabase client — the RHF/Zod check in the dialog is the only
+  // prior validation. Enforce the same schema here so a direct console call
+  // with a malformed payload is rejected before PostgREST (DB CHECK/RLS stay
+  // the final authority).
+  const parsedData = createCourseSchema.parse(data);
+
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -188,7 +247,7 @@ export async function createCourse(data: CreateCourseInput): Promise<Course> {
 
   // v13: is_free is a generated column, do not insert it.
   // Instead, ensure price is 0 if is_free was passed as true.
-  const { is_free, ...cleanData } = data;
+  const { is_free, ...cleanData } = parsedData;
   const finalPrice = is_free === true ? 0 : (cleanData.price ?? 0);
 
   const { data: course, error } = await supabase
@@ -209,12 +268,16 @@ export async function createCourse(data: CreateCourseInput): Promise<Course> {
 export async function updateCourse(id: string, data: UpdateCourseInput): Promise<Course> {
   const { supabase } = container;
 
+  // PHASE 2.9 (G13): same boundary rationale as createCourse above.
+  const parsedId = z.string().uuid().parse(id);
+  const parsedData = updateCourseSchema.parse(data);
+
   // v13: is_free is a generated column, do not update it.
-  const { is_free, ...cleanData } = data;
-  const updatePayload: Partial<UpdateCourseInput> & { updated_at: string; price?: number } = {
-    ...cleanData,
-    updated_at: new Date().toISOString(),
-  };
+  const { is_free, ...cleanData } = parsedData;
+  const updatePayload: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  for (const [key, entry] of Object.entries(cleanData)) {
+    if (entry !== undefined) updatePayload[key] = entry;
+  }
 
   if (is_free === true) {
     updatePayload.price = 0;
@@ -226,39 +289,12 @@ export async function updateCourse(id: string, data: UpdateCourseInput): Promise
   const { data: course, error } = await supabase
     .from('courses')
     .update(updatePayload)
-    .eq('id', id)
+    .eq('id', parsedId)
     .select()
     .single();
 
   if (error) throw mapDbError(error, 'courses.service.ts');
   return course as Course;
-}
-
-/**
- * Looks up the owning tenant_id for a course via the service-role client.
- * Used by the action boundary to assert the caller (unless super_admin)
- * may only mutate courses within their own tenant — courses.tenant_id is
- * NOT NULL, every course belongs to exactly one tenant. Returns null when
- * the course does not exist.
- */
-export async function getCourseTenantId(id: string): Promise<string | null> {
-  const admin = createAdminClient();
-  const { data, error } = await admin
-    .from('courses')
-    .select('tenant_id')
-    .eq('id', id)
-    .maybeSingle();
-  if (error || !data) return null;
-  return (data.tenant_id as string) ?? null;
-}
-
-export async function deleteCourse(id: string): Promise<void> {
-  const admin = createAdminClient();
-  const { error } = await admin
-    .from('courses')
-    .update({ deleted_at: new Date().toISOString() })
-    .eq('id', id);
-  if (error) throw mapDbError(error, 'courses.service.ts');
 }
 
 // ══════════════════════════════════════════════════
@@ -400,32 +436,17 @@ export async function createLesson(sectionId: string, data: CreateLessonInput): 
   const courseId = sectionData.course_id;
   const tenantId = sectionData.tenant_id;
 
-  // v13: duration fetch from YouTube (server-side only — the client
-  // mutations pre-resolve this via the video.actions server boundary).
-  // NOTE: no `typeof window` pre-check here on purpose — `getServerEnv()`
-  // only throws outside `NODE_ENV=test`, so a window check would wrongly
-  // skip the lookup under jsdom/happy-dom unit tests (which mock the env
-  // and the YouTube API). The catch below handles the real-browser guard.
+  // v13: duration fetch via the `video.actions` server boundary (P1: this
+  // module must never hold the YouTube API key — the client mutations
+  // pre-resolve durations BEFORE calling; this fallback degrades to
+  // duration 0 on any failure).
   let duration = data.duration_sec ?? 0;
   if (data.video_url && !data.duration_sec) {
     const parsed = parseVideoUrl(data.video_url);
     if (parsed.provider === 'youtube') {
-      try {
-        const metadata = await getYoutubeVideoDetails(data.video_url);
-        if (metadata) {
-          duration = metadata.duration_sec;
-        }
-      } catch (err) {
-        if (isBrowserContextGuardError(err)) {
-          console.warn(
-            '[createLesson] YouTube lookup called in browser context — resolve duration via getYoutubeMetadataAction first. Using duration 0.',
-          );
-        } else {
-          console.warn('[createLesson] YouTube lookup failed. Using duration 0:', err);
-        }
-      }
+      const resolved = await resolveYoutubeDuration(data.video_url, 'createLesson');
+      if (resolved !== null) duration = resolved;
     }
-  } else {
   }
 
   // 1. Create Lesson Metadata
@@ -527,43 +548,16 @@ export async function createLessons(
   const failureByInput = new Map<string, string>(); // input video_url -> reason
 
   if (youtubeTargets.length > 0) {
-    // NOTE: no `typeof window` pre-check here on purpose — see createLesson
-    // above. The catch handles the real-browser `getServerEnv()` guard while
-    // unit tests (NODE_ENV=test, mocked env + API) still exercise the batch
-    // path. Reasons are seeded into `failureByInput` only; the enrichedData
-    // mapping below emits each per-lesson partial failure exactly once.
-    try {
-      const batch = await getYoutubeVideoDetailsBatch(
-        youtubeTargets.map(({ item }) => item.video_url as string),
-      );
-
-      for (const metadata of batch.results.values()) {
-        // Metadata is keyed by video ID; re-attach it to every input URL that
-        // resolves to that ID (dedupe-safe).
-        for (const { item } of youtubeTargets) {
-          if (extractYoutubeId(item.video_url as string) === metadata.id) {
-            metadataByInput.set(item.video_url as string, metadata.duration_sec);
-          }
-        }
-      }
-      for (const failure of batch.partial_failures) {
-        failureByInput.set(failure.url_or_id, failure.reason);
-      }
-    } catch (err) {
-      if (isBrowserContextGuardError(err)) {
-        console.warn(
-          '[createLessons] YouTube batch lookup called in browser context — resolve durations via getYoutubeMetadataBatchAction first. Using duration 0.',
-        );
-      } else {
-        console.warn('[createLessons] YouTube batch lookup failed. Using duration 0:', err);
-      }
-      for (const { item } of youtubeTargets) {
-        const key = item.video_url as string;
-        if (!failureByInput.has(key)) {
-          failureByInput.set(key, 'youtube_metadata_unavailable');
-        }
-      }
-    }
+    // Resolved via the `video.actions` server boundary (P1: no API key in
+    // this module). Reasons are seeded into `failureByInput` only; the
+    // enrichedData mapping below emits each per-lesson partial failure
+    // exactly once.
+    const resolved = await resolveYoutubeDurationsBatch(
+      youtubeTargets.map(({ item }) => item.video_url as string),
+      'createLessons',
+    );
+    for (const [url, durationSec] of resolved.durations) metadataByInput.set(url, durationSec);
+    for (const [url, reason] of resolved.failures) failureByInput.set(url, reason);
   }
 
   const enrichedData = data.map((item, index) => {
@@ -649,26 +643,14 @@ export async function createLessons(
 export async function updateLesson(id: string, data: Partial<CreateLessonInput>): Promise<Lesson> {
   const { supabase } = container;
 
-  // v13: duration fetch from YouTube on update (server-side only — see
-  // the note in createLesson above).
+  // v13: duration fetch via the `video.actions` server boundary (P1: no API
+  // key in this module — see the note in createLesson above).
   let duration = data.duration_sec;
   if (data.video_url && !duration) {
     const parsed = parseVideoUrl(data.video_url);
     if (parsed.provider === 'youtube') {
-      try {
-        const metadata = await getYoutubeVideoDetails(data.video_url);
-        if (metadata) {
-          duration = metadata.duration_sec;
-        }
-      } catch (err) {
-        if (isBrowserContextGuardError(err)) {
-          console.warn(
-            '[updateLesson] YouTube lookup called in browser context — resolve duration via getYoutubeMetadataAction first. Keeping existing duration.',
-          );
-        } else {
-          console.warn('[updateLesson] YouTube lookup failed. Keeping existing duration:', err);
-        }
-      }
+      const resolved = await resolveYoutubeDuration(data.video_url, 'updateLesson');
+      if (resolved !== null) duration = resolved;
     }
   }
 
@@ -983,24 +965,6 @@ export async function extendEnrollment(
 // STATS
 // ══════════════════════════════════════════════════
 
-export async function getCourseStats(courseId: string): Promise<CourseStats | null> {
-  try {
-    const admin = createAdminClient();
-    const { data, error } = await admin
-      .from('vw_course_stats')
-      .select('*')
-      .eq('course_id', courseId)
-      .maybeSingle();
-    if (error) return null;
-    return (data as CourseStats) ?? null;
-  } catch (err: unknown) {
-    if (process.env.NODE_ENV === 'development') {
-      console.debug('[getCourseStats] Stats not available:', err);
-    }
-    return null;
-  }
-}
-
 export async function getCoursesOverviewStats(tenantId?: string): Promise<CoursesOverviewStats> {
   const { supabase } = container;
 
@@ -1080,93 +1044,6 @@ export async function getVideoViewsByUser(
   );
 
   const views = (data ?? []).map((row: Record<string, unknown>) => ({
-    ...row,
-    course_title: courseTitles.get(row.course_id as string),
-    lesson_title: lessonTitles.get(row.lesson_id as string),
-  })) as VideoView[];
-
-  return {
-    data: views,
-    count: count ?? 0,
-    page,
-    pageSize,
-    totalPages: Math.ceil((count ?? 0) / pageSize),
-  };
-}
-
-/**
- * Admin (service_role) variant of getVideoViewsByUser.
- *
- * Root cause for Activities → Views showing incomplete data: `video_views`
- * is a partitioned table (PARTITION BY RANGE viewed_at) and every child
- * partition carries `partition_deny_direct USING (false)` for the
- * authenticated role (see supabase/schema/09_rls.sql). Postgres evaluates
- * partition policies even when querying the parent, so any browser-client
- * (authenticated JWT) read returns zero/incomplete rows. The title
- * enrichment (courses/lessons via RLS) suffers the same filtering.
- *
- * This variant uses the service-role client (bypasses RLS, including the
- * partition deny) and MUST only be called from a tenant-scoped server
- * action (see activities.actions.ts) that authenticates, authorizes and
- * asserts same-tenant before invoking it. `tenantId` scopes the read to
- * the target user's tenant when provided.
- */
-export async function getVideoViewsByUserAdmin(
-  userId: string,
-  page: number,
-  pageSize: number,
-  tenantId?: string,
-): Promise<PaginatedResult<VideoView>> {
-  const admin = createAdminClient();
-  const from = (page - 1) * pageSize;
-  const to = from + pageSize - 1;
-
-  let query = admin
-    .from('video_views')
-    .select('*', { count: 'exact' })
-    .eq('user_id', userId)
-    .order('viewed_at', { ascending: false })
-    .range(from, to);
-  if (tenantId) query = query.eq('tenant_id', tenantId);
-
-  const { data, error, count } = await query;
-  if (error) throw mapDbError(error, 'courses.service.ts');
-
-  const rows = (data ?? []) as Record<string, unknown>[];
-  const courseIds = [
-    ...new Set(
-      rows.map((row) => row.course_id).filter((id): id is string => typeof id === 'string'),
-    ),
-  ];
-  const lessonIds = [
-    ...new Set(
-      rows.map((row) => row.lesson_id).filter((id): id is string => typeof id === 'string'),
-    ),
-  ];
-
-  const [coursesRes, lessonsRes] = await Promise.all([
-    courseIds.length
-      ? admin.from('courses').select('id, title').in('id', courseIds)
-      : Promise.resolve({ data: [] as { id: string; title: string }[] }),
-    lessonIds.length
-      ? admin.from('lessons').select('id, title').in('id', lessonIds)
-      : Promise.resolve({ data: [] as { id: string; title: string }[] }),
-  ]);
-
-  const courseTitles = new Map(
-    ((coursesRes.data ?? []) as { id: string; title: string }[]).map((row) => [
-      row.id,
-      row.title,
-    ]),
-  );
-  const lessonTitles = new Map(
-    ((lessonsRes.data ?? []) as { id: string; title: string }[]).map((row) => [
-      row.id,
-      row.title,
-    ]),
-  );
-
-  const views = rows.map((row) => ({
     ...row,
     course_title: courseTitles.get(row.course_id as string),
     lesson_title: lessonTitles.get(row.lesson_id as string),

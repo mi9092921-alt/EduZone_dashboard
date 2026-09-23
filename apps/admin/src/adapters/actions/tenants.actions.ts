@@ -1,5 +1,7 @@
 'use server';
 
+import { z } from 'zod';
+
 import { requireSuperAdmin } from '@/adapters/actions/boundary';
 import {
   CreateTenantUseCase,
@@ -8,6 +10,10 @@ import {
   UpdateTenantUseCase,
 } from '@/application/use-cases/tenants/manage-tenants.use-case';
 import { SwitchTenantContextUseCase } from '@/application/use-cases/tenants/switch-tenant-context.use-case';
+import {
+  createTenantInputSchema,
+  updateTenantInputSchema,
+} from '@/domain/schemas/admin-action-inputs.schema';
 import type { Tenant, CreateTenantInput, UpdateTenantInput } from '@/domain/types/tenant.types';
 import { makeAuditLogger } from '@/infrastructure/observability/audit-logger.service';
 import { makeTenantAdminRepository } from '@/infrastructure/repos/tenant-admin.repository';
@@ -27,33 +33,41 @@ import { makeTenantContextRepository } from '@/infrastructure/repos/tenant-conte
 // ── Create tenant (admin client bypasses RLS) ───────────────────
 export async function createTenantAction(input: CreateTenantInput): Promise<Tenant> {
   const ctx = await requireSuperAdmin();
-  return new CreateTenantUseCase(makeTenantAdminRepository(), makeAuditLogger()).execute(ctx, input);
+  // PHASE 2.9: runtime shape validation — TS type erased at the boundary.
+  const parsedInput = createTenantInputSchema.parse(input);
+  return new CreateTenantUseCase(makeTenantAdminRepository(), makeAuditLogger()).execute(ctx, parsedInput);
 }
 
 // ── Update tenant (admin client bypasses RLS) ───────────────────
 export async function updateTenantAction(id: string, input: UpdateTenantInput): Promise<Tenant> {
   const ctx = await requireSuperAdmin();
+  // PHASE 2.9: runtime validation for id + payload.
+  const parsedId = z.string().uuid().parse(id);
+  const parsedInput = updateTenantInputSchema.parse(input);
   return new UpdateTenantUseCase(makeTenantAdminRepository(), makeAuditLogger()).execute(
     ctx,
-    id,
-    input,
+    parsedId,
+    parsedInput,
   );
 }
 
 // ── Suspend tenant (admin client bypasses RLS) ──────────────────
 export async function suspendTenantAction(id: string, reason: string): Promise<void> {
   const ctx = await requireSuperAdmin();
+  const parsedId = z.string().uuid().parse(id);
+  const parsedReason = z.string().min(5).max(500).parse(reason);
   return new SuspendTenantUseCase(makeTenantAdminRepository(), makeAuditLogger()).execute(
     ctx,
-    id,
-    reason,
+    parsedId,
+    parsedReason,
   );
 }
 
 // ── Soft delete tenant (admin client bypasses RLS) ──────────────
 export async function deleteTenantAction(id: string): Promise<void> {
   const ctx = await requireSuperAdmin();
-  return new DeleteTenantUseCase(makeTenantAdminRepository(), makeAuditLogger()).execute(ctx, id);
+  const parsedId = z.string().uuid().parse(id);
+  return new DeleteTenantUseCase(makeTenantAdminRepository(), makeAuditLogger()).execute(ctx, parsedId);
 }
 
 // ── Tenant Switcher: switch (or, with null, exit) acting tenant context ──

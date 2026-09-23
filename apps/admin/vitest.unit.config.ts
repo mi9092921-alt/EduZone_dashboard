@@ -16,6 +16,9 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(dirname, './src'),
+      // `server-only` guards server modules at the bundler level; in plain
+      // Node tests it must resolve to an inert shim (see the shim file).
+      'server-only': path.resolve(dirname, './vitest.server-only-shim.ts'),
     },
   },
   test: {

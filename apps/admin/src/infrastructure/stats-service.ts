@@ -1,14 +1,12 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
-
 import { container } from '@/container';
-import { mapDbError } from '@/domain/errors';
-import { createAdminClient } from '@/infrastructure/supabase/admin';
 
 /**
- * Stats Service
+ * Stats Service — browser-safe dashboard metrics.
  *
- * Fetches consolidated analytical data and system statistics.
- * Utilizes high-performance SQL views and RPCs to minimize client-side processing.
+ * P1 FIX (server/client boundary): this module MUST NOT import the
+ * service-role client — it is bundled for client queries. The privileged
+ * teacher engagement stats (`getTeacherEngagementStatsAdmin`) live in
+ * `./stats.admin` (server-only).
  */
 
 export interface DashboardStats {
@@ -97,71 +95,3 @@ export interface TeacherEngagementStats {
   dailySessions: number;
 }
 
-async function countSessionsTodayAdmin(
-  admin: SupabaseClient,
-  userIds: string[],
-  sinceIso: string,
-): Promise<number> {
-  if (userIds.length === 0) return 0;
-
-  const { count, error } = await admin
-    .from('sessions')
-    .select('id', { count: 'exact', head: true })
-    .in('user_id', userIds)
-    .gte('started_at', sinceIso);
-  if (error) throw mapDbError(error, 'stats-service.ts');
-
-  return count ?? 0;
-}
-
-/**
- * Teacher-scoped engagement counts (Total Views + Sessions Today), read via
- * the service-role client.
- *
- * Why not the browser client: video_views / sessions are partitioned tables
- * whose child partitions deny authenticated reads (partition_deny_direct in
- * 09_rls.sql), and the parent policies only ever expose the caller's OWN
- * rows — a teacher counting through the browser client would always get 0.
- * MUST only be called from a server action that authenticates the caller,
- * requires courses.read/reports.read, and passes the teacher id from the
- * trusted session — never a client argument
- * (see adapters/actions/teacher-dashboard.actions.ts).
- */
-export async function getTeacherEngagementStatsAdmin(
-  teacherId: string,
-): Promise<TeacherEngagementStats> {
-  const admin = createAdminClient();
-
-  const { data: teacherCourses, error: coursesError } = await admin
-    .from('courses')
-    .select('id')
-    .eq('teacher_id', teacherId)
-    .is('deleted_at', null);
-  if (coursesError) throw mapDbError(coursesError, 'stats-service.ts');
-
-  const courseIds = (teacherCourses ?? []).map((course) => course.id as string);
-  if (courseIds.length === 0) return { totalViews: 0, dailySessions: 0 };
-
-  const { data: enrolledRows, error: enrolledError } = await admin
-    .from('enrollments')
-    .select('user_id')
-    .in('course_id', courseIds)
-    .is('deleted_at', null);
-  if (enrolledError) throw mapDbError(enrolledError, 'stats-service.ts');
-
-  const studentIds = [...new Set((enrolledRows ?? []).map((row) => row.user_id as string))];
-
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
-
-  const [viewsRes, dailySessions] = await Promise.all([
-    admin
-      .from('video_views')
-      .select('id', { count: 'exact', head: true })
-      .in('course_id', courseIds),
-    countSessionsTodayAdmin(admin, studentIds, startOfDay.toISOString()),
-  ]);
-  if (viewsRes.error) throw mapDbError(viewsRes.error, 'stats-service.ts');
-
-  return { totalViews: viewsRes.count ?? 0, dailySessions };
-}

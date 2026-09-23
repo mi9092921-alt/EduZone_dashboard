@@ -1,5 +1,7 @@
 'use server';
 
+import { z } from 'zod';
+
 import { assertSameTenant, requirePermission } from '@/adapters/actions/boundary';
 import {
   ControlUserAccountUseCase,
@@ -9,11 +11,17 @@ import {
 import { CreateUserUseCase } from '@/application/use-cases/users/create-user.use-case';
 import { DeleteUserUseCase } from '@/application/use-cases/users/delete-user.use-case';
 import { toClientMessage } from '@/domain/errors';
-import { CreateUserInput, createUserSchema } from '@/domain/schemas/user.schema';
+import {
+  accountActionSchema,
+  CreateUserInput,
+  createUserSchema,
+  issueWarningSchema,
+  terminateSessionsSchema,
+} from '@/domain/schemas/user.schema';
 import type { AccountAction } from '@/domain/types/user.types';
 import { makeAuditLogger } from '@/infrastructure/observability/audit-logger.service';
 import { makeUserAdminRepository } from '@/infrastructure/repos/user-admin.repository';
-import * as usersService from '@/infrastructure/repos/users.service';
+import { getUserTenantId } from '@/infrastructure/repos/users.admin';
 
 /**
  * Thin Server-Action boundary for the user-lifecycle domain.
@@ -54,6 +62,8 @@ export async function createUserAction(data: CreateUserInput) {
  */
 export async function deleteUserAction(userId: string) {
   try {
+    // PHASE 2.9: runtime UUID shape check — TS type is erased at the boundary.
+    const parsedUserId = z.string().uuid().parse(userId);
     // Verify caller auth and permission
     const ctx = await requirePermission('users.write');
 
@@ -61,12 +71,12 @@ export async function deleteUserAction(userId: string) {
     // (super_admin exempt — see assertSameTenant). Deletion goes through the
     // Admin Auth API directly (not an RLS/tenant-scoped RPC), so this check
     // must happen here at the boundary.
-    assertSameTenant(ctx, await usersService.getUserTenantId(userId));
+    assertSameTenant(ctx, await getUserTenantId(parsedUserId));
 
     // Execute use case (auth deletion + soft-delete fallback policy)
     return await new DeleteUserUseCase(makeUserAdminRepository(), makeAuditLogger()).execute(
       ctx,
-      userId,
+      parsedUserId,
     );
   } catch (error: unknown) {
     console.error('deleteUserAction error:', error);
@@ -93,18 +103,26 @@ export async function controlUserAccountAction(
   suspendHours?: number,
 ): Promise<{ success: boolean; accountStatus?: string; until?: string; error?: string }> {
   try {
+    // PHASE 2.9: runtime validation at the server boundary (TS types erased).
+    const parsedUserId = z.string().uuid().parse(userId);
+    const parsedAction = accountActionSchema.parse(action);
+    const parsedReason = reason !== undefined ? z.string().max(500).parse(reason) : undefined;
+    const parsedSuspendHours =
+      suspendHours !== undefined
+        ? z.number().int().min(1).max(720).parse(suspendHours)
+        : undefined;
     const ctx = await requirePermission('users.lock');
 
     // IDOR/BOLA guard: block acting on a user outside the caller's tenant
     // (super_admin exempt — see assertSameTenant).
-    assertSameTenant(ctx, await usersService.getUserTenantId(userId));
+    assertSameTenant(ctx, await getUserTenantId(parsedUserId));
 
     return await new ControlUserAccountUseCase(makeUserAdminRepository(), makeAuditLogger()).execute(
       ctx,
-      userId,
-      action,
-      reason,
-      suspendHours,
+      parsedUserId,
+      parsedAction,
+      parsedReason,
+      parsedSuspendHours,
     );
   } catch (error: unknown) {
     console.error('controlUserAccountAction error:', error);
@@ -126,14 +144,17 @@ export async function terminateUserSessionsAction(
   reason?: string,
 ): Promise<{ success: boolean; count?: number; error?: string }> {
   try {
+    // PHASE 2.9: runtime validation at the server boundary.
+    const parsedUserId = z.string().uuid().parse(userId);
+    const parsedReason = terminateSessionsSchema.parse({ reason }).reason;
     const ctx = await requirePermission(['sessions.manage', 'users.write']);
 
-    assertSameTenant(ctx, await usersService.getUserTenantId(userId));
+    assertSameTenant(ctx, await getUserTenantId(parsedUserId));
 
     return await new TerminateUserSessionsUseCase(makeUserAdminRepository(), makeAuditLogger()).execute(
       ctx,
-      userId,
-      reason,
+      parsedUserId,
+      parsedReason,
     );
   } catch (error: unknown) {
     console.error('terminateUserSessionsAction error:', error);
@@ -148,6 +169,10 @@ export async function issueWarningAction(
   action: string = 'none',
 ): Promise<{ success: boolean; warningId?: string; error?: string }> {
   try {
+    // PHASE 2.9: runtime validation at the server boundary (reason 20..1000,
+    // severity 1|2|3 — mirrors issueWarningSchema used by the client form).
+    const parsedUserId = z.string().uuid().parse(userId);
+    const parsed = issueWarningSchema.parse({ reason, severity, action });
     const ctx = await requirePermission('warnings.write');
     // SECURITY FIX (2026-09-12): IDOR/BOLA guard — defense-in-depth parity
     // with deleteUserAction / controlUserAccountAction /
@@ -160,13 +185,13 @@ export async function issueWarningAction(
     // real vulnerability if the RPC is ever rewritten to use
     // p_initiator_id instead of auth.uid() (the pattern used by
     // worker_control_user_account / worker_terminate_user_sessions).
-    assertSameTenant(ctx, await usersService.getUserTenantId(userId));
+    assertSameTenant(ctx, await getUserTenantId(parsedUserId));
     return await new IssueWarningUseCase(makeUserAdminRepository(), makeAuditLogger()).execute(
       ctx,
-      userId,
-      reason,
-      severity,
-      action,
+      parsedUserId,
+      parsed.reason,
+      parsed.severity,
+      parsed.action ?? 'none',
     );
   } catch (error: unknown) {
     console.error('issueWarningAction error:', error);
