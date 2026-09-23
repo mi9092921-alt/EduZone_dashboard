@@ -19,8 +19,13 @@ export async function middleware(request: NextRequest) {
   // accident — each route still performs its own fine-grained checks
   // (role/tenant/permission). The cron route authenticates with CRON_SECRET
   // instead of a user session and is exempt.
+  // PHASE 3 (WEB-001): exact-match exemption — a prefix exemption would
+  // silently exempt any future route added under /api/cron/* from the
+  // session backstop. Only the single known cron route is exempt; every
+  // other /api path (including any future /api/cron/* sibling) falls
+  // through to the session check below (fail-closed).
   if (request.nextUrl.pathname.startsWith('/api')) {
-    if (request.nextUrl.pathname.startsWith('/api/cron')) {
+    if (request.nextUrl.pathname === '/api/cron/routine') {
       return NextResponse.next();
     }
     const { user, response } = await getApiUser(request);

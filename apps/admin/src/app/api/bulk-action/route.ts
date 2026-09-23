@@ -47,7 +47,14 @@ const ACTION_PERMISSIONS: Record<BulkAction, string> = {
 };
 
 function errorJson(code: string, message: string, status = 400, extra?: Record<string, unknown>) {
-  return NextResponse.json({ code, message, error: message, ...extra }, { status });
+  // PHASE 3 (WEB-002): every admin API response carries user/tenant-specific
+  // data — forbid shared/private caches from storing or replaying it. Set
+  // explicitly at the handler so the guarantee does not depend on middleware
+  // header-merge behavior.
+  return NextResponse.json(
+    { code, message, error: message, ...extra },
+    { status, headers: { 'Cache-Control': 'no-store' } },
+  );
 }
 
 async function updateBulkJob(
@@ -402,8 +409,14 @@ export async function POST(request: NextRequest) {
           retryAfter: rl.retryAfter ?? null,
         },
         retryAfterSeconds
-          ? { status: 429, headers: { 'Retry-After': String(retryAfterSeconds) } }
-          : { status: 429 },
+          ? {
+              status: 429,
+              headers: {
+                'Retry-After': String(retryAfterSeconds),
+                'Cache-Control': 'no-store',
+              },
+            }
+          : { status: 429, headers: { 'Cache-Control': 'no-store' } },
       );
     }
 
@@ -506,7 +519,10 @@ export async function POST(request: NextRequest) {
 
     // ── Dry run → return count only ───────────────────────────
     if (body.dry_run) {
-      return NextResponse.json({ estimated_count: count, dry_run: true });
+      return NextResponse.json(
+        { estimated_count: count, dry_run: true },
+        { headers: { 'Cache-Control': 'no-store' } },
+      );
     }
 
     // ── Submit → validate limits ──────────────────────────────
@@ -581,7 +597,7 @@ export async function POST(request: NextRequest) {
         status: 'done',
         created_at: job.created_at,
       },
-      { status: 202 },
+      { status: 202, headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (err) {
     console.error('[bulk-action] Unhandled error:', err);

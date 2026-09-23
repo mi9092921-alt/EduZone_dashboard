@@ -30,7 +30,10 @@ function hasValidCronSecret(request: Request): boolean {
 
 export async function GET(request: Request) {
   if (!hasValidCronSecret(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401, headers: { 'Cache-Control': 'no-store' } },
+    );
   }
 
   // M11: all RPC call sites live in infrastructure/repos/jobs-rpc.service.ts
@@ -72,7 +75,13 @@ export async function GET(request: Request) {
         results,
         ...(failures.length > 0 ? { failed_steps: failures } : {}),
       },
-      { status: failures.length > 0 ? 500 : 200 },
+      {
+        status: failures.length > 0 ? 500 : 200,
+        // PHASE 3 (WEB-002): auth/ops-sensitive JSON must never be stored
+        // by a shared cache — set explicitly at the handler so the guarantee
+        // does not depend on middleware header-merge behavior.
+        headers: { 'Cache-Control': 'no-store' },
+      },
     );
   } catch (err: unknown) {
     console.error('[CRON_ROUTINE_ERROR]', err);
@@ -83,7 +92,7 @@ export async function GET(request: Request) {
         error: 'Cron worker failed',
         timestamp: new Date().toISOString(),
       },
-      { status: 500 },
+      { status: 500, headers: { 'Cache-Control': 'no-store' } },
     );
   }
 }
