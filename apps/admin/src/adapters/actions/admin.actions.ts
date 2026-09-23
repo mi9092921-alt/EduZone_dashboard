@@ -22,8 +22,17 @@ import {
 } from '@/application/use-cases/notifications/manage-notifications.use-case';
 import { SendCourseAnnouncementUseCase } from '@/application/use-cases/notifications/send-course-announcement.use-case';
 import { SendNotificationUseCase } from '@/application/use-cases/notifications/send-notification.use-case';
-import { toClientMessage, ValidationError } from '@/domain/errors';
-import type { UpsertAccessRuleInput } from '@/domain/schemas/settings.schema';
+import { ForbiddenError, toClientMessage, ValidationError } from '@/domain/errors';
+import {
+  courseAnnouncementInputSchema,
+  createFeatureFlagAdminSchema,
+  jobFiltersSchema,
+  updateFeatureFlagAdminSchema,
+} from '@/domain/schemas/admin-action-inputs.schema';
+import {
+  upsertAccessRuleSchema,
+  type UpsertAccessRuleInput,
+} from '@/domain/schemas/settings.schema';
 import type { CourseWithStats } from '@/domain/types/analytics.types';
 import type { ActivityLogQueueEntry } from '@/domain/types/audit.types';
 import type { CourseStats } from '@/domain/types/course.types';
@@ -47,11 +56,11 @@ import type {
   TopOffender,
 } from '@/domain/types/rate-limit.types';
 import { makeAuditLogger } from '@/infrastructure/observability/audit-logger.service';
-import * as accessRulesService from '@/infrastructure/repos/access-rules.service';
+import * as accessRulesService from '@/infrastructure/repos/access-rules.admin';
 import * as analyticsService from '@/infrastructure/repos/analytics.service';
-import * as auditService from '@/infrastructure/repos/audit.service';
+import * as auditService from '@/infrastructure/repos/audit.admin';
 import { makeCourseAdminRepository } from '@/infrastructure/repos/course-admin.repository';
-import * as coursesService from '@/infrastructure/repos/courses.service';
+import * as coursesService from '@/infrastructure/repos/courses.admin';
 import * as featureFlagsService from '@/infrastructure/repos/feature-flags.service';
 import * as jobsService from '@/infrastructure/repos/jobs.service';
 import { makeNotificationAdminRepository } from '@/infrastructure/repos/notifications.repository';
@@ -73,12 +82,57 @@ import * as rateLimitsService from '@/infrastructure/repos/rate-limits.service';
  * this file — it lives exclusively in the repository implementations.
  */
 
+/**
+ * PHASE 2.9: Zod `.parse()` returns optional keys with explicit `undefined`
+ * values, but service input types use `exactOptionalPropertyTypes` (an absent
+ * key is allowed; an explicit `undefined` is not). These typed mappers strip
+ * `undefined` field-by-field — no blind casts (M9 architecture rule).
+ */
+function toCreateFeatureFlagInput(
+  parsed: ReturnType<typeof createFeatureFlagAdminSchema.parse>,
+): CreateFeatureFlagInput {
+  return {
+    key: parsed.key,
+    ...(parsed.label !== undefined ? { label: parsed.label } : {}),
+    ...(parsed.description !== undefined ? { description: parsed.description } : {}),
+    ...(parsed.is_enabled !== undefined ? { is_enabled: parsed.is_enabled } : {}),
+    ...(parsed.rollout_pct !== undefined ? { rollout_pct: parsed.rollout_pct } : {}),
+    ...(parsed.status !== undefined ? { status: parsed.status } : {}),
+    ...(parsed.starts_at !== undefined ? { starts_at: parsed.starts_at } : {}),
+    ...(parsed.ends_at !== undefined ? { ends_at: parsed.ends_at } : {}),
+    ...(parsed.metadata !== undefined ? { metadata: parsed.metadata } : {}),
+  };
+}
+
+function toUpdateFeatureFlagInput(
+  parsed: ReturnType<typeof updateFeatureFlagAdminSchema.parse>,
+): UpdateFeatureFlagInput {
+  return {
+    ...(parsed.label !== undefined ? { label: parsed.label } : {}),
+    ...(parsed.description !== undefined ? { description: parsed.description } : {}),
+    ...(parsed.is_enabled !== undefined ? { is_enabled: parsed.is_enabled } : {}),
+    ...(parsed.rollout_pct !== undefined ? { rollout_pct: parsed.rollout_pct } : {}),
+    ...(parsed.status !== undefined ? { status: parsed.status } : {}),
+    ...(parsed.starts_at !== undefined ? { starts_at: parsed.starts_at } : {}),
+    ...(parsed.ends_at !== undefined ? { ends_at: parsed.ends_at } : {}),
+    ...(parsed.metadata !== undefined ? { metadata: parsed.metadata } : {}),
+  };
+}
+
+function toJobFilters(parsed: ReturnType<typeof jobFiltersSchema.parse>): JobFilters {
+  return {
+    ...(parsed.status !== undefined ? { status: parsed.status } : {}),
+    ...(parsed.job_type !== undefined ? { job_type: parsed.job_type } : {}),
+    ...(parsed.dateFrom !== undefined ? { dateFrom: parsed.dateFrom } : {}),
+  };
+}
+
 export async function getAccessRulesAction(
   tenantId?: string,
   page = 1,
   pageSize = 20,
 ): Promise<PaginatedResult<AccessRule>> {
-  const ctx = await requirePermission(['settings.manage', 'settings.write', 'tenants.manage']);
+  const ctx = await requirePermission(['settings.write', 'tenants.manage']);
   // IDOR guard: getAccessRulesAdmin reads via the service-role client
   // (bypasses RLS). `tenantId` was previously taken from the caller
   // as-is — a non-super_admin caller could pass another tenant's id (or
@@ -91,19 +145,24 @@ export async function getAccessRulesAction(
 export async function upsertAccessRuleAction(
   rule: UpsertAccessRuleInput,
 ): Promise<AccessRule> {
-  const ctx = await requirePermission(['settings.manage', 'settings.write', 'tenants.manage']);
+  const ctx = await requirePermission(['settings.write', 'tenants.manage']);
+  // PHASE 2.9: server actions deserialize client args into plain JS — the
+  // TS type is erased at runtime, so the shape is enforced here with the
+  // same Zod schema the client form uses before anything reaches the
+  // service-role repository.
+  const parsedRule = upsertAccessRuleSchema.parse(rule);
   // IDOR/BOLA guard: upsertAccessRuleAdmin writes via the service-role
   // client (bypasses RLS). Without this guard a non-super_admin caller
   // could create/overwrite an access rule (IP whitelist, time window,
   // geo, device-type) in ANY tenant by setting `tenant_id` (insert) or
   // `id` (update) to another tenant's values — same class of bug as
   // deleteCourseAction / assertSameTenant.
-  if (rule.id) {
-    assertSameTenant(ctx, await accessRulesService.getAccessRuleTenantId(rule.id));
+  if (parsedRule.id) {
+    assertSameTenant(ctx, await accessRulesService.getAccessRuleTenantId(parsedRule.id));
   }
   const scopedRule = ctx.permissions.includes('*')
-    ? rule
-    : { ...rule, tenant_id: ctx.tenantId };
+    ? parsedRule
+    : { ...parsedRule, tenant_id: ctx.tenantId };
   const saved = await accessRulesService.upsertAccessRuleAdmin(scopedRule);
   // M13: settings change is an audited operation (the boundary owns the ctx;
   // the details never carry rule internals — just the target + tenant).
@@ -116,7 +175,7 @@ export async function upsertAccessRuleAction(
 }
 
 export async function deleteAccessRuleAction(id: string): Promise<void> {
-  const ctx = await requirePermission(['settings.manage', 'settings.write', 'tenants.manage']);
+  const ctx = await requirePermission(['settings.write', 'tenants.manage']);
   assertSameTenant(ctx, await accessRulesService.getAccessRuleTenantId(id));
   await accessRulesService.deleteAccessRuleAdmin(id);
   await makeAuditLogger().record(ctx, {
@@ -127,7 +186,7 @@ export async function deleteAccessRuleAction(id: string): Promise<void> {
 }
 
 export async function toggleAccessRuleAction(id: string, isActive: boolean): Promise<void> {
-  const ctx = await requirePermission(['settings.manage', 'settings.write', 'tenants.manage']);
+  const ctx = await requirePermission(['settings.write', 'tenants.manage']);
   assertSameTenant(ctx, await accessRulesService.getAccessRuleTenantId(id));
   await accessRulesService.toggleAccessRuleAdmin(id, isActive);
   await makeAuditLogger().record(ctx, {
@@ -149,7 +208,11 @@ export async function getFeatureFlagByIdAction(id: string): Promise<FeatureFlagD
 
 export async function createFeatureFlagAction(input: CreateFeatureFlagInput): Promise<FeatureFlag> {
   const ctx = await requirePermission('feature_flags.manage');
-  const flag = await featureFlagsService.createFeatureFlagAdmin(input);
+  // PHASE 2.9: runtime shape validation at the server boundary.
+  const parsedInput = createFeatureFlagAdminSchema.parse(input);
+  const flag = await featureFlagsService.createFeatureFlagAdmin(
+    toCreateFeatureFlagInput(parsedInput),
+  );
   await makeAuditLogger().record(ctx, {
     type: 'feature_flag_created',
     summary: 'Feature flag created',
@@ -164,7 +227,12 @@ export async function updateFeatureFlagAction(
   input: UpdateFeatureFlagInput,
 ): Promise<FeatureFlag> {
   const ctx = await requirePermission('feature_flags.manage');
-  const flag = await featureFlagsService.updateFeatureFlagAdmin(id, input);
+  // PHASE 2.9: runtime shape validation at the server boundary.
+  const parsedInput = updateFeatureFlagAdminSchema.parse(input);
+  const flag = await featureFlagsService.updateFeatureFlagAdmin(
+    id,
+    toUpdateFeatureFlagInput(parsedInput),
+  );
   await makeAuditLogger().record(ctx, {
     type: 'feature_flag_updated',
     summary: 'Feature flag updated',
@@ -262,24 +330,34 @@ export async function getJobsAction(
   page: number,
   pageSize: number,
 ): Promise<PaginatedResult<Job>> {
-  const ctx = await requirePermission(['jobs.manage', 'audit.read', 'settings.write']);
+  const ctx = await requirePermission(['audit.read', 'settings.write']);
+  // PHASE 2.9: reject malformed filter shapes and clamp pagination before
+  // the service-role RPC — a crafted filter must not become a bulk scan.
+  const parsedFilters = jobFiltersSchema.parse(filters);
+  const safePage = Math.max(1, Math.floor(page) || 1);
+  const safePageSize = Math.min(100, Math.max(1, Math.floor(pageSize) || 20));
   // SECURITY FIX (2026-09-12): jobs RPCs run via service_role, which makes
   // `v_is_unrestricted=TRUE` inside admin_get_jobs and returns rows for
   // every tenant (launch-blocker APP-2). Scope to the caller's own tenant;
   // super_admin passes undefined to see across tenants.
   const tenantScope = ctx.permissions.includes('*') ? null : ctx.tenantId;
-  return jobsService.getJobs(filters, page, pageSize, tenantScope);
+  return jobsService.getJobs(
+    toJobFilters(parsedFilters),
+    safePage,
+    safePageSize,
+    tenantScope,
+  );
 }
 
 export async function getJobStatusCountsAction(): Promise<JobStatusCounts> {
-  const ctx = await requirePermission(['jobs.manage', 'audit.read', 'settings.write']);
+  const ctx = await requirePermission(['audit.read', 'settings.write']);
   // SECURITY FIX (2026-09-12): same tenant scoping as getJobsAction above.
   const tenantScope = ctx.permissions.includes('*') ? null : ctx.tenantId;
   return jobsService.getJobStatusCounts(tenantScope);
 }
 
 export async function retryJobAction(id: string): Promise<void> {
-  const ctx = await requirePermission(['jobs.manage', 'audit.read', 'settings.write']);
+  const ctx = await requirePermission(['audit.read', 'settings.write']);
   // SECURITY FIX (2026-09-12): IDOR/BOLA guard — admin_retry_job runs via
   // service_role and accepts any job UUID. Block retrying a job outside
   // the caller's tenant (super_admin exempt — see assertSameTenant).
@@ -288,7 +366,7 @@ export async function retryJobAction(id: string): Promise<void> {
 }
 
 export async function cancelJobAction(id: string): Promise<void> {
-  const ctx = await requirePermission(['jobs.manage', 'audit.read', 'settings.write']);
+  const ctx = await requirePermission(['audit.read', 'settings.write']);
   // SECURITY FIX (2026-09-12): IDOR/BOLA guard — same as retryJobAction.
   assertSameTenant(ctx, await jobsService.getJobTenantId(id));
   return jobsService.cancelJob(id);
@@ -335,10 +413,14 @@ export async function sendCourseAnnouncementAction(input: {
     'notifications.send',
     'courses.write',
   ]);
+  // PHASE 2.9: same limits the DB CHECKs / use case enforce (title 3..100,
+  // body 10..500) — enforced here first so a malformed payload never
+  // reaches the repository.
+  const parsedInput = courseAnnouncementInputSchema.parse(input);
   return new SendCourseAnnouncementUseCase(
     makeNotificationAdminRepository(),
     makeAuditLogger(),
-  ).execute(ctx, input);
+  ).execute(ctx, parsedInput);
 }
 
 export async function getCourseAnnouncementsAction(
@@ -352,6 +434,18 @@ export async function getCourseAnnouncementsAction(
     'courses.read',
   ]);
   if (!ctx.tenantId) throw new ValidationError('Tenant context is missing');
+  // IDOR guard (parity with SendCourseAnnouncementUseCase): a teacher may
+  // only list announcements for a course they own. Admins/super_admins see
+  // every course in the tenant.
+  if (ctx.role === 'teacher') {
+    const { ownsCourse } =
+      await makeNotificationAdminRepository().verifyTeacherCourseOwnership(
+        courseId,
+        ctx.userId,
+        ctx.tenantId,
+      );
+    if (!ownsCourse) throw new ForbiddenError('You do not own this course');
+  }
   return makeNotificationAdminRepository().listCourseAnnouncements(
     courseId,
     ctx.tenantId,
@@ -361,11 +455,11 @@ export async function getCourseAnnouncementsAction(
 }
 
 export async function deleteNotificationAction(id: string): Promise<void> {
-  const ctx = await requirePermission([
-    'notifications.delete',
-    'notifications.send',
-    'settings.write',
-  ]);
+  // Delete requires the dedicated permission — NOT notifications.send.
+  // The previous OR-list (notifications.send / settings.write) let any
+  // sender-capable role delete arbitrary tenant broadcasts, which the
+  // database RPC (delete_notification) never allowed.
+  const ctx = await requirePermission('notifications.delete');
   return new DeleteNotificationUseCase(makeNotificationAdminRepository(), makeAuditLogger()).execute(
     ctx,
     id,
@@ -377,9 +471,11 @@ export async function getMyNotificationsAction(
   unreadOnly = false,
 ): Promise<MyNotificationsResult> {
   const userId = await requireUser();
+  // Clamp: a crafted call must not turn the inbox into a bulk export.
+  const safeLimit = Math.min(100, Math.max(1, Math.floor(limit) || 20));
   return new GetMyNotificationsUseCase(makeNotificationAdminRepository()).execute(
     userId,
-    limit,
+    safeLimit,
     unreadOnly,
   );
 }

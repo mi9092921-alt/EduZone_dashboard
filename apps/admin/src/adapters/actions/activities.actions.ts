@@ -1,15 +1,17 @@
 'use server';
 
+import type { PermissionName } from '@eduzone/types';
+
 import { assertSameTenant, requirePermission } from '@/adapters/actions/boundary';
 import type { UserLocationLog } from '@/domain/types/analytics.types';
 import type { ActivityLog, AuditFilters } from '@/domain/types/audit.types';
 import type { VideoView } from '@/domain/types/course.types';
 import type { PaginatedResult, Session } from '@/domain/types/user.types';
-import { getActivityLogsAdmin } from '@/infrastructure/repos/audit.service';
-import { getVideoViewsByUserAdmin } from '@/infrastructure/repos/courses.service';
-import { getUserLocationLogsAdmin } from '@/infrastructure/repos/user_location_logs.service';
+import { getActivityLogsAdmin } from '@/infrastructure/repos/audit.admin';
+import { getVideoViewsByUserAdmin } from '@/infrastructure/repos/courses.admin';
+import { getUserLocationLogsAdmin } from '@/infrastructure/repos/user-location-logs.admin';
 import { getUserSessionsAdmin } from '@/infrastructure/repos/user_sessions.service';
-import { getUserTenantId } from '@/infrastructure/repos/users.service';
+import { getUserTenantId } from '@/infrastructure/repos/users.admin';
 
 /**
  * Thin Server-Action boundary for the Activities page (Views + Locations).
@@ -25,7 +27,7 @@ import { getUserTenantId } from '@/infrastructure/repos/users.service';
  * client-supplied tenant id.
  */
 
-const ACTIVITIES_READ_PERMISSIONS = ['users.read', 'audit.read', 'reports.read', 'courses.read'];
+const ACTIVITIES_READ_PERMISSIONS: PermissionName[] = ['users.read', 'audit.read', 'reports.read', 'courses.read'];
 
 function clampInt(value: number, fallback: number, min: number, max: number): number {
   if (!Number.isFinite(value)) return fallback;

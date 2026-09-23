@@ -1,15 +1,13 @@
-'use client';
+import DashboardScreen from './dashboard-screen';
 
-import { useAuthUser, useIsTeacher } from '@/adapters/stores/auth.store';
-import { AdminDashboard } from '@/features/dashboard/components/AdminDashboard';
-import { TeacherDashboard } from '@/features/dashboard/components/TeacherDashboard';
-import { AdminShell } from '@/features/layout';
+import { requirePageAccess } from '@/infrastructure/auth/page-guard';
 
-export default function DashboardPage() {
-  const user = useAuthUser();
-  const isTeacher = useIsTeacher();
-
-  if (!user) return null;
-
-  return <AdminShell>{isTeacher ? <TeacherDashboard /> : <AdminDashboard />}</AdminShell>;
+/**
+ * PHASE 2.5 (G1): the dashboard root is a server wrapper so the staff-role
+ * gate runs at the server boundary before any client bundle is served
+ * (the role matrix previously lived only in client-side AdminShell).
+ */
+export default async function DashboardPage() {
+  await requirePageAccess('dashboard');
+  return <DashboardScreen />;
 }

@@ -645,7 +645,8 @@
     "announcement_sent_success": "Announcement sent successfully to {count} students!",
     "no_active_students": "No active students enrolled in this course.",
     "announcement_title_placeholder": "e.g. Unit 2 Grammar Quiz Next Lecture...",
-    "announcement_body_placeholder": "Write your announcement details here (e.g. materials to prepare, date, instructions)..."
+    "announcement_body_placeholder": "Write your announcement details here (e.g. materials to prepare, date, instructions)...",
+    "inbox_title": "My Notifications"
   },
   "audit": {
     "page_title": "Audit Logs",

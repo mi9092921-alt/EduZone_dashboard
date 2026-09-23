@@ -1,3 +1,5 @@
+import 'server-only';
+
 import { mapDbError } from '@/domain/errors';
 import type { Job, JobFilters, JobStatusCounts } from '@/domain/types/job.types';
 import type { PaginatedResult } from '@/domain/types/user.types';

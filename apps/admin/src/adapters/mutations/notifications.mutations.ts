@@ -65,11 +65,16 @@ export function useMarkNotificationRead() {
 
       const previous = queryClient.getQueryData(queryKeys.notifications.mine(20, false));
 
+      // Resolve wasUnread from the CURRENT cache (not inside the updater)
+      // so the standalone unread-count key only decrements for a row that
+      // was actually unread.
+      const currentData = previous as { data: UserNotification[] } | undefined;
+      const wasUnread = currentData?.data?.some((n) => n.id === id && !n.is_read) ?? false;
+
       queryClient.setQueryData(
         queryKeys.notifications.mine(20, false),
         (old: { data: UserNotification[]; unreadCount: number } | undefined) => {
           if (!old) return old;
-          const wasUnread = old.data.find((n) => n.id === id && !n.is_read);
           return {
             data: old.data.map((n) => (n.id === id ? { ...n, is_read: true } : n)),
             unreadCount: wasUnread ? Math.max(0, old.unreadCount - 1) : old.unreadCount,
@@ -77,10 +82,11 @@ export function useMarkNotificationRead() {
         },
       );
 
-      // Also decrement the standalone unread count key
-      queryClient.setQueryData(queryKeys.notifications.unreadCount, (old: number | undefined) =>
-        Math.max(0, (old ?? 1) - 1),
-      );
+      if (wasUnread) {
+        queryClient.setQueryData(queryKeys.notifications.unreadCount, (old: number | undefined) =>
+          Math.max(0, (old ?? 1) - 1),
+        );
+      }
 
       return { previous };
     },

@@ -645,7 +645,8 @@
     "announcement_sent_success": "تم إرسال الإعلان بنجاح إلى {count} طالب!",
     "no_active_students": "لا يوجد طلاب مشتركون بشكل فعّال في هذا الكورس حالياً.",
     "announcement_title_placeholder": "مثال: امتحان سريع في Grammar الحصة القادمة...",
-    "announcement_body_placeholder": "اكتب تفاصيل الإعلان هنا (موعد الامتحان، الأجزاء المطلوبة، التعليمات)..."
+    "announcement_body_placeholder": "اكتب تفاصيل الإعلان هنا (موعد الامتحان، الأجزاء المطلوبة، التعليمات)...",
+    "inbox_title": "إشعاراتي"
   },
   "audit": {
     "page_title": "سجلات النشاط",

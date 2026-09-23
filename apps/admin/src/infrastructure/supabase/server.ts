@@ -1,6 +1,7 @@
 import { createServerClient as createClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
+import { sessionCookieOptions } from '@/infrastructure/supabase/cookie-options';
 import { env } from '@/lib/env';
 
 /**
@@ -14,6 +15,7 @@ export async function createServerClient() {
     env.NEXT_PUBLIC_SUPABASE_URL,
     env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     {
+      cookieOptions: sessionCookieOptions(),
       cookies: {
         getAll() {
           return cookieStore.getAll();

@@ -19,14 +19,25 @@ export async function middleware(request: NextRequest) {
   // accident — each route still performs its own fine-grained checks
   // (role/tenant/permission). The cron route authenticates with CRON_SECRET
   // instead of a user session and is exempt.
+  // PHASE 3 (WEB-001): exact-match exemption — a prefix exemption would
+  // silently exempt any future route added under /api/cron/* from the
+  // session backstop. Only the single known cron route is exempt; every
+  // other /api path (including any future /api/cron/* sibling) falls
+  // through to the session check below (fail-closed).
   if (request.nextUrl.pathname.startsWith('/api')) {
-    if (request.nextUrl.pathname.startsWith('/api/cron')) {
+    if (request.nextUrl.pathname === '/api/cron/routine') {
       return NextResponse.next();
     }
     const { user, response } = await getApiUser(request);
     if (!user) {
-      return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+      const unauthorized = NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+      // PHASE 2.24 (G12): auth-gated responses must never be cached.
+      unauthorized.headers.set('Cache-Control', 'no-store');
+      return unauthorized;
     }
+    // PHASE 2.24 (G12): every admin API response carries user-specific data —
+    // forbid shared/private caches from storing or replaying it.
+    response.headers.set('Cache-Control', 'no-store');
     return response;
   }
 
@@ -59,6 +70,11 @@ export async function middleware(request: NextRequest) {
   // components that need to inject <script> tags directly (e.g. MUI's
   // Emotion cache) can read it without an extra round trip.
   authedResponse.headers.set(NONCE_REQUEST_HEADER, nonce);
+  // PHASE 2.24 (G12): this is a session-scoped admin console — HTML and RSC
+  // payloads render user-specific data and must not be cached anywhere.
+  // Static assets are excluded by the matcher, so this never fights the
+  // immutable caching of /_next/static.
+  authedResponse.headers.set('Cache-Control', 'private, no-store');
 
   return authedResponse;
 }

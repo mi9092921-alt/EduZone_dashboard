@@ -2001,6 +2001,8 @@ DECLARE
   v_tenant_id uuid;
   v_id uuid;
   v_final_user_ids uuid[] := p_target_user_ids;
+  v_sender_role text;
+  v_allowed_roles text[];
   v_targeting_mode text := CASE
     WHEN cardinality(coalesce(p_target_user_ids, ARRAY[]::uuid[])) > 0 THEN 'users'
     ELSE 'audience'
@@ -2013,6 +2015,34 @@ BEGIN
   END IF;
 
   IF NOT public.user_has_permission(v_uid, 'notifications.send', v_tenant_id) THEN
+    RAISE EXCEPTION 'PERMISSION_DENIED';
+  END IF;
+
+  -- Role-scope matrix (parity with the dashboard's SendNotificationUseCase):
+  -- who a sender may target depends on the sender's own role. Without this,
+  -- any holder of notifications.send (e.g. a teacher) could broadcast
+  -- directly to admins via this RPC even though the dashboard blocks it.
+  -- The lookup is deliberately tenant-agnostic: a switched super_admin's
+  -- profile row lives in their HOME tenant, not the acting one. Recipient
+  -- scoping below remains strictly bound to v_tenant_id, so this only
+  -- decides the sender's allowed recipient roles — never widens reach.
+  SELECT primary_role INTO v_sender_role
+  FROM public.users
+  WHERE id = v_uid
+    AND deleted_at IS NULL;
+
+  IF v_sender_role IS NULL THEN
+    RAISE EXCEPTION 'AUTH_REQUIRED';
+  END IF;
+
+  v_allowed_roles := CASE v_sender_role
+    WHEN 'super_admin' THEN ARRAY['student','teacher','admin','super_admin']::text[]
+    WHEN 'admin'       THEN ARRAY['student','teacher']::text[]
+    WHEN 'teacher'     THEN ARRAY['student']::text[]
+    ELSE ARRAY[]::text[]
+  END;
+
+  IF cardinality(v_allowed_roles) = 0 THEN
     RAISE EXCEPTION 'PERMISSION_DENIED';
   END IF;
 
@@ -2041,7 +2071,10 @@ BEGIN
   )
   RETURNING id INTO v_id;
 
-  -- 2. Fanout immediately to in-app notifications
+  -- 2. Fanout immediately to in-app notifications. The sender's role-scope
+  -- applies to BOTH explicit ids and permission-resolved ids — out-of-scope
+  -- ids are silently dropped, never rejected wholesale (matches the
+  -- dashboard's resolveTargetUserIds filtering).
   IF v_final_user_ids IS NOT NULL AND array_length(v_final_user_ids, 1) IS NOT NULL THEN
     INSERT INTO public.notification_targets (notification_id, user_id)
     SELECT v_id, u.id
@@ -2049,6 +2082,7 @@ BEGIN
     WHERE u.id = ANY(v_final_user_ids)
       AND u.tenant_id = v_tenant_id
       AND u.deleted_at IS NULL
+      AND u.primary_role = ANY(v_allowed_roles)
     ON CONFLICT DO NOTHING;
 
     INSERT INTO public.user_notifications (user_id, notification_id, tenant_id, is_read)
@@ -2057,6 +2091,7 @@ BEGIN
     WHERE u.id = ANY(v_final_user_ids)
       AND u.tenant_id = v_tenant_id
       AND u.deleted_at IS NULL
+      AND u.primary_role = ANY(v_allowed_roles)
     ON CONFLICT (user_id, notification_id) DO NOTHING;
   ELSE
     INSERT INTO public.user_notifications (user_id, notification_id, tenant_id, is_read)
@@ -2065,6 +2100,7 @@ BEGIN
     WHERE u.tenant_id = v_tenant_id
       AND u.deleted_at IS NULL
       AND u.account_status = 'active'
+      AND u.primary_role = ANY(v_allowed_roles)
       AND (
             coalesce(p_target_audience, 'all') = 'all'
         OR (p_target_audience = 'students' AND u.primary_role = 'student')
@@ -2112,6 +2148,25 @@ BEGIN
     NULL;
   END;
 
+  -- M13 parity: RPC-originated sends must be audited like dashboard sends.
+  -- Details carry counts/ids only — never the notification body. NULL
+  -- tenant_id lets log_activity_internal derive the pair from the actor
+  -- row (explicit override is service_role-only).
+  PERFORM internal.log_activity_internal(
+    v_uid,
+    'notification_sent',
+    jsonb_build_object(
+      'notification_id', v_id,
+      'target_audience', coalesce(p_target_audience, 'all'),
+      'targeting_mode', v_targeting_mode,
+      'source', 'rpc',
+      'recipient_count', (
+        SELECT count(*) FROM public.user_notifications WHERE notification_id = v_id
+      )
+    ),
+    NULL, NULL, 'medium', NULL
+  );
+
   RETURN v_id;
 END;
 $$;
@@ -2153,6 +2208,14 @@ BEGIN
   IF NOT FOUND THEN
     RAISE EXCEPTION 'NOTIFICATION_NOT_FOUND';
   END IF;
+
+  -- M13 parity: RPC-originated deletes must be audited like dashboard deletes.
+  PERFORM internal.log_activity_internal(
+    v_uid,
+    'notification_deleted',
+    jsonb_build_object('notification_id', p_notification_id, 'source', 'rpc'),
+    NULL, NULL, 'medium', NULL
+  );
 END;
 $$;
 
@@ -4055,7 +4118,19 @@ AS $$
     FROM public.activity_logs
     WHERE created_at >= current_date - make_interval(days => greatest(coalesce(p_days, 30), 1))
       AND (p_activity_type IS NULL OR activity_type = p_activity_type)
-      AND tenant_id = coalesce(p_tenant_id, public.get_current_tenant_id())
+      -- DBSEC-003 (2026-09-23): p_tenant_id is honored only for super admins.
+      -- Previously the data filter followed the caller-supplied tenant while
+      -- the reports.read permission was checked in the CALLER'S own tenant,
+      -- so a reports.read holder in tenant A could read tenant B's daily
+      -- activity aggregates (the same class fixed in search_courses_ranked,
+      -- which this function had missed). is_current_user_super_admin_lite()
+      -- is session-validated and reads users.primary_role server-side; the
+      -- permission predicate below keeps non-holders out entirely.
+      AND tenant_id = CASE
+        WHEN public.is_current_user_super_admin_lite()
+          THEN coalesce(p_tenant_id, public.get_current_tenant_id())
+        ELSE public.get_current_tenant_id()
+      END
       AND public.user_has_permission(auth.uid(), 'reports.read', public.get_current_tenant_id())
     GROUP BY created_at::date
   ) d;
@@ -4924,10 +4999,23 @@ LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
+DECLARE
+  v_is_unrestricted boolean;
+  v_tenant_id uuid;
 BEGIN
   IF auth.role() <> 'service_role' AND NOT public.is_admin_with_session_validation() THEN
     RAISE EXCEPTION 'PERMISSION_DENIED';
   END IF;
+
+  -- DBSEC-002 (2026-09-23): same tenant filter as admin_get_jobs /
+  -- admin_retry_job / admin_cancel_job. admin_get_job was the only reader
+  -- in the family without it, so a tenant-scoped admin could fetch any
+  -- tenant's job payload/result by UUID (the APP-2 IDOR class the sibling
+  -- functions were already fixed for). Inside this SECURITY DEFINER body
+  -- the is_current_user_super_admin() call is privilege-checked against the
+  -- definer, so callers need no extra EXECUTE grant.
+  v_is_unrestricted := (auth.role() = 'service_role') OR public.is_current_user_super_admin();
+  v_tenant_id := public.get_current_tenant_id();
 
   RETURN QUERY
   SELECT
@@ -4939,7 +5027,12 @@ BEGIN
     jq.created_at,
     jq.finished_at AS completed_at
   FROM internal.job_queue jq
-  WHERE jq.id = p_id;
+  WHERE jq.id = p_id
+    AND (
+      v_is_unrestricted
+      OR jq.tenant_id IS NULL
+      OR jq.tenant_id = v_tenant_id
+    );
 END;
 $$;
 
@@ -5424,9 +5517,16 @@ DECLARE
   v_partition_key text;
   v_is_attached boolean;
 BEGIN
-  IF coalesce(auth.role(), '') <> 'service_role'
-     AND current_user NOT IN ('app_executor', 'app_maintenance', 'postgres', 'supabase_admin')
-     AND NOT public.is_admin_with_session_validation() THEN
+  -- DBSEC-004 (2026-09-23): this guard was dead code. Inside a SECURITY
+  -- DEFINER function current_user is the function OWNER (postgres), so the
+  -- middle condition was always FALSE and the whole IF never raised — every
+  -- PostgREST caller would have passed if the grants file had not kept this
+  -- function postgres/service_role-only. Replaced with the standard cron-safe
+  -- pattern used by the other maintenance guards (coalesce of the JWT role
+  -- with current_user), without the admin escape: partition DDL is an
+  -- infrastructure operation, not an admin-dashboard operation.
+  IF coalesce(auth.role(), current_user) NOT IN
+     ('service_role', 'app_executor', 'app_maintenance', 'postgres', 'supabase_admin') THEN
     RAISE EXCEPTION 'PERMISSION_DENIED';
   END IF;
 
@@ -5619,14 +5719,20 @@ SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_cutoff timestamptz;
-  -- PHASE 6 FIX (2026-09-21): each DELETE runs in its own subtransaction so
-  -- a single failing target (bad column, trigger, FK) can no longer abort
-  -- the whole nightly job and silently disable retention for every table.
-  -- Before this fix the job raised 42703 on its first statement every night
-  -- (activity_logs has no logged_at column; user_location_logs has no
-  -- accessed_at column), so NOTHING below it ever ran.
+  -- DBSEC-005 (2026-09-23): body guard — this function mass-DELETEs
+  -- retention-window telemetry (including security_incidents evidence);
+  -- reachable only from the postgres/service_role maintenance surface.
+  -- Cron (telemetry-retention, 30 4 * * *) runs as postgres with no JWT,
+  -- so the coalesce keeps it working.
   v_errors text := '';
 BEGIN
+  IF coalesce(auth.role(), current_user) NOT IN ('service_role', 'postgres', 'supabase_admin') THEN
+    RAISE EXCEPTION 'PERMISSION_DENIED';
+  END IF;
+  -- PHASE 6 FIX (2026-09-21): each DELETE below runs in its own
+  -- subtransaction so a single failing target (bad column, trigger, FK) can
+  -- no longer abort the whole nightly job and silently disable retention for
+  -- every table.
   -- activity_logs is deliberately NOT deleted here: trg_audit_mutation
   -- (prevent_audit_mutation) blocks all UPDATE/DELETE on the hash-chained
   -- audit trail by design, so retention for that table is partition-based
@@ -5795,6 +5901,14 @@ LANGUAGE plpgsql
 SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
 BEGIN
+  -- DBSEC-006 (2026-09-23): body guard per the project's defense-in-depth
+  -- convention (10_permissions.sql keeps the EXECUTE surface postgres-only;
+  -- the guard also covers any future grant drift). Cron-safe: auth.role()
+  -- is NULL for JWT-less postgres sessions and the coalesce falls through
+  -- to current_user.
+  IF coalesce(auth.role(), current_user) NOT IN ('service_role', 'postgres', 'supabase_admin') THEN
+    RAISE EXCEPTION 'PERMISSION_DENIED';
+  END IF;
   EXECUTE format('VACUUM ANALYZE %I.%I', p_schema, p_table);
 END;
 $$;
@@ -5808,6 +5922,14 @@ AS $$
 DECLARE
   v_partition record;
 BEGIN
+  -- DBSEC-005 (2026-09-23): body guard. This function executes DROP TABLE on
+  -- year partitions with a caller-controlled retention interval; it must
+  -- stay reachable only from the postgres/service_role maintenance surface
+  -- (10_permissions.sql holds the EXECUTE grants; this guard covers grant
+  -- drift). Cron-safe via the coalesce(auth.role(), current_user) pattern.
+  IF coalesce(auth.role(), current_user) NOT IN ('service_role', 'postgres', 'supabase_admin') THEN
+    RAISE EXCEPTION 'PERMISSION_DENIED';
+  END IF;
   -- Find year-based partitions older than retention
   FOR v_partition IN (
     SELECT schemaname, tablename 
@@ -7289,8 +7411,18 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 BEGIN
+  -- DBSEC-005 (2026-09-23): body guard. Reachable only from the
+  -- postgres/service_role maintenance surface; this function mass-rewrites
+  -- enrollment state and must never be client-invokable.
+  IF coalesce(auth.role(), current_user) NOT IN ('service_role', 'postgres', 'supabase_admin') THEN
+    RAISE EXCEPTION 'PERMISSION_DENIED';
+  END IF;
   -- Recalculate progress for all active (non-deleted) enrollments.
   -- IDEMPOTENT: only rows whose computed values differ from stored values are written.
+  -- DBSEC-005: terminal enrollments (revoked / expired) are excluded — the
+  -- CASE below previously forced every touched row to 'active'/'completed',
+  -- silently resurrecting revoked and expired enrollments and defeating the
+  -- revocation blocks in enroll_in_course and revoke_enrollment.
   UPDATE public.enrollments e
   SET
     progress_pct = sub.calc_pct,
@@ -7321,6 +7453,7 @@ BEGIN
                                      AND up.course_id = e2.course_id
                                      AND up.lesson_id = l.id
     WHERE e2.deleted_at IS NULL
+      AND e2.status IN ('active', 'completed')
     GROUP BY e2.id
   ) sub
   WHERE e.id = sub.enrollment_id

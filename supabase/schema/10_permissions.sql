@@ -41,6 +41,13 @@ REVOKE ALL ON SCHEMA internal FROM PUBLIC, anon, authenticated;
 
 REVOKE ALL ON SCHEMA maintenance FROM PUBLIC, anon, authenticated;
 
+-- DBSEC-008 (2026-09-23): archive was created in 01_extensions.sql but never
+-- added to the schema lock-down net, so it kept the PostgreSQL default
+-- (USAGE to PUBLIC). It holds cold-storage copies of soft-deleted rows and
+-- is only written by maintenance.archive_soft_deleted_data() in definer
+-- context; no client or service_role path needs it.
+REVOKE ALL ON SCHEMA archive FROM PUBLIC, anon, authenticated;
+
 GRANT USAGE ON SCHEMA private TO service_role;
 
 GRANT USAGE ON SCHEMA audit TO service_role;
@@ -53,6 +60,16 @@ REVOKE ALL ON ALL FUNCTIONS IN SCHEMA private FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON ALL FUNCTIONS IN SCHEMA audit FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON ALL FUNCTIONS IN SCHEMA internal FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON ALL FUNCTIONS IN SCHEMA maintenance FROM PUBLIC, anon, authenticated;
+
+-- DBSEC-008 (2026-09-23): future objects in maintenance/archive follow the
+-- same default-deny model as private/audit/internal; previously functions
+-- created later in maintenance would have defaulted to EXECUTE TO PUBLIC
+-- again (the archive_old_partitions / create_next_partition_if_not_exists
+-- class of functions).
+ALTER DEFAULT PRIVILEGES IN SCHEMA maintenance REVOKE ALL ON TABLES FROM PUBLIC, anon, authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA maintenance REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon, authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA archive REVOKE ALL ON TABLES FROM PUBLIC, anon, authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA archive REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon, authenticated;
 
 ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM PUBLIC, anon, authenticated;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon, authenticated;
@@ -125,7 +142,20 @@ GRANT SELECT ON public.settings_cache, public.security_settings TO authenticated
 -- before re-granting; that is the canonical definition for these 4 tables.
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.courses, public.course_prerequisites, public.course_learning_objectives, public.sections, public.lessons TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.lesson_contents TO authenticated;
-GRANT SELECT, INSERT, UPDATE ON public.enrollments TO authenticated;
+-- DBSEC-001 (2026-09-23, Phase 1 security audit): direct client UPDATE on
+-- enrollments is revoked. No app writes this table directly: the Student App
+-- is SELECT-only (all five lib/ usages are .select()) and the Dashboard
+-- mutates through the enroll_student / revoke_enrollment / extend_enrollment
+-- RPCs; progress is recomputed server-side by trg_update_enrollment_progress
+-- and the enrollment-progress workers, which run in definer context and are
+-- unaffected by this revoke. The old full-row UPDATE grant let a user repoint
+-- their OWN enrollment row at any other course in their tenant
+-- (course_id/status/revoked_at/expires_at are unpinned in the self-branch of
+-- enrollments_update_merged, 09_rls.sql) and thereby satisfy
+-- has_course_access() for a course they were never enrolled in — an
+-- entitlement-forgery path. Same hardening model as users above.
+REVOKE UPDATE ON public.enrollments FROM authenticated;
+GRANT SELECT, INSERT ON public.enrollments TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.user_progress TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.course_ratings TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.devices TO authenticated;
@@ -638,9 +668,20 @@ REVOKE ALL ON FUNCTION public.get_tenants_usage(uuid[]) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.get_tenants_usage(uuid[]) TO authenticated, service_role;
 
 -- 3. ADMIN ONLY - Revoked from anon AND authenticated; granted to service_role only
+-- DBSEC-007 (2026-09-23): is_current_user_super_admin() is re-granted to
+-- authenticated. The body validates the caller's session and reads
+-- users.primary_role server-side (07_functions.sql), so granting EXECUTE
+-- exposes no privilege — it only lets the expression evaluate for browser
+-- callers. It is referenced by security_invoker views (vw_course_stats /
+-- public.mv_course_stats, whose SELECT grants to authenticated+anon were
+-- otherwise dead: a security_invoker view requires the INVOKER to hold
+-- EXECUTE on every function in its WHERE clause, so browser SELECTs failed
+-- at plan time) and by admin job RPCs and tenants write policies, which
+-- previously failed with a plan-time permission error instead of a clean
+-- RLS denial for non-admins. The *_lite variant below is already
+-- PUBLIC-executable; this aligns the strict variant's surface with it.
 REVOKE EXECUTE ON FUNCTION public.is_current_user_super_admin() FROM anon;
-REVOKE EXECUTE ON FUNCTION public.is_current_user_super_admin() FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.is_current_user_super_admin() TO service_role;
+GRANT EXECUTE ON FUNCTION public.is_current_user_super_admin() TO authenticated, service_role;
 
 REVOKE EXECUTE ON FUNCTION public.is_current_user_super_admin_lite() FROM anon;
 REVOKE EXECUTE ON FUNCTION public.is_current_user_super_admin_lite() FROM authenticated;
@@ -1426,3 +1467,55 @@ REVOKE ALL ON FUNCTION public.trg_refresh_enrollment_totals_stmt()
   FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.trg_touch_feature_flag_row()
   FROM PUBLIC, anon, authenticated;
+
+-- ============================================================================
+-- DBSEC-010 (2026-09-23, Phase 1 security audit): normalize the public-schema
+-- EXECUTE surface.
+--
+-- Root cause: the historical sweeps revoked FROM anon and FROM authenticated
+-- but not always FROM PUBLIC. PostgreSQL grants EXECUTE to PUBLIC by default,
+-- and anon inherits every PUBLIC privilege, so any function whose sweep
+-- missed the PUBLIC entry (e.g. worker_terminate_user_sessions, the control-
+-- plane RPCs, the trigger functions whose revokes predate the convention)
+-- stayed invokable by anon through PUBLIC membership. VALIDATION.sql check
+-- 47 ("Phase 6 EXECUTE sweep") flags exactly this class, and the live
+-- project's proacl still carries `=X/postgres` entries for those functions.
+--
+-- The single statement below clears PUBLIC EXECUTE for the whole schema
+-- (future functions are already covered by the ALTER DEFAULT PRIVILEGES
+-- block at the top of this file). Everything that legitimately needs it is
+-- re-granted explicitly right after:
+--   * the seven pre-login RPCs (anon surface, mirrored from the grants
+--     above),
+--   * the helpers evaluated inside `TO public` policies, which anon must be
+--     able to EXECUTE for RLS evaluation of settings_kv/rate_limits rows.
+-- Trigger-invoked functions need no EXECUTE grants (trigger firing is not a
+-- privilege check); service_role/authenticated keep their explicit grants
+-- from the sections above. is_current_user_super_admin_lite() previously
+-- relied on PUBLIC for its authenticated policy evaluation
+-- (sessions_admin_all / devices_admin_all) and gains an explicit grant here.
+--
+-- Verified against the disposable PostgreSQL 17 run of VALIDATION.sql.
+-- ============================================================================
+REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC;
+
+-- Intended anon (pre-login) RPC surface
+GRANT EXECUTE ON FUNCTION public.get_public_settings() TO anon;
+GRANT EXECUTE ON FUNCTION public.get_constant(text) TO anon;
+GRANT EXECUTE ON FUNCTION public.get_default_region_id() TO anon;
+GRANT EXECUTE ON FUNCTION public.system_tenant_id() TO anon;
+GRANT EXECUTE ON FUNCTION public.immutable_unaccent(text) TO anon;
+GRANT EXECUTE ON FUNCTION public.immutable_tsvector(text) TO anon;
+GRANT EXECUTE ON FUNCTION public.report_security_incident(text, text, text, boolean, text, text, text, jsonb) TO anon;
+
+-- NOTE: intentionally NOT granted to anon. Functions inside RLS policy
+-- expressions are ACL-checked when the policy expression is planned with the
+-- calling role — production evidence: the pre-login settings_kv read raised
+-- "permission denied for function user_has_permission" for anon even though
+-- the CASE branch anon takes never calls it. See DBSEC-011 in 09_rls.sql for
+-- the policy split that resolves this without opening a permission-probing
+-- oracle for arbitrary user ids.
+
+-- Policy helpers that relied on PUBLIC for authenticated evaluation
+GRANT EXECUTE ON FUNCTION public.is_current_user_super_admin_lite() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.is_current_user_super_admin_lite() TO service_role;

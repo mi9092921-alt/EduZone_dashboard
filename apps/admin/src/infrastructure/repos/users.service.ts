@@ -13,12 +13,16 @@ import type {
   UserRoleAssignment,
   UserStats,
 } from '@/domain/types/user.types';
-import { createAdminClient } from '@/infrastructure/supabase/admin';
 import { sanitizePostgrestSearchTerm } from '@/infrastructure/supabase/postgrest-filter';
 
 /**
- * Users service — all Supabase queries for the users domain.
+ * Users service — browser-safe Supabase queries for the users domain.
  * No UI, no React — pure async functions.
+ *
+ * P1 FIX (server/client boundary): this module MUST NOT import the
+ * service-role client — it is bundled for client components/queries/
+ * mutations. Privileged reads (`getUserTenantId`) live in `./users.admin`
+ * (server-only).
  */
 
 // ── List users (paginated + filtered) ────────────────────────────
@@ -83,18 +87,6 @@ export async function getUserById(id: string): Promise<User> {
 
   if (error) throw mapDbError(error, 'users.service.ts');
   return data as User;
-}
-
-// ── Tenant lookup for a user (cross-tenant IDOR guard support) ───
-export async function getUserTenantId(userId: string): Promise<string | null> {
-  const admin = createAdminClient();
-  const { data, error } = await admin
-    .from('users')
-    .select('tenant_id')
-    .eq('id', userId)
-    .maybeSingle();
-  if (error || !data) return null;
-  return (data.tenant_id as string) ?? null;
 }
 
 // ── Control account / terminate sessions ─────────────────────────

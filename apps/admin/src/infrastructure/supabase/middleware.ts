@@ -1,7 +1,8 @@
 import { createServerClient as createClient, type CookieOptions } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
-import { env } from '@/lib/env';
+import { sessionCookieOptions } from '@/infrastructure/supabase/cookie-options';
+import { env } from '@/lib/env.client';
 
 type CookieUser = Awaited<ReturnType<ReturnType<typeof createClient>['auth']['getUser']>>['data']['user'];
 
@@ -11,6 +12,10 @@ function createMiddlewareSupabase(request: NextRequest, initialResponse: NextRes
     env.NEXT_PUBLIC_SUPABASE_URL,
     env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     {
+      // PHASE 2.3 (G2): refreshed session cookies written here must carry the
+      // Secure attribute outside local development, matching the browser and
+      // server clients.
+      cookieOptions: sessionCookieOptions(),
       cookies: {
         getAll() {
           return request.cookies.getAll();

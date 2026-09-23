@@ -68,6 +68,7 @@ import { StatsCard, StatsCardContent } from '@/components/ui/Card';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { QueryErrorBanner } from '@/components/ui/QueryErrorBanner';
 import { TablePagination } from '@/components/ui/TablePagination';
+import { toClientMessage } from '@/domain/errors';
 import { PermissionGate } from '@/features/layout/components/PermissionGate';
 import { getAllPermissions, searchUsers } from '@/infrastructure/repos/users.service';
 
@@ -259,7 +260,7 @@ interface UserOption {
 
 const sendNotificationSchema = z
   .object({
-    title: z.string().min(3),
+    title: z.string().min(3).max(100),
     body: z.string().min(10).max(500),
     targeting_type: z.enum(['role', 'permission', 'users']).optional(),
     target_audience: z.enum(['all', 'students', 'teachers', 'admins']).optional(),
@@ -296,6 +297,7 @@ function SendNotificationDialog({
 }: SendDialogProps) {
   const t = useTranslations('notifications');
   const tCommon = useTranslations('common');
+  const showToast = useToastStore((s) => s.showToast);
   const sendMutation = useSendNotification();
   const [permissions, setPermissions] = useState<string[]>([]);
   const [userQuery, setUserQuery] = useState('');
@@ -385,8 +387,11 @@ function SendNotificationDialog({
       await sendMutation.mutateAsync(payload);
       onSuccess(t('status_success'));
       handleClose();
-    } catch (_err) {
-      // error handled by mutation
+    } catch (err) {
+      // A silent catch here left the user staring at an unchanged dialog
+      // after a server-side failure. Mirror CourseAnnouncementsTab: always
+      // surface the mapped client-safe message.
+      showToast(toClientMessage(err), 'error');
     }
   };
 
@@ -688,6 +693,7 @@ interface DeleteDialogProps {
 
 function DeleteNotificationDialog({ open, notificationId, onClose, onSuccess }: DeleteDialogProps) {
   const t = useTranslations('notifications');
+  const showToast = useToastStore((s) => s.showToast);
   const deleteMutation = useDeleteNotification();
 
   const handleDelete = async () => {
@@ -696,8 +702,8 @@ function DeleteNotificationDialog({ open, notificationId, onClose, onSuccess }: 
       await deleteMutation.mutateAsync(notificationId);
       onSuccess(t('status_delete_success'));
       onClose();
-    } catch (_err) {
-      // toast handled in mutation
+    } catch (err) {
+      showToast(toClientMessage(err), 'error');
     }
   };
 

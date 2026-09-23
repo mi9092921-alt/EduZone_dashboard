@@ -34,7 +34,7 @@ vi.mock('@/adapters/actions/boundary', () => ({
 const mockGetAccessRulesAdmin = vi.fn();
 const mockUpsertAccessRuleAdmin = vi.fn();
 const mockGetAccessRuleTenantId = vi.fn();
-vi.mock('@/infrastructure/repos/access-rules.service', () => ({
+vi.mock('@/infrastructure/repos/access-rules.admin', () => ({
   getAccessRulesAdmin: (...args: unknown[]) => mockGetAccessRulesAdmin(...args),
   upsertAccessRuleAdmin: (...args: unknown[]) => mockUpsertAccessRuleAdmin(...args),
   getAccessRuleTenantId: (...args: unknown[]) => mockGetAccessRuleTenantId(...args),
@@ -63,7 +63,7 @@ vi.mock('@/infrastructure/repos/rate-limits.service', () => ({
 }));
 
 const mockGetQueuedActivities = vi.fn();
-vi.mock('@/infrastructure/repos/audit.service', () => ({
+vi.mock('@/infrastructure/repos/audit.admin', () => ({
   getQueuedActivities: (...args: unknown[]) => mockGetQueuedActivities(...args),
 }));
 
@@ -93,7 +93,7 @@ vi.mock('@/application/use-cases/notifications/send-notification.use-case', () =
 vi.mock('@/infrastructure/repos/course-admin.repository', () => ({
   makeCourseAdminRepository: vi.fn(),
 }));
-vi.mock('@/infrastructure/repos/courses.service', () => ({
+vi.mock('@/infrastructure/repos/courses.admin', () => ({
   getCourseStats: vi.fn(),
 }));
 vi.mock('@/infrastructure/repos/feature-flags.service', () => ({}));
@@ -120,7 +120,7 @@ function ctxFor(overrides: Partial<{ tenantId: string; permissions: string[] }> 
     userId: 'user-1',
     tenantId: overrides.tenantId ?? 'tenant-a',
     role: 'admin',
-    permissions: overrides.permissions ?? ['settings.manage', 'audit.read', 'settings.write'],
+    permissions: overrides.permissions ?? ['audit.read', 'settings.write'],
     supabase: mockSupabaseClient,
   };
 }
@@ -165,12 +165,18 @@ describe('admin.actions.ts — tenant-scoping IDOR guards', () => {
   });
 
   describe('upsertAccessRuleAction', () => {
+    // Valid UUID fixtures: the boundary now enforces upsertAccessRuleSchema
+    // at runtime (PHASE 2.9), so payloads must be schema-valid — the attack
+    // intent is preserved via genuinely different tenant UUIDs.
+    const ATTACKER_TENANT_ID = '22222222-2222-4222-8222-222222222222';
+    const OTHER_RULE_ID = '33333333-3333-4333-8333-333333333333';
     it('forces tenant_id to the caller own tenant on insert for a non-super_admin caller', async () => {
       mockRequirePermission.mockResolvedValue(ctxFor({ tenantId: 'tenant-a' }));
 
       await upsertAccessRuleAction({
-        tenant_id: 'tenant-B-attacker-supplied',
+        tenant_id: ATTACKER_TENANT_ID,
         rule_type: 'ip_whitelist',
+        rule_value: { cidr: '10.0.0.0/8' },
         is_active: true,
       } as never);
 
@@ -188,9 +194,10 @@ describe('admin.actions.ts — tenant-scoping IDOR guards', () => {
 
       await expect(
         upsertAccessRuleAction({
-          id: 'rule-owned-by-tenant-B',
-          tenant_id: 'tenant-a',
+          id: OTHER_RULE_ID,
+          tenant_id: ATTACKER_TENANT_ID,
           rule_type: 'ip_whitelist',
+          rule_value: { cidr: '10.0.0.0/8' },
           is_active: true,
         } as never),
       ).rejects.toThrow('Cross-tenant access forbidden');
@@ -202,13 +209,14 @@ describe('admin.actions.ts — tenant-scoping IDOR guards', () => {
       mockRequirePermission.mockResolvedValue(ctxFor({ permissions: ['*'] }));
 
       await upsertAccessRuleAction({
-        tenant_id: 'tenant-B',
+        tenant_id: ATTACKER_TENANT_ID,
         rule_type: 'ip_whitelist',
+        rule_value: { cidr: '10.0.0.0/8' },
         is_active: true,
       } as never);
 
       expect(mockUpsertAccessRuleAdmin).toHaveBeenCalledWith(
-        expect.objectContaining({ tenant_id: 'tenant-B' }),
+        expect.objectContaining({ tenant_id: ATTACKER_TENANT_ID }),
       );
     });
   });

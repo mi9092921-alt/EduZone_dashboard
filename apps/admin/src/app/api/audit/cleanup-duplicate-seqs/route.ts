@@ -31,14 +31,23 @@ import { createServerClient } from '@/infrastructure/supabase/server';
  * for the full rationale.
  *
  * Requires: super_admin role.
+ *
+ * PHASE 3 (WEB-002): every response carries admin/ops-sensitive data and
+ * must never be stored by a shared cache — all JSON responses below set
+ * `Cache-Control: no-store` explicitly at the handler.
  */
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
 export async function POST() {
   try {
     // ── Auth check ────────────────────────────────────────────
     const supabase = await createServerClient();
     const { data: userData, error: userErr } = await supabase.auth.getUser();
     if (userErr || !userData?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401, headers: NO_STORE_HEADERS },
+      );
     }
 
     const { data: profile, error: profErr } = await supabase
@@ -49,7 +58,10 @@ export async function POST() {
       .single();
 
     if (profErr || !profile || profile.primary_role !== 'super_admin') {
-      return NextResponse.json({ error: 'Forbidden: super_admin only' }, { status: 403 });
+      return NextResponse.json(
+        { error: 'Forbidden: super_admin only' },
+        { status: 403, headers: NO_STORE_HEADERS },
+      );
     }
 
     // ── Admin client (service_role bypasses RLS; trigger allows duplicate deletes) ──
@@ -66,7 +78,10 @@ export async function POST() {
 
     if (chainErr || !chainState) {
       console.error('[cleanup-duplicate-seqs] failed to read audit_chain_state:', chainErr);
-      return NextResponse.json({ error: 'Failed to read audit chain state' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'Failed to read audit chain state' },
+        { status: 500, headers: NO_STORE_HEADERS },
+      );
     }
 
     // ── Fetch every row (tenant_id included — see module doc: a
@@ -80,7 +95,10 @@ export async function POST() {
       // M10: log raw DB error server-side, return a generic message — the
       // PostgREST text can contain schema/column/function details.
       console.error('[cleanup-duplicate-seqs] fetch failed:', fetchErr);
-      return NextResponse.json({ error: 'Failed to scan audit logs' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'Failed to scan audit logs' },
+        { status: 500, headers: NO_STORE_HEADERS },
+      );
     }
 
     let plan;
@@ -95,7 +113,10 @@ export async function POST() {
         // can't be trusted. Audit immutability takes priority over
         // completing the cleanup.
         console.error('[cleanup-duplicate-seqs] refusing to modify a corrupted chain:', err.detail);
-        return NextResponse.json({ error: err.message }, { status: 409 });
+        return NextResponse.json(
+          { error: err.message },
+          { status: 409, headers: NO_STORE_HEADERS },
+        );
       }
       throw err;
     }
@@ -108,14 +129,17 @@ export async function POST() {
     }
 
     if (plan.toDelete.length === 0) {
-      return NextResponse.json({
-        deleted: 0,
-        message:
-          plan.conflicts.length > 0
-            ? `No safe deletions; ${plan.conflicts.length} seq group(s) look forked and were left untouched`
-            : 'No duplicate seq entries found',
-        conflicts: plan.conflicts.length > 0 ? plan.conflicts : undefined,
-      });
+      return NextResponse.json(
+        {
+          deleted: 0,
+          message:
+            plan.conflicts.length > 0
+              ? `No safe deletions; ${plan.conflicts.length} seq group(s) look forked and were left untouched`
+              : 'No duplicate seq entries found',
+          conflicts: plan.conflicts.length > 0 ? plan.conflicts : undefined,
+        },
+        { headers: NO_STORE_HEADERS },
+      );
     }
 
     // Delete in batches of 100
@@ -130,19 +154,25 @@ export async function POST() {
         console.error('[cleanup-duplicate-seqs] delete failed:', delErr);
         return NextResponse.json(
           { error: 'Failed to remove duplicate entries', deleted },
-          { status: 500 },
+          { status: 500, headers: NO_STORE_HEADERS },
         );
       }
       deleted += batch.length;
     }
 
-    return NextResponse.json({
-      deleted,
-      message: `Removed ${deleted} orphaned duplicate-seq entries from activity_logs`,
-      conflicts: plan.conflicts.length > 0 ? plan.conflicts : undefined,
-    });
+    return NextResponse.json(
+      {
+        deleted,
+        message: `Removed ${deleted} orphaned duplicate-seq entries from activity_logs`,
+        conflicts: plan.conflicts.length > 0 ? plan.conflicts : undefined,
+      },
+      { headers: NO_STORE_HEADERS },
+    );
   } catch (err) {
     console.error('[cleanup-duplicate-seqs] Unhandled error:', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500, headers: NO_STORE_HEADERS },
+    );
   }
 }

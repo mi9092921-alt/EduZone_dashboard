@@ -23,7 +23,8 @@ export interface Notification {
   target_permission: string | null;
   target_user_ids: string[] | null;
   course_id?: string | null;
-  is_deleted: boolean;
+  /** Soft-delete marker — the table has no boolean is_deleted column. */
+  deleted_at?: string | null;
   created_at: string;
 }
 

@@ -4,10 +4,10 @@ import { requirePermission } from '@/adapters/actions/boundary';
 import {
   getYoutubeVideoDetails,
   getYoutubeVideoDetailsBatch,
-  YOUTUBE_METADATA_BATCH_ACTION_LIMIT,
   type YouTubeBatchPartialFailure,
   type YouTubeVideoMetadata,
 } from '@/infrastructure/youtube.service';
+import { YOUTUBE_METADATA_BATCH_ACTION_LIMIT } from '@/infrastructure/youtube.utils';
 
 /**
  * Server action to fetch YouTube video metadata.

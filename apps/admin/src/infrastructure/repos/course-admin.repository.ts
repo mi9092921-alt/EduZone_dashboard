@@ -1,5 +1,5 @@
 import type { ICourseAdminRepository } from '@/application/ports/ICourseAdminRepository';
-import { deleteCourse, getCourseTenantId } from '@/infrastructure/repos/courses.service';
+import { deleteCourse, getCourseTenantId } from '@/infrastructure/repos/courses.admin';
 
 /**
  * Supabase implementation of ICourseAdminRepository.

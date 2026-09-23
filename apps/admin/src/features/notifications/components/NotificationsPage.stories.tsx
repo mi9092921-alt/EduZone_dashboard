@@ -37,7 +37,7 @@ const meta: Meta<typeof NotificationsPage> = {
                 title: 'Server Maintenance',
                 body: 'The server will be down for maintenance at 2 AM UTC.',
                 target_audience: 'admins',
-                target_permission: 'settings.manage',
+                target_permission: 'settings.write',
                 target_user_ids: null,
                 created_at: new Date(Date.now() - 7200000).toISOString(),
               },
@@ -62,7 +62,7 @@ const meta: Meta<typeof NotificationsPage> = {
           return HttpResponse.json([
             { name: 'users.manage' },
             { name: 'courses.manage' },
-            { name: 'settings.manage' },
+            { name: 'settings.write' },
             { name: 'notifications.send' },
           ]);
         }),

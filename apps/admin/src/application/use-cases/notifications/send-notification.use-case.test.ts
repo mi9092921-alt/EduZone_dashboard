@@ -21,6 +21,8 @@ function makeRepo(
     triggerInstantPush: vi.fn().mockResolvedValue(undefined),
     listForAdmin: vi.fn(),
     softDelete: vi.fn().mockResolvedValue(undefined),
+    getNotificationOwnershipMeta: vi.fn().mockResolvedValue(null),
+    detachNotificationTargets: vi.fn().mockResolvedValue(undefined),
     listMine: vi.fn().mockResolvedValue([]),
     countMine: vi.fn().mockResolvedValue(0),
     markRead: vi.fn().mockResolvedValue(undefined),
@@ -52,7 +54,9 @@ describe('SendNotificationUseCase', () => {
     audit = { record: vi.fn().mockResolvedValue(undefined) };
   });
 
-  const input: SendNotificationInput = { title: 'Hello', body: 'World' };
+  // Body must satisfy the use-case's own 10..500 validation (parity with
+  // the DB CHECK) — 'World' would now be rejected before any write.
+  const input: SendNotificationInput = { title: 'Hello', body: 'Hello broadcast world' };
 
   it('rejects a teacher attempt to target users outside the student role', async () => {
     const repo = makeRepo();
@@ -168,7 +172,52 @@ describe('SendNotificationUseCase', () => {
     );
     // The orphan notification row is removed so the caller's retry starts clean.
     expect(repo.softDelete).toHaveBeenCalledWith('notif-1', 'tenant-1');
+    // Attached target rows point at the dead notification id — cleaned too.
+    expect(repo.detachNotificationTargets).toHaveBeenCalledWith('notif-1');
     expect(repo.triggerInstantPush).not.toHaveBeenCalled();
+  });
+
+  it('rejects a title shorter than 3 or longer than 100 characters before any write', async () => {
+    const repo = makeRepo();
+
+    await expect(
+      new SendNotificationUseCase(repo, audit).execute(ctx, { title: 'ab', body: 'Long enough body' }),
+    ).rejects.toThrow('Title must be between 3 and 100 characters');
+    await expect(
+      new SendNotificationUseCase(repo, audit).execute(ctx, { title: 'x'.repeat(101), body: 'Long enough body' }),
+    ).rejects.toThrow('Title must be between 3 and 100 characters');
+    expect(repo.insertNotification).not.toHaveBeenCalled();
+  });
+
+  it('rejects a body shorter than 10 or longer than 500 characters before any write', async () => {
+    const repo = makeRepo();
+
+    await expect(
+      new SendNotificationUseCase(repo, audit).execute(ctx, { title: 'Valid title', body: 'short' }),
+    ).rejects.toThrow('Body must be between 10 and 500 characters');
+    await expect(
+      new SendNotificationUseCase(repo, audit).execute(ctx, {
+        title: 'Valid title',
+        body: 'x'.repeat(501),
+      }),
+    ).rejects.toThrow('Body must be between 10 and 500 characters');
+    expect(repo.insertNotification).not.toHaveBeenCalled();
+  });
+
+  it('trims whitespace around title/body before inserting', async () => {
+    const repo = makeRepo();
+    (repo.resolveTargetUserIds as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+
+    await new SendNotificationUseCase(repo, audit).execute(ctx, {
+      title: '  Valid title  ',
+      body: '  Long enough body content  ',
+    });
+
+    expect(repo.insertNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Valid title', body: 'Long enough body content' }),
+      'tenant-1',
+      'admin-1',
+    );
   });
 
   it('M16 (F16-4): still throws the original fanout error when the compensation itself fails', async () => {
@@ -240,6 +289,6 @@ describe('SendNotificationUseCase', () => {
     const event = (audit.record as ReturnType<typeof vi.fn>).mock.calls.find(
       (c) => (c[1] as { type: string }).type === 'notification_sent',
     )?.[1] as { details?: Record<string, unknown>; summary?: string };
-    expect(JSON.stringify(event)).not.toContain('World');
+    expect(JSON.stringify(event)).not.toContain('Hello broadcast world');
   });
 });

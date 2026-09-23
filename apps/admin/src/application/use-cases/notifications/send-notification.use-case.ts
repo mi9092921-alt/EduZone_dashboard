@@ -45,11 +45,25 @@ export class SendNotificationUseCase {
       throw new ForbiddenError('The selected audience is outside the sender role scope');
     }
 
+    // Length validation mirrors the DB CHECK constraints (03_tables.sql):
+    // catching it here returns a 400 ValidationError instead of a raw
+    // CHECK violation surfacing as a 500 InfrastructureError.
+    const title = input.title?.trim();
+    if (!title || title.length < 3 || title.length > 100) {
+      throw new ValidationError('Title must be between 3 and 100 characters');
+    }
+    const body = input.body?.trim();
+    if (!body || body.length < 10 || body.length > 500) {
+      throw new ValidationError('Body must be between 10 and 500 characters');
+    }
+
     // Normalize the audience before resolving recipients and inserting the
     // broadcast row. This keeps role/permission/user targeting consistent
     // even when a client sends a hand-crafted request.
     const scopedInput: SendNotificationInput = {
       ...input,
+      title,
+      body,
       target_audience: targetAudience,
     };
 
@@ -84,6 +98,11 @@ export class SendNotificationUseCase {
         // retry starts clean. Best-effort: the original error still wins.
         try {
           await this.notifications.softDelete(notificationId, tenantId);
+          // Targets attached before the failure point would otherwise point
+          // at a soft-deleted notification forever (CASCADE only fires on a
+          // hard delete). The retry mints a new notification id, so these
+          // rows are dead weight — remove them.
+          await this.notifications.detachNotificationTargets(notificationId);
         } catch (cleanupError) {
           console.error('[SEND_NOTIFICATION_COMPENSATION_FAILED]', cleanupError);
         }

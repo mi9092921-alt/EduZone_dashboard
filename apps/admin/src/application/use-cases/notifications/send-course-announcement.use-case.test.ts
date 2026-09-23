@@ -17,6 +17,8 @@ function makeRepo(
     triggerInstantPush: vi.fn().mockResolvedValue(undefined),
     listForAdmin: vi.fn(),
     softDelete: vi.fn().mockResolvedValue(undefined),
+    getNotificationOwnershipMeta: vi.fn().mockResolvedValue(null),
+    detachNotificationTargets: vi.fn().mockResolvedValue(undefined),
     verifyTeacherCourseOwnership: vi.fn().mockResolvedValue({ ownsCourse: true }),
     resolveEnrolledStudentIds: vi.fn().mockResolvedValue(['student-1', 'student-2']),
     listCourseAnnouncements: vi.fn().mockResolvedValue({ data: [], count: 0 }),

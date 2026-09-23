@@ -32,7 +32,7 @@ import {
   saveLearningObjectives,
   savePrerequisites,
 } from '@/infrastructure/repos/courses.service';
-import { extractYoutubeId } from '@/infrastructure/youtube.service';
+import { extractYoutubeId } from '@/infrastructure/youtube.utils';
 
 /**
  * Mutation hooks for course management actions.

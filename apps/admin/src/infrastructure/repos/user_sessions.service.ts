@@ -1,3 +1,5 @@
+import 'server-only';
+
 import { container } from '@/container';
 import { InfrastructureError } from '@/domain/errors';
 import type { Session } from '@/domain/types/user.types';

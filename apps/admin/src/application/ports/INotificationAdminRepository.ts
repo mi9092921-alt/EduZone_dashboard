@@ -65,6 +65,23 @@ export interface INotificationAdminRepository {
   /** Soft-deletes a broadcast notification, scoped to the tenant when known. */
   softDelete(id: string, tenantId: string | null): Promise<void>;
 
+  /**
+   * Fetches the ownership metadata a teacher-scoped delete authorization
+   * needs (creator + targeting mode + course). Returns null when the
+   * notification does not exist in the tenant (fails closed upstream).
+   */
+  getNotificationOwnershipMeta(
+    id: string,
+    tenantId: string | null,
+  ): Promise<{
+    created_by: string | null;
+    targeting_mode: string;
+    course_id: string | null;
+  } | null>;
+
+  /** Hard-deletes explicit target rows (fanout-failure compensation cleanup). */
+  detachNotificationTargets(notificationId: string): Promise<void>;
+
   // ── Course announcements ────────────────────────────────────────
   /** Checks whether a teacher owns a specific course within the given tenant. */
   verifyTeacherCourseOwnership(

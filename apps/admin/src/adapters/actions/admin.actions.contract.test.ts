@@ -41,7 +41,7 @@ vi.mock('@/adapters/actions/boundary', () => ({
 const mockGetAccessRuleTenantId = vi.fn();
 const mockDeleteAccessRuleAdmin = vi.fn();
 const mockToggleAccessRuleAdmin = vi.fn();
-vi.mock('@/infrastructure/repos/access-rules.service', () => ({
+vi.mock('@/infrastructure/repos/access-rules.admin', () => ({
   getAccessRulesAdmin: vi.fn(),
   upsertAccessRuleAdmin: vi.fn(),
   getAccessRuleTenantId: (...args: unknown[]) => mockGetAccessRuleTenantId(...args),
@@ -108,7 +108,7 @@ vi.mock('@/infrastructure/repos/rate-limits.service', () => ({
 
 const mockGetCourseTenantId = vi.fn();
 const mockGetCourseStats = vi.fn();
-vi.mock('@/infrastructure/repos/courses.service', () => ({
+vi.mock('@/infrastructure/repos/courses.admin', () => ({
   getCourseTenantId: (...args: unknown[]) => mockGetCourseTenantId(...args),
   getCourseStats: (...args: unknown[]) => mockGetCourseStats(...args),
 }));
@@ -116,14 +116,17 @@ vi.mock('@/infrastructure/repos/courses.service', () => ({
 // Imported by admin.actions.ts but not exercised in this file — stubbed so
 // the module under test resolves cleanly (no createAdminClient anywhere).
 vi.mock('@/infrastructure/repos/analytics.service', () => ({ getCourseStats: vi.fn() }));
-vi.mock('@/infrastructure/repos/audit.service', () => ({ getQueuedActivities: vi.fn() }));
+vi.mock('@/infrastructure/repos/audit.admin', () => ({ getQueuedActivities: vi.fn() }));
 vi.mock('@/infrastructure/repos/course-admin.repository', () => ({
   makeCourseAdminRepository: vi.fn(),
 }));
 const mockListCourseAnnouncements = vi.fn();
+const mockVerifyTeacherCourseOwnership = vi.fn().mockResolvedValue({ ownsCourse: true });
 vi.mock('@/infrastructure/repos/notifications.repository', () => ({
   makeNotificationAdminRepository: vi.fn(() => ({
     listCourseAnnouncements: (...args: unknown[]) => mockListCourseAnnouncements(...args),
+    verifyTeacherCourseOwnership: (...args: unknown[]) =>
+      mockVerifyTeacherCourseOwnership(...args),
   })),
 }));
 
@@ -228,14 +231,17 @@ const ADMIN_CTX = {
   userId: 'user-1',
   tenantId: 'tenant-a',
   role: 'admin',
-  permissions: ['settings.write', 'feature_flags.manage', 'jobs.manage'],
+  permissions: ['settings.write', 'feature_flags.manage', 'audit.read'],
 };
 
-function ctxFor(overrides: { tenantId?: string | null; permissions?: string[] } = {}) {
+function ctxFor(
+  overrides: { tenantId?: string | null; permissions?: string[]; role?: string } = {},
+) {
   return {
     ...ADMIN_CTX,
     tenantId: overrides.tenantId === undefined ? ADMIN_CTX.tenantId : overrides.tenantId,
     permissions: overrides.permissions ?? ADMIN_CTX.permissions,
+    role: overrides.role ?? ADMIN_CTX.role,
   };
 }
 
@@ -298,7 +304,6 @@ describe('admin.actions.ts — remaining action surface', () => {
       await deleteAccessRuleAction('rule-1');
 
       expect(mockRequirePermission).toHaveBeenCalledWith([
-        'settings.manage',
         'settings.write',
         'tenants.manage',
       ]);
@@ -336,7 +341,8 @@ describe('admin.actions.ts — remaining action surface', () => {
   describe('feature flag CRUD', () => {
     it('createFeatureFlagAction delegates and audits with the created flag key', async () => {
       mockRequirePermission.mockResolvedValue(ctxFor());
-      const input = { key: 'new-flag', enabled: false };
+      // Schema-valid fixture (PHASE 2.9): snake_case key + is_enabled field.
+      const input = { key: 'new_flag', is_enabled: false };
 
       const flag = await createFeatureFlagAction(input as never);
 
@@ -352,14 +358,45 @@ describe('admin.actions.ts — remaining action surface', () => {
     it('updateFeatureFlagAction delegates and audits with the updated flag key', async () => {
       mockRequirePermission.mockResolvedValue(ctxFor());
 
-      const flag = await updateFeatureFlagAction('flag-1', { enabled: true } as never);
+      const flag = await updateFeatureFlagAction('flag-1', { is_enabled: true } as never);
 
       expect(flag).toEqual({ id: 'flag-1', key: 'flag' });
-      expect(mockUpdateFeatureFlagAdmin).toHaveBeenCalledWith('flag-1', { enabled: true });
+      expect(mockUpdateFeatureFlagAdmin).toHaveBeenCalledWith('flag-1', { is_enabled: true });
       expect(mockAuditRecord).toHaveBeenCalledWith(
         ctxFor(),
         expect.objectContaining({ type: 'feature_flag_updated' }),
       );
+    });
+
+    it('forwards every optional feature-flag field when present', async () => {
+      mockRequirePermission.mockResolvedValue(ctxFor());
+
+      const createInput = {
+        key: 'full_flag',
+        label: 'Full flag',
+        description: 'A fully specified feature flag',
+        is_enabled: true,
+        rollout_pct: 50,
+        status: 'active',
+        starts_at: '2026-01-01T00:00:00.000Z',
+        ends_at: '2026-12-31T23:59:59.000Z',
+        metadata: { source: 'test' },
+      };
+      await createFeatureFlagAction(createInput as never);
+      expect(mockCreateFeatureFlagAdmin).toHaveBeenCalledWith(createInput);
+
+      const updateInput = {
+        label: 'Updated flag',
+        description: 'Updated description',
+        is_enabled: false,
+        rollout_pct: 75,
+        status: 'deprecated',
+        starts_at: null,
+        ends_at: '2027-01-01T00:00:00.000Z',
+        metadata: { source: 'updated-test' },
+      };
+      await updateFeatureFlagAction('flag-1', updateInput as never);
+      expect(mockUpdateFeatureFlagAdmin).toHaveBeenCalledWith('flag-1', updateInput);
     });
 
     it('deleteFeatureFlagAction delegates and audits', async () => {
@@ -502,12 +539,13 @@ describe('admin.actions.ts — remaining action surface', () => {
 
   describe('jobs', () => {
     it('getJobsAction scopes to the caller tenant; super_admin sees across tenants', async () => {
-      const filters = { status: 'queued' } as never;
+      // 'pending' is a real DB job status (03_tables.sql CHECK); the boundary
+      // schema rejects anything outside pending/processing/done/failed/dead.
+      const filters = { status: 'pending' } as never;
 
       mockRequirePermission.mockResolvedValue(ctxFor({ tenantId: 'tenant-a' }));
       await getJobsAction(filters, 1, 20);
       expect(mockRequirePermission).toHaveBeenCalledWith([
-        'jobs.manage',
         'audit.read',
         'settings.write',
       ]);
@@ -516,6 +554,10 @@ describe('admin.actions.ts — remaining action surface', () => {
       mockRequirePermission.mockResolvedValue(ctxFor({ permissions: ['*'] }));
       await getJobsAction(filters, 2, 10);
       expect(mockGetJobs).toHaveBeenLastCalledWith(filters, 2, 10, null);
+
+      mockRequirePermission.mockResolvedValue(ctxFor({ tenantId: 'tenant-a' }));
+      await getJobsAction({}, 0, 0);
+      expect(mockGetJobs).toHaveBeenLastCalledWith({}, 1, 20, 'tenant-a');
     });
 
     it('getJobStatusCountsAction scopes the same way as getJobsAction', async () => {
@@ -588,7 +630,7 @@ describe('admin.actions.ts — remaining action surface', () => {
     it('sendCourseAnnouncementAction authorizes and delegates to its use case', async () => {
       mockRequirePermission.mockResolvedValue(ctxFor());
       const input = {
-        courseId: 'course-1',
+        courseId: '44444444-4444-4444-8444-444444444444',
         title: 'Schedule update',
         body: 'The next lesson starts tomorrow at 10:00.',
       };
@@ -640,17 +682,45 @@ describe('admin.actions.ts — remaining action surface', () => {
       expect(mockListCourseAnnouncements).not.toHaveBeenCalled();
     });
 
-    it('deleteNotificationAction delegates to DeleteNotificationUseCase.execute', async () => {
+    it('deleteNotificationAction requires the dedicated delete permission and delegates', async () => {
       mockRequirePermission.mockResolvedValue(ctxFor());
 
       await deleteNotificationAction('notification-1');
 
-      expect(mockRequirePermission).toHaveBeenCalledWith([
-        'notifications.delete',
-        'notifications.send',
-        'settings.write',
-      ]);
+      expect(mockRequirePermission).toHaveBeenCalledWith('notifications.delete');
       expect(mockDeleteNotificationExecute).toHaveBeenCalledWith(ctxFor(), 'notification-1');
+    });
+
+    it('getCourseAnnouncementsAction IDOR-guards a teacher against a foreign course', async () => {
+      mockRequirePermission.mockResolvedValue(ctxFor({ role: 'teacher' }));
+      mockVerifyTeacherCourseOwnership.mockResolvedValue({ ownsCourse: false });
+
+      await expect(getCourseAnnouncementsAction('course-1')).rejects.toThrow(
+        'You do not own this course',
+      );
+      expect(mockVerifyTeacherCourseOwnership).toHaveBeenCalledWith(
+        'course-1',
+        'user-1',
+        'tenant-a',
+      );
+      expect(mockListCourseAnnouncements).not.toHaveBeenCalled();
+    });
+
+    it('getCourseAnnouncementsAction lets a teacher list their own course', async () => {
+      mockRequirePermission.mockResolvedValue(ctxFor({ role: 'teacher' }));
+      mockVerifyTeacherCourseOwnership.mockResolvedValue({ ownsCourse: true });
+      mockListCourseAnnouncements.mockResolvedValue({ data: [], count: 0 });
+
+      await expect(getCourseAnnouncementsAction('course-1')).resolves.toEqual({
+        data: [],
+        count: 0,
+      });
+      expect(mockListCourseAnnouncements).toHaveBeenCalledWith('course-1', 'tenant-a', 1, 10);
+    });
+
+    it('getMyNotificationsAction clamps a crafted oversized limit to 100', async () => {
+      await getMyNotificationsAction(999_999);
+      expect(mockGetMyNotificationsExecute).toHaveBeenLastCalledWith('user-1', 100, false);
     });
 
     it('inbox actions authenticate with requireUser and use default limit/unreadOnly', async () => {
@@ -660,6 +730,9 @@ describe('admin.actions.ts — remaining action surface', () => {
 
       await getMyNotificationsAction(5, true);
       expect(mockGetMyNotificationsExecute).toHaveBeenLastCalledWith('user-1', 5, true);
+
+      await getMyNotificationsAction(0);
+      expect(mockGetMyNotificationsExecute).toHaveBeenLastCalledWith('user-1', 20, false);
 
       await markNotificationAsReadAction('notification-1');
       expect(mockMarkOneReadExecute).toHaveBeenCalledWith('user-1', 'notification-1');
@@ -755,6 +828,15 @@ describe('admin.actions.ts — remaining action surface', () => {
       expect(mockAssertSameTenant).toHaveBeenCalledWith(ctxFor({ tenantId: 'tenant-a' }), 'tenant-a');
       expect(mockDeleteCourseExecute).toHaveBeenCalledWith(ctxFor({ tenantId: 'tenant-a' }), 'course-1');
       expect(result).toEqual({ success: true });
+    });
+
+    it('maps unexpected delete failures to a safe client message', async () => {
+      mockRequirePermission.mockRejectedValueOnce(new Error('database details must not leak'));
+
+      await expect(deleteCourseAction('course-1')).resolves.toEqual({
+        success: false,
+        error: 'An unexpected error occurred. Please try again.',
+      });
     });
   });
 });

@@ -2434,8 +2434,50 @@ BEGIN
   );
 END $$;
 
+-- Check 48 (notification production hardening, 2026-09-23): the RPC send
+-- path must enforce the dashboard's sender→recipient role matrix and emit
+-- audit events (M13 parity), delete_notification must audit, and
+-- user_notifications must be a member of supabase_realtime so BOTH clients'
+-- live subscriptions actually stream (dashboard NotificationBell + student
+-- app watchChanges).
+DO $$
+DECLARE
+  v_send_fn text;
+  v_delete_fn text;
+  v_pub_member boolean;
+BEGIN
+  SELECT pg_get_functiondef(to_regprocedure(
+    'public.send_notification(text,text,text,text,uuid[])'
+  )) INTO v_send_fn;
+  SELECT pg_get_functiondef(to_regprocedure('public.delete_notification(uuid)'))
+    INTO v_delete_fn;
+  SELECT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime'
+      AND schemaname = 'public'
+      AND tablename = 'user_notifications'
+  ) INTO v_pub_member;
 
--- Display Results (includes Checks 27-47 above)
+  INSERT INTO validation_results VALUES (
+    'Notification production hardening',
+    CASE WHEN v_send_fn IS NOT NULL
+       AND v_send_fn ILIKE '%primary_role = ANY(v_allowed_roles)%'
+       AND v_send_fn ILIKE '%notification_sent%'
+       AND v_delete_fn ILIKE '%notification_deleted%'
+       AND v_pub_member
+      THEN 'PASS' ELSE 'FAIL' END,
+    format(
+      'role-scope guard=%s, send audit=%s, delete audit=%s, realtime publication membership=%s',
+      v_send_fn ILIKE '%primary_role = ANY(v_allowed_roles)%',
+      v_send_fn ILIKE '%notification_sent%',
+      coalesce(v_delete_fn, '') ILIKE '%notification_deleted%',
+      v_pub_member
+    )
+  );
+END $$;
+
+
+-- Display Results (includes Checks 27-48 above)
 SELECT * FROM validation_results ORDER BY check_name;
 
 -- Summary
