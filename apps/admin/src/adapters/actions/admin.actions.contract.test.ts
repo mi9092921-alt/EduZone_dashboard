@@ -368,6 +368,37 @@ describe('admin.actions.ts — remaining action surface', () => {
       );
     });
 
+    it('forwards every optional feature-flag field when present', async () => {
+      mockRequirePermission.mockResolvedValue(ctxFor());
+
+      const createInput = {
+        key: 'full_flag',
+        label: 'Full flag',
+        description: 'A fully specified feature flag',
+        is_enabled: true,
+        rollout_pct: 50,
+        status: 'active',
+        starts_at: '2026-01-01T00:00:00.000Z',
+        ends_at: '2026-12-31T23:59:59.000Z',
+        metadata: { source: 'test' },
+      };
+      await createFeatureFlagAction(createInput as never);
+      expect(mockCreateFeatureFlagAdmin).toHaveBeenCalledWith(createInput);
+
+      const updateInput = {
+        label: 'Updated flag',
+        description: 'Updated description',
+        is_enabled: false,
+        rollout_pct: 75,
+        status: 'deprecated',
+        starts_at: null,
+        ends_at: '2027-01-01T00:00:00.000Z',
+        metadata: { source: 'updated-test' },
+      };
+      await updateFeatureFlagAction('flag-1', updateInput as never);
+      expect(mockUpdateFeatureFlagAdmin).toHaveBeenCalledWith('flag-1', updateInput);
+    });
+
     it('deleteFeatureFlagAction delegates and audits', async () => {
       mockRequirePermission.mockResolvedValue(ctxFor());
 
@@ -523,6 +554,10 @@ describe('admin.actions.ts — remaining action surface', () => {
       mockRequirePermission.mockResolvedValue(ctxFor({ permissions: ['*'] }));
       await getJobsAction(filters, 2, 10);
       expect(mockGetJobs).toHaveBeenLastCalledWith(filters, 2, 10, null);
+
+      mockRequirePermission.mockResolvedValue(ctxFor({ tenantId: 'tenant-a' }));
+      await getJobsAction({}, 0, 0);
+      expect(mockGetJobs).toHaveBeenLastCalledWith({}, 1, 20, 'tenant-a');
     });
 
     it('getJobStatusCountsAction scopes the same way as getJobsAction', async () => {
@@ -696,6 +731,9 @@ describe('admin.actions.ts — remaining action surface', () => {
       await getMyNotificationsAction(5, true);
       expect(mockGetMyNotificationsExecute).toHaveBeenLastCalledWith('user-1', 5, true);
 
+      await getMyNotificationsAction(0);
+      expect(mockGetMyNotificationsExecute).toHaveBeenLastCalledWith('user-1', 20, false);
+
       await markNotificationAsReadAction('notification-1');
       expect(mockMarkOneReadExecute).toHaveBeenCalledWith('user-1', 'notification-1');
 
@@ -790,6 +828,15 @@ describe('admin.actions.ts — remaining action surface', () => {
       expect(mockAssertSameTenant).toHaveBeenCalledWith(ctxFor({ tenantId: 'tenant-a' }), 'tenant-a');
       expect(mockDeleteCourseExecute).toHaveBeenCalledWith(ctxFor({ tenantId: 'tenant-a' }), 'course-1');
       expect(result).toEqual({ success: true });
+    });
+
+    it('maps unexpected delete failures to a safe client message', async () => {
+      mockRequirePermission.mockRejectedValueOnce(new Error('database details must not leak'));
+
+      await expect(deleteCourseAction('course-1')).resolves.toEqual({
+        success: false,
+        error: 'An unexpected error occurred. Please try again.',
+      });
     });
   });
 });
