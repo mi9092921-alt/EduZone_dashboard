@@ -299,7 +299,7 @@ INSERT INTO auth.users (
   'aaaaaaaa-0000-0000-0000-000000000001',
   '00000000-0000-0000-0000-000000000000',
   'super_admin@eduzone-test.com',
-  '$2b$10$p/1N9e/qZaxxvUi6UGUpMO.7EekV0yLQ/4NLdr8ac3D4cfVy7mPJW',
+  '$2a$10$f5llkB8BoIoNGFRNaYOgCeomaRagQtxi2iLII5IRVloUuxH3EP8Z6',
   now(), now(), now(), 'authenticated', 'authenticated',
   '{"provider":"email","providers":["email"]}', '{}',
   false, '','','',''
