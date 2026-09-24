@@ -4,7 +4,7 @@
 
 ## Local development
 
-From the repository root:
+Run dashboard commands from the dashboard repository root (`eduzone_dashboard/`):
 
 ```powershell
 pnpm install --frozen-lockfile
@@ -12,6 +12,9 @@ supabase start
 supabase status
 pnpm dev
 ```
+
+The `supabase/` package itself has no `dev` script; do not run `pnpm dev`
+from this directory. The Flutter commands belong to `EduZone_App/`.
 
 The local project uses `supabase/config.toml`. The repository's ordered schema files are deployed by the checked-in deployment tooling; a plain `supabase db reset` should not be treated as proof that the application schema has been applied because `supabase/migrations/` contains no SQL migration chain.
 

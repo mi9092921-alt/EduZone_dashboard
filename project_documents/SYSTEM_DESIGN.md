@@ -18,7 +18,7 @@ EduZone Admin Dashboard is a multi-tenant control-plane implementation built aro
 | **Page Load**        | LCP < 2.5s on 4G connection                   |
 | **Concurrent Users** | 10,000+ simultaneous admin sessions           |
 | **Data Isolation**   | Zero cross-tenant data leakage (RLS-enforced) |
-| **Audit Coverage**   | 100% of write operations logged               |
+| **Audit Coverage target** | Source design targets logging write operations; current coverage requires executable verification |
 
 ---
 

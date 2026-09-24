@@ -5,6 +5,9 @@
 
 ## 1. Local setup
 
+Run these commands from the containing repository root, not from inside the
+`supabase/` directory.
+
 ```powershell
 supabase start
 supabase status
