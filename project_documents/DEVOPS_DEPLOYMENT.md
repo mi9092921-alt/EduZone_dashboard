@@ -384,3 +384,60 @@ Issue detected in production
 6. Check rate limit metrics (spike = DDoS / abuse)
 7. Check job queue depth (backlog = processing issue)
 ```
+
+## 10. Scheduled Jobs & External Automation (Cron)
+
+> Added 2026-09-24 (Phase 7 production certification, CRON-ORIGIN closure).
+> A Phase 7 audit observed `GET /api/cron/routine → 200` every minute in
+> production logs and initially could not attribute it to any in-repo
+> automation. It is the **cron-job.org job below** — documented here so a
+> future audit does not re-solve the same mystery.
+
+### 10.1 Production job pipeline driver — cron-job.org (every minute)
+
+| Field | Value |
+| --- | --- |
+| Scheduler | [cron-job.org](https://console.cron-job.org/jobs) — **external service, operator-owned** |
+| Schedule | Every minute (`* * * * *`) |
+| Target | `GET https://eduzone-admin-snowy.vercel.app/api/cron/routine` (production alias) |
+| Auth | `Authorization: Bearer <CRON_SECRET>` — the secret lives in the cron-job.org job configuration and in the Vercel production environment. It is **never** committed to the repo |
+| Owner | Repository owner / operator (`mi9092921-alt`) |
+| Purpose | Drives the async job pipeline at operational latency: `manage_partitions`, `prune_expired_access_cache`, `process_update_enrollment_totals_jobs`, `process_cache_purges`, `process_notification_fanout_jobs`, `process_course_notify_jobs`, `cron_queue_health` (see `apps/admin/src/app/api/cron/routine/route.ts`). Notification fan-out latency in production **depends on this cadence** |
+
+The endpoint itself enforces a timing-safe Bearer comparison and returns
+401 without the secret, 405 for non-GET. Middleware exempts exactly this
+one path from the session backstop (`apps/admin/src/middleware.ts`).
+
+### 10.2 Vercel Cron — daily deep maintenance
+
+`apps/admin/vercel.json` registers one cron: `GET /api/cron/routine` at
+`0 3 * * *` (UTC). It runs the same maintenance steps as the per-minute
+driver, but at daily frequency — it is the baseline fallback, not the
+latency driver.
+
+### 10.3 Database-level pg_cron jobs (separate system)
+
+Eight `pg_cron` jobs run **inside** the Supabase database and never call
+the dashboard HTTP endpoint (their per-minute jobs invoke the
+`send-push-notification` Edge Function directly via `pg_net` + Vault
+secrets). Definitions and schedules live in
+`supabase/schema/07_functions.sql`
+(`course-notification-worker`, `notification_push_worker`,
+`release-stale-job-locks` every minute; `refresh-materialized-views` every
+5 min; plus monthly/daily maintenance jobs).
+
+### 10.4 Rotating CRON_SECRET without breaking production
+
+The cron-job.org job holds a copy of `CRON_SECRET`, so rotation is a
+two-consumer operation:
+
+1. Update `CRON_SECRET` in the Vercel production environment.
+2. Update the `Authorization` header inside the cron-job.org job settings
+   (https://console.cron-job.org/jobs) to the same new value.
+3. Redeploy the dashboard (Vercel env changes require a redeploy to take
+   effect) — deploy from the audited release or newer.
+4. Verify: the job's next tick returns 200 in Vercel logs; a request
+   without/with a wrong secret still returns 401.
+
+Skipping step 2 breaks notification fan-out within one minute; skipping
+step 3 leaves production running on the old secret.
