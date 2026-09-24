@@ -288,7 +288,7 @@ ON CONFLICT (id) DO NOTHING;
 -- whose plaintext (Admin@12345) is documented in git — ROTATE IT IMMEDIATELY
 -- after first login (Supabase Dashboard -> Authentication -> Users, or the
 -- admin dashboard's user management). Never leave the seeded password live
--- in production.
+-- in production.-- '$2a$10$f5llkB8BoIoNGFRNaYOgCeomaRagQtxi2iLII5IRVloUuxH3EP8Z6',
 INSERT INTO auth.users (
   id, instance_id, email, encrypted_password,
   email_confirmed_at, created_at, updated_at,
