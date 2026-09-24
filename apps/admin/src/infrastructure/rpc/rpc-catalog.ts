@@ -169,7 +169,11 @@ export const RPC_CATALOG: readonly RpcDefinition[] = [
   {
     name: 'enroll_in_course',
     classification: 'authenticated',
-    owner: 'infrastructure/enrollment-service.ts',
+    // DOC-FIX (2026-09-25): the former owner file
+    // infrastructure/enrollment-service.ts was dead code (zero importers —
+    // enrollment mutations go through repos/courses.service.ts) and has
+    // been deleted.
+    owner: 'infrastructure/repos/courses.service.ts (enrollStudent)',
     notes:
       'SECURITY DEFINER. Self-enrollment for auth.uid(); validates tenant + published + not revoked.',
   },

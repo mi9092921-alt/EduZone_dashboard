@@ -13,8 +13,8 @@ export const createCourseBaseSchema = z.object({
     .string()
     .min(3, 'Title must be at least 3 characters')
     .max(200, 'Title cannot exceed 200 characters'),
-  description: z.string().max(5000).optional().or(z.literal('')),
-  category: z.string().max(100).optional().or(z.literal('')),
+  description: z.string().max(5000).nullish(),
+  category: z.string().max(100).nullish(),
   level: courseLevelSchema.optional().default('beginner'),
   status: courseStatusSchema.optional().default('draft'),
   is_discoverable: z.boolean().optional().default(true),
@@ -24,13 +24,22 @@ export const createCourseBaseSchema = z.object({
     .min(0, 'Price cannot be negative')
     .optional()
     .default(0),
+  // NULLABLE-ALIGNMENT (2026-09-25): courses.slug and courses.thumbnail_url
+  // are nullable text columns in the DB (03_tables.sql), and form payloads
+  // can carry an explicit null (react-hook-form defaultValues sourced from a
+  // row where the column is NULL). The previous `.optional().or(z.literal(''))
+  // // shape rejected null with an invalid_union ZodError. `.nullish()` accepts
+  // string | null | undefined, and the transform normalizes '' to null —
+  // matching the DB CHECK (slug IS NULL OR length(btrim(slug)) > 0) which
+  // rejects the empty string but allows NULL.
   slug: z
     .string()
     .max(200)
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Slug must be URL-friendly (lowercase, hyphens only)')
-    .optional()
-    .or(z.literal('')),
-  teacher_id: z.string().uuid().optional(),
+    .or(z.literal(''))
+    .nullish()
+    .transform((v) => (v ? v : null)),
+  teacher_id: z.string().uuid().nullish(),
   thumbnail_url: z
     .string()
     .url('Invalid image URL format')
@@ -38,8 +47,9 @@ export const createCourseBaseSchema = z.object({
       /\.(jpg|jpeg|png|webp|avif|gif|svg|bmp)(\?.*)?$/i,
       'Must be a valid image URL (jpg, png, etc.)',
     )
-    .optional()
-    .or(z.literal('')),
+    .or(z.literal(''))
+    .nullish()
+    .transform((v) => (v ? v : null)),
 });
 
 export const createCourseSchema = createCourseBaseSchema.refine(

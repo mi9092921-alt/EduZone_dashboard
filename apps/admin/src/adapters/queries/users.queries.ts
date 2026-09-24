@@ -12,6 +12,7 @@ import {
   getEffectivePermissions,
   getUserRoles,
   getUserStats,
+  searchStudentsForEnrollment,
 } from '@/infrastructure/repos/users.service';
 
 /**
@@ -80,5 +81,24 @@ export function useUserStats(tenantId?: string) {
     queryKey: [...queryKeys.users.all, 'stats', tenantId],
     queryFn: () => getUserStats(tenantId),
     staleTime: 60_000, // 1 minute — stats don't need rapid refresh
+  });
+}
+
+/**
+ * TEACHER-STUDENT-DIRECTORY (2026-09-25): enrollment search for the
+ * EnrollStudentDialog. Backed by the body-guarded search_tenant_students
+ * RPC so teachers can find not-yet-enrolled students (the direct
+ * users-table search is invisible to teachers under users_select_merged
+ * RLS until a student is already enrolled in one of their courses).
+ * An empty query lists the first students of the acting tenant, bounded
+ * server-side to 50 rows.
+ */
+export function useStudentSearch(query: string, enabled = true) {
+  return useQuery({
+    queryKey: [...queryKeys.users.all, 'enrollment-search', query],
+    queryFn: () => searchStudentsForEnrollment(query, 50),
+    enabled,
+    placeholderData: keepPreviousData,
+    staleTime: 30_000,
   });
 }

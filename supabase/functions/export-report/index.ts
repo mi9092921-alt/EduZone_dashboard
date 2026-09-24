@@ -105,6 +105,16 @@ async function requirePermission(req: Request, permission?: string): Promise<Aut
   if (userErr || !userData) throw new AuthError(401, 'UNAUTHORIZED', 'User not found');
   if (userData.account_status !== 'active')
     throw new AuthError(403, 'ACCOUNT_INACTIVE', `Account is ${userData.account_status}`);
+
+  // HARDENING-2026-09-25: server-side session-revocation check (same rationale
+  // as bulk-action/create-user): a suspended-and-revoked admin whose JWT is
+  // still unexpired must not be able to export reports until token expiry.
+  const { data: sessionValid, error: sessionErr } = await supabase.rpc(
+    'validate_user_session',
+  );
+  if (sessionErr || sessionValid !== true) {
+    throw new AuthError(401, 'UNAUTHORIZED', 'Session revoked or invalid');
+  }
   if (permission) {
     const { data: hasPermission } = await supabase.rpc('user_has_permission', {
       p_user_id: user.id,
@@ -173,11 +183,17 @@ Deno.serve(async (req: Request) => {
 
     switch (reportType) {
       case 'user_stats': {
-        let q = admin.from('mv_user_stats').select('*');
-        if (tenantId) q = q.eq('tenant_id', tenantId);
-        const { data, error } = await q;
+        // EXPORT-REPORT-BACKEND (2026-09-25): mv_user_stats lives in the
+        // `private` schema, which PostgREST does not expose, so the previous
+        // direct .from('mv_user_stats') query always failed with 500. Read
+        // through the guarded RPC instead (tenant-pinned + reports.read
+        // inside the body; the service-role path trusts this function's own
+        // requirePermission validation above).
+        const { data, error } = await admin.rpc('admin_export_user_stats', {
+          p_tenant_id: tenantId ?? null,
+        });
         if (error) throw error;
-        csvContent = toCsv(data ?? []);
+        csvContent = toCsv(Array.isArray(data) ? data : []);
         filename = `user-stats-${Date.now()}`;
         break;
       }
@@ -207,14 +223,17 @@ Deno.serve(async (req: Request) => {
         break;
       }
       case 'activity': {
-        let q = admin
-          .from('mv_daily_activity')
-          .select('*')
-          .order('hour_bucket', { ascending: false });
-        if (tenantId) q = q.eq('tenant_id', tenantId);
-        const { data, error } = await q;
+        // EXPORT-REPORT-BACKEND (2026-09-25): mv_daily_activity does not
+        // exist in any schema — the real table is
+        // private.mv_daily_activity_30d (columns: activity_date,
+        // unique_users, total_events, lesson_views, logins). The old query
+        // also ordered by a nonexistent `hour_bucket` column. Use the
+        // guarded RPC (orders by activity_date DESC internally).
+        const { data, error } = await admin.rpc('admin_export_daily_activity', {
+          p_tenant_id: tenantId ?? null,
+        });
         if (error) throw error;
-        csvContent = toCsv(data ?? []);
+        csvContent = toCsv(Array.isArray(data) ? data : []);
         filename = `activity-${Date.now()}`;
         break;
       }

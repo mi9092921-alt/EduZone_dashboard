@@ -355,3 +355,32 @@ export async function searchUsers(
   if (error) throw mapDbError(error, 'users.service.ts');
   return data ?? [];
 }
+
+/**
+ * TEACHER-STUDENT-DIRECTORY (2026-09-25): search students for enrollment.
+ *
+ * Why an RPC: `users_select_merged` RLS only lets a teacher SELECT students
+ * already enrolled in their own courses, so the previous direct
+ * `.from('users').or(ilike...)` search in EnrollStudentDialog always returned
+ * an empty list for teachers — a not-yet-enrolled student is by definition
+ * invisible to them. `search_tenant_students()` is a body-guarded SECURITY
+ * DEFINER RPC (validate_user_session + courses.manage + staff-role check,
+ * pinned to the caller's acting tenant, bounded to 50 rows) that provides
+ * the enrollment directory without weakening any RLS policy.
+ *
+ * Browser-safe: runs under the caller's own JWT, not the service role.
+ */
+export async function searchStudentsForEnrollment(
+  query: string,
+  limit = 20,
+): Promise<UserSearchResult[]> {
+  const { supabase } = container;
+
+  const { data, error } = await supabase.rpc('search_tenant_students', {
+    p_query: query,
+    p_limit: limit,
+  });
+
+  if (error) throw mapDbError(error, 'users.service.ts');
+  return (data ?? []) as UserSearchResult[];
+}

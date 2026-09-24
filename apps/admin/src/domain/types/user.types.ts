@@ -26,14 +26,26 @@ export type User = BaseUser;
 /** Paginated result wrapper */
 export type PaginatedResult<T> = BasePaginatedResult<T>;
 
+/**
+ * Structural source for the display helpers. Nullable names/email on purpose:
+ * DB columns are nullable and the enrollment-directory RPC
+ * (search_tenant_students) returns exactly this shape. Both helpers already
+ * tolerate null at runtime (filter(Boolean) / optional chaining).
+ */
+type UserDisplaySource = {
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+};
+
 /** Computed display name helper */
-export function getUserDisplayName(user: Pick<User, 'first_name' | 'last_name' | 'email'>): string {
+export function getUserDisplayName(user: UserDisplaySource): string {
   const full = [user.first_name, user.last_name].filter(Boolean).join(' ');
   return full || user.email || 'Unknown';
 }
 
 /** Initials for avatar fallback */
-export function getUserInitials(user: Pick<User, 'first_name' | 'last_name' | 'email'>): string {
+export function getUserInitials(user: UserDisplaySource): string {
   if (user.first_name && user.last_name) {
     return `${user.first_name[0]}${user.last_name[0]}`.toUpperCase();
   }

@@ -1,8 +1,11 @@
-import { PermissionName } from '@eduzone/types';
+import { PermissionName, UserRole } from '@eduzone/types';
 import { create } from 'zustand';
 
-/** Primary role types */
-export type PrimaryRole = 'super_admin' | 'admin' | 'teacher' | 'student';
+// DEDUP (2026-09-25): the role union was re-declared here while the
+// canonical `UserRole` already lives in @eduzone/types
+// (domain.types.ts) — two definitions could silently drift. Consumers
+// needing the alias use `PrimaryRole` from @/domain/types/user.types.
+export type PrimaryRole = UserRole;
 
 /** Authenticated user state */
 export interface AuthUser {

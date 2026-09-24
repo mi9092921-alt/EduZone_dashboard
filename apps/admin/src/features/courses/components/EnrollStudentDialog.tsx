@@ -22,7 +22,7 @@ import { useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 
 import { useEnrollStudent } from '@/adapters/mutations/courses.mutations';
-import { useUsers } from '@/adapters/queries/users.queries';
+import { useStudentSearch } from '@/adapters/queries/users.queries';
 import { toClientMessage } from '@/domain/errors';
 import { enrollStudentSchema, type EnrollStudentFormInput } from '@/domain/schemas/course.schema';
 import { getUserDisplayName } from '@/domain/types/user.types';
@@ -41,12 +41,18 @@ export function EnrollStudentDialog({ courseId, open, onClose }: EnrollStudentDi
 
   // Search state for students
   const [userSearchText, setUserSearchText] = useState('');
-  const { data: usersData, isLoading: isLoadingUsers } = useUsers(
-    { primary_role: 'student', search: userSearchText },
-    1,
-    50
+  // TEACHER-STUDENT-DIRECTORY (2026-09-25): search via the body-guarded
+  // search_tenant_students RPC instead of a direct users-table query.
+  // The direct query returned an empty list for teachers — users_select_merged
+  // RLS only exposes students already enrolled in the teacher's own courses,
+  // so a not-yet-enrolled student (the exact case this dialog exists for)
+  // could never be found by name or email. The RPC is pinned to the caller's
+  // acting tenant, students-only, and bounded to 50 rows.
+  const { data: studentsData, isLoading: isLoadingUsers } = useStudentSearch(
+    userSearchText,
+    open,
   );
-  const students = usersData?.data || [];
+  const students = studentsData ?? [];
 
   const {
     handleSubmit,
