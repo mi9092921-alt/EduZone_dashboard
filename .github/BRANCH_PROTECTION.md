@@ -1,7 +1,9 @@
 # Branch Protection — Release Policy
 
 **Repository:** `mi9092921-alt/EduZone_dashboard`
-**Last verified against the live GitHub API:** 2026-09-13
+**Snapshot date:** 2026-09-13
+
+> This is a dated external-state snapshot, not current evidence. GitHub settings may have changed after this date; re-run the API commands below before relying on the values.
 
 ## 1. Observed protection state (verified, not inferred)
 
@@ -25,12 +27,12 @@ GET /repos/mi9092921-alt/EduZone_dashboard/actions/variables/E2E_ENABLED
 E2E_ENABLED:                    "true"
 ```
 
-Interpretation:
+Interpretation of the 2026-09-13 snapshot:
 
 - PR merges into `main` are blocked unless `build_and_test` and `e2e` pass on
   a branch that is up to date with `main` (`strict: true`), and administrators
   cannot bypass the rules (`enforce_admins: true`).
-- Required status checks gate *merges*, not *pushes*: direct pushes to `main`
+- Required status checks gate _merges_, not _pushes_: direct pushes to `main`
   by an admin are still possible and cannot be pre-blocked. They are
   re-validated after landing by `deploy.yml`, which mirrors the same gate
   chain as ci.yml — including the Security / RLS Gate (fast) and the

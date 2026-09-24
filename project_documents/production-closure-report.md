@@ -1,32 +1,35 @@
-# EduZone Dashboard — Production Closure Report (SEC-1 → READY)
+# EduZone Dashboard — Historical Production Closure Report
 
-**التاريخ:** 2026-09-09 | **الفرع:** `main` | **الحكم:** `PRODUCTION READY` (بخطر P1 واحد موثق)
+> **Historical snapshot (2026-09-09):** This report records evidence claimed at that date. It is not current production approval. Re-run every CI, security, deployment, and backup/restore check before relying on any result.
+
+**التاريخ:** 2026-09-09 | **الفرع:** `main` | **الحكم التاريخي:** كانت الوثيقة تصف الحالة بأنها `PRODUCTION READY`، لكن ذلك لا يمثل موافقة إنتاج حالية.
 **القاعدة:** الكود الفعلي + الأدلة الحية فقط. كل `[x]` أدناه مربوط بدليل قابل لإعادة التنفيذ.
 
 ---
 
 ## 1. سلسلة الـ Commits
 
-| SHA | الوصف |
-|---|---|
-| `a092833` | الأساس قبل العمل |
+| SHA       | الوصف                                                    |
+| --------- | -------------------------------------------------------- |
+| `a092833` | الأساس قبل العمل                                         |
 | `f67bdb7` | SEC-1: مصفوفة cross-tenant + بوابة الصلاحيات + توصيل e2e |
-| `98934d1` | إصلاح CRLF في loaders (عبر PR #9) |
-| `112fa4b` | دمج PR #9 — HEAD الحالي |
+| `98934d1` | إصلاح CRLF في loaders (عبر PR #9)                        |
+| `112fa4b` | دمج PR #9 — HEAD الحالي                                  |
 
 ## 2. أدلة CI (GitHub Actions)
 
-| الـ Run | النتيجة | الدليل |
-|---|---|---|
-| Main Branch Checks `34381057713` (push f67bdb7) | success | `gh run view` → conclusion: success |
-| E2E `34381074282` (manual dispatch) | success | خطوة Security gate: success + Playwright **34/34** |
-| PR #9: e2e `34391263170` | pass 6m29s | تضمنت `All RLS smoke tests passed` + `All exhaustive permission tests passed` (26 سطر ✅ في الـ log) |
-| PR #9: build_and_test `34391263186` | pass 2m20s | typecheck + lint + unit + build |
-| إثبات المنع حيًا | push مباشر **مرفوض** بعد التفعيل (`protected branch hook declined`) ثم نجاح مسار PR والدمج | |
+| الـ Run                                         | النتيجة                                                                                    | الدليل                                                                                               |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| Main Branch Checks `34381057713` (push f67bdb7) | success                                                                                    | `gh run view` → conclusion: success                                                                  |
+| E2E `34381074282` (manual dispatch)             | success                                                                                    | خطوة Security gate: success + Playwright **34/34**                                                   |
+| PR #9: e2e `34391263170`                        | pass 6m29s                                                                                 | تضمنت `All RLS smoke tests passed` + `All exhaustive permission tests passed` (26 سطر ✅ في الـ log) |
+| PR #9: build_and_test `34391263186`             | pass 2m20s                                                                                 | typecheck + lint + unit + build                                                                      |
+| إثبات المنع حيًا                                | push مباشر **مرفوض** بعد التفعيل (`protected branch hook declined`) ثم نجاح مسار PR والدمج |                                                                                                      |
 
 ## 3. أدلة الأمان الحية (مشروع الاختبار السحابي)
 
 ### 3.1 `rls-smoke-test.ts` — EXIT 0 (24/24)
+
 - قراءة cross-tenant (courses/enrollments/user_progress/activity_logs/audit_logs): **0 rows / DENIED**
 - قراءات غير مفلترة: 0 تسرّب Tenant-B
 - UPDATE/DELETE عبر tenant: 0 rows / DENIED
@@ -34,27 +37,31 @@
 - `--prove-failure`: **EXIT 1** (البوابة تتعثر عند الخرق)
 
 ### 3.2 `permission-exhaustive-test.ts` — EXIT 0 (18/18)
+
 - 11 صلاحية admin-only = false للمعلم | 7 مسموحات (users.read, courses.read/write/manage, reports.read, warnings.write) = true
 - تصحيحان موثقان: `courses.manage` و`users.read` للمعلم حسب الـ seed المعياري؛ تمرير `p_tenant_id` كما يفعل كل منادي التطبيق
 
 ### 3.3 `extend_enrollment` على الـ DB الحي
+
 `prosecdef=true`, `search_path=public, pg_temp`, grants (authenticated + service_role فقط، بلا anon)، seed مطابق (4 tenants / 8 users / 13 course / 8 enrollments).
 
 ### 3.4 مصفوفة SECURITY DEFINER (`scripts/security/security-definer-audit.md`)
+
 190 دالة: **0 بلا search_path**؛ 16 بـ `search_path=''` بأنماط مؤهلة آمنة.
 
 ### 3.5 Route test (`cleanup-duplicate-seqs/route.test.ts`) — 5/5
+
 401 مجهول / 403 غير super_admin / حذف-صفري / keeper-safety / إخفاء أخطاء DB. الـ suite الكاملة: **50 ملف / 1138 اختبار** + `tsc` 0 + `eslint` 0.
 
 ## 4. أدلة التشغيل
 
-| البند | الدليل |
-|---|---|
-| Edge `validate-course-access` | طالب مسجل → `allowed:true` (+expires يعكس تمديد R1)؛ كورس أجنبي → `false`؛ بلا auth → 401؛ مدخل فاسد → 400 |
-| pg_cron حي | 4 jobs نشطة: `release-stale-job-locks` و`notification_push_worker` كل دقيقة، `manage_partitions` و`archive_soft_deleted_data` شهريًا؛ `pg_cron 1.6.4` |
-| Sentry | probe عبر SDK الحقيقي → `DELIVERED`، الحدث `edf611cf…` مسترجع من API (`bytes.ingested` + `nodestore_insert`) |
-| حماية الفرع | `build_and_test` + `e2e` required (strict، enforce_admins، منع force-push/deletion) |
-| Secrets | `.env.test` و`db_url.test.txt` gitignored؛ لا secrets في أي diff مدفوع |
+| البند                         | الدليل                                                                                                                                                |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Edge `validate-course-access` | طالب مسجل → `allowed:true` (+expires يعكس تمديد R1)؛ كورس أجنبي → `false`؛ بلا auth → 401؛ مدخل فاسد → 400                                            |
+| pg_cron حي                    | 4 jobs نشطة: `release-stale-job-locks` و`notification_push_worker` كل دقيقة، `manage_partitions` و`archive_soft_deleted_data` شهريًا؛ `pg_cron 1.6.4` |
+| Sentry                        | probe عبر SDK الحقيقي → `DELIVERED`، الحدث `edf611cf…` مسترجع من API (`bytes.ingested` + `nodestore_insert`)                                          |
+| حماية الفرع                   | `build_and_test` + `e2e` required (strict، enforce_admins، منع force-push/deletion)                                                                   |
+| Secrets                       | `.env.test` و`db_url.test.txt` gitignored؛ لا secrets في أي diff مدفوع                                                                                |
 
 ## 5. الخطر المتبقي (P1 واحد)
 

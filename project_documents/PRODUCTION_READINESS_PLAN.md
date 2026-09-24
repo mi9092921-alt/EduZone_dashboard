@@ -1,7 +1,7 @@
 # EduZone Dashboard — Production Readiness Plan
 
-**Assessment baseline:** `main` @ `9f1a31659d929fcf5bbcdec58429c146021b777d`  
-**Assessment date:** 2026-09-08  
+**Assessment baseline:** `production-readiness` @ `e731bc680f02e25bd1b41207721fe25bf0ed3bdb`
+**Assessment date:** 2026-09-24
 **Decision:** **NO-GO — production readiness is not yet demonstrated**
 
 ## 1. Assessment method
@@ -39,9 +39,9 @@ A documentation file cannot close a production finding.
 
 The source tree contains domain, application, adapter, infrastructure, feature, component, app, and configuration areas.
 
-`src/container.ts` currently acts as dependency wiring and no longer contains the mutable `actorId` / `tenantId` state described in older plans.
+`apps/admin/src/container.ts` currently acts as dependency wiring and no longer contains the mutable `actorId` / `tenantId` state described in older plans.
 
-`application/authorization/policy.ts` centralizes the previously duplicated role-permission fast path, but its own comments identify this as only a partial step toward fully centralized authorization.
+`apps/admin/src/application/authorization/policy.ts` centralizes the previously duplicated role-permission fast path, but this remains only a partial step toward fully centralized authorization.
 
 ### Database configuration
 
@@ -53,18 +53,18 @@ The `supabase/migrations/` area must not be described as a normal historical mig
 
 ## 3. Current release gates
 
-| Gate | Current documentation status | Required evidence |
-|---|---|---|
-| Typecheck | Source/script available; current PASS not independently rerun in this review | clean checkout exit 0 |
-| Lint | Script exists | clean checkout exit 0 |
-| Unit tests | Test infrastructure exists | deterministic no-network unit run, exit 0 |
-| Build | Build script exists | production build exit 0 |
-| Playwright/Cypress | Suites exist | critical flows pass in CI |
-| RLS/tenant isolation | SQL controls exist | executable Tenant A/B negative matrix |
-| Service-role boundary | Privileged infrastructure exists | audited allowlist + direct-route tests |
-| Secrets | Environment/config mechanisms exist | rotation/history/artifact scan |
-| CI/CD | Workflows exist | all release gates enforced in protected pipeline |
-| Backup/restore | Operational documentation exists | successful disposable restore drill |
+| Gate                  | Current documentation status                                                 | Required evidence                                |
+| --------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------ |
+| Typecheck             | Source/script available; current PASS not independently rerun in this review | clean checkout exit 0                            |
+| Lint                  | Script exists                                                                | clean checkout exit 0                            |
+| Unit tests            | Test infrastructure exists                                                   | deterministic no-network unit run, exit 0        |
+| Build                 | Build script exists                                                          | production build exit 0                          |
+| Playwright/Cypress    | Suites exist                                                                 | critical flows pass in CI                        |
+| RLS/tenant isolation  | SQL controls exist                                                           | executable Tenant A/B negative matrix            |
+| Service-role boundary | Privileged infrastructure exists                                             | audited allowlist + direct-route tests           |
+| Secrets               | Environment/config mechanisms exist                                          | rotation/history/artifact scan                   |
+| CI/CD                 | Workflows exist                                                              | all release gates enforced in protected pipeline |
+| Backup/restore        | Operational documentation exists                                             | successful disposable restore drill              |
 
 Anything not backed by this evidence remains **UNVERIFIED**.
 
@@ -188,8 +188,8 @@ The following do not prove production readiness:
 
 This document intentionally leaves runtime result cells open when execution was not performed during the documentation review.
 
-The baseline commit used for this cleanup is:
+The baseline commit used for this assessment is:
 
-`9f1a31659d929fcf5bbcdec58429c146021b777d`
+`e731bc680f02e25bd1b41207721fe25bf0ed3bdb`
 
 No claim in this document overrides the evidence produced by future CI or production/staging verification.

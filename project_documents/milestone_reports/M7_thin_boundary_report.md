@@ -1,5 +1,7 @@
 # M7 — Route / Server Action Thin Boundary — تقرير تنفيذ
 
+> **Historical snapshot (2026-09-02):** this report records a point-in-time implementation check. Its paths, counts, and completion statements are not current release evidence; re-run the referenced checks against the current tree.
+
 > المرحلة: **#11 / P0 — Route / Server Action Thin Boundary** (M7 في ترتيب التنفيذ)
 > التاريخ: 2026-09-02
 > المنهجية: شوف → افحص → فكّر → عدّل → تأكد (نُفِّذت الحلقة كاملة مع إعادة فحص)
@@ -10,13 +12,13 @@
 
 ملفات الـServer Actions في `application/actions/` كانت تحتوي منطقًا تجاريًا وorchestration لقاعدة البيانات مباشرة:
 
-| الملف | الحجم | التصنيف | الحالة |
-|---|---|---|---|
-| `admin.actions.ts` | 500 سطر | READ/WRITE/ADMIN | 24 action رقيق (تفويض لخدمات infrastructure) ✓ + 9 actions سمينة في نطاق الإشعارات ✗ |
-| `user.actions.ts` | 292 سطر | WRITE/ADMIN | `createUserAction` و`deleteUserAction` سمينتان ✗ + 3 RPC actions |
-| `session.actions.ts` | 104 أسطر | SESSION | `recordCurrentSessionAction` سمينة بالكامل ✗ |
-| `tenants.actions.ts` | 110 أسطر | TENANT | عمليات CRUD + audit داخل الـaction ✗ |
-| `video.actions.ts` | 17 سطر | VIDEO | رقيقة ✓ (لم تُمسّ) |
+| الملف                | الحجم    | التصنيف          | الحالة                                                                               |
+| -------------------- | -------- | ---------------- | ------------------------------------------------------------------------------------ |
+| `admin.actions.ts`   | 500 سطر  | READ/WRITE/ADMIN | 24 action رقيق (تفويض لخدمات infrastructure) ✓ + 9 actions سمينة في نطاق الإشعارات ✗ |
+| `user.actions.ts`    | 292 سطر  | WRITE/ADMIN      | `createUserAction` و`deleteUserAction` سمينتان ✗ + 3 RPC actions                     |
+| `session.actions.ts` | 104 أسطر | SESSION          | `recordCurrentSessionAction` سمينة بالكامل ✗                                         |
+| `tenants.actions.ts` | 110 أسطر | TENANT           | عمليات CRUD + audit داخل الـaction ✗                                                 |
+| `video.actions.ts`   | 17 سطر   | VIDEO            | رقيقة ✓ (لم تُمسّ)                                                                   |
 
 ## 2. Findings (المخالفات الفعلية)
 
@@ -47,6 +49,7 @@ Repository Impl (infrastructure/repos — Supabase + admin client حصريًا)
 ## 5. Files Changed
 
 ### جديدة — Ports (application/ports/)
+
 - `INotificationAdminRepository.ts` — broadcast + inbox
 - `IUserAdminRepository.ts` — دورة حياة المستخدم المتميزة
 - `ISessionRepository.ts` — heartbeat
@@ -54,6 +57,7 @@ Repository Impl (infrastructure/repos — Supabase + admin client حصريًا)
 - تحديث `index.ts` (barrel)
 
 ### جديدة — Repository Implementations (infrastructure/repos/)
+
 - `notifications.repository.ts` — يملك `createAdminClient()` لنطاق الإشعارات
 - `user-admin.repository.ts` — auth admin API + RPCs المتميزة (`issueWarning` عبر server client كما كان)
 - `session.repository.ts`
@@ -62,6 +66,7 @@ Repository Impl (infrastructure/repos — Supabase + admin client حصريًا)
 كل مستودع يقبول `SupabaseClient` كمعامل اختياري للاختبار، ويستخدم `createAdminClient()` افتراضيًا — **أصبح إنشاء service_role محصورًا في infrastructure**.
 
 ### جديدة — Use Cases (application/use-cases/)
+
 - `notifications/send-notification.use-case.ts` — حسم المستلمين + fanout + push best-effort
 - `notifications/manage-notifications.use-case.ts` — قائمة admin + حذف (tenant-scoped)
 - `notifications/inbox.use-case.ts` — inbox + mark read + unread count (degrade gracefully)
@@ -72,19 +77,23 @@ Repository Impl (infrastructure/repos — Supabase + admin client حصريًا)
 - `tenants/manage-tenants.use-case.ts` — create/update/suspend(+audit)/delete
 
 ### جديدة — Boundary مشترك
+
 - `application/actions/boundary.ts` — `requirePermission` / `requireUser` / `requireSuperAdmin` (deny-by-default)
 
 ### مُعدَّلة — Actions (أصبحت رقيقة)
+
 - `admin.actions.ts`: 500 → ~260 سطرًا. **لم يعد يستورد `createAdminClient` إطلاقًا.**
 - `user.actions.ts`: 292 → ~140 سطرًا (validate → authorize → use case).
 - `session.actions.ts`: validate + auth + استخراج headers → use case.
 - `tenants.actions.ts`: super-admin gate → use case.
 
 ### مُعدَّلة — Types & Adapters
+
 - `domain/types/notification.types.ts` (جديد) — المصدر الموحد للأنواع.
 - `adapters/queries/notifications.queries.ts` + `adapters/mutations/notifications.mutations.ts` — re-export للتوافق الخلفي (لا تغيير على أي مستهلك UI).
 
 ### اختبارات جديدة (8 ملفات)
+
 - `send-notification.use-case.test.ts`, `manage-notifications.use-case.test.ts`, `inbox.use-case.test.ts`
 - `create-user.use-case.test.ts`, `delete-user.use-case.test.ts`, `account-control.use-case.test.ts`
 - `record-current-session.use-case.test.ts`, `manage-tenants.use-case.test.ts`
@@ -109,10 +118,10 @@ Repository Impl (infrastructure/repos — Supabase + admin client حصريًا)
 
 ## 9. Validation (أوامر + نتائج)
 
-| الفحص | قبل | بعد |
-|---|---|---|
-| `pnpm --filter @eduzone/admin typecheck` | PASS | PASS |
-| `pnpm --filter @eduzone/admin lint` | PASS | PASS |
+| الفحص                                      | قبل  | بعد                                    |
+| ------------------------------------------ | ---- | -------------------------------------- |
+| `pnpm --filter @eduzone/admin typecheck`   | PASS | PASS                                   |
+| `pnpm --filter @eduzone/admin lint`        | PASS | PASS                                   |
 | `pnpm --filter @eduzone/admin test` (unit) | PASS | PASS (شامل اختبارات use cases الجديدة) |
 
 ## 10. Regression Check + Grep Proof
@@ -146,4 +155,3 @@ video.actions.ts   : createAdminClient=False from=False rpc=False
 [x] typecheck + lint + tests PASS
 [x] لا تغيير في عقود الاستدعاء العامة ولا في قاعدة البيانات المشتركة
 ```
-

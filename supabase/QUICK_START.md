@@ -1,9 +1,8 @@
 # Supabase Quick Start
 
-**Baseline:** `main` @ `9f1a31659d929fcf5bbcdec58429c146021b777d`  
-**Reviewed:** 2026-09-08
+**Reviewed:** 2026-09-24
 
-## Development
+## Local development
 
 From the repository root:
 
@@ -11,45 +10,23 @@ From the repository root:
 pnpm install --frozen-lockfile
 supabase start
 supabase status
-supabase db reset
-```
-
-The current `config.toml` uses the ordered SQL files in `supabase/schema/` as schema inputs.
-
-Start the dashboard with:
-
-```powershell
 pnpm dev
 ```
 
-Or target the admin package directly:
+The local project uses `supabase/config.toml`. The repository's ordered schema files are deployed by the checked-in deployment tooling; a plain `supabase db reset` should not be treated as proof that the application schema has been applied because `supabase/migrations/` contains no SQL migration chain.
+
+For a disposable local database, review the script before running it:
 
 ```powershell
-pnpm --filter @eduzone/admin dev
+supabase\deploy.ps1 local
 ```
 
-## Database verification
+Do not run the remote deployment helpers or apply QA/demo data to a shared environment without an approved procedure. `12_seed_qa_demo.sql` contains disposable test data and is opt-in only.
 
-Use the repository's canonical validation SQL where applicable:
+## Verification
 
-```powershell
-supabase db execute < supabase/schema/VALIDATION.sql
-```
+The canonical validation SQL is [`schema/VALIDATION.sql`](schema/VALIDATION.sql). Use the database client and connection selected by the local deployment procedure; do not paste production credentials into shell history or documentation.
 
-For database changes, inspect both repositories before changing shared objects.
+After signing in, the dashboard uses the `check_dashboard_access` RPC path. UI visibility alone is not authorization evidence.
 
-## Authentication smoke check
-
-After signing in to the dashboard, the application uses the server-side dashboard access gate:
-
-```text
-check_dashboard_access
-```
-
-Do not infer successful authorization from UI visibility alone.
-
-## Important restriction
-
-The development-stage project policy uses `supabase/schema/` as the canonical SQL source. Do not create a competing active migration/patch source.
-
-For schema ownership and file order, see `schema/README.md`.
+For schema ownership and order, see [`schema/README.md`](schema/README.md).

@@ -1,8 +1,9 @@
 # EduZone Admin Dashboard — Rollback Plan
 
-**Version:** 1.0  
-**Date:** 2026-03-28  
-**Owner:** Tech Lead
+**Status:** Operational template, reviewed 2026-09-24.
+**Owner:** Not assigned in the repository.
+
+> The repository does not prove that a Vercel project, production domain, Supabase backup policy, Edge Function deployment, or on-call service is configured. Replace placeholders with verified operator data before using this plan.
 
 ---
 
@@ -20,7 +21,7 @@
 4. Click **⋮ (three dots)** → **Promote to Production**
 5. Verify domain is serving the previous version (~30 seconds)
 
-**Verification:** `curl -I https://admin.eduzone.com` → HTTP 200
+**Verification:** use the verified deployment URL and an authenticated smoke check. The repository does not contain a canonical production domain.
 
 ---
 
@@ -119,8 +120,8 @@ $$);
 - [ ] Supabase DB snapshot taken and labeled
 - [ ] Vercel previous deployment identified and noted
 - [ ] pg_cron jobs verified working on Staging
-- [ ] All 5 Edge Functions deployed and tested
-- [ ] DNS propagated (`dig admin.eduzone.com`)
+- [ ] All required Edge Functions deployed and tested (the repository currently contains 10 function entrypoints)
+- [ ] Verified deployment URL and DNS/SSL checked (no domain is defined in this repository)
 - [ ] SSL certificate active (green padlock)
 - [ ] Sentry receiving events
 - [ ] Vercel Analytics enabled

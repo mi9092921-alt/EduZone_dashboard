@@ -1,6 +1,10 @@
 # Database Refactor Report (v13)
 
-## Current Issues
+## Scope note
+
+This is a historical refactor report. The standalone `Eduzone_schema_v13.sql`, `Eduzone_seed_qa.sql`, and timestamped migration files named below are not present in the current tree. Use [`supabase/schema/README.md`](../supabase/schema/README.md) for current SQL ownership.
+
+## Historical issues
 
 - Canonical schema drift: `Eduzone_schema_v13.sql` كان غير متزامن مع `supabase/migrations/20260517..20260523` لبعض RPCs.
 - Job queue root-cause mismatch: `internal.job_queue` يستخدم `locked_by_worker_id` بينما وظائف مثل `internal.dequeue_job` و`public.release_stale_job_locks` كانت تحدث عمود `locked_by`.

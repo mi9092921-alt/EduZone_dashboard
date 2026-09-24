@@ -1,5 +1,7 @@
 # M14 — Architecture Enforcement Report (Execution Plan §18)
 
+> **Historical snapshot (2026-09-03):** this report records a point-in-time implementation check. Its counts and PASS/complete statements are not current release evidence; re-run the referenced checks against the current tree.
+
 - **التاريخ:** 2026-09-03
 - **المنهجية:** شوف → افحص → فكّر → عدّل → تأكد (حلقة كاملة مع إعادة فحص)
 - **الترقيم:** M14 في تسلسل التقارير الفعلي (M13 في ترتيب تنفيذ الخطة §25؛ تقرير M13 سبق وحُجز لمرحلة Audit & Observability §17)
@@ -26,14 +28,14 @@ routes ↛ business logic
 
 ## 2. ما الذي وجدناه (شوف + افحص)
 
-| الملاحظة | التفصيل |
-|---|---|
-| الفرض الحالي في مرحلة الاختبار فقط | `architecture/layer-boundaries.test.ts` (من M8) يعمل ضمن باب Vitest — وتقرير M8 طلب صراحة «الرفع من arch tests إلى ESLint `no-restricted-imports` داخل CI ليتعطل البناء مباشرة» |
-| لا قواعد boundaries في ESLint | `eslint.config.mjs` كان يحتوي `import/order` فقط — لا شيء يمنع domain من استيراد React أو features من استيراد service_role وقت اللينت |
-| **violation مسجلة (1)** — data access داخل UI | `features/dashboard/components/SecurityAlertPanel.tsx` ينفّذ `.from('activity_logs')...` مباشرة عبر `container.supabase` داخل مكوّن — استعلام بيانات خارج repos/adapters |
-| **violation مسجلة (2)** — علاقة معكوسة موثقة | `infrastructure/repos/tenants.service.ts` و`courses.service.ts` تستوردان من `@/adapters/actions/{tenants,video}.actions` (موثقة في M7/M8 كتاريخية) |
-| استثناءا service_role الموثقان | `app/api/bulk-action/route.ts` و`app/api/audit/cleanup-duplicate-seqs/route.ts` يستوردان `createAdminClient` (نطاق M4) — cron يمر عبر `jobs-rpc.service` ولا يستورده |
-| إحصاء الاستيراد الفعلي | `createAdminClient` محصور في `infrastructure/**` + المسارين؛ لا استيراد `@supabase/*` **قيميًا** خارج infrastructure (bulk-action type-only)؛ `application` نظيف من كل الطبقات ومن next/react؛ `features` لا تستورد `@/application` ولا `@supabase` |
+| الملاحظة                                      | التفصيل                                                                                                                                                                                                                                             |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| الفرض الحالي في مرحلة الاختبار فقط            | `architecture/layer-boundaries.test.ts` (من M8) يعمل ضمن باب Vitest — وتقرير M8 طلب صراحة «الرفع من arch tests إلى ESLint `no-restricted-imports` داخل CI ليتعطل البناء مباشرة»                                                                     |
+| لا قواعد boundaries في ESLint                 | `eslint.config.mjs` كان يحتوي `import/order` فقط — لا شيء يمنع domain من استيراد React أو features من استيراد service_role وقت اللينت                                                                                                               |
+| **violation مسجلة (1)** — data access داخل UI | `features/dashboard/components/SecurityAlertPanel.tsx` ينفّذ `.from('activity_logs')...` مباشرة عبر `container.supabase` داخل مكوّن — استعلام بيانات خارج repos/adapters                                                                            |
+| **violation مسجلة (2)** — علاقة معكوسة موثقة  | `infrastructure/repos/tenants.service.ts` و`courses.service.ts` تستوردان من `@/adapters/actions/{tenants,video}.actions` (موثقة في M7/M8 كتاريخية)                                                                                                  |
+| استثناءا service_role الموثقان                | `app/api/bulk-action/route.ts` و`app/api/audit/cleanup-duplicate-seqs/route.ts` يستوردان `createAdminClient` (نطاق M4) — cron يمر عبر `jobs-rpc.service` ولا يستورده                                                                                |
+| إحصاء الاستيراد الفعلي                        | `createAdminClient` محصور في `infrastructure/**` + المسارين؛ لا استيراد `@supabase/*` **قيميًا** خارج infrastructure (bulk-action type-only)؛ `application` نظيف من كل الطبقات ومن next/react؛ `features` لا تستورد `@/application` ولا `@supabase` |
 
 ---
 
@@ -41,13 +43,13 @@ routes ↛ business logic
 
 ### 3.1 خمس كتل قواعد في `apps/admin/eslint.config.mjs` (بدون أي dependency جديدة)
 
-| # | الكتلة | الملفات | الممنوع | الاستثناءات |
-|---|---|---|---|---|
-| 1 | **service-role containment** (M4 + `features ↛ service_role`) | `src/**` | `@/infrastructure/supabase/admin` + استيراد `@supabase/*` **قيميًا** | `src/infrastructure/**`، `app/api/bulk-action/**`، `app/api/audit/cleanup-duplicate-seqs/**` |
-| 2 | **domain purity** (`domain ↛ Supabase/Next/React`) | `src/domain/**` | أي `@/*` خارج `@/domain` (regex) + `next`/`react`/`react-dom`/`@supabase/*`/`@eduzone/ui` (بأنواعها) | — (النقي: relative + zod + `@eduzone/types`) |
-| 3 | **application isolation** (`application ↛ infrastructure`) | `src/application/**` | `@/(infrastructure\|adapters\|features\|components\|app\|container)` + `next`/`react` + `@supabase/*` قيميًا | `allowTypeImports` لـ`@supabase/*` (حقن أنواع `SupabaseClient` — توثيق M8) |
-| 4 | **thin routes** (`routes ↛ business logic`) | `src/app/**` | `@/infrastructure/supabase/admin` + `@supabase/*` قيميًا (لا اتصالات DB في الـroutes) | المساران المميزان أعلاه؛ types مسموحة |
-| 5 | **features** | `src/features/**` | `@/infrastructure/supabase/admin` + `@supabase/*` قيميًا (الوصول عبر `container.supabase`/hooks) | types مسموحة |
+| #   | الكتلة                                                        | الملفات              | الممنوع                                                                                                      | الاستثناءات                                                                                  |
+| --- | ------------------------------------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| 1   | **service-role containment** (M4 + `features ↛ service_role`) | `src/**`             | `@/infrastructure/supabase/admin` + استيراد `@supabase/*` **قيميًا**                                         | `src/infrastructure/**`، `app/api/bulk-action/**`، `app/api/audit/cleanup-duplicate-seqs/**` |
+| 2   | **domain purity** (`domain ↛ Supabase/Next/React`)            | `src/domain/**`      | أي `@/*` خارج `@/domain` (regex) + `next`/`react`/`react-dom`/`@supabase/*`/`@eduzone/ui` (بأنواعها)         | — (النقي: relative + zod + `@eduzone/types`)                                                 |
+| 3   | **application isolation** (`application ↛ infrastructure`)    | `src/application/**` | `@/(infrastructure\|adapters\|features\|components\|app\|container)` + `next`/`react` + `@supabase/*` قيميًا | `allowTypeImports` لـ`@supabase/*` (حقن أنواع `SupabaseClient` — توثيق M8)                   |
+| 4   | **thin routes** (`routes ↛ business logic`)                   | `src/app/**`         | `@/infrastructure/supabase/admin` + `@supabase/*` قيميًا (لا اتصالات DB في الـroutes)                        | المساران المميزان أعلاه؛ types مسموحة                                                        |
+| 5   | **features**                                                  | `src/features/**`    | `@/infrastructure/supabase/admin` + `@supabase/*` قيميًا (الوصول عبر `container.supabase`/hooks)             | types مسموحة                                                                                 |
 
 ملاحظات تنفيذية:
 
@@ -80,6 +82,7 @@ routes ↛ business logic
 ## 5. ملفات التغيير
 
 **معدّلة (2):**
+
 - `apps/admin/eslint.config.mjs` — قسم M14: 5 كتل `@typescript-eslint/no-restricted-imports` (جدول 3.1)
 - `apps/admin/src/architecture/layer-boundaries.test.ts` — `describe('architecture: service-role containment (M14)')`
 
@@ -91,12 +94,12 @@ routes ↛ business logic
 
 ### 6.1 المسار الأخضر (بعد القواعد، على main)
 
-| الفحص | الأمر | النتيجة |
-|---|---|---|
-| Architecture guards | `vitest run --config vitest.unit.config.ts src/architecture/layer-boundaries.test.ts` | ✅ **754/754 PASS** |
-| Lint | `eslint . --max-warnings=0` | ✅ **exit=0** (صفر مشاكل) |
-| Typecheck | `tsc --noEmit` | ✅ exit=0 |
-| Unit كاملة | `vitest run --config vitest.unit.config.ts` | ✅ **43 ملفًا / 1068 اختبارًا PASS** |
+| الفحص               | الأمر                                                                                 | النتيجة                              |
+| ------------------- | ------------------------------------------------------------------------------------- | ------------------------------------ |
+| Architecture guards | `vitest run --config vitest.unit.config.ts src/architecture/layer-boundaries.test.ts` | ✅ **754/754 PASS**                  |
+| Lint                | `eslint . --max-warnings=0`                                                           | ✅ **exit=0** (صفر مشاكل)            |
+| Typecheck           | `tsc --noEmit`                                                                        | ✅ exit=0                            |
+| Unit كاملة          | `vitest run --config vitest.unit.config.ts`                                           | ✅ **43 ملفًا / 1068 اختبارًا PASS** |
 
 ### 6.2 إثبات الفشل — violation مقصودة على branch اختباري (مطلوب في §18)
 
@@ -105,10 +108,10 @@ routes ↛ business logic
 - `src/domain/violation-probe.ts`: يستورد `next/server` + `@/lib/env` + `@/infrastructure/supabase/admin`
 - `src/features/violation-probe.ts`: يستورد `@/infrastructure/supabase/admin`
 
-| البوابة | النتيجة |
-|---|---|
-| `eslint` (باب CI «Lint») | ❌ **فشل — exit=1**: 3 أخطاء في domain probe (`next` framework ban + `@/lib` + admin client عبر regex الـdomain) + خطأ في features probe (`features ↛ service_role`) |
-| `vitest layer-boundaries.test.ts` (باب CI «Test») | ❌ **فشل — 2 failed / 759**: `service-role containment (M14)` اكتشف الاستيرادين في الملفين |
+| البوابة                                           | النتيجة                                                                                                                                                              |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `eslint` (باب CI «Lint»)                          | ❌ **فشل — exit=1**: 3 أخطاء في domain probe (`next` framework ban + `@/lib` + admin client عبر regex الـdomain) + خطأ في features probe (`features ↛ service_role`) |
+| `vitest layer-boundaries.test.ts` (باب CI «Test») | ❌ **فشل — 2 failed / 759**: `service-role containment (M14)` اكتشف الاستيرادين في الملفين                                                                           |
 
 ⇒ أي PR يحوي violation مماثلًا **لا يمكن دمجه**: باب Lint في CI يتعطل مباشرة (قبل Test/Build).
 
@@ -125,4 +128,3 @@ routes ↛ business logic
 2. **عكس العلاقة المعكوسة** `infrastructure/repos/{tenants,courses}.service → @/adapters/actions` ثم إضافة قاعدة تحظر `infrastructure → adapters` (توصية M7/M8 المؤجلة).
 3. **§19 — CI/CD Production Gates**: باب Lint يغطي هذه القواعد أصلًا؛ عند الحاجة لتحليل أعمق (circular deps، مسارات transitive) يُضاف dependency-cruiser كباب صريح.
 4. ESLint `no-restricted-imports` يغطي الاستيراد الساكن فقط — الاستيراد الديناميكي (`import()`) يغطيه guard الـvitest النصي ومراجعة الكود.
-

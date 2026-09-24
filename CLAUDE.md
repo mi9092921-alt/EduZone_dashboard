@@ -1,8 +1,7 @@
 # EduZone Dashboard — AI Engineering Guide
 
 **Repository:** `mi9092921-alt/EduZone_dashboard`
-**Baseline:** `main` @ `9f1a31659d929fcf5bbcdec58429c146021b777d`
-**Reviewed:** 2026-09-08
+**Reviewed:** 2026-09-24
 **Package manager:** `pnpm@10.32.1`
 
 ## 1. Source of truth
@@ -23,7 +22,7 @@ Check → Think → Modify → Verify → Repeat
 
 ## 2. Repository shape
 
-The runtime application is `apps/admin`. Shared packages live under `packages/`. Database and Edge Function assets live under `supabase/`.
+The runtime application is `apps/admin`. Shared packages live under `packages/`. Database and Edge Function assets live under `supabase/`. This guide describes repository structure and constraints; it is not a release certificate.
 
 The application source contains:
 
@@ -73,7 +72,7 @@ Request identity and tenant context must be derived from trusted server/auth con
 
 ## 5. Authorization
 
-`src/application/authorization/policy.ts` is a shared role-permission fast path. It is **partial centralization**, not proof of a complete authorization service.
+`apps/admin/src/application/authorization/policy.ts` is a shared role-permission fast path. It is **partial centralization**, not proof of a complete authorization service.
 
 For privileged operations:
 
@@ -147,7 +146,7 @@ resource owner / non-owner
 
 ## 9. Testing commands
 
-Use the package scripts actually declared in `apps/admin/package.json`:
+Use the root scripts declared in `package.json`, or the package scripts declared in `apps/admin/package.json`:
 
 ```bash
 pnpm typecheck
@@ -155,10 +154,10 @@ pnpm lint
 pnpm test
 pnpm test:coverage
 pnpm test:e2e
-pnpm test:e2e:ui
+pnpm --filter @eduzone/admin test:e2e:ui
 ```
 
-Keep unit tests network-free. Use Playwright/Cypress/database harnesses for integration or end-to-end behavior.
+Keep unit tests network-free. Use Playwright/Cypress/database harnesses for integration or end-to-end behavior. The repository currently contains both suites; do not claim that one has replaced the other without checking the files and workflow.
 
 ## 10. Documentation maintenance
 

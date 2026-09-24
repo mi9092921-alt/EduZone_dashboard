@@ -1,5 +1,7 @@
 # 🗺️ EduZone Admin Dashboard — Implementation Plan
 
+> **Scope note:** This is a historical implementation plan. Paths, packages, durations, and commands below are not a current inventory; verify them against the root package files and `apps/admin/` before use.
+
 > **Version:** 2.1  
 > **Date:** 2026-04-05  
 > **Schema:** EduZone v10.0 (PostgreSQL 17 / Supabase Pro)  
@@ -1966,6 +1968,7 @@ Implement GDPR Article 17 (Right to Erasure) compliance. Soft-deleted user recor
 **Acceptance Criteria:**
 
 - `supabase/migrations/YYYYMMDD_gdpr_hard_delete.sql`:
+
   ```sql
   CREATE OR REPLACE FUNCTION gdpr_hard_delete_expired_users()
   RETURNS INT
@@ -2008,6 +2011,7 @@ Implement GDPR Article 17 (Right to Erasure) compliance. Soft-deleted user recor
   END;
   $$;
   ```
+
 - **CASCADE verification checklist** (must pass before deploying):
   | Child Table | FK Column | ON DELETE | Status |
   |-------------|-----------|-----------|--------|

@@ -1,6 +1,6 @@
 # EduZone — RFC & Architectural Decision Log
 
-> **Version:** 1.0 | **Date:** 2026-03-11  
+> **Status:** Historical decision record, reviewed 2026-09-24. Decisions describe intent; source/configuration and tests determine what is actually implemented.
 > **Purpose:** Document major engineering decisions, their rationale, and the alternatives considered.  
 > **Format:** Each RFC is immutable once status is ACCEPTED or REJECTED.
 
@@ -32,7 +32,7 @@
 **Date:** 2026-03-08 | **Status:** ACCEPTED | **Author:** Lead Architect
 
 **Decision:**  
-Adopt Clean Architecture (Ports & Adapters / Hexagonal) as the structural pattern for the admin app codebase, with strict layer dependency enforcement via ESLint + dependency-cruiser.
+Adopt a layered/ports-and-adapters pattern for the admin app codebase, with the currently visible boundary checks in ESLint and Vitest architecture tests. A separate `dependency-cruiser` gate is not present in this checkout.
 
 **Context:**  
 The admin dashboard will grow from a simple CRUD app to a complex multi-tenant control plane with 10+ feature domains. Without architectural discipline, the codebase becomes difficult to test, change, and reason about.
@@ -310,7 +310,7 @@ To propose a new architectural decision:
 
 1. Copy the RFC template below
 2. Fill in all sections
-3. Submit as a PR to `docs/RFC_DECISION_LOG.md`
+3. Submit as a PR to `project_documents/RFC_DECISION_LOG.md`
 4. Discuss in PR comments; get at least 2 senior engineer sign-offs
 5. Merge with status: ACCEPTED or REJECTED
 

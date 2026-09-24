@@ -4,19 +4,21 @@
 >
 > الميزات: البحث الشامل (Global Search) · صفحة صحة النظام (System Health) · مركز النسخ الاحتياطي والتصدير (Backup & Export Center) · لوحة التحكم القابلة للتخصيص (Customizable Dashboard)
 
+> **Scope note:** This document is a proposal. The paths, pages, integrations, and acceptance criteria below are target design, not evidence that the feature is implemented. Confirm each item in `apps/admin/src/`, `supabase/`, tests, and configuration before changing status.
+
 ---
 
 ## 📌 اكتشافات من الكود الحالي تؤثر على الخطة
 
-| الاكتشاف | الأثر |
-|---|---|
-| `@dnd-kit/core` + `@dnd-kit/sortable` مثبّتة في `apps/admin` | اللوحة القابلة للتخصيص لا تحتاج مكتبات جديدة |
-| Edge Functions‏ `bulk-export` و`export-report` موجودة في `supabase/functions/` | مركز التصدير يبني عليها بدل البدء من الصفر |
-| RPC `getSystemHealth` + hook `useSystemHealth` موجودان (`src/adapters/queries/analytics.queries.ts`) | صفحة الصحة لها أساس جاهز |
-| لا يوجد `cmdk` ولا Radix — المكونات مبنية يدوياً في `src/components/ui/` | نبني CommandPalette فوق `Modal.tsx` الموجود بنفس النمط |
-| إضافة route جديد تتطلب تحديث 4 أماكن | `src/config/nav.config.ts` · `src/config/route-access.config.ts` (له اختبار lockstep يجب تحديثه) · `layout.tsx` مع `page-guard` · الترجمات `messages/ar.json` و`en.json` |
-| نظام المهام غير المتزامنة جاهز | `internal.job_queue` + RPCs‏ `admin_get_jobs`/`admin_cancel_job`/`admin_retry_job` + تقدّم realtime عبر `postgres_changes` |
-| Rate limiting جاهز | RPC `check_rate_limit` (DB-backed, SECURITY DEFINER) |
+| الاكتشاف                                                                                             | الأثر                                                                                                                                                                    |
+| ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `@dnd-kit/core` + `@dnd-kit/sortable` مثبّتة في `apps/admin`                                         | اللوحة القابلة للتخصيص لا تحتاج مكتبات جديدة                                                                                                                             |
+| Edge Functions‏ `bulk-export` و`export-report` موجودة في `supabase/functions/`                       | مركز التصدير يبني عليها بدل البدء من الصفر                                                                                                                               |
+| RPC `getSystemHealth` + hook `useSystemHealth` موجودان (`src/adapters/queries/analytics.queries.ts`) | صفحة الصحة لها أساس جاهز                                                                                                                                                 |
+| لا يوجد `cmdk` ولا Radix — المكونات مبنية يدوياً في `src/components/ui/`                             | نبني CommandPalette فوق `Modal.tsx` الموجود بنفس النمط                                                                                                                   |
+| إضافة route جديد تتطلب تحديث 4 أماكن                                                                 | `src/config/nav.config.ts` · `src/config/route-access.config.ts` (له اختبار lockstep يجب تحديثه) · `layout.tsx` مع `page-guard` · الترجمات `messages/ar.json` و`en.json` |
+| نظام المهام غير المتزامنة جاهز                                                                       | `internal.job_queue` + RPCs‏ `admin_get_jobs`/`admin_cancel_job`/`admin_retry_job` + تقدّم realtime عبر `postgres_changes`                                               |
+| Rate limiting جاهز                                                                                   | RPC `check_rate_limit` (DB-backed, SECURITY DEFINER)                                                                                                                     |
 
 ---
 
@@ -62,12 +64,12 @@ apps/admin/src/features/<feature>/
 
 ### 2) الواجهة
 
-| الملف | الوصف |
-|---|---|
-| `src/components/ui/CommandPalette.tsx` | مكوّن جديد فوق `Modal.tsx`: حقل بحث + قائمة نتائج + تنقل بالأسهم + Enter |
-| `src/features/search/components/GlobalSearch.tsx` | منطق البحث: debounce 250ms + React Query |
-| `src/features/layout/components/Topbar.tsx` | زر بحث يعرض اختصار `Ctrl K` |
-| `src/features/layout/components/AdminShell.tsx` | تسجيل الاختصار العام (`metaKey`/`ctrlKey` + `K`) و`/` للتركيز |
+| الملف                                             | الوصف                                                                    |
+| ------------------------------------------------- | ------------------------------------------------------------------------ |
+| `src/components/ui/CommandPalette.tsx`            | مكوّن جديد فوق `Modal.tsx`: حقل بحث + قائمة نتائج + تنقل بالأسهم + Enter |
+| `src/features/search/components/GlobalSearch.tsx` | منطق البحث: debounce 250ms + React Query                                 |
+| `src/features/layout/components/Topbar.tsx`       | زر بحث يعرض اختصار `Ctrl K`                                              |
+| `src/features/layout/components/AdminShell.tsx`   | تسجيل الاختصار العام (`metaKey`/`ctrlKey` + `K`) و`/` للتركيز            |
 
 ### 3) السلوك
 
@@ -94,14 +96,14 @@ admin_get_failed_jobs_24h()         -- المهام dead/failed خلال 24 سا
 
 ### 2) الواجهة
 
-| الملف | الوصف |
-|---|---|
-| `app/[locale]/system-health/page.tsx` + `layout.tsx` | route جديد مع `page-guard` (super_admin فقط) |
-| `features/system-health/components/SystemHealthPage.tsx` | الصفحة الرئيسية |
-| `.../HealthOverviewCards.tsx` | بطاقات: حالة عامة (Healthy/Degraded/Down)، عمق الطابور، backlog الأنشطة، زمن قاعدة البيانات |
-| `.../QueueDepthChart.tsx` | رسم بياني حسب نوع المهمة |
-| `.../CronJobsTable.tsx` | جدول مهام pg_cron مع حالة آخر تشغيل |
-| `.../IncidentsTable.tsx` | المهام الفاشلة خلال 24 ساعة + زر إعادة المحاولة (`admin_retry_job` موجود) |
+| الملف                                                    | الوصف                                                                                       |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `app/[locale]/system-health/page.tsx` + `layout.tsx`     | route جديد مع `page-guard` (super_admin فقط)                                                |
+| `features/system-health/components/SystemHealthPage.tsx` | الصفحة الرئيسية                                                                             |
+| `.../HealthOverviewCards.tsx`                            | بطاقات: حالة عامة (Healthy/Degraded/Down)، عمق الطابور، backlog الأنشطة، زمن قاعدة البيانات |
+| `.../QueueDepthChart.tsx`                                | رسم بياني حسب نوع المهمة                                                                    |
+| `.../CronJobsTable.tsx`                                  | جدول مهام pg_cron مع حالة آخر تشغيل                                                         |
+| `.../IncidentsTable.tsx`                                 | المهام الفاشلة خلال 24 ساعة + زر إعادة المحاولة (`admin_retry_job` موجود)                   |
 
 ### 3) التكاملات
 
@@ -111,7 +113,6 @@ admin_get_failed_jobs_24h()         -- المهام dead/failed خلال 24 سا
 - تحديث `route-access.config.ts` + اختبار الـ lockstep الخاص به.
 
 **⏱️ التقدير: 4–5 أيام | الحجم: متوسط**
-
 
 ---
 
@@ -128,7 +129,7 @@ admin_get_failed_jobs_24h()         -- المهام dead/failed خلال 24 سا
   job_id → internal.job_queue, file_path, expires_at, created_at
   ```
 
-  + RLS (المستأجر يرى تصديراته فقط) + تنظيف تلقائي عبر pg_cron بعد 7 أيام.
+  - RLS (المستأجر يرى تصديراته فقط) + تنظيف تلقائي عبر pg_cron بعد 7 أيام.
 
 - **RPCs**:
   - `admin_request_export()` — تحقق + rate-limit عبر `check_rate_limit` + enqueue
@@ -137,12 +138,12 @@ admin_get_failed_jobs_24h()         -- المهام dead/failed خلال 24 سا
 
 ### 2) الواجهة
 
-| الملف | الوصف |
-|---|---|
-| `app/[locale]/exports/page.tsx` + `layout.tsx` | route جديد (super_admin + admin) |
-| `features/exports/components/ExportWizard.tsx` | معالج: الكيان → الصيغة (CSV/JSON) → الفلاتر → تأكيد |
+| الملف                                          | الوصف                                                             |
+| ---------------------------------------------- | ----------------------------------------------------------------- |
+| `app/[locale]/exports/page.tsx` + `layout.tsx` | route جديد (super_admin + admin)                                  |
+| `features/exports/components/ExportWizard.tsx` | معالج: الكيان → الصيغة (CSV/JSON) → الفلاتر → تأكيد               |
 | `features/exports/components/ExportsTable.tsx` | سجل التصديرات مع حالة المهمة realtime (نمط `JobsPage`) + زر تنزيل |
-| `features/exports/hooks/useExports.ts` | استعلامات + طلب تصدير |
+| `features/exports/hooks/useExports.ts`         | استعلامات + طلب تصدير                                             |
 
 ### 3) توضيح مهم
 
@@ -170,13 +171,13 @@ CREATE TABLE public.dashboard_layouts (
 
 ### 2) الواجهة
 
-| الملف | الوصف |
-|---|---|
-| `features/dashboard/widgets/registry.tsx` | سجل الودجات: `{id, titleKey, component, defaultSize, roles[]}` — كل بطاقة موجودة في `AdminDashboard` تتحول لودجت |
-| `features/dashboard/components/DashboardGrid.tsx` | شبكة `DndContext` + `SortableContext` (dnd-kit مثبتة ✔️) |
-| `features/dashboard/components/WidgetWrapper.tsx` | إطار موحد: عنوان + زر إخفاء + مقبض سحب (يظهر في وضع التحرير) |
-| `features/dashboard/hooks/useDashboardLayout.ts` | جلب + حفظ debounced (1s) + reset للافتراضي |
-| تعديل `AdminDashboard.tsx` و`TeacherDashboard.tsx` | عرض عبر السجل مع افتراضيات مختلفة لكل دور |
+| الملف                                              | الوصف                                                                                                            |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `features/dashboard/widgets/registry.tsx`          | سجل الودجات: `{id, titleKey, component, defaultSize, roles[]}` — كل بطاقة موجودة في `AdminDashboard` تتحول لودجت |
+| `features/dashboard/components/DashboardGrid.tsx`  | شبكة `DndContext` + `SortableContext` (dnd-kit مثبتة ✔️)                                                         |
+| `features/dashboard/components/WidgetWrapper.tsx`  | إطار موحد: عنوان + زر إخفاء + مقبض سحب (يظهر في وضع التحرير)                                                     |
+| `features/dashboard/hooks/useDashboardLayout.ts`   | جلب + حفظ debounced (1s) + reset للافتراضي                                                                       |
+| تعديل `AdminDashboard.tsx` و`TeacherDashboard.tsx` | عرض عبر السجل مع افتراضيات مختلفة لكل دور                                                                        |
 
 ### 3) السلوك
 
@@ -190,12 +191,12 @@ CREATE TABLE public.dashboard_layouts (
 
 ## 🗓️ الترتيب المقترح للتنفيذ
 
-| المرحلة | الميزة | المدة | السبب |
-|---|---|---|---|
-| **1** | البحث الشامل | 3–4 أيام | الأصغر، قيمة فورية، لا يغيّر schema حساس |
-| **2** | صحة النظام | 4–5 أيام | يخدم هدف production-readiness + يبني على RPC موجود |
-| **3** | لوحة التحكم القابلة للتخصيص | 4–5 أيام | مستقل تماماً، يحسّن الداشبورد الحالي |
-| **4** | مركز التصدير | 6–8 أيام | الأكبر والأكثر حساسية (Storage + صلاحيات) — يُترك للنهاية |
+| المرحلة | الميزة                      | المدة    | السبب                                                     |
+| ------- | --------------------------- | -------- | --------------------------------------------------------- |
+| **1**   | البحث الشامل                | 3–4 أيام | الأصغر، قيمة فورية، لا يغيّر schema حساس                  |
+| **2**   | صحة النظام                  | 4–5 أيام | يخدم هدف production-readiness + يبني على RPC موجود        |
+| **3**   | لوحة التحكم القابلة للتخصيص | 4–5 أيام | مستقل تماماً، يحسّن الداشبورد الحالي                      |
+| **4**   | مركز التصدير                | 6–8 أيام | الأكبر والأكثر حساسية (Storage + صلاحيات) — يُترك للنهاية |
 
 **الإجمالي التقريبي: 3.5–4 أسابيع** للميزات الأربع شاملة الاختبارات.
 

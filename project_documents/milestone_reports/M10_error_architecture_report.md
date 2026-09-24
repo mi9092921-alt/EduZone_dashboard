@@ -1,5 +1,7 @@
 # M10 — Error Architecture (P1) — Milestone Report
 
+> **Historical snapshot (2026-09-02):** this report records a point-in-time implementation check. Its counts and PASS/complete statements are not current release evidence; re-run the referenced checks against the current tree.
+
 > المرحلة: **§14 P1 — Error Architecture** (M9 في ترتيب التنفيذ = M10 في تسلسل التقارير)
 > التاريخ: 2026-09-02
 > المنهجية: شوف → افحص → فكّر → عدّل → تأكد (نُفِّذت الحلقة كاملة مع إعادة فحص وقياس على HEAD نظيف)
@@ -19,14 +21,14 @@
 
 ستة أصناف فوق `AppError` الموجود (كل صنف **هو** `AppError` — لا كسر للمستهلكين الحاليين):
 
-| الصنف | الكود | الحالة |
-|---|---|---|
-| `ValidationError` | `INVALID_TYPE` | 400 |
-| `UnauthorizedError` | `AUTH_REQUIRED` | 401 |
-| `ForbiddenError` | `PERMISSION_DENIED` | 403 |
-| `NotFoundError` | `NOT_FOUND` | 404 |
-| `ConflictError` | `DUPLICATE` | 409 |
-| `InfrastructureError` | `INTERNAL_ERROR` | 500 |
+| الصنف                 | الكود               | الحالة |
+| --------------------- | ------------------- | ------ |
+| `ValidationError`     | `INVALID_TYPE`      | 400    |
+| `UnauthorizedError`   | `AUTH_REQUIRED`     | 401    |
+| `ForbiddenError`      | `PERMISSION_DENIED` | 403    |
+| `NotFoundError`       | `NOT_FOUND`         | 404    |
+| `ConflictError`       | `DUPLICATE`         | 409    |
+| `InfrastructureError` | `INTERNAL_ERROR`    | 500    |
 
 - `errorStatus(err)`: خريطة الحالة (مصفوفة "تأكد" في §14) — مُختبرة بـtest matrix.
 - `toClientMessage(err)`: **النقطة الوحيدة** لاستخراج رسالة موجهة للعميل:
@@ -46,6 +48,7 @@
 ### 2.3 إصلاح مواقع التسريب (17 ملفًا)
 
 **البنية التحتية (repos):**
+
 - `user-admin.repository.ts`: رسائل Auth/DB الخام في `StepResult.message` → `toStepFailure()` (تسجيل + رسالة قصيرة مستقرة `"<Step> failed"`)؛ استثناء `not found` في `deleteAuthUser` محفوظ كمَعلَم idempotency؛ RPCs → `InfrastructureError`.
 - `settings.service.ts`: `throw new Error('ADMIN_ONLY')` → `UnauthorizedError`؛ `SETTING_NOT_FOUND` → `NotFoundError('Setting')`؛ `throw error` → `mapDbError`.
 - `feature-flags.service.ts`: `FLAG_NOT_FOUND` → `NotFoundError`؛ `FLAG_KEY_EXISTS` (23505) → `ConflictError('A flag with this key already exists')`؛ `No tenant found...` → `ForbiddenError`.
@@ -59,12 +62,14 @@
 **خارجي:** `youtube.service.ts`: `YouTube API error: ${statusText}` → رسالة عامة (statusText قد يعكس تفاصيل upstream).
 
 **الواجهة (sentinel strings → كود منظم):**
+
 - `FeatureFlagsPage.tsx`: مقارنة `msg === 'FLAG_KEY_EXISTS'` → فحص `code === 'DUPLICATE'` + `toClientMessage`.
 - `EnrollStudentDialog.tsx`: مقارنة `msg.includes('DUPLICATE')` → نفس النمط.
 
 ### 2.4 قاعدة Architecture قابلة للفشل (M10) — `layer-boundaries.test.ts`
 
 قاعدتان تنفيذيتان على 4 طبقات (`infrastructure`, `adapters`, `app`, `application`):
+
 1. **منع إعادة رفع الخطأ الخام**: نمط `if (error) throw error;` ممنوع — يجب الـmapping للتصنيف.
 2. **`getErrorMessage` ممنوعة في حدود العميل**: يجب `toClientMessage` (تقنّع الأشكال غير-AppError).
 
@@ -78,17 +83,18 @@
 
 ## 3) التحقق (تأكد)
 
-| الفحص | النتيجة |
-|---|---|
-| `tsc --noEmit` | ✅ صفر أخطاء |
-| `eslint src --max-warnings=0` | ✅ صفر تحذيرات/أخطاء |
-| vitest (domain + architecture + application + 15 ملف repos/adapters) | ✅ **563/563** |
-| architecture tests (M9+M10) | ✅ 330/330 |
-| domain/errors | ✅ 18/18 (12 قائمة + 6 taxonomy جديدة) |
+| الفحص                                                                | النتيجة                                |
+| -------------------------------------------------------------------- | -------------------------------------- |
+| `tsc --noEmit`                                                       | ✅ صفر أخطاء                           |
+| `eslint src --max-warnings=0`                                        | ✅ صفر تحذيرات/أخطاء                   |
+| vitest (domain + architecture + application + 15 ملف repos/adapters) | ✅ **563/563**                         |
+| architecture tests (M9+M10)                                          | ✅ 330/330                             |
+| domain/errors                                                        | ✅ 18/18 (12 قائمة + 6 taxonomy جديدة) |
 
 ### المقارنة مع HEAD نظيف (لعزل المسبق عن الجديد)
 
 شُغّلت الحزمة الكاملة على HEAD عبر `git stash` مرتين:
+
 - **feature-flags.service.test (12 فشل)**: فاشلة على HEAD أيضًا — MSW/network isolation، **مسبقة** (موثقة في تقرير M9).
 - **env.test (1) + admin.test (3) + storybook (6) + e2e suites (3)**: فاشلة على HEAD أيضًا (متغيرات بيئة/بنية storybook/playwright) — **مسبقة وغير مرتبطة**.
 - **إخفاقات كانت ناتجة عن تغييري** (courses 1، use-cases 4، jobs 4، rate-limits 1، tenants 1) — أُصلحت جميعًا؛ الإخفاق الكلي النهائي = الإخفاق المسبق على HEAD حرفيًا (لا رجوع).

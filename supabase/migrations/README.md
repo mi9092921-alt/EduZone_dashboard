@@ -1,6 +1,6 @@
 # Supabase Migrations Directory
 
-**Baseline:** `main` @ `9f1a31659d929fcf5bbcdec58429c146021b777d`  
+**Reviewed:** 2026-09-24
 **Reviewed:** 2026-09-08
 
 ## Current state
