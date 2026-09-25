@@ -58,7 +58,7 @@ The root scripts delegate to Turborepo where configured. The admin package also 
 
 The repository includes seven Playwright spec files under `apps/admin/tests/e2e/` and fifteen Cypress spec files under `apps/admin/cypress/e2e/`. The Playwright workflow is conditional on the repository variable `E2E_ENABLED`; the current value and branch-protection settings must be checked on GitHub, not inferred from YAML. Unit, lint, typecheck, build, RLS, and tenant-isolation results are time-sensitive and must be recorded from the relevant run.
 
-Source-level controls include Supabase Auth integration, RLS/permission SQL, server-side authorization paths, validation schemas, and service-role use in server infrastructure. These controls are not a claim that the deployed system is secure or production-ready.
+Source-level controls include Supabase Auth integration, RLS and permission SQL, server-side authorization paths, validation schemas, and service-role use in server infrastructure. These controls are not a claim that the deployed system is secure or production-ready.
 
 ## Database boundary
 
