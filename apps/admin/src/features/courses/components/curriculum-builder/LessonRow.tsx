@@ -190,9 +190,14 @@ export function LessonRow({
   };
 
   const handleConfirmDelete = async () => {
-    await deleteLesson.mutateAsync({ id: lesson.id, courseId });
-    showToast(t('lesson_deleted_successfully'), 'success');
-    setIsDeleteDialogOpen(false);
+    try {
+      await deleteLesson.mutateAsync({ id: lesson.id, courseId });
+      showToast(t('lesson_deleted_successfully'), 'success');
+      setIsDeleteDialogOpen(false);
+    } catch (err) {
+      // Keep the confirmation dialog open so the user can retry.
+      showToast(err instanceof Error ? err.message : t('failed_to_save'), 'error');
+    }
   };
 
   if (editing) {

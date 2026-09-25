@@ -15,6 +15,25 @@ export function shouldDropSentryEvent(event: ErrorEvent): boolean {
   );
 }
 
+// Client-only network-level fetch rejections, per browser engine: Chrome
+// "Failed to fetch", Safari "Load failed", Firefox "NetworkError when
+// attempting to fetch resource". The app already surfaces these to users via
+// toasts and query error states, and the overwhelming majority are request
+// cancellations riding along with route transitions or tab unloads — same
+// rationale as the filter above. Real server-side faults keep flowing: Node
+// (undici) reports them as "fetch failed", which this regex never matches.
+const CLIENT_FETCH_FAILURE_RE =
+  /\b(?:Failed to fetch|Load failed|NetworkError when attempting to fetch resource)\b/;
+
+export function shouldDropClientSentryEvent(event: ErrorEvent): boolean {
+  if (shouldDropSentryEvent(event)) return true;
+
+  const exceptionMessages = (event.exception?.values ?? [])
+    .map((value) => `${value.type ?? ''} ${value.value ?? ''}`)
+    .join(' ');
+  return CLIENT_FETCH_FAILURE_RE.test(exceptionMessages);
+}
+
 function scrubRecord(record: Record<string, string> | undefined): Record<string, string> | undefined {
   if (!record) return undefined;
   return Object.fromEntries(

@@ -57,10 +57,21 @@ export function Topbar() {
 
   async function handleLogout() {
     setAnchorEl(null);
-    // M11: RPC call lives in infrastructure/repos/auth-rpc.service.ts
-    await logoutCurrentUser();
-    const supabase = createBrowserClient();
-    await supabase.auth.signOut();
+    // Best-effort server-side sign-out: a network-level failure here (Sentry
+    // "TypeError: Failed to fetch") must never leave the user trapped in the
+    // dashboard, so local session cleanup always runs below.
+    try {
+      // M11: RPC call lives in infrastructure/repos/auth-rpc.service.ts
+      await logoutCurrentUser();
+    } catch (err) {
+      console.error('[Topbar] logout RPC failed:', err);
+    }
+    try {
+      const supabase = createBrowserClient();
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.error('[Topbar] supabase signOut failed:', err);
+    }
     clearBrowserSessionId();
     logout();
     router.replace('/login');

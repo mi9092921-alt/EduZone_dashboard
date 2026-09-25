@@ -128,16 +128,27 @@ export function SectionCard({
 
     // M16 (F16-2): atomic reorder — send the section id with the full
     // ordered lesson list; the RPC validates and applies it in one statement.
-    await reorderLessons.mutateAsync({
-      courseId,
-      sectionId: section.id,
-      orderedIds: newLessons.map((l: Lesson) => l.id),
-    });
+    try {
+      await reorderLessons.mutateAsync({
+        courseId,
+        sectionId: section.id,
+        orderedIds: newLessons.map((l: Lesson) => l.id),
+      });
+    } catch (err) {
+      // Revert the optimistic reorder — the server still holds the old order.
+      setLocalLessons(section.lessons || []);
+      showToast(err instanceof Error ? err.message : t('failed_to_save'), 'error');
+    }
   };
 
   const handleSaveTitle = async () => {
-    await updateSection.mutateAsync({ id: section.id, courseId, data: { title } });
-    setEditingTitle(false);
+    try {
+      await updateSection.mutateAsync({ id: section.id, courseId, data: { title } });
+      setEditingTitle(false);
+    } catch (err) {
+      // Keep the editor open so the user can retry the same title.
+      showToast(err instanceof Error ? err.message : t('failed_to_save'), 'error');
+    }
   };
 
   const handleTogglePublish = async (e?: React.MouseEvent) => {
@@ -157,9 +168,14 @@ export function SectionCard({
   };
 
   const handleConfirmDeleteSection = async () => {
-    await deleteSection.mutateAsync({ id: section.id, courseId });
-    showToast(t('section_deleted_successfully'), 'success');
-    setIsDeleteDialogOpen(false);
+    try {
+      await deleteSection.mutateAsync({ id: section.id, courseId });
+      showToast(t('section_deleted_successfully'), 'success');
+      setIsDeleteDialogOpen(false);
+    } catch (err) {
+      // Keep the confirmation dialog open so the user can retry.
+      showToast(err instanceof Error ? err.message : t('failed_to_save'), 'error');
+    }
   };
 
   const [urlError, setUrlError] = useState('');

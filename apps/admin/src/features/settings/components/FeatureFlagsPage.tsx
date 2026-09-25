@@ -851,6 +851,7 @@ function FlagOverridesPanel({ flagId }: { flagId: string }) {
   const theme = useTheme();
   const t = useTranslations('settings');
   const tCommon = useTranslations('common');
+  const showToast = useToastStore((s) => s.showToast);
   const { data: detail, isLoading } = useFeatureFlagDetail(flagId);
   const { data: roles } = useRoles();
   const addRoleMutation = useAddRoleOverride();
@@ -1139,11 +1140,15 @@ function FlagOverridesPanel({ flagId }: { flagId: string }) {
             variant="contained"
             disabled={!selectedRoleId || addRoleMutation.isPending}
             onClick={async () => {
-              await addRoleMutation.mutateAsync({
-                flagId, roleId: selectedRoleId, isExclude: selectedIsExclude,
-              });
-              setAddRoleOpen(false);
-              setSelectedRoleId('');
+              try {
+                await addRoleMutation.mutateAsync({
+                  flagId, roleId: selectedRoleId, isExclude: selectedIsExclude,
+                });
+                setAddRoleOpen(false);
+                setSelectedRoleId('');
+              } catch (err) {
+                showToast(err instanceof Error ? err.message : tCommon('failed_to_save'), 'error');
+              }
             }}
             sx={{
               textTransform: 'none', fontWeight: 600, borderRadius: 2,
@@ -1204,13 +1209,17 @@ function FlagOverridesPanel({ flagId }: { flagId: string }) {
             variant="contained"
             disabled={!userId || addUserMutation.isPending}
             onClick={async () => {
-              await addUserMutation.mutateAsync({
-                flagId,
-                userId,
-                isExclude: selectedIsExclude,
-              });
-              setAddUserOpen(false);
-              setUserId('');
+              try {
+                await addUserMutation.mutateAsync({
+                  flagId,
+                  userId,
+                  isExclude: selectedIsExclude,
+                });
+                setAddUserOpen(false);
+                setUserId('');
+              } catch (err) {
+                showToast(err instanceof Error ? err.message : tCommon('failed_to_save'), 'error');
+              }
             }}
           >
             {tCommon('add')}
@@ -1281,14 +1290,18 @@ function FlagOverridesPanel({ flagId }: { flagId: string }) {
             variant="contained"
             disabled={!tenantId || upsertTenantMutation.isPending}
             onClick={async () => {
-              await upsertTenantMutation.mutateAsync({
-                flagId,
-                tenantId,
-                isEnabled: tenantEnabled,
-                rolloutPct: tenantRollout,
-              });
-              setAddTenantOpen(false);
-              setTenantId('');
+              try {
+                await upsertTenantMutation.mutateAsync({
+                  flagId,
+                  tenantId,
+                  isEnabled: tenantEnabled,
+                  rolloutPct: tenantRollout,
+                });
+                setAddTenantOpen(false);
+                setTenantId('');
+              } catch (err) {
+                showToast(err instanceof Error ? err.message : tCommon('failed_to_save'), 'error');
+              }
             }}
           >
             {tCommon('add')}
