@@ -3390,7 +3390,10 @@ BEGIN
   END IF;
 
   v_term := pg_catalog.btrim(coalesce(p_query, ''));
-  v_limit := pg_catalog.least(pg_catalog.greatest(coalesce(p_limit, 20), 1), 50);
+  -- Unqualified like every other least/greatest call in this file:
+  -- PostgreSQL 17 handles GREATEST/LEAST at parser level with no
+  -- pg_catalog entry, so the schema-qualified form fails with 42883.
+  v_limit := least(greatest(coalesce(p_limit, 20), 1), 50);
 
   RETURN QUERY
   SELECT u.id, u.first_name, u.last_name, u.email,
