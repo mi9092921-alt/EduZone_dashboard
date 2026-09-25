@@ -322,6 +322,26 @@ BEGIN
   INSERT INTO storage.buckets (id, name, public)
   VALUES ('videos', 'videos', false)
   ON CONFLICT (id) DO UPDATE SET public = false;
+
+  -- Course thumbnails are public marketing content (courses.thumbnail_url is
+  -- read by the student app and the dashboard without a session), so the
+  -- bucket is public like avatars. Writes are restricted twice: the object
+  -- must live under the uploader's own <uid>/ folder AND the uploader must
+  -- pass check_dashboard_access() (trusted server-side role/session gate), so
+  -- student-app users cannot use this bucket as free image hosting. The MIME
+  -- allowlist and 5 MiB limit mirror the avatars bucket posture.
+  INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+  VALUES (
+    'course-thumbnails',
+    'course-thumbnails',
+    true,
+    5242880,
+    ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif']
+  )
+  ON CONFLICT (id) DO UPDATE
+    SET public = true,
+        file_size_limit = 5242880,
+        allowed_mime_types = ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'];
 END $$;
 
 -- No anon/authenticated object DML or SELECT policies are defined for
@@ -380,6 +400,62 @@ CREATE POLICY avatars_delete_own_folder
   USING (
     bucket_id = 'avatars'
     AND split_part(name, '/', 1) = auth.uid()::text
+  );
+
+-- COURSE-THUMBNAILS: same own-folder boundary as avatars, additionally gated
+-- on the dashboard access RPC so only authenticated admin/teacher/super_admin
+-- sessions with a valid (unsuspended, non-deleted, token-current) user row can
+-- write. check_dashboard_access() is SECURITY DEFINER + STABLE and returns
+-- jsonb with an 'allowed' flag; it never trusts client-provided roles.
+-- Public HTTP reads need no SELECT policy (bucket-level public = true), the
+-- SELECT policy exists for the same upsert-check reason documented above.
+DROP POLICY IF EXISTS course_thumbnails_select_own_folder ON storage.objects;
+CREATE POLICY course_thumbnails_select_own_folder
+  ON storage.objects
+  FOR SELECT
+  TO authenticated
+  USING (
+    bucket_id = 'course-thumbnails'
+    AND split_part(name, '/', 1) = auth.uid()::text
+    AND coalesce((public.check_dashboard_access() ->> 'allowed')::boolean, false)
+  );
+
+DROP POLICY IF EXISTS course_thumbnails_insert_own_folder ON storage.objects;
+CREATE POLICY course_thumbnails_insert_own_folder
+  ON storage.objects
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    bucket_id = 'course-thumbnails'
+    AND split_part(name, '/', 1) = auth.uid()::text
+    AND coalesce((public.check_dashboard_access() ->> 'allowed')::boolean, false)
+  );
+
+DROP POLICY IF EXISTS course_thumbnails_update_own_folder ON storage.objects;
+CREATE POLICY course_thumbnails_update_own_folder
+  ON storage.objects
+  FOR UPDATE
+  TO authenticated
+  USING (
+    bucket_id = 'course-thumbnails'
+    AND split_part(name, '/', 1) = auth.uid()::text
+    AND coalesce((public.check_dashboard_access() ->> 'allowed')::boolean, false)
+  )
+  WITH CHECK (
+    bucket_id = 'course-thumbnails'
+    AND split_part(name, '/', 1) = auth.uid()::text
+    AND coalesce((public.check_dashboard_access() ->> 'allowed')::boolean, false)
+  );
+
+DROP POLICY IF EXISTS course_thumbnails_delete_own_folder ON storage.objects;
+CREATE POLICY course_thumbnails_delete_own_folder
+  ON storage.objects
+  FOR DELETE
+  TO authenticated
+  USING (
+    bucket_id = 'course-thumbnails'
+    AND split_part(name, '/', 1) = auth.uid()::text
+    AND coalesce((public.check_dashboard_access() ->> 'allowed')::boolean, false)
   );
 
 -- No anon/authenticated object DML policies are defined for reports/exports.

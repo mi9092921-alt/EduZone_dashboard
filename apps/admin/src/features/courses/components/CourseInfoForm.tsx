@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 
+import { CourseThumbnailField } from './CourseThumbnailField';
 import { DeleteCourseDialog } from './DeleteCourseDialog';
 
 import { useUpdateCourse } from '@/adapters/mutations/courses.mutations';
@@ -210,15 +211,17 @@ export function CourseInfoForm({
               )}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="thumbnail_url">{t('thumbnail_url_label')}</Label>
-              <Input
-                id="thumbnail_url"
-                {...register('thumbnail_url')}
-                error={errors.thumbnail_url?.message}
-                placeholder={t('thumbnail_url_placeholder')}
-              />
-            </div>
+            <Controller
+              name="thumbnail_url"
+              control={control}
+              render={({ field }) => (
+                <CourseThumbnailField
+                  value={field.value ?? ''}
+                  onChange={field.onChange}
+                  error={errors.thumbnail_url?.message}
+                />
+              )}
+            />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">

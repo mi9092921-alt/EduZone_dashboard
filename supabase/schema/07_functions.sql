@@ -3344,8 +3344,9 @@ $$;
 -- callers who hold courses.manage for that tenant with a valid, non-revoked
 -- session (same guard pair as enroll_student). No RLS policy is weakened:
 -- this is the same deliberate SECURITY DEFINER pattern enroll_student uses.
--- Wildcard-safe: substring matching via position() so no LIKE/regex escaping
--- can be injected through p_query.
+-- Wildcard-safe: substring matching via strpos() (identical semantics to
+-- position(needle IN haystack), but callable as a qualified catalog
+-- function) so no LIKE/regex escaping can be injected through p_query.
 -- ============================================================================
 CREATE OR REPLACE FUNCTION public.search_tenant_students(
   p_query text,
@@ -3400,9 +3401,9 @@ BEGIN
     AND u.primary_role = 'student'
     AND (
       v_term = ''
-      OR pg_catalog.position(pg_catalog.lower(v_term) IN pg_catalog.lower(u.first_name)) > 0
-      OR pg_catalog.position(pg_catalog.lower(v_term) IN pg_catalog.lower(u.last_name)) > 0
-      OR pg_catalog.position(pg_catalog.lower(v_term) IN pg_catalog.lower(u.email)) > 0
+      OR pg_catalog.strpos(pg_catalog.lower(u.first_name), pg_catalog.lower(v_term)) > 0
+      OR pg_catalog.strpos(pg_catalog.lower(u.last_name), pg_catalog.lower(v_term)) > 0
+      OR pg_catalog.strpos(pg_catalog.lower(u.email), pg_catalog.lower(v_term)) > 0
     )
   ORDER BY u.first_name, u.last_name, u.created_at
   LIMIT v_limit;
