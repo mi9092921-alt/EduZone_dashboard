@@ -46,9 +46,11 @@ export function CourseThumbnailField({
   const hasImage = value.trim().length > 0 && !previewFailed;
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    // Reset first so picking the same file again still fires onChange.
-    event.target.value = '';
+    // Read the selection BEFORE resetting: assigning value = '' clears the
+    // input's files list, so resetting first would silently lose the file.
+    // Resetting afterwards still allows re-picking the same file again.
     const file = event.target.files?.[0];
+    event.target.value = '';
     if (!file) return;
 
     if (!isAllowedThumbnailType(file)) {
