@@ -926,7 +926,7 @@ VALUES
    '11111111-0000-0000-0000-000000000001',
    'System Maintenance',
    'Scheduled maintenance on Sunday 2AM UTC. Expected downtime: 30 minutes.',
-   'all', 'aaaaaaaa-0000-0000-0000-000000000001')
+   'all', 'aaaaaaaa-0000-0000-0000-000000000002')
 
 ON CONFLICT (id) DO NOTHING;
 
