@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import {
+  deleteCourseThumbnailByUrl,
   isAllowedThumbnailType,
   isWithinThumbnailSizeLimit,
   uploadCourseThumbnail,
@@ -42,8 +43,19 @@ export function CourseThumbnailField({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [previewFailed, setPreviewFailed] = useState(false);
+  // URLs uploaded during this component session, not yet saved to the course.
+  // Only these are safe to delete the moment they are superseded — the last
+  // SAVED thumbnail (courses.thumbnail_url) stays untouched until the form
+  // update commits (see CourseInfoForm.onSubmit).
+  const sessionUploadsRef = useRef<Set<string>>(new Set());
 
   const hasImage = value.trim().length > 0 && !previewFailed;
+
+  const cleanupSupersededUpload = (previousUrl: string) => {
+    if (!previousUrl || !sessionUploadsRef.current.has(previousUrl)) return;
+    sessionUploadsRef.current.delete(previousUrl);
+    if (user?.id) void deleteCourseThumbnailByUrl(previousUrl, user.id);
+  };
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     // Read the selection BEFORE resetting: assigning value = '' clears the
@@ -70,7 +82,9 @@ export function CourseThumbnailField({
     try {
       const url = await uploadCourseThumbnail(file, user.id);
       setPreviewFailed(false);
+      cleanupSupersededUpload(value);
       onChange(url);
+      sessionUploadsRef.current.add(url);
       showToast(t('thumbnail_upload_success'), 'success');
     } catch (err: unknown) {
       showToast(err instanceof Error ? err.message : t('failed_to_save'), 'error');
@@ -141,7 +155,10 @@ export function CourseThumbnailField({
                 type="button"
                 variant="ghost"
                 disabled={disabled || isUploading}
-                onClick={() => onChange('')}
+                onClick={() => {
+                  cleanupSupersededUpload(value);
+                  onChange('');
+                }}
                 className="text-xs font-bold uppercase tracking-wider text-destructive hover:bg-destructive/10"
               >
                 <DeleteOutline className="me-2 h-4 w-4" />

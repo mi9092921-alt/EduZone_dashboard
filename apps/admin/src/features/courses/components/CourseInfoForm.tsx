@@ -20,6 +20,7 @@ import {
   useCoursePrerequisites,
   useCoursePrerequisiteOptions,
 } from '@/adapters/queries/courses.queries';
+import { useAuthUser } from '@/adapters/stores/auth.store';
 import { useToast } from '@/adapters/stores/toast.store';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -29,6 +30,7 @@ import { Switch } from '@/components/ui/Switch';
 import { updateCourseSchema, type UpdateCourseFormInput } from '@/domain/schemas/course.schema';
 import type { CourseDetail } from '@/domain/types/course.types';
 import { useRouter } from '@/i18n/routing';
+import { deleteCourseThumbnailByUrl } from '@/infrastructure/repos/course-thumbnails.storage';
 import { cn } from '@/lib/utils';
 
 interface CourseInfoFormProps {
@@ -46,6 +48,7 @@ export function CourseInfoForm({
   const saveObjectivesMutation = useSaveLearningObjectives();
   const savePrerequisitesMutation = useSavePrerequisites();
   const { showToast } = useToast();
+  const user = useAuthUser();
 
   const { data: dbObjectives } = useCourseLearningObjectives(course.id);
   const { data: dbPrerequisites } = useCoursePrerequisites(course.id);
@@ -158,6 +161,15 @@ export function CourseInfoForm({
 
     try {
       await updateMutation.mutateAsync({ id: course.id, data: payload });
+
+      // The old thumbnail is only deleted AFTER the course update commits —
+      // deleting earlier would break the persisted URL if the save failed.
+      // Non-owned/external URLs are a no-op inside the storage helper.
+      const previousThumbnail = course.thumbnail_url;
+      const nextThumbnail = payload.thumbnail_url ?? null;
+      if (previousThumbnail && previousThumbnail !== nextThumbnail && user?.id) {
+        void deleteCourseThumbnailByUrl(previousThumbnail, user.id);
+      }
 
       const cleanObjectives = objectives.map((o) => o.trim()).filter(Boolean);
       await saveObjectivesMutation.mutateAsync({

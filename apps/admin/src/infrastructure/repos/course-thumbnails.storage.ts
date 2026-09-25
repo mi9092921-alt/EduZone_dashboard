@@ -66,3 +66,47 @@ export async function uploadCourseThumbnail(file: File, userId: string): Promise
   const { data } = supabase.storage.from(THUMBNAIL_BUCKET).getPublicUrl(path);
   return data.publicUrl;
 }
+
+/**
+ * Extracts the `<uid>/<file>` object path from a course-thumbnails public
+ * URL, or null when the URL does not point at this bucket.
+ */
+export function extractThumbnailObjectPath(url: string): string | null {
+  const marker = `/storage/v1/object/public/${THUMBNAIL_BUCKET}/`;
+  const markerIndex = url.indexOf(marker);
+  if (markerIndex === -1) return null;
+
+  const objectPath = url.slice(markerIndex + marker.length).split(/[?#]/)[0];
+  if (!objectPath || objectPath.endsWith('/')) return null;
+  return objectPath;
+}
+
+/**
+ * Deletes a previously uploaded thumbnail object given its public URL.
+ * No-op (returns false, never throws) when the URL is not one of this
+ * bucket's public URLs, or when the object lives under a different user's
+ * `<uid>/` folder — the storage DELETE policy only permits removing objects
+ * the caller owns, so cross-owner and external URLs are deliberately left
+ * untouched. Callers treat a false return as "nothing to clean up".
+ */
+export async function deleteCourseThumbnailByUrl(
+  url: string,
+  userId: string,
+): Promise<boolean> {
+  const objectPath = extractThumbnailObjectPath(url);
+  if (!objectPath) return false;
+
+  const ownerSegment = objectPath.split('/')[0];
+  if (ownerSegment !== userId) return false;
+
+  const supabase = createBrowserClient();
+  const { error } = await supabase.storage.from(THUMBNAIL_BUCKET).remove([objectPath]);
+  if (error) {
+    // Orphan cleanup is best-effort housekeeping: a failed delete must not
+    // surface as a course-save failure. The object remains in the bucket
+    // and the raw cause is logged here.
+    console.warn('[course-thumbnails] object delete failed:', error.message);
+    return false;
+  }
+  return true;
+}

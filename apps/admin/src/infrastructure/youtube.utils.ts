@@ -11,6 +11,8 @@
  * (server-only): it holds `YOUTUBE_API_KEY` via `getServerEnv()`.
  */
 
+import { YOUTUBE_VIDEO_ID_REGEX } from '@/domain/video.utils';
+
 export interface YouTubeVideoMetadata {
   id: string;
   title: string;
@@ -20,7 +22,8 @@ export interface YouTubeVideoMetadata {
 
 /**
  * Extracts YouTube Video ID from various URL formats.
- * Supported: youtube.com/watch?v=ID, youtu.be/ID, embed/ID, etc.
+ * Supported: youtube.com/watch?v=ID, youtu.be/ID, embed/ID, shorts/ID, live/ID, etc.
+ * The regex lives in `@/domain/video.utils` so both parsers stay in sync.
  */
 export function extractYoutubeId(urlOrId: string): string | null {
   if (!urlOrId) return null;
@@ -30,9 +33,7 @@ export function extractYoutubeId(urlOrId: string): string | null {
     return urlOrId;
   }
 
-  const regex =
-    /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
-  const match = urlOrId.match(regex);
+  const match = urlOrId.match(YOUTUBE_VIDEO_ID_REGEX);
   return match ? (match[1] ?? null) : null;
 }
 

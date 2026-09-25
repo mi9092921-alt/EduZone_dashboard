@@ -6,6 +6,16 @@ export interface ParsedVideo {
 }
 
 /**
+ * Single source of truth for extracting a YouTube video id from any current
+ * URL shape: watch?v=ID, youtu.be/ID, /embed/ID, /v/ID, /shorts/ID, /live/ID.
+ * `extractYoutubeId` (infrastructure/youtube.utils) reuses this so the two
+ * parsers cannot drift — a miss here means a raw https:// URL reaches the
+ * `lesson_contents_video_path_relative_only` DB check and the insert fails.
+ */
+export const YOUTUBE_VIDEO_ID_REGEX =
+  /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:shorts|live|v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+
+/**
  * Parses a full URL into a provider and a relative video path.
  * If it's already a clean ID/path, tries to guess or defaults to youtube.
  */
@@ -16,9 +26,7 @@ export function parseVideoUrl(url: string): ParsedVideo {
 
   // YouTube
   if (cleanUrl.includes('youtube.com') || cleanUrl.includes('youtu.be')) {
-    const regex =
-      /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
-    const match = cleanUrl.match(regex);
+    const match = cleanUrl.match(YOUTUBE_VIDEO_ID_REGEX);
     return {
       provider: 'youtube',
       video_path: match && match[1] ? match[1] : cleanUrl,
