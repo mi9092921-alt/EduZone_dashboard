@@ -1,8 +1,11 @@
 # EduZone Dashboard — Production Architecture Execution Plan
+
 ## Execution Model: شوف → افحص → فكّر → عدّل → تأكد
 
 Repository:
 https://github.com/mi9092921-alt/EduZone_dashboard
+
+> **Document status:** This is an execution roadmap. Milestone markers and historical report links are not current proof of implementation, CI success, deployment, security, or production readiness. Verify every referenced path and command against the current repository before executing it.
 
 ## 1. الهدف النهائي
 
@@ -21,7 +24,7 @@ src/
 └── container.ts
 ```
 
-كما توجد `application/ports` و`application/authorization` وطبقات Supabase وRepositories بالفعل. لذلك المهمة هي **refactoring + enforcement + verification**، وليست إنشاء Architecture جديدة من الصفر.  
+كما توجد `application/ports` و`application/authorization` وطبقات Supabase وRepositories بالفعل. لذلك المهمة هي **refactoring + enforcement + verification**، وليست إنشاء Architecture جديدة من الصفر.
 
 ---
 
@@ -85,7 +88,7 @@ src/
 - استخدام mutable global request state.
 - تعديل قاعدة البيانات دون فحص المستودعين المشتركين وتأثير التغيير على `EduZone_App`.
 
-قاعدة البيانات مشتركة بين التطبيق والـDashboard، وتعليمات المشروع تنص صراحة على أن أي تغيير فيها يجب فحص استخداماته في المستودعين معًا. 
+قاعدة البيانات مشتركة بين التطبيق والـDashboard، وتعليمات المشروع تنص صراحة على أن أي تغيير فيها يجب فحص استخداماته في المستودعين معًا.
 
 ---
 
@@ -223,7 +226,7 @@ DEPENDENCY_GRAPH
 - lint غير سليم
 - build لا ينتهي بنجاح كامل
 
-وهذا P0 حقيقي. 
+وهذا P0 حقيقي.
 
 ## شوف
 
@@ -253,7 +256,7 @@ TOOLING
 CONFIGURATION
 ```
 
-Production plan الحالي يذكر وجود network calls داخل unit tests وVitest worker timeouts ووجود مشكلة في lint integration. 
+Production plan الحالي يذكر وجود network calls داخل unit tests وVitest worker timeouts ووجود مشكلة في lint integration.
 
 ### فكّر
 
@@ -293,7 +296,7 @@ build = PASS
 
 # 6. P0 — Configuration & Secret Boundary
 
-الـProduction plan الحالي يعتبر credentials المحلية Risk/P0، حتى لو كانت `.gitignored`. يجب التعامل معها على أنها exposed إلى أن يتم إثبات العكس. 
+الـProduction plan الحالي يعتبر credentials المحلية Risk/P0، حتى لو كانت `.gitignored`. يجب التعامل معها على أنها exposed إلى أن يتم إثبات العكس.
 
 ## شوف
 
@@ -391,7 +394,7 @@ actorId: '' as string,
 tenantId: '' as string,
 ```
 
-أي أن هناك mutable global state للـrequest context داخل container. 
+أي أن هناك mutable global state للـrequest context داخل container.
 
 ## شوف
 
@@ -447,7 +450,7 @@ Request B → Tenant B
 
 هذه واحدة من أخطر نقاط المشروع.
 
-في `admin.actions.ts` يوجد حاليًا إنشاء مباشر لـ`service_role` client داخل Server Action، مع Authorization وDB operations في الملف نفسه. 
+في `admin.actions.ts` يوجد حاليًا إنشاء مباشر لـ`service_role` client داخل Server Action، مع Authorization وDB operations في الملف نفسه.
 
 ## شوف
 
@@ -517,7 +520,7 @@ Grep يجب أن يثبت أن استعمال service-role محصور في ال�
 
 # 9. P0 — Authorization Consolidation
 
-هناك بالفعل `application/authorization/policy.ts`، لكنه يمثل إصلاحًا جزئيًا فقط، والملف نفسه يوضح أن الـcentralized authorization النهائي لم يُنفذ بعد. 
+هناك بالفعل `application/authorization/policy.ts`، لكنه يمثل إصلاحًا جزئيًا فقط، والملف نفسه يوضح أن الـcentralized authorization النهائي لم يُنفذ بعد.
 
 ## شوف
 
@@ -611,7 +614,7 @@ foreign resource
 
 هذه ليست مرحلة Documentation.
 
-Production plan الحالي يصنفها P0 لأن RLS موجود، لكن لا يوجد executable attack matrix يثبت العزل عبر كل المسارات. 
+Production plan الحالي يصنفها P0 لأن RLS موجود، لكن لا يوجد executable attack matrix يثبت العزل عبر كل المسارات.
 
 ## شوف
 
@@ -698,7 +701,7 @@ A cannot export B
 
 # 11. P0 — Route / Server Action Thin Boundary
 
-المشروع الحالي يحتوي Server Actions كبيرة، وأبرز مثال `admin.actions.ts` بحجم يقارب 30 KB. 
+المشروع الحالي يحتوي Server Actions كبيرة، وأبرز مثال `admin.actions.ts` بحجم يقارب 30 KB.
 
 ## الهدف
 
@@ -770,7 +773,7 @@ large DB orchestration
 
 # 12. P1 — Repository / Port Boundary
 
-المشروع يحتوي أصلًا على `application/ports` و`infrastructure/repos`.  
+المشروع يحتوي أصلًا على `application/ports` و`infrastructure/repos`.
 
 لذلك لا ننشئها من الصفر.
 
@@ -839,7 +842,7 @@ database row casts
 Partial<DB types>
 ```
 
-Production plan بالفعل يسجل كثرة `any` كخطر P2-SEC-007. 
+Production plan بالفعل يسجل كثرة `any` كخطر P2-SEC-007.
 
 ## عدّل
 
@@ -1011,7 +1014,7 @@ partial failure
 
 # 17. P1 — Audit & Observability ✅ DONE (M13 — 2026-09-03, see project_documents/milestone_reports/M13_audit_observability_report.md)
 
-المشروع لديه observability وaudit infrastructure بالفعل، لكن Production evidence غير مكتمل. 
+المشروع لديه observability وaudit infrastructure بالفعل، لكن Production evidence غير مكتمل.
 
 ## شوف
 
@@ -1105,9 +1108,9 @@ routes ↛ business logic
 
 # 19. P1 — CI/CD Production Gates ✅ DONE (M15 — 2026-09-03, see project_documents/milestone_reports/M15_ci_cd_production_gates_report.md — Architecture Check صارت بوابة صريحة + parity على main؛ بوابة E2E مُعرَّفة وخاملة تنتظر `vars.E2E_ENABLED`، وRLS/Integration/Smoke متابَعة بفقرة §7 من التقرير)
 
-الـCI الحالي يقوم بـsecret scan وtypecheck وlint وVitest وbuild وDB lint، لكنه لا يثبت E2E أو integration/RLS/migration وغيرها. 
+الـCI الحالي يقوم بـsecret scan وtypecheck وlint وVitest وbuild وDB lint، لكنه لا يثبت E2E أو integration/RLS/migration وغيرها.
 
-كما أن Production plan يسجل tool/version drift في deploy pipeline. 
+كما أن Production plan يسجل tool/version drift في deploy pipeline.
 
 ## الهدف
 
@@ -1147,9 +1150,9 @@ Deployment Smoke
 
 هذه المرحلة يجب التعامل معها بحذر لأنها **ليست Dashboard-only**.
 
-Production plan الحالي يحدد مشكلة migration history وrollback كـP0-DB-001. 
+Production plan الحالي يحدد مشكلة migration history وrollback كـP0-DB-001.
 
-وفي المقابل، تعليمات `agent_prompt_eduzone_db.md` الحالية تقول صراحة إن قاعدة البيانات المشتركة ما زالت في تطوير نشط، وتمنع إنشاء migrations/patches بالطريقة الحالية، وتطلب التعامل مع `supabase/schema/` كمرجع مباشر إلى أن يتم تغيير هذه السياسة. 
+وفي المقابل، تعليمات `agent_prompt_eduzone_db.md` الحالية تقول صراحة إن قاعدة البيانات المشتركة ما زالت في تطوير نشط، وتمنع إنشاء migrations/patches بالطريقة الحالية، وتطلب التعامل مع `supabase/schema/` كمرجع مباشر إلى أن يتم تغيير هذه السياسة.
 
 لذلك لا يجب أن يخلط Agent Architecture بين المسارين.
 
@@ -1203,7 +1206,7 @@ search
 exports
 ```
 
-Production plan الحالي يعتبر هذه المناطق مرشحة للمخاطر لكنه يؤكد أنها غير مقاسة بعد. 
+Production plan الحالي يعتبر هذه المناطق مرشحة للمخاطر لكنه يؤكد أنها غير مقاسة بعد.
 
 ## عدّل
 
@@ -1227,7 +1230,7 @@ bounded exports
 # 22. P2 — External Services
 
 أي integrations خارجية:  
-مرحلة محذوفة حاليا 
+مرحلة محذوفة حاليا
 
 ---
 
@@ -1235,7 +1238,7 @@ bounded exports
 
 بعد استقرار Architecture، وليس قبلها.
 
-الـrepository يحتوي Storybook/axe/Cypress/Playwright، لكن هذه الأدوات ليست release evidence حاليًا. 
+الـrepository يحتوي Storybook/axe/Cypress/Playwright، لكن هذه الأدوات ليست release evidence حاليًا.
 
 افحص:
 

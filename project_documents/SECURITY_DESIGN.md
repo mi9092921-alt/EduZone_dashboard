@@ -1,13 +1,13 @@
 # EduZone — Security Design Document
 
-> **Version:** 1.0 | **Date:** 2026-03-11 | **Status:** APPROVED  
-> **Classification:** CONFIDENTIAL — Internal Engineering Only
+> **Status:** Security design reference, reviewed 2026-09-24.
+> The controls below mix implemented source patterns and release requirements; this document is not a security certification or proof of deployed configuration.
 
 ---
 
 ## 1. Security Philosophy
 
-EduZone Admin Dashboard follows a **Zero-Trust** security model: every request is authenticated, authorised, and validated — regardless of origin. No implicit trust is granted to any component, user, or network.
+The intended security model is **zero trust**: requests should be authenticated, authorized, and validated regardless of origin. The current source implements some of these controls, while the complete behavior still requires runtime and deployment verification.
 
 **Core Principles:**
 
@@ -29,7 +29,7 @@ User enters email + password
     ▼
 Supabase Auth → validates credentials
     │
-    ▼ (if MFA enrolled — required for admin/super_admin)
+    ▼ (if MFA is configured for the account and environment)
 TOTP verification
     │
     ▼
@@ -56,11 +56,11 @@ Dashboard renders (or redirect to appropriate error screen)
 
 ### 2.3 MFA Requirements
 
-| Role          | MFA Status                                |
-| ------------- | ----------------------------------------- |
-| `super_admin` | **Enforced** — cannot access without TOTP |
-| `admin`       | **Enforced** — cannot access without TOTP |
-| `teacher`     | Optional — can enrol via profile settings |
+| Role          | MFA Status                                                                             |
+| ------------- | -------------------------------------------------------------------------------------- |
+| `super_admin` | Required by the target policy when MFA is enabled; live enforcement is unverified here |
+| `admin`       | Required by the target policy when MFA is enabled; live enforcement is unverified here |
+| `teacher`     | Optional — can enrol via profile settings                                              |
 
 ### 2.4 Session Management
 
@@ -180,7 +180,7 @@ CREATE POLICY audit_append_only ON activity_logs
 
 ## 5. Audit Trail (Hash-Chain Integrity)
 
-Every write operation generates an immutable audit log entry. Entries are cryptographically chained:
+The design intends to record sensitive writes in an append-oriented, hash-chained audit trail. Source presence does not prove that every write is covered or that deployed records are immutable:
 
 ```sql
 -- Each log entry includes a hash of the previous entry

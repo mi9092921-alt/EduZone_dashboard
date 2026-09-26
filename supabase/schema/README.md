@@ -1,88 +1,47 @@
 # Canonical Database Schema — EduZone
 
-**Baseline:** `main` @ `9f1a31659d929fcf5bbcdec58429c146021b777d`
+**Reviewed:** 2026-09-24
 
-## 1. Purpose
+## Purpose
 
-This directory is the canonical development-stage SQL source represented by `supabase/config.toml`.
+This directory is the canonical development-stage SQL source represented by `supabase/config.toml`. Do not create duplicate active definitions elsewhere.
 
-The schema is intentionally split into ordered layers so that ownership is explicit and reviewable.
+## File ownership
 
-## 2. File ownership
+| File                    | Ownership                                                                  |
+| ----------------------- | -------------------------------------------------------------------------- |
+| `01_extensions.sql`     | extensions and schemas                                                     |
+| `02_types.sql`          | types and domains                                                          |
+| `03_tables.sql`         | table definitions                                                          |
+| `04_constraints.sql`    | constraints                                                                |
+| `05_indexes.sql`        | indexes                                                                    |
+| `06_views.sql`          | views and materialized views                                               |
+| `07_functions.sql`      | functions and procedures                                                   |
+| `08_triggers.sql`       | triggers                                                                   |
+| `09_rls.sql`            | RLS enablement and policies                                                |
+| `10_permissions.sql`    | grants, revokes, and default privileges                                    |
+| `11_seed_reference.sql` | reference/bootstrap data used by the repository policy                     |
+| `12_seed_qa_demo.sql`   | disposable QA/E2E data; not in the production-oriented `schema_paths` list |
+| `VALIDATION.sql`        | validation queries; not application DDL                                    |
 
-| File | Primary ownership |
-|---|---|
-| `01_extensions.sql` | extensions and schemas |
-| `02_types.sql` | types/domains |
-| `03_tables.sql` | table definitions |
-| `04_constraints.sql` | PK/FK/UNIQUE/CHECK/EXCLUDE constraints |
-| `05_indexes.sql` | indexes |
-| `06_views.sql` | views/materialized views |
-| `07_functions.sql` | functions/procedures |
-| `08_triggers.sql` | triggers |
-| `09_rls.sql` | RLS enablement and policies |
-| `10_permissions.sql` | GRANT/REVOKE/default privileges |
-| `11_seed_reference.sql` | seed/reference SQL represented by the current repository policy |
-| `VALIDATION.sql` | validation queries; not application DDL |
-
-Do not create duplicate active definitions in another SQL file.
-
-## 3. Dependency order
-
-The configured order is:
+## Configured order
 
 ```text
 01 → 02 → 03 → 04 → 05 → 07 → 06 → 08 → 09 → 10 → 11
 ```
 
-`VALIDATION.sql` is a verification artifact, not another schema layer.
+The order above is copied from `supabase/config.toml`; it is not inferred from filename sorting. The deployment helpers may apply the QA seed explicitly for a disposable test database.
 
-## 4. Security expectations
+## Security and shared-database rules
 
-For security-sensitive SQL:
+Keep RLS, controlled SECURITY DEFINER `search_path`, least-privilege function privileges, and trusted tenant checks intact. The database is documented as shared with `EduZone_App`; trace consumers in both repositories before changing a shared object. Source inspection is not proof that deployed policies behave correctly.
 
-```text
-RLS must remain enforced as intended
-SECURITY DEFINER functions must use a controlled search_path
-function EXECUTE privileges must remain least-privilege
-tenant scope must be checked from trusted context
-```
-
-A source-level inspection is not enough to claim that the deployed policies behave correctly.
-
-## 5. Shared-database rule
-
-The schema is consumed by both:
+## Change procedure
 
 ```text
-EduZone_dashboard
-EduZone_App
+identify the owner file → trace callers → make the smallest change
+→ run local/schema and targeted security checks → search for dangling references
+→ review the diff
 ```
 
-Before renaming/removing/changing an RPC or shared object, trace consumers in both repositories.
-
-## 6. Change procedure
-
-```text
-Check
-→ identify exact owner file
-→ inspect all callers
-→ change the canonical source
-→ run schema validation/reset as appropriate
-→ run targeted application/security tests
-→ search for dangling references
-→ review diff
-```
-
-## 7. Status language
-
-Use these terms precisely:
-
-```text
-IMPLEMENTED      = source/configuration is present
-VERIFIED         = executable evidence passed
-UNVERIFIED       = not tested in the current assessment
-PRODUCTION READY = release gates and operational evidence are complete
-```
-
-Do not use `PRODUCTION READY` merely because all schema files exist.
+Use `IMPLEMENTED` for source/configuration, `VERIFIED` for executable evidence, and `UNVERIFIED` when the relevant runtime or external state was not checked.

@@ -67,13 +67,28 @@ export class ConflictError extends AppError {
 export class InfrastructureError extends AppError {
   public readonly name = 'InfrastructureError' as const;
   /**
+   * Raw cause text, attached non-enumerably by the constructor when
+   * `internalDetail` is passed. Declared here only for type-safe reads by
+   * server-side telemetry (src/instrumentation.ts); it is intentionally
+   * invisible to `JSON.stringify`/`toJSON` so it can never reach a client.
+   */
+  public declare readonly internalDetail?: string;
+  /**
    * 500 — database/RPC/network/external-service failure.
    * NEVER pass raw DB error text as `message`; callers receive the generic
    * message while the raw cause goes to server logs via `internalDetail`.
    */
   constructor(message = 'An unexpected error occurred. Please try again.', internalDetail?: string) {
     super('INTERNAL_ERROR', message, undefined);
-    if (internalDetail) console.error('[InfrastructureError]', internalDetail);
+    if (internalDetail) {
+      console.error('[InfrastructureError]', internalDetail);
+      Object.defineProperty(this, 'internalDetail', {
+        value: internalDetail,
+        enumerable: false,
+        writable: false,
+        configurable: false,
+      });
+    }
     Object.setPrototypeOf(this, InfrastructureError.prototype);
   }
 }

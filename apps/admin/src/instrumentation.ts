@@ -39,4 +39,32 @@ export async function register() {
   }
 }
 
-export const onRequestError = Sentry.captureRequestError;
+/**
+ * The M10 taxonomy masks raw DB/infra causes from clients (the message stays
+ * generic — "An unexpected error occurred. Please try again."), and the
+ * unmasked text rides along on the error instance as a non-enumerable
+ * `internalDetail` (see domain/errors/taxonomy.ts). Enrich the captured
+ * request error with it so the masked 500s — previously opaque 18-event
+ * Sentry issues — stay diagnosable without ever leaking the detail to a
+ * client response.
+ */
+export function onRequestError(
+  error: unknown,
+  request: Parameters<typeof Sentry.captureRequestError>[1],
+  context: Parameters<typeof Sentry.captureRequestError>[2],
+): void {
+  const detail =
+    typeof error === 'object' && error !== null && 'internalDetail' in error
+      ? (error as { internalDetail?: unknown }).internalDetail
+      : undefined;
+
+  if (typeof detail === 'string' && detail.length > 0) {
+    Sentry.withScope((scope) => {
+      scope.setExtra('internal_detail', detail);
+      Sentry.captureRequestError(error, request, context);
+    });
+    return;
+  }
+
+  Sentry.captureRequestError(error, request, context);
+}

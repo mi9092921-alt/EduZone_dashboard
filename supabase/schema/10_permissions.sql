@@ -198,7 +198,13 @@ GRANT SELECT ON public.mv_course_stats TO authenticated, service_role, anon;
 GRANT SELECT ON private.mv_course_stats TO authenticated, anon;
 
 -- Mutation grants (RLS still controls who can do what)
-GRANT INSERT, DELETE ON public.users                             TO authenticated;
+-- HARDENING-2026-09-25: DELETE on public.users revoked from authenticated.
+-- trg_prevent_physical_delete_users blocks every client-issued physical
+-- delete unconditionally, so this grant could never succeed — it is removed
+-- to keep the grant surface truthful. Soft delete (deleted_at UPDATE) and
+-- admin account lifecycle RPCs are unaffected.
+GRANT INSERT ON public.users                                     TO authenticated;
+REVOKE DELETE ON public.users                                    FROM authenticated;
 GRANT INSERT, UPDATE, DELETE ON public.courses                   TO authenticated;
 GRANT INSERT, UPDATE, DELETE ON public.course_prerequisites      TO authenticated;
 GRANT INSERT, UPDATE, DELETE ON public.course_learning_objectives TO authenticated;
@@ -291,9 +297,9 @@ REVOKE ALL ON public.push_deliveries FROM anon, authenticated, public;
 -- authenticated clients may only write/delete their own <uid>/... objects.
 DO $$
 BEGIN
-  INSERT INTO storage.buckets (id, name, public)
-  VALUES ('avatars', 'avatars', true)
-  ON CONFLICT (id) DO UPDATE SET public = true;
+  INSERT INTO storage.buckets (id, name, public, file_size_limit)
+  VALUES ('avatars', 'avatars', true, 5242880)
+  ON CONFLICT (id) DO UPDATE SET public = true, file_size_limit = 5242880;
 
   INSERT INTO storage.buckets (id, name, public)
   VALUES ('reports', 'reports', false)
@@ -316,6 +322,26 @@ BEGIN
   INSERT INTO storage.buckets (id, name, public)
   VALUES ('videos', 'videos', false)
   ON CONFLICT (id) DO UPDATE SET public = false;
+
+  -- Course thumbnails are public marketing content (courses.thumbnail_url is
+  -- read by the student app and the dashboard without a session), so the
+  -- bucket is public like avatars. Writes are restricted twice: the object
+  -- must live under the uploader's own <uid>/ folder AND the uploader must
+  -- pass check_dashboard_access() (trusted server-side role/session gate), so
+  -- student-app users cannot use this bucket as free image hosting. The MIME
+  -- allowlist and 5 MiB limit mirror the avatars bucket posture.
+  INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+  VALUES (
+    'course-thumbnails',
+    'course-thumbnails',
+    true,
+    5242880,
+    ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif']
+  )
+  ON CONFLICT (id) DO UPDATE
+    SET public = true,
+        file_size_limit = 5242880,
+        allowed_mime_types = ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'];
 END $$;
 
 -- No anon/authenticated object DML or SELECT policies are defined for
@@ -374,6 +400,62 @@ CREATE POLICY avatars_delete_own_folder
   USING (
     bucket_id = 'avatars'
     AND split_part(name, '/', 1) = auth.uid()::text
+  );
+
+-- COURSE-THUMBNAILS: same own-folder boundary as avatars, additionally gated
+-- on the dashboard access RPC so only authenticated admin/teacher/super_admin
+-- sessions with a valid (unsuspended, non-deleted, token-current) user row can
+-- write. check_dashboard_access() is SECURITY DEFINER + STABLE and returns
+-- jsonb with an 'allowed' flag; it never trusts client-provided roles.
+-- Public HTTP reads need no SELECT policy (bucket-level public = true), the
+-- SELECT policy exists for the same upsert-check reason documented above.
+DROP POLICY IF EXISTS course_thumbnails_select_own_folder ON storage.objects;
+CREATE POLICY course_thumbnails_select_own_folder
+  ON storage.objects
+  FOR SELECT
+  TO authenticated
+  USING (
+    bucket_id = 'course-thumbnails'
+    AND split_part(name, '/', 1) = auth.uid()::text
+    AND coalesce((public.check_dashboard_access() ->> 'allowed')::boolean, false)
+  );
+
+DROP POLICY IF EXISTS course_thumbnails_insert_own_folder ON storage.objects;
+CREATE POLICY course_thumbnails_insert_own_folder
+  ON storage.objects
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    bucket_id = 'course-thumbnails'
+    AND split_part(name, '/', 1) = auth.uid()::text
+    AND coalesce((public.check_dashboard_access() ->> 'allowed')::boolean, false)
+  );
+
+DROP POLICY IF EXISTS course_thumbnails_update_own_folder ON storage.objects;
+CREATE POLICY course_thumbnails_update_own_folder
+  ON storage.objects
+  FOR UPDATE
+  TO authenticated
+  USING (
+    bucket_id = 'course-thumbnails'
+    AND split_part(name, '/', 1) = auth.uid()::text
+    AND coalesce((public.check_dashboard_access() ->> 'allowed')::boolean, false)
+  )
+  WITH CHECK (
+    bucket_id = 'course-thumbnails'
+    AND split_part(name, '/', 1) = auth.uid()::text
+    AND coalesce((public.check_dashboard_access() ->> 'allowed')::boolean, false)
+  );
+
+DROP POLICY IF EXISTS course_thumbnails_delete_own_folder ON storage.objects;
+CREATE POLICY course_thumbnails_delete_own_folder
+  ON storage.objects
+  FOR DELETE
+  TO authenticated
+  USING (
+    bucket_id = 'course-thumbnails'
+    AND split_part(name, '/', 1) = auth.uid()::text
+    AND coalesce((public.check_dashboard_access() ->> 'allowed')::boolean, false)
   );
 
 -- No anon/authenticated object DML policies are defined for reports/exports.
@@ -977,6 +1059,9 @@ GRANT EXECUTE ON FUNCTION public.admin_get_job_counts_tenant(uuid)
 --      public.vw_student_progress_timeline, public.vw_daily_revenue) — a cheap
 --      resource-exhaustion DoS. Locked to service_role only (the cron/worker
 --      path uses private.refresh_all_materialized_views, already locked).
+--      2026-09-25: the two public matviews were removed entirely (zero
+--      consumers — see 06_views.sql); this function now refreshes only
+--      private.mv_course_stats and remains service_role-only.
 --
 --   2. check_and_increment_rate_limit(...) — SECURITY DEFINER, no guard: any
 --      caller could insert into public.rate_limits with an ARBITRARY
@@ -1198,6 +1283,27 @@ GRANT EXECUTE ON FUNCTION public.delete_notification(uuid)
 REVOKE EXECUTE ON FUNCTION public.enroll_student(uuid, uuid, timestamptz)
   FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.enroll_student(uuid, uuid, timestamptz)
+  TO authenticated, service_role;
+
+-- TEACHER-STUDENT-DIRECTORY (2026-09-25): body-guarded by
+-- validate_user_session() + courses.manage + staff-role check (see
+-- search_tenant_students in 07_functions.sql). Students get no directory.
+REVOKE EXECUTE ON FUNCTION public.search_tenant_students(text, integer)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.search_tenant_students(text, integer)
+  TO authenticated, service_role;
+
+-- EXPORT-REPORT-BACKEND (2026-09-25): guarded read path for the
+-- export-report Edge Function over private.* analytics aggregates
+-- (validate_user_session + reports.read + tenant pin inside the body).
+REVOKE EXECUTE ON FUNCTION public.admin_export_user_stats(uuid)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.admin_export_user_stats(uuid)
+  TO authenticated, service_role;
+
+REVOKE EXECUTE ON FUNCTION public.admin_export_daily_activity(uuid)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.admin_export_daily_activity(uuid)
   TO authenticated, service_role;
 
 REVOKE EXECUTE ON FUNCTION public.revoke_enrollment(uuid, uuid, text)

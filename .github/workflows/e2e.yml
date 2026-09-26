@@ -168,6 +168,79 @@ jobs:
             psql "$DB_URL" -v ON_ERROR_STOP=1 -f "$f"
           done
 
+          # PostgREST caches the schema and reloads it only on an explicit
+          # notification. `supabase db reset` fires one for the CLI's own
+          # apply, but the psql loop above runs afterwards with no
+          # notification, so functions created/changed by that apply can
+          # stay invisible to PostgREST (404/SQLSTATE 42883 on RPC calls
+          # to them -- e.g. search_tenant_students, added 2026-09-25).
+          # This is the same closing notification the repo's own deploy
+          # scripts (scripts/exec_sql.mjs, scripts/update_db_functions.mjs)
+          # always send after applying SQL.
+          echo "Reloading PostgREST schema cache ..."
+          psql "$DB_URL" -c "NOTIFY pgrst, 'reload schema';"
+          sleep 5
+
+          # Provision the LOCAL-ONLY super admin the E2E specs sign in as
+          # (settings.spec.ts System Lock flow, auth.spec.ts). The canonical
+          # seed no longer plants a super_admin anywhere: HARDENING-2026-09-25
+          # removed the seeded top-level credential from
+          # schema/11_seed_reference.sql and real deployments bootstrap the
+          # first super admin manually (see the commented template there).
+          # This throwaway CI stack still needs the account to exercise
+          # super-admin-only flows, so it is recreated here with the shared
+          # QA bcrypt hash (schema/12_seed_qa_demo.sql, plaintext documented
+          # in apps/admin/tests/e2e/auth.setup.ts) and never leaves the
+          # container.
+          psql "$DB_URL" <<'SQL'
+          INSERT INTO auth.users (
+            id, instance_id, email, encrypted_password,
+            email_confirmed_at, created_at, updated_at,
+            role, aud, raw_app_meta_data, raw_user_meta_data,
+            is_super_admin, confirmation_token, recovery_token,
+            email_change_token_new, email_change
+          ) VALUES (
+            'aaaaaaaa-0000-0000-0000-000000000001',
+            '00000000-0000-0000-0000-000000000000',
+            'super_admin@eduzone-test.com',
+            '$2b$10$p/1N9e/qZaxxvUi6UGUpMO.7EekV0yLQ/4NLdr8ac3D4cfVy7mPJW',
+            now(), now(), now(), 'authenticated', 'authenticated',
+            '{"provider":"email","providers":["email"]}', '{}',
+            false, '','','',''
+          )
+          ON CONFLICT (id) DO NOTHING;
+
+          INSERT INTO auth.identities
+            (id, user_id, provider, identity_data, created_at, updated_at, provider_id, last_sign_in_at)
+          VALUES (
+            'aaaaaaaa-0000-0000-0000-000000000001',
+            'aaaaaaaa-0000-0000-0000-000000000001', 'email',
+            '{"sub":"aaaaaaaa-0000-0000-0000-000000000001","email":"super_admin@eduzone-test.com"}',
+            now(), now(), 'super_admin@eduzone-test.com', NULL
+          )
+          ON CONFLICT (provider, provider_id) DO NOTHING;
+
+          -- Bound to the SYSTEM tenant (00000000-...-0001), exactly like the
+          -- bootstrap template in 11_seed_reference.sql; super_admins are
+          -- never tenants members of a QA tenant.
+          INSERT INTO public.users (id, email, first_name, last_name, primary_role, tenant_id, account_status, token_version, region_id)
+          VALUES (
+            'aaaaaaaa-0000-0000-0000-000000000001',
+            'super_admin@eduzone-test.com', 'Super', 'Admin', 'super_admin',
+            '00000000-0000-0000-0000-000000000001', 'active', 1, 'me-south-1'
+          )
+          ON CONFLICT (id) DO NOTHING;
+
+          INSERT INTO public.user_roles (user_id, role_id, tenant_id)
+          SELECT u.id, r.id, u.tenant_id
+          FROM public.users u
+          JOIN public.roles r
+            ON r.name = u.primary_role
+           AND r.tenant_id = public.system_tenant_id()
+          WHERE u.id = 'aaaaaaaa-0000-0000-0000-000000000001'
+          ON CONFLICT DO NOTHING;
+          SQL
+
       - name: Export local Supabase URL and anon key
         working-directory: supabase
         run: supabase status -o env >> "$GITHUB_ENV"

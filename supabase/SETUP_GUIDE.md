@@ -1,95 +1,46 @@
 # Supabase Setup Guide — EduZone Dashboard
 
-**Baseline:** `main` @ `9f1a31659d929fcf5bbcdec58429c146021b777d`  
-**Reviewed:** 2026-09-08  
-**Status:** database infrastructure is present; production approval still requires runtime evidence
+**Reviewed:** 2026-09-24
+**Status:** repository setup tooling is present; remote deployment and production readiness remain unverified here.
 
 ## 1. Local setup
+
+Run these commands from the containing repository root, not from inside the
+`supabase/` directory.
 
 ```powershell
 supabase start
 supabase status
-supabase db reset
+supabase\deploy.ps1 local
 ```
 
-The current `supabase/config.toml` defines the ordered schema inputs under `supabase/schema/`.
-
-The repository also contains deployment helpers:
-
-```text
-supabase/deploy.ps1
-supabase/deploy.sh
-supabase/deploy.js
-```
-
-Use the project procedure associated with the target environment; do not assume local reset is a production deployment operation.
-
-### QA seed gate (F-01, 2026-09-13)
-
-`deploy.js` and `scripts/supabase-schema-deploy.mjs` skip
-`schema/11_seed_reference.sql` by default. That file plants the
-`*@eduzone-test.com` QA accounts whose shared password is documented in git —
-running it against staging/production would create known-password privileged
-accounts. To apply the seed, the target must be a disposable local/QA
-database **and** the run must set:
-
-```text
-ALLOW_QA_SEED_DATA=true
-```
-
-Schema files (`01`–`10`) apply unconditionally in both scripts. The local
-`supabase db reset` / E2E stack seeds via its own path and is unaffected.
+The deployment script validates the numbered files in `supabase/schema/` and applies them in the repository's configured order. Inspect the script and target connection before using it. A local reset is not a production deployment operation.
 
 ## 2. Canonical schema
 
-The current canonical schema is the ordered set:
+The active order is defined explicitly in `supabase/config.toml`:
 
 ```text
-01_extensions.sql
-02_types.sql
-03_tables.sql
-04_constraints.sql
-05_indexes.sql
-07_functions.sql
-06_views.sql
-08_triggers.sql
-09_rls.sql
-10_permissions.sql
-11_seed_reference.sql
+01_extensions.sql → 02_types.sql → 03_tables.sql → 04_constraints.sql
+→ 05_indexes.sql → 07_functions.sql → 06_views.sql → 08_triggers.sql
+→ 09_rls.sql → 10_permissions.sql → 11_seed_reference.sql
 ```
 
-The order above is taken from `config.toml`, not inferred from filename sorting.
+`12_seed_qa_demo.sql` is disposable QA/E2E data and is not part of the configured production-oriented order. The migrations directory currently contains only its README.
 
-## 3. Database change policy
+## 3. QA seed boundary
 
-The database is shared with `EduZone_App`.
+The QA seed creates test accounts and demo data. It is opt-in in the deployment tooling and must be used only with a disposable local/QA database. Never use the documented test credentials against staging or production.
 
-Before changing any shared object:
+## 4. Shared database and production boundary
 
-```text
-inspect dashboard callers
-inspect student-app callers
-inspect SQL references
-inspect tests and Edge Functions
-make the smallest safe change
-verify behavior
-re-check references
-```
+The repository documents the Supabase database as shared with `EduZone_App`. Before changing a shared object, inspect both repositories, SQL dependencies, Edge Functions, tests, and CI. If the other repository is unavailable, record compatibility as **UNVERIFIED**.
 
-The project policy does not permit a second active schema source.
-
-## 4. Production boundary
-
-The existence of schema files, RLS policies, SECURITY DEFINER functions, deployment scripts, or a successful local reset is not sufficient for production approval.
-
-Production approval requires executable evidence for deployment behavior, RLS/tenant isolation, privileged RPCs, backup/restore, rollback or forward-fix procedure, and application release gates.
+The existence of schema files, RLS policies, SECURITY DEFINER functions, deployment scripts, or a successful local run does not prove production approval. That requires executable evidence for deployment behavior, tenant isolation, privileged RPCs, backup/restore, rollback or forward-fix, and application release gates.
 
 ## 5. Related documents
 
-```text
-schema/README.md       → SQL ownership and dependency order
-QUICK_START.md         → local developer workflow
-CLAUDE.md              → agent rules
-AGENTS.md              → agent rules
-README.md              → Supabase-specific overview
-```
+- [`schema/README.md`](schema/README.md) — SQL ownership and dependency order.
+- [`QUICK_START.md`](QUICK_START.md) — local workflow.
+- [`README.md`](README.md) — Supabase scope and evidence rules.
+- [`deploy.ps1`](deploy.ps1) — local validation/deployment helper.

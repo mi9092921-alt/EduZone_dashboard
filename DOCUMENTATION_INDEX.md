@@ -1,43 +1,43 @@
 # EduZone Dashboard — Documentation Index
 
-**Baseline:** `main` @ `9f1a31659d929fcf5bbcdec58429c146021b777d`  
-**Reviewed:** 2026-09-08  
-**Purpose:** define documentation ownership and prevent competing sources of truth
+**Reviewed:** 2026-09-24
+**Purpose:** identify the current source of truth and separate it from plans and historical reports.
 
-## Current operational documents 
+## Current operational references
 
-| Path | Owner | Use for |
-|---|---|---|
-| `README.md` | Repository | project orientation and current release status |
-| `CLAUDE.md` | Engineering | AI/developer constraints and architecture rules |
-| `agent_prompt_eduzone_db.md` | Database | strict DB change-control instructions |
-| `project_documents/PRODUCTION_READINESS_PLAN.md` | Release | production gate and evidence ledger |
-| `Performance_Reliability_Execution_Plan.md` | Performance | performance/reliability execution and verification |
-| `supabase/README.md` | Database ops | current Supabase layout, operations, and release boundaries |
-| `supabase/CLAUDE.md` | Database agents | Supabase-specific agent rules |
-| `supabase/AGENTS.md` | Database agents | Supabase-specific agent rules |
-| `supabase/FILE_GUIDE.md` | Database ops | file/command navigation |
-| `supabase/QUICK_START.md` | Database ops | local development quick start |
-| `supabase/SETUP_GUIDE.md` | Database ops | setup/deployment procedure |
-| `supabase/schema/README.md` | Database schema | canonical SQL ownership and verification rules |
-| `supabase/migrations/README.md` | Database governance | explains why the migrations directory contains no active migration chain |
-| `.github/BRANCH_PROTECTION.md` | Release governance | expected and observed `main` protection state |
+| Path                                                                                               | Purpose                                                    |
+| -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| [`README.md`](README.md)                                                                           | Repository orientation and verified local paths/commands   |
+| [`CLAUDE.md`](CLAUDE.md)                                                                           | Engineering and agent constraints                          |
+| [`agent_prompt_eduzone_db.md`](agent_prompt_eduzone_db.md)                                         | Database change-control rules                              |
+| [`project_documents/PRODUCTION_READINESS_PLAN.md`](project_documents/PRODUCTION_READINESS_PLAN.md) | Release evidence ledger; no production approval is implied |
+| [`supabase/README.md`](supabase/README.md)                                                         | Supabase operations and evidence boundary                  |
+| [`supabase/schema/README.md`](supabase/schema/README.md)                                           | SQL ownership and configured order                         |
+| [`supabase/QUICK_START.md`](supabase/QUICK_START.md)                                               | Local Supabase workflow                                    |
+| [`supabase/SETUP_GUIDE.md`](supabase/SETUP_GUIDE.md)                                               | Schema deployment and QA-seed boundary                     |
+| [`.github/BRANCH_PROTECTION.md`](.github/BRANCH_PROTECTION.md)                                     | Dated GitHub protection snapshot and re-check commands     |
 
-## Reference documents
+## Plans and specifications
 
-`project_documents/` also contains architecture, API, design, testing, monitoring, DevOps, PRD, RFC, security, and other historical/reference documents.
+The following documents describe requirements, design targets, or proposed work. They are not evidence that the described feature, integration, route, command, or deployment exists:
 
-Reference documents must not silently override the evidence ledger in `project_documents/PRODUCTION_READINESS_PLAN.md`.
+- [Production Architecture Execution Plan](EduZone%20Dashboard%20%E2%80%94%20Production%20Architecture%20Execution%20Plan.md)
+- [`project_documents/FOUR_FEATURES_EXECUTION_PLAN.md`](project_documents/FOUR_FEATURES_EXECUTION_PLAN.md)
+- [`project_documents/GOOGLE_DRIVE_VIDEO_PLAN.md`](project_documents/GOOGLE_DRIVE_VIDEO_PLAN.md)
+- [`project_documents/EduZone_Admin_Dashboard_PRD_v2.md`](project_documents/EduZone_Admin_Dashboard_PRD_v2.md)
+- [`project_documents/EduZone_API_Design_v1.md`](project_documents/EduZone_API_Design_v1.md)
+- [`project_documents/EduZone_Clean_Architecture_v1.md`](project_documents/EduZone_Clean_Architecture_v1.md)
+- [`project_documents/EduZone_Design_Tokens_v1.md`](project_documents/EduZone_Design_Tokens_v1.md)
+- [`project_documents/implementation_plan.md`](project_documents/implementation_plan.md)
+
+## Historical reports
+
+Milestone, go/no-go, closure, audit, and performance reports retain their original dates and evidence claims. They must be read as point-in-time records, not as the current release status. Current claims belong in the production-readiness plan and must be backed by a new executable result.
 
 ## Maintenance rules
 
-1. Avoid duplicating the same current status across documents.
-2. Use exact dates and commit SHAs for point-in-time assessments.
-3. Distinguish `IMPLEMENTED`, `VERIFIED`, `UNVERIFIED`, and `PRODUCTION READY`.
-4. Update operational documentation when source/configuration changes invalidate a claim.
-5. Do not document files, commands, or workflows that do not exist in the current repository.
-6. Temporary planning notes must not become competing sources of truth.
-
-## Known cleanup target
-
-` `  .
+1. Source code, configuration, tests, SQL, and observed runtime evidence outrank documentation.
+2. Use `IMPLEMENTED`, `VERIFIED`, and `UNVERIFIED` precisely; do not use `PRODUCTION READY` for source inspection alone.
+3. Keep one owner for current release status and link to it instead of copying claims.
+4. Mark planned paths and integrations as planned; do not present them as existing files or services.
+5. Update or remove broken local links when files move or are deleted.

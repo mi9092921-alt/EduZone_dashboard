@@ -6,6 +6,8 @@ import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { useForm, Controller, type Resolver } from 'react-hook-form';
 
+import { CourseThumbnailField } from './CourseThumbnailField';
+
 import {
   useCreateCourse,
   useSaveLearningObjectives,
@@ -215,18 +217,17 @@ export function CreateCourseDialog({ open, onClose }: CreateCourseDialogProps) {
           )}
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="thumbnail_url">{t('thumbnail_url_label')}</Label>
-          <Input
-            id="thumbnail_url"
-            placeholder={t('thumbnail_url_placeholder')}
-            {...register('thumbnail_url')}
-            className={errors.thumbnail_url ? 'border-destructive' : ''}
-          />
-          {errors.thumbnail_url && (
-            <p className="text-xs text-destructive font-medium">{errors.thumbnail_url.message}</p>
+        <Controller
+          name="thumbnail_url"
+          control={control}
+          render={({ field }) => (
+            <CourseThumbnailField
+              value={field.value ?? ''}
+              onChange={field.onChange}
+              error={errors.thumbnail_url?.message}
+            />
           )}
-        </div>
+        />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <div className="space-y-2">

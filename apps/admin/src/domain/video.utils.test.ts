@@ -23,6 +23,23 @@ describe('parseVideoUrl', () => {
     });
   });
 
+  it('extracts the id from YouTube Shorts and live URLs', () => {
+    // Regression: a full https:// URL stored as video_path violates the
+    // lesson_contents_video_path_relative_only DB check.
+    expect(parseVideoUrl('https://www.youtube.com/shorts/1X9TXSjL4TM?feature=share')).toEqual({
+      provider: 'youtube',
+      video_path: '1X9TXSjL4TM',
+    });
+    expect(parseVideoUrl('https://youtube.com/shorts/abcdefghijk')).toEqual({
+      provider: 'youtube',
+      video_path: 'abcdefghijk',
+    });
+    expect(parseVideoUrl('https://www.youtube.com/live/abcdefghijk?feature=share')).toEqual({
+      provider: 'youtube',
+      video_path: 'abcdefghijk',
+    });
+  });
+
   it('parses Vimeo URLs and falls back to the clean URL when the id is missing', () => {
     expect(parseVideoUrl('https://vimeo.com/123456')).toEqual({
       provider: 'vimeo',

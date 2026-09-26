@@ -1,5 +1,7 @@
 EduZone Admin & Management Dashboard — PRD v2.0 **| CONFIDENTIAL**
 
+> **Scope note:** This is a requirements specification. It does not assert that the described features exist in the current app; verify each requirement against `apps/admin/src/` and the actual routes/tests.
+
 **EduZone**
 
 **Admin & Management Dashboard**
@@ -13,7 +15,7 @@ Based on EduZone Schema v5.0 | 2026-03-08
 | **Version** | 2\.0                                               |
 | :---------- | :------------------------------------------------- |
 | **Date**    | 2026-03-08                                         |
-| **Status**  | FINAL — Approved for Development                   |
+| **Status**  | Requirements reference — implementation unverified |
 | **Author**  | PM Team — EduZone Platform                         |
 | **Schema**  | EduZone Schema v5.0 (PostgreSQL 17 / Supabase Pro) |
 

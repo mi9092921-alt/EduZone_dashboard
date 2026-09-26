@@ -122,6 +122,34 @@ async function requirePermission(req: Request, permission?: string) {
       throw new AuthError(403, 'PERMISSION_DENIED', `Missing permission: ${permission}`);
   }
 
+  // HARDENING-2026-09-25: server-side session-revocation check. The profile
+  // read above trusts the still-unexpired JWT; validate_user_session compares
+  // the JWT's token_version + session_id against the DB so a
+  // suspended-and-revoked admin cannot keep invoking bulk actions until the
+  // token expires (same guard create-user and video-info already apply).
+  const { data: sessionValid, error: sessionErr } = await supabase.rpc(
+    'validate_user_session',
+  );
+  if (sessionErr || sessionValid !== true) {
+    throw new AuthError(401, 'UNAUTHORIZED', 'Session revoked or invalid');
+  }
+
+  // HARDENING-2026-09-25: enforce the seeded bulk_action rate-limit rule
+  // (11_seed_reference.sql: 30 hits/hour, 10-minute block). The rule existed
+  // in rate_limit_rules but was never invoked, leaving bulk actions bounded
+  // only by the per-tenant job-queue cap inside admin_enqueue_bulk_job.
+  const { data: rateLimit, error: rateLimitErr } = await supabase.rpc('check_rate_limit', {
+    p_action: 'bulk_action',
+    p_user_id: user.id,
+  });
+  if (rateLimitErr) {
+    console.error('bulk-action rate-limit check failed', rateLimitErr);
+    throw new AuthError(503, 'SERVICE_UNAVAILABLE', 'Rate-limit check failed');
+  }
+  if (rateLimit?.allowed === false) {
+    throw new AuthError(429, 'TOO_MANY_REQUESTS', 'Too many bulk actions; retry later');
+  }
+
   return { id: user.id, role: userData.primary_role, tenant_id: userData.tenant_id };
 }
 

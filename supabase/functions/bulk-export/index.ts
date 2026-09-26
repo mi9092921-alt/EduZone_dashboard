@@ -364,7 +364,14 @@ function generateCsv(data: Record<string, unknown>[]): string {
     const values = userFields.map((field) => {
       const val = row[field];
       if (val === null || val === undefined) return '';
-      const str = String(val);
+      let str = String(val);
+      // CSV formula-injection guard (HARDENING-2026-09-25): spreadsheet apps
+      // execute cells that begin with =, +, -, @, or a tab/CR as formulas or
+      // control input. The exported columns include user-supplied free-text
+      // fields (names), so neutralize them by prefixing a single quote.
+      if (/^[=+\-@\t\r]/.test(str)) {
+        str = `'${str}`;
+      }
       // Escape commas and quotes in CSV
       if (str.includes(',') || str.includes('"') || str.includes('\n')) {
         return `"${str.replace(/"/g, '""')}"`;

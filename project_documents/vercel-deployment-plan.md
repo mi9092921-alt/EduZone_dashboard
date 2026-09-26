@@ -1,5 +1,7 @@
 # EduZone — خطة النشر على Vercel
 
+> **حالة الوثيقة:** خطة تشغيلية، وليست سجلًا لنشر فعلي. لا يعرّف المستودع اسم مشروع Vercel أو النطاق العام أو بيئة staging/production؛ استبدل القيم الافتراضية ببيانات تم التحقق منها قبل التنفيذ.
+
 ## 1. نطاق الخطة
 
 التطبيق القابل للنشر هو لوحة الإدارة الموجودة في:
@@ -34,16 +36,16 @@ eduzone-admin
 
 الإعداد المقترح:
 
-| الإعداد | القيمة |
-|---|---|
-| Framework | Next.js |
-| Production Branch | `main` |
-| Node.js | Node 20 أو الإصدار المعتمد في المشروع |
-| Package Manager | pnpm |
-| Install Command | `pnpm install --frozen-lockfile` |
-| Build Command | `pnpm --filter @eduzone/admin build` |
-| Output Directory | تلقائي لـ Next.js |
-| Root Directory | جذر المستودع |
+| الإعداد           | القيمة                                |
+| ----------------- | ------------------------------------- |
+| Framework         | Next.js                               |
+| Production Branch | `main`                                |
+| Node.js           | Node 20 أو الإصدار المعتمد في المشروع |
+| Package Manager   | pnpm                                  |
+| Install Command   | `pnpm install --frozen-lockfile`      |
+| Build Command     | `pnpm --filter @eduzone/admin build`  |
+| Output Directory  | تلقائي لـ Next.js                     |
+| Root Directory    | جذر المستودع                          |
 
 يفضل إبقاء `Root Directory` على جذر المستودع حتى تعمل حزم Workspace الموجودة في:
 
@@ -123,7 +125,7 @@ NEXT_PUBLIC_SENTRY_DSN=<preview-sentry-dsn>
 قبل Production Deployment:
 
 1. تجهيز مشروع Supabase Production.
-2. تطبيق migrations الموجودة في مجلد `supabase`.
+2. تطبيق `supabase/schema/` عبر إجراء deployment معتمد؛ مجلد `supabase/migrations/` لا يحتوي حاليًا على سلسلة SQL نشطة.
 3. نشر Edge Functions المطلوبة.
 4. تفعيل RLS والسياسات والـ RPCs.
 5. مراجعة Auth Redirect URLs.
@@ -139,7 +141,7 @@ NEXT_PUBLIC_SENTRY_DSN=<preview-sentry-dsn>
 
 ```text
 https://<preview-url>.vercel.app/**
-https://admin.eduzone.com/**
+https://<verified-production-domain>/**
 ```
 
 كما يجب اختبار:
@@ -158,7 +160,7 @@ https://admin.eduzone.com/**
 يفضل ضبط البيئة صراحة في إعدادات Sentry:
 
 ```ts
-environment: process.env.NEXT_PUBLIC_APP_ENV
+environment: process.env.NEXT_PUBLIC_APP_ENV;
 ```
 
 يجب تنفيذ Probe بعد النشر والتأكد من ظهور الحدث في Sentry.
@@ -171,9 +173,9 @@ environment: process.env.NEXT_PUBLIC_APP_ENV
 "schedule": "0 3 * * *"
 ```
 
-وهذا يعني تشغيل المهمة يوميًا 3 صباحًا UTC    .
+وهذا يعني تشغيل المهمة يوميًا 3 صباحًا UTC .
 
-يجب التأكد من استخدام خطة Vercel Pro أو Enterprise، لأن خطة Hobby لا تسمح بالـ Cron المتكرر يوميًا 3 صباحًا UTC    .
+يجب التأكد من استخدام خطة Vercel Pro أو Enterprise، لأن خطة Hobby لا تسمح بالـ Cron المتكرر يوميًا 3 صباحًا UTC .
 
 قبل التفعيل:
 
@@ -220,7 +222,7 @@ vercel curl / --deployment <preview-url>
 4. ربط النطاق:
 
    ```text
-   admin.eduzone.com
+   <verified-production-domain>
    ```
 
 5. تحديث DNS.
@@ -231,7 +233,7 @@ vercel curl / --deployment <preview-url>
 ## 12. فحوصات ما بعد النشر
 
 ```bash
-curl -I https://admin.eduzone.com
+curl -I https://<verified-production-domain>
 ```
 
 قائمة التحقق:
@@ -265,19 +267,19 @@ curl -I https://admin.eduzone.com
 
 ## 14. ترتيب التنفيذ
 
-| المرحلة | شرط الإنجاز |
-|---|---|
-| مراجعة Build وCI | جميع الفحوصات ناجحة |
-| إنشاء Vercel Project | المشروع مربوط بالمستودع |
-| إضافة Preview Variables | القيم متاحة للـ Preview |
-| تجهيز Supabase Preview | Auth وRLS وmigrations جاهزة |
-| نشر Preview | Deployment ناجح |
-| الاختبار الوظيفي والأمني | لا توجد مشاكل حرجة |
-| إضافة Production Variables | كل الأسرار مضافة بشكل صحيح |
-| إعداد Domain وDNS | SSL فعال |
-| Production Deployment | النشر ناجح |
-| Smoke Test وMonitoring | لا توجد أخطاء حرجة |
-| تجربة Rollback على Staging | الإجراء قابل للتنفيذ |
+| المرحلة                    | شرط الإنجاز                 |
+| -------------------------- | --------------------------- |
+| مراجعة Build وCI           | جميع الفحوصات ناجحة         |
+| إنشاء Vercel Project       | المشروع مربوط بالمستودع     |
+| إضافة Preview Variables    | القيم متاحة للـ Preview     |
+| تجهيز Supabase Preview     | Auth وRLS وmigrations جاهزة |
+| نشر Preview                | Deployment ناجح             |
+| الاختبار الوظيفي والأمني   | لا توجد مشاكل حرجة          |
+| إضافة Production Variables | كل الأسرار مضافة بشكل صحيح  |
+| إعداد Domain وDNS          | SSL فعال                    |
+| Production Deployment      | النشر ناجح                  |
+| Smoke Test وMonitoring     | لا توجد أخطاء حرجة          |
+| تجربة Rollback على Staging | الإجراء قابل للتنفيذ        |
 
 ## 15. ملاحظات ومراجع
 

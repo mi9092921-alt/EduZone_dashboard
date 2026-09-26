@@ -1,5 +1,7 @@
 ﻿EduZone Design Tokens & Figma Handoff v1.0 **| CONFIDENTIAL**
 
+> **Scope note:** This is a design handoff/reference. It is not evidence that Figma assets, tokens, or every UI state described below are present in the repository.
+
 **EduZone**
 
 **Design Tokens & Figma Handoff**
@@ -13,7 +15,7 @@ _Version 1.0 | 2026-03-08_
 | **Token Format**  | CSS Custom Properties + MUI theme tokens + Tailwind config      |
 | **Figma Library** | EduZone/Admin DS (shared library, auto-synced via Token Studio) |
 | **Framework**     | Next.js 15 + MUI v5 + Tailwind CSS v3 + RTL support             |
-| **Status**        | **APPROVED — use for all Sprint 1+ components**                 |
+| **Status**        | **Design reference — verify before use**                        |
 
 # **1. Color System**
 

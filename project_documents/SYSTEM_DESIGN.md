@@ -1,13 +1,13 @@
 # EduZone — System Design Document
 
-> **Version:** 1.0 | **Date:** 2026-03-11 | **Status:** APPROVED  
-> **Scope:** Admin & Management Dashboard — Full System Architecture
+> **Status:** System design reference, reviewed 2026-09-24.
+> It describes intended architecture and source-level patterns; it is not evidence that every flow, integration, or deployment property is complete.
 
 ---
 
 ## 1. System Overview
 
-EduZone Admin Dashboard is a multi-tenant, enterprise-grade control plane built on a **Clean Architecture** foundation. It serves three distinct personas (super_admin, admin, teacher) across isolated tenant boundaries, with all operations enforced by PostgreSQL Row-Level Security and Supabase JWT authentication.
+EduZone Admin Dashboard is a multi-tenant control-plane implementation built around a layered architecture. It contains source paths for the `super_admin`, `admin`, and `teacher` roles and PostgreSQL/Supabase authorization controls. Tenant isolation and complete operation coverage still require executable verification.
 
 ### 1.1 Design Goals
 
@@ -18,7 +18,7 @@ EduZone Admin Dashboard is a multi-tenant, enterprise-grade control plane built 
 | **Page Load**        | LCP < 2.5s on 4G connection                   |
 | **Concurrent Users** | 10,000+ simultaneous admin sessions           |
 | **Data Isolation**   | Zero cross-tenant data leakage (RLS-enforced) |
-| **Audit Coverage**   | 100% of write operations logged               |
+| **Audit Coverage target** | Source design targets logging write operations; current coverage requires executable verification |
 
 ---
 
@@ -64,7 +64,7 @@ EduZone Admin Dashboard is a multi-tenant, enterprise-grade control plane built 
 
 ## 3. Clean Architecture Layers
 
-The codebase follows **Clean Architecture** (Ports & Adapters) with strict dependency direction enforced by ESLint + dependency-cruiser.
+The codebase uses a layered/ports-and-adapters direction with visible checks in ESLint and Vitest architecture tests. A separate `dependency-cruiser` gate is not present in the current package or workflow files.
 
 ### 3.1 Layer Dependency Matrix
 

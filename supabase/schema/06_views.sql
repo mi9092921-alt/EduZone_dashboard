@@ -69,31 +69,16 @@ SELECT * FROM public.sessions WHERE deleted_at IS NULL AND is_active = true;
 
 -- Legacy public.vw_course_stats matview removed; tenant-scoped VIEW over private.mv_course_stats below.
 
-CREATE MATERIALIZED VIEW IF NOT EXISTS public.vw_student_progress_timeline AS
-SELECT
-  u.id AS student_id,
-  u.tenant_id,
-  COUNT(DISTINCT c.id) FILTER (WHERE e.status = 'active') AS active_courses,
-  COUNT(DISTINCT c.id) FILTER (WHERE e.status = 'completed') AS completed_courses,
-  ROUND(AVG(e.progress_pct), 2) AS overall_progress_pct,
-  MAX(e.updated_at) AS last_activity_at
-FROM public.users u
-LEFT JOIN public.enrollments e ON u.id = e.user_id
-LEFT JOIN public.courses c ON e.course_id = c.id
-WHERE u.deleted_at IS NULL
-GROUP BY u.id, u.tenant_id;
-
-CREATE MATERIALIZED VIEW IF NOT EXISTS public.vw_daily_revenue AS
-SELECT
-  DATE(e.enrolled_at) AS enrollment_date,
-  e.tenant_id,
-  COUNT(DISTINCT e.user_id) AS new_enrollments,
-  COUNT(DISTINCT e.id) FILTER (WHERE e.status = 'completed') AS completions,
-  SUM(c.price) FILTER (WHERE c.price IS NOT NULL) AS daily_revenue
-FROM public.enrollments e
-LEFT JOIN public.courses c ON e.course_id = c.id
-WHERE e.deleted_at IS NULL
-GROUP BY DATE(e.enrolled_at), e.tenant_id;
+-- HARDENING-2026-09-25: The former PUBLIC materialized views
+-- `vw_student_progress_timeline` and `vw_daily_revenue` were removed.
+-- Rationale: materialized views support neither RLS nor security_invoker,
+-- so keeping all-tenant aggregates in the API-exposed `public` schema was a
+-- latent cross-tenant leak (a single future GRANT would have exposed them
+-- through PostgREST, and cron kept them populated with live data).
+-- Consumer tracing found ZERO readers of either object: the
+-- student-progress RPC reads the `private.vw_student_progress_timeline`
+-- twin (below), and no dashboard or app query selects these names. The
+-- private equivalents remain the only analytics surfaces.
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS private.vw_course_stats AS
 SELECT
@@ -229,11 +214,8 @@ WITH NO DATA;
 -- ============================================================================
 -- Materialized View Indexes
 -- ============================================================================
-CREATE UNIQUE INDEX IF NOT EXISTS idx_vw_student_progress_pk ON public.vw_student_progress_timeline(student_id);
-CREATE INDEX IF NOT EXISTS idx_vw_student_progress_tenant ON public.vw_student_progress_timeline(tenant_id);
-
-CREATE UNIQUE INDEX IF NOT EXISTS idx_vw_daily_revenue_unique ON public.vw_daily_revenue(enrollment_date, tenant_id);
-CREATE INDEX IF NOT EXISTS idx_vw_daily_revenue_date ON public.vw_daily_revenue(enrollment_date DESC, tenant_id);
+-- HARDENING-2026-09-25: indexes on the removed public.* matviews dropped with
+-- them (see the consumer-tracing note above the private definitions).
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_private_vw_course_stats_pk ON private.vw_course_stats(id);
 CREATE INDEX IF NOT EXISTS idx_private_vw_course_stats_tenant ON private.vw_course_stats(tenant_id);

@@ -196,5 +196,9 @@ describe('youtube.service — PERF-06 batching', () => {
   it('extractYoutubeId still handles plain ids', () => {
     expect(extractYoutubeId(makeId(1))).toBe(makeId(1));
     expect(extractYoutubeId(urlFor(makeId(1)))).toBe(makeId(1));
+    expect(extractYoutubeId(`https://www.youtube.com/shorts/${makeId(1)}?feature=share`)).toBe(
+      makeId(1),
+    );
+    expect(extractYoutubeId(`https://www.youtube.com/live/${makeId(1)}`)).toBe(makeId(1));
   });
 });

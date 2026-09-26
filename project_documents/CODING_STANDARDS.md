@@ -1,7 +1,7 @@
 # EduZone — Coding Standards & Conventions
 
-> **Version:** 1.0 | **Date:** 2026-03-11 | **Applies To:** All engineers  
-> **Enforcement:** ESLint + TypeScript + dependency-cruiser (CI gate)
+> **Status:** Repository convention reference; reviewed 2026-09-24.
+> **Enforcement visible in this checkout:** ESLint + TypeScript + Vitest architecture guards. A separate `dependency-cruiser` gate is not present in the current package/workflow files.
 
 ---
 
@@ -304,18 +304,14 @@ try {
 
 ### 7.1 Coverage Requirements
 
-| Layer                 | Minimum Coverage               |
-| --------------------- | ------------------------------ |
-| Domain services       | 100%                           |
-| Application use cases | 90%                            |
-| Infrastructure repos  | 80%                            |
-| React hooks           | 80%                            |
-| Components            | 70% (happy path + error state) |
+Coverage thresholds are defined in `apps/admin/vitest.unit.config.ts` and are enforced only when the coverage command is run. They are aggregate and selected per-file floors, not the layer-by-layer percentages in older versions of this document. Do not report a coverage percentage without naming the command, commit, and result.
 
 ### 7.2 Test File Location & Naming
 
+The following is an illustrative naming pattern, not a current file inventory. In this repository, unit tests are under `apps/admin/src/` and Playwright tests are under `apps/admin/tests/e2e/`; verify exact feature filenames before linking to them.
+
 ```
-src/
+apps/admin/src/
 ├── application/use-cases/users/
 │   ├── suspendUser.ts
 │   └── suspendUser.test.ts      # Co-located unit test
@@ -408,6 +404,6 @@ Reviewers must verify:
 - [ ] Tests cover the main success + error paths
 - [ ] No `any` types without explicit justification comment
 - [ ] Sensitive data not logged (passwords, tokens, PII)
-- [ ] New events registered in `application/events/registry.ts`
+- [ ] New events follow the existing definitions under `apps/admin/src/domain/events/`
 - [ ] Idempotency key used on all mutations
 - [ ] Observability (metrics + tracer span) added to new use cases

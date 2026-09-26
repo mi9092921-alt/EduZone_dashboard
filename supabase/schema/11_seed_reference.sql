@@ -276,64 +276,48 @@ VALUES (1, 0, repeat('0', 64))
 ON CONFLICT (id) DO NOTHING;
 
 -- ============================================================================
--- PHASE 0B: Production Bootstrap Super Admin (owner-requested, 2026-09-18)
+-- PHASE 0B: Production Bootstrap Super Admin — SECURE BOOTSTRAP (2026-09-25)
 -- ============================================================================
--- The ONE account a fresh deployment starts with, so the project is
--- administrable from the first minute. Everything else that used to live in
--- this combined seed (@eduzone-test.com QA accounts, demo tenants, demo
--- courses/lessons, notifications, devices, logs) moved to
--- 12_seed_qa_demo.sql, which deploy.js skips unless ALLOW_QA_SEED_DATA=true.
+-- HARDENING-2026-09-25: the previous version of this section INSERTED a
+-- super_admin (super_admin@eduzone-test.com) whose bcrypt hash was committed
+-- to git with its plaintext documented in this very file. Every fresh
+-- deployment therefore started with a top-level admin account whose password
+-- was public. That is removed; nothing is seeded automatically anymore.
 --
--- SECURITY: this account's encrypted_password is the committed seed hash
--- whose plaintext (Admin@12345) is documented in git — ROTATE IT IMMEDIATELY
--- after first login (Supabase Dashboard -> Authentication -> Users, or the
--- admin dashboard's user management). Never leave the seeded password live
--- in production.-- '$2a$10$f5llkB8BoIoNGFRNaYOgCeomaRagQtxi2iLII5IRVloUuxH3EP8Z6',
-INSERT INTO auth.users (
-  id, instance_id, email, encrypted_password,
-  email_confirmed_at, created_at, updated_at,
-  role, aud, raw_app_meta_data, raw_user_meta_data,
-  is_super_admin, confirmation_token, recovery_token,
-  email_change_token_new, email_change
-) VALUES (
-  'aaaaaaaa-0000-0000-0000-000000000001',
-  '00000000-0000-0000-0000-000000000000',
-  'super_admin@eduzone-test.com',
-  '$2b$10$p/1N9e/qZaxxvUi6UGUpMO.7EekV0yLQ/4NLdr8ac3D4cfVy7mPJW',
-  now(), now(), now(), 'authenticated', 'authenticated',
-  '{"provider":"email","providers":["email"]}', '{}',
-  false, '','','',''
-)
-ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO auth.identities
-  (id, user_id, provider, identity_data, created_at, updated_at, provider_id, last_sign_in_at)
-VALUES (
-  'aaaaaaaa-0000-0000-0000-000000000001',
-  'aaaaaaaa-0000-0000-0000-000000000001', 'email',
-  '{"sub":"aaaaaaaa-0000-0000-0000-000000000001","email":"super_admin@eduzone-test.com"}',
-  now(), now(), 'super_admin@eduzone-test.com', NULL
-)
-ON CONFLICT (provider, provider_id) DO NOTHING;
-
--- Profile is re-tenanted to the SYSTEM tenant (00000000-...-0001, the only
--- tenant that exists in a fresh deployment). The old combined seed bound it
--- to the QA tenant, which would violate the tenants FK in production.
-INSERT INTO public.users (id, email, first_name, last_name, primary_role, tenant_id, account_status, token_version, region_id)
-VALUES (
-  'aaaaaaaa-0000-0000-0000-000000000001',
-  'super_admin@eduzone-test.com', 'Super', 'Admin', 'super_admin',
-  '00000000-0000-0000-0000-000000000001', 'active', 1, 'me-south-1'
-)
-ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO public.user_roles (user_id, role_id, tenant_id)
-SELECT u.id, r.id, u.tenant_id
-FROM public.users u
-JOIN public.roles r
-  ON r.name = u.primary_role
-  AND r.tenant_id = public.system_tenant_id()
-WHERE u.id = 'aaaaaaaa-0000-0000-0000-000000000001'
-ON CONFLICT DO NOTHING;
+-- SECURE BOOTSTRAP PROCEDURE (owner/operator performs ONCE per new project):
+--   1. Supabase Dashboard -> Authentication -> Users -> "Add user":
+--      create the first admin with a strong, owner-chosen password
+--      (never committed anywhere), confirm the email.
+--   2. Capture the new auth user's UUID, then run the commented template
+--      below in the SQL editor with <AUTH_USER_UUID> and the admin email
+--      substituted. It creates the profile row bound to the SYSTEM tenant
+--      (the only tenant in a fresh deployment) and the super_admin role
+--      binding. Do NOT commit the filled-in statement anywhere.
+--   3. Verify with check_dashboard_access() before using the dashboard.
+--
+-- Re-tenanted to the SYSTEM tenant (00000000-...-0001); binding to any QA
+-- tenant would violate the tenants FK in production (see history below).
+--
+-- TEMPLATE (commented out on purpose — no executable seeded credential):
+--
+-- WITH new_admin AS (
+--   SELECT '<AUTH_USER_UUID>'::uuid AS id
+-- )
+-- INSERT INTO public.users
+--   (id, email, first_name, last_name, primary_role, tenant_id,
+--    account_status, token_version, region_id)
+-- SELECT n.id, '<ADMIN_EMAIL>', 'Super', 'Admin', 'super_admin',
+--        '00000000-0000-0000-0000-000000000001', 'active', 1, 'me-south-1'
+-- FROM new_admin n
+-- ON CONFLICT (id) DO NOTHING;
+--
+-- INSERT INTO public.user_roles (user_id, role_id, tenant_id)
+-- SELECT u.id, r.id, u.tenant_id
+-- FROM public.users u
+-- JOIN public.roles r
+--   ON r.name = u.primary_role
+--  AND r.tenant_id = public.system_tenant_id()
+-- WHERE u.id = '<AUTH_USER_UUID>'::uuid
+-- ON CONFLICT DO NOTHING;
 
 COMMIT;

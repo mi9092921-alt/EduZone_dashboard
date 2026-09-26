@@ -8,9 +8,11 @@ Supabase Edge Function that records a successful offline download attempt for an
 {
   "lesson_id": "uuid",
   "quality": "720p",
-  "access_expires_at": "2026-12-01T00:00:00Z" // or null
+  "access_expires_at": "2026-12-01T00:00:00Z"
 }
 ```
+
+`access_expires_at` may also be `null`; it is only a client hint and is re-derived server-side.
 
 ## Output
 

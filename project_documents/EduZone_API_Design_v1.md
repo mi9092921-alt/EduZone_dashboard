@@ -1,5 +1,7 @@
 EduZone API Design Document v1.0 **| CONFIDENTIAL**
 
+> **Scope note:** This is an API contract proposal/reference. It does not prove that every RPC, Edge Function, response shape, or realtime channel below exists; verify against `supabase/schema/`, `supabase/functions/`, and the application callers.
+
 **EduZone**
 
 **API Design Document**
@@ -8,12 +10,12 @@ Admin & Management Dashboard — Edge Functions + RPC Contracts
 
 _Version 1.0 | 2026-03-08 | Schema v5.0_
 
-| **Version**  | 1\.0                                  |
-| :----------- | :------------------------------------ |
-| **Status**   | **FINAL — Approved**                  |
-| **Base URL** | _https://<project>.supabase.co_       |
-| **Auth**     | Supabase JWT (Bearer) — every request |
-| **Schema**   | EduZone v5.0 (PostgreSQL 17)          |
+| **Version**  | 1\.0                                              |
+| :----------- | :------------------------------------------------ |
+| **Status**   | **Reference contract; implementation unverified** |
+| **Base URL** | _https://<project>.supabase.co_                   |
+| **Auth**     | Supabase JWT (Bearer) — every request             |
+| **Schema**   | EduZone v5.0 (PostgreSQL 17)                      |
 
 # **1. Overview & Architecture**
 
@@ -438,10 +440,10 @@ Student-facing course rating submission (1–5 stars, one rating per user per co
 
 ### **Parameters**
 
-|   **Field**    |  **Type** |              **Description**               |
-| :------------: | :-------: | :----------------------------------------: |
-| **p_course_id** | _UUID_   | Target course. Must be published, same tenant, not soft-deleted. |
-| **p_rating**    | _INT_    | Star rating, 1–5 inclusive. |
+|    **Field**    | **Type** |                         **Description**                          |
+| :-------------: | :------: | :--------------------------------------------------------------: |
+| **p_course_id** |  _UUID_  | Target course. Must be published, same tenant, not soft-deleted. |
+|  **p_rating**   |  _INT_   |                   Star rating, 1–5 inclusive.                    |
 
 ### **TypeScript Call**
 
@@ -449,21 +451,21 @@ Student-facing course rating submission (1–5 stars, one rating per user per co
 
 ### **Response (JSONB)**
 
-|     **Field**     |   **Type**  |                         **Notes**                          |
-| :---------------: | :---------: | :---------------------------------------------------------: |
-|   **course_id**   |    _UUID_   |                     Echoed course id                        |
-|    **rating**     |  _NUMERIC?_ | Refreshed course-wide average (null when count returns to 0) |
-|  **rating_count** |     _INT_   |           Refreshed count of non-deleted ratings            |
+|    **Field**     |  **Type**  |                          **Notes**                           |
+| :--------------: | :--------: | :----------------------------------------------------------: |
+|  **course_id**   |   _UUID_   |                       Echoed course id                       |
+|    **rating**    | _NUMERIC?_ | Refreshed course-wide average (null when count returns to 0) |
+| **rating_count** |   _INT_    |            Refreshed count of non-deleted ratings            |
 
 ### **Error Codes**
 
-|             **Error Code**                      | **HTTP / PG** |                  **Condition + UI Action**                   |
-| :---------------------------------------------: | :-----------: | :----------------------------------------------------------: |
-|                **AUTH_REQUIRED**                |  **PG 401**   |                       auth.uid() is NULL                      |
-|               **INVALID_RATING**                |  **PG 422**   |                  rating is NULL or outside 1–5                 |
-|          **USER_NOT_FOUND_OR_INACTIVE**         |  **PG 404**   | Caller missing/inactive in public.users                       |
-|     **COURSE_NOT_FOUND_OR_NOT_PUBLISHED**       |  **PG 404**   | Course missing, soft-deleted, or in another tenant             |
-|                **NOT_ENROLLED**                 |  **PG 403**   | Caller has no active/completed access to the course            |
+|            **Error Code**             | **HTTP / PG** |              **Condition + UI Action**              |
+| :-----------------------------------: | :-----------: | :-------------------------------------------------: |
+|           **AUTH_REQUIRED**           |  **PG 401**   |                 auth.uid() is NULL                  |
+|          **INVALID_RATING**           |  **PG 422**   |            rating is NULL or outside 1–5            |
+|    **USER_NOT_FOUND_OR_INACTIVE**     |  **PG 404**   |       Caller missing/inactive in public.users       |
+| **COURSE_NOT_FOUND_OR_NOT_PUBLISHED** |  **PG 404**   | Course missing, soft-deleted, or in another tenant  |
+|           **NOT_ENROLLED**            |  **PG 403**   | Caller has no active/completed access to the course |
 
 **Side effects:** `courses.rating` / `courses.rating_count` are re-maintained synchronously by the `trg_course_ratings_apply` trigger; the returned values are the post-trigger authoritative aggregate.
 
@@ -473,9 +475,9 @@ Resolves the public instructor display fields (name + avatar URL) for a batch of
 
 ### **Parameters**
 
-|    **Field**     |  **Type**  |                **Description**                |
-| :--------------: | :--------: | :-------------------------------------------: |
-| **p_course_ids** | _UUID[]_   | Course ids to resolve (batch: one call per screen load). |
+|    **Field**     | **Type** |                     **Description**                      |
+| :--------------: | :------: | :------------------------------------------------------: |
+| **p_course_ids** | _UUID[]_ | Course ids to resolve (batch: one call per screen load). |
 
 ### **TypeScript Call**
 
@@ -483,11 +485,11 @@ Resolves the public instructor display fields (name + avatar URL) for a batch of
 
 ### **Response (SETOF record)**
 
-|       **Field**        |  **Type** |                     **Notes**                      |
-| :--------------------: | :-------: | :------------------------------------------------: |
-|      **course_id**     |   _UUID_  |                    Matching course                  |
-|   **instructor_name**  |  _TEXT?_  | `first_name + last_name` trimmed (null if no teacher) |
-|  **instructor_avatar** |  _TEXT?_  |                Teacher avatar_url or NULL           |
+|       **Field**       | **Type** |                       **Notes**                       |
+| :-------------------: | :------: | :---------------------------------------------------: |
+|     **course_id**     |  _UUID_  |                    Matching course                    |
+|  **instructor_name**  | _TEXT?_  | `first_name + last_name` trimmed (null if no teacher) |
+| **instructor_avatar** | _TEXT?_  |              Teacher avatar_url or NULL               |
 
 ### **Error Codes**
 
@@ -1049,9 +1051,9 @@ const FN = process.env.NEXT_PUBLIC_APP_ENV === 'production'
 
 ## **6.4 Changelog**
 
-| **Version** |  **Date**  |                                                                            **Changes**                                                                             |
-| :---------: | :--------: | :----------------------------------------------------------------------------------------------------------------------------------------------------------------: |
-|   **1.0**   | 2026-03-08 | Initial release — all RPC contracts from Schema v5.0; Edge Functions: bulk-action, bulk-worker, bulk-export, export-report; full TypeScript interface definitions. |
+| **Version** |  **Date**  |                                                                                                                                **Changes**                                                                                                                                 |
+| :---------: | :--------: | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: |
+|   **1.0**   | 2026-03-08 |                                                     Initial release — all RPC contracts from Schema v5.0; Edge Functions: bulk-action, bulk-worker, bulk-export, export-report; full TypeScript interface definitions.                                                     |
 |   **1.1**   | 2026-09-17 | Course ratings: §2.12 `rate_course` (student star-rating upsert + aggregate) and §2.13 `get_courses_instructors` (column-safe instructor resolution for students). New table `course_ratings`; denormalized `courses.rating`/`courses.rating_count` maintained by trigger. |
 
 EduZone Platform | Schema v5.0 | Page of

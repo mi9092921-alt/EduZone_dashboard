@@ -1,5 +1,7 @@
 # M8 — Repository / Port Boundary — Milestone Report
 
+> **Historical snapshot (2026-09-02):** this report records a point-in-time implementation check. Its paths, counts, and completion statements are not current release evidence; re-run the referenced checks against the current tree.
+
 > المرحلة: **# 12. P1 — Repository / Port Boundary** (M8 في ترتيب التنفيذ)
 > التاريخ: 2026-09-02
 > المنهجية: شوف → افحص → فكّر → عدّل → تأكد (نُفِّذت الحلقة كاملة مع إعادة فحص)
@@ -31,6 +33,7 @@ application/actions/*.ts  →  import  →  infrastructure/*   (6 ملفات)
 ```
 
 أمثلة فعلية:
+
 - `application/actions/boundary.ts` → `@/infrastructure/supabase/server`
 - `application/actions/user.actions.ts` → `@/infrastructure/repos/user-admin.repository`
 - `application/actions/admin.actions.ts` → `@/infrastructure/repos/*` (8 خدمات)
@@ -61,6 +64,7 @@ infrastructure) — دورة كاملة بدل الاستدعاء المباشر
 ### F8-4: service_role محصور (لا تغيير مطلوب)
 
 `createAdminClient` مستخدم فقط في:
+
 - `infrastructure/supabase/admin.ts` (المصدر الوحيد)
 - `infrastructure/repos/*` (12 repo/service)
 - 3 route handlers (`cron/routine`, `bulk-action`, `audit/cleanup-duplicate-seqs`)
@@ -91,18 +95,18 @@ INFRASTRUCTURE (Supabase / repos / services)
 
 ## 5. Files to Change
 
-| الملف | التغيير |
-|---|---|
-| `application/actions/*` → `adapters/actions/*` | نقل 6 ملفات (git mv — rename 100%) |
-| `adapters/hooks/useSessionCheck.ts` | تحديث import |
-| `adapters/mutations/users.mutations.ts` + test | تحديث imports |
-| `adapters/mutations/warnings.mutations.ts` | تحديث import |
-| `features/auth/components/AuthProvider.tsx` | تحديث import |
-| `features/auth/components/LoginPage.tsx` | تحديث import |
-| `infrastructure/repos/courses.service.ts` | تحديث import |
-| `infrastructure/repos/{tenants,users,warnings,notifications}.service.ts` + tests | تحديث imports |
-| `infrastructure/repos/feature-flags.service.test.ts` | تحديث mock path |
-| `src/architecture/layer-boundaries.test.ts` | **جديد** — Architecture enforcement test |
+| الملف                                                                            | التغيير                                  |
+| -------------------------------------------------------------------------------- | ---------------------------------------- |
+| `application/actions/*` → `adapters/actions/*`                                   | نقل 6 ملفات (git mv — rename 100%)       |
+| `adapters/hooks/useSessionCheck.ts`                                              | تحديث import                             |
+| `adapters/mutations/users.mutations.ts` + test                                   | تحديث imports                            |
+| `adapters/mutations/warnings.mutations.ts`                                       | تحديث import                             |
+| `features/auth/components/AuthProvider.tsx`                                      | تحديث import                             |
+| `features/auth/components/LoginPage.tsx`                                         | تحديث import                             |
+| `infrastructure/repos/courses.service.ts`                                        | تحديث import                             |
+| `infrastructure/repos/{tenants,users,warnings,notifications}.service.ts` + tests | تحديث imports                            |
+| `infrastructure/repos/feature-flags.service.test.ts`                             | تحديث mock path                          |
+| `src/architecture/layer-boundaries.test.ts`                                      | **جديد** — Architecture enforcement test |
 
 ## 6. Dependency Impact
 
@@ -124,7 +128,6 @@ INFRASTRUCTURE (Supabase / repos / services)
 2. استبدال `@/application/actions/` → `@/adapters/actions/` في 17 ملفًا.
 3. `eslint --fix` لإصلاح `import/order` الناتجة عن التغيير.
 4. إنشاء `src/architecture/layer-boundaries.test.ts`:
-
    - **domain purity**: كل ملف في `domain/` ممنوع فيه import من
      `infrastructure/adapters/features/components/app/container/next/react/@supabase`.
    - **application isolation**: كل ملف في `application/` ممنوع فيه import من أي
@@ -133,14 +136,14 @@ INFRASTRUCTURE (Supabase / repos / services)
 
 ## 9. Validation (تأكد)
 
-| الفحص | النتيجة |
-|---|---|
-| `pnpm typecheck` (apps/admin) | **PASS** (exit 0) |
-| `pnpm lint` (apps/admin, --max-warnings=0) | **PASS** (0 problems) |
-| `pnpm test` (unit) | **323 passed** / 12 failed (ملف واحد) |
-| `src/architecture/layer-boundaries.test.ts` | **62/62 PASS** |
-| grep `@/application/actions` في src | **0 نتائج** |
-| git rename detection | 6 renames بنسبة 100% |
+| الفحص                                       | النتيجة                               |
+| ------------------------------------------- | ------------------------------------- |
+| `pnpm typecheck` (apps/admin)               | **PASS** (exit 0)                     |
+| `pnpm lint` (apps/admin, --max-warnings=0)  | **PASS** (0 problems)                 |
+| `pnpm test` (unit)                          | **323 passed** / 12 failed (ملف واحد) |
+| `src/architecture/layer-boundaries.test.ts` | **62/62 PASS**                        |
+| grep `@/application/actions` في src         | **0 نتائج**                           |
+| git rename detection                        | 6 renames بنسبة 100%                  |
 
 ### الفشل المتبقي — تحقيق الجذر (Re-scan)
 
@@ -169,14 +172,14 @@ timeout. **تم إثبات أنه فشل مسبق**: شُغّل نفس الاخ�
 
 ## 11. Exit Criteria
 
-| المعيار | الحالة |
-|---|---|
-| `Application → Infrastructure = FAIL` (اختبار تنفيذي) | ✅ PASS (62/62) |
-| `Application → Port = PASS` (Use Cases تعتمد Ports فقط) | ✅ (كان قائمًا من M7، الآن مفروض اختباريًا) |
-| Server Actions في طبقة Adapters وفق §29 | ✅ |
-| لا انحدار في typecheck/lint | ✅ |
-| لا اختبارات جديدة فاشلة | ✅ (الفشل الوحيد موثق كمسبق ومخرَج جذر خارج نطاق M8) |
-| Shared DB غير متأثرة | ✅ |
+| المعيار                                                 | الحالة                                               |
+| ------------------------------------------------------- | ---------------------------------------------------- |
+| `Application → Infrastructure = FAIL` (اختبار تنفيذي)   | ✅ PASS (62/62)                                      |
+| `Application → Port = PASS` (Use Cases تعتمد Ports فقط) | ✅ (كان قائمًا من M7، الآن مفروض اختباريًا)          |
+| Server Actions في طبقة Adapters وفق §29                 | ✅                                                   |
+| لا انحدار في typecheck/lint                             | ✅                                                   |
+| لا اختبارات جديدة فاشلة                                 | ✅ (الفشل الوحيد موثق كمسبق ومخرَج جذر خارج نطاق M8) |
+| Shared DB غير متأثرة                                    | ✅                                                   |
 
 ## 12. Remaining Risks / المتبعات
 

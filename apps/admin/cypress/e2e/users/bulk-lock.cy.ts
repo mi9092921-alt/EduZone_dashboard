@@ -53,11 +53,21 @@ describe('User Management: Bulk Lock Flow (Cloud Safe)', () => {
 
     cy.get('textarea[aria-label="Action Reason"]').type('Bulk security lockdown incident #123');
 
-    // MOCK the actual Edge Function or RPC bulk logic
-    // Usually bulk actions are sent to an Edge Function invoke or RPC
-    cy.intercept('POST', '**/functions/v1/bulk-actions*', {
-      statusCode: 200,
-      body: { jobId: 'job-cypress-123', status: 'pending' },
+    // MOCK the actual bulk pipeline: the dashboard posts to its OWN
+    // /api/bulk-action route (server-side service-role RPC enqueue), not to
+    // an Edge Function. DOC-FIX (2026-09-25): the old intercept targeted
+    // `**/functions/v1/bulk-actions*` — a name matching no deployed function
+    // (plural) and an endpoint the app never calls, so the mock could never
+    // fire and any contract drift was silently masked. Response mirrors the
+    // route's 202 enqueue shape ({ job_id, estimated_count, status, ... }).
+    cy.intercept('POST', '**/api/bulk-action', {
+      statusCode: 202,
+      body: {
+        job_id: 'job-cypress-123',
+        estimated_count: 5,
+        status: 'pending',
+        created_at: new Date().toISOString(),
+      },
     }).as('invokeBulkFunction');
 
     // Alternatively, if it's an RPC call `bulk_lock_users`

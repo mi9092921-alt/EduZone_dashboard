@@ -7,7 +7,6 @@ import {
   Bolt,
   CalendarToday,
   Download,
-  Star,
 } from '@mui/icons-material';
 import {
   Box,
@@ -103,32 +102,27 @@ export function CourseAnalyticsPage() {
     },
   ];
 
-  // Dynamic lesson data from real course curriculum
+  // Dynamic lesson data from real course curriculum. Only fields backed by
+  // real data are surfaced: the schema has no lesson-level comments or
+  // ratings (only course-level course_ratings) and no per-lesson watch
+  // telemetry, so those fabricated columns were removed rather than
+  // rendered as placeholder values.
   const lessons = useMemo(() => {
     if (!sections || !sections.length) return [];
     const flat: {
       id: string;
       title: string;
       watchTime: string;
-      dropOff: number;
-      dropColor: 'success' | 'warning' | 'error';
-      comments: number;
-      rating: number;
     }[] = [];
 
-    sections.forEach((sec, sIdx) => {
-      (sec.lessons ?? []).forEach((l, lIdx) => {
+    sections.forEach((sec) => {
+      (sec.lessons ?? []).forEach((l) => {
         const secDuration = (l as { duration_sec?: number }).duration_sec ?? l.content?.duration_sec ?? 0;
         const durationMin = secDuration > 0 ? Math.round(secDuration / 60) : 0;
-        const estDropOff = Math.min(100, Math.max(0, Math.round(5 + sIdx * 4 + lIdx * 2)));
         flat.push({
           id: l.id,
           title: `${flat.length + 1}. ${l.title}`,
           watchTime: durationMin > 0 ? `${durationMin} min` : '—',
-          dropOff: estDropOff,
-          dropColor: estDropOff < 10 ? 'success' : estDropOff < 25 ? 'warning' : 'error',
-          comments: 0,
-          rating: 4.8,
         });
       });
     });
@@ -185,8 +179,8 @@ export function CourseAnalyticsPage() {
   }, [students]);
 
   const handleExportCSV = useCallback(() => {
-    const headers = [t('header_lesson_title'), t('header_watch_time'), t('header_drop_off')];
-    const rows = lessons.map((l) => [`"${l.title}"`, `"${l.watchTime}"`, `"${l.dropOff}%"`]);
+    const headers = [t('header_lesson_title'), t('header_watch_time')];
+    const rows = lessons.map((l) => [`"${l.title}"`, `"${l.watchTime}"`]);
     const content = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
     const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -658,7 +652,7 @@ export function CourseAnalyticsPage() {
               </Box>
             </Box>
             <TableContainer sx={{ overflowX: 'auto' }}>
-              <Table sx={{ minWidth: 900 }}>
+              <Table sx={{ minWidth: 480 }}>
                 <TableHead>
                   <TableRow sx={{ backgroundColor: 'action.hover' }}>
                     <TableCell
@@ -683,45 +677,12 @@ export function CourseAnalyticsPage() {
                     >
                       {t('header_watch_time')}
                     </TableCell>
-                    <TableCell
-                      sx={{
-                        fontWeight: 800,
-                        textTransform: 'uppercase',
-                        fontSize: '0.75rem',
-                        color: alpha(theme.palette.text.primary, 0.6),
-                        py: 2,
-                      }}
-                    >
-                      {t('header_drop_off')}
-                    </TableCell>
-                    <TableCell
-                      sx={{
-                        fontWeight: 800,
-                        textTransform: 'uppercase',
-                        fontSize: '0.75rem',
-                        color: alpha(theme.palette.text.primary, 0.6),
-                        py: 2,
-                      }}
-                    >
-                      {t('header_engagements')}
-                    </TableCell>
-                    <TableCell
-                      sx={{
-                        fontWeight: 800,
-                        textTransform: 'uppercase',
-                        fontSize: '0.75rem',
-                        color: alpha(theme.palette.text.primary, 0.6),
-                        py: 2,
-                      }}
-                    >
-                      {t('header_rating')}
-                    </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {lessons.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} align="center" sx={{ py: 8 }}>
+                      <TableCell colSpan={2} align="center" sx={{ py: 8 }}>
                         <Typography
                           variant="body2"
                           sx={{ color: alpha(theme.palette.text.primary, 0.6), fontWeight: 600 }}
@@ -745,47 +706,6 @@ export function CourseAnalyticsPage() {
                           >
                             {row.watchTime}
                           </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                            <Typography
-                              variant="body2"
-                              sx={{ fontWeight: 800, color: `${row.dropColor}.main`, minWidth: 45 }}
-                            >
-                              {row.dropOff}%
-                            </Typography>
-                            <LinearProgress
-                              variant="determinate"
-                              value={row.dropOff}
-                              color={row.dropColor as 'success' | 'warning' | 'error'}
-                              sx={{
-                                width: 80,
-                                height: 6,
-                                borderRadius: 3,
-                                backgroundColor: 'action.disabledBackground',
-                                '& .MuiLinearProgress-bar': { borderRadius: 3 },
-                              }}
-                            />
-                          </Box>
-                        </TableCell>
-                        <TableCell>
-                          <Typography
-                            variant="body2"
-                            sx={{ fontWeight: 600, color: alpha(theme.palette.text.primary, 0.6) }}
-                          >
-                            {t('comments_count', { count: row.comments })}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Star sx={{ fontSize: 18, color: 'warning.main' }} />
-                            <Typography
-                              variant="body2"
-                              sx={{ fontWeight: 800, color: 'text.primary' }}
-                            >
-                              {row.rating}
-                            </Typography>
-                          </Box>
                         </TableCell>
                       </TableRow>
                     )))}

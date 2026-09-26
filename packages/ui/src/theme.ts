@@ -33,8 +33,15 @@ export const eduZoneTheme = createTheme({
       main: colors.success[500],
     },
     background: {
-      default: 'var(--mui-background)',
-      paper: 'var(--mui-paper)',
+      // Real hex, NOT `var(--mui-paper)`: MUI's internal color engine
+      // (alpha/emphasize/getContrastText) parses these values and throws
+      // "MUI: Unsupported `var(--mui-paper)` color." on CSS var strings
+      // (Sentry, 2026-09). The pre-hydration anti-flash behavior is kept by
+      // pinning the paper surface back to the CSS variable in the MuiPaper
+      // styleOverrides below — globals.css remains the source of truth for
+      // `--mui-background` / `--mui-paper` per data-theme.
+      default: '#f8fafc',
+      paper: '#ffffff',
     },
     text: {
       primary: colors.neutral[900],
@@ -140,6 +147,12 @@ export const eduZoneTheme = createTheme({
       styleOverrides: {
         root: {
           backgroundImage: 'none',
+          // Anti-flash: during the SSR→hydration gap the JS theme is always
+          // the light one, so emitting the variable (resolved per data-theme
+          // in globals.css) keeps dark users on dark surfaces. Paper backs
+          // Card, Dialog, Menu, Drawer and Popover, so this single override
+          // covers every major surface.
+          backgroundColor: 'var(--mui-paper)',
         },
         rounded: {
           borderRadius: 16,
@@ -244,7 +257,10 @@ export const eduZoneTheme = createTheme({
       styleOverrides: {
         root: {
           borderRadius: 10,
-          backgroundColor: 'background.default',
+          // The palette path string 'background.default' is not a valid CSS
+          // color here — styleOverrides are plain CSS, so resolve it to the
+          // bridge variable explicitly.
+          backgroundColor: 'var(--mui-background)',
           transition: 'box-shadow 200ms ease',
           '& fieldset': {
             borderColor: 'divider',
@@ -306,8 +322,11 @@ export const eduZoneDarkTheme = createTheme({
     ...eduZoneTheme.palette,
     mode: 'dark',
     background: {
-      default: 'var(--mui-background)',
-      paper: 'var(--mui-paper)',
+      // Same rationale as the light theme: hex for MUI's color engine; dark
+      // surfaces stay CSS-var driven via the inherited MuiPaper styleOverrides
+      // + globals.css.
+      default: '#090e1a',
+      paper: '#161f30',
     },
     text: {
       primary: colors.neutral[50],

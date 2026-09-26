@@ -1,6 +1,8 @@
-# Dependency Audit Resolutuions
+# Dependency Audit Resolutions
 
-# Date: 2026-03-28
+> **Historical audit notes:** entries below record decisions made on the stated dates. They do not replace a new `pnpm audit` against the current lockfile and do not certify that all advisories remain resolved.
+
+## 2026-03-28
 
 ## High Vulnerability: Picomatch ReDoS (extglob quantifiers)
 
@@ -10,19 +12,19 @@
 - **Resolution:** ACCEPTED. Since these toolchains perform compilation over statically trusted codebases managed exclusively internally in CI/CD (and are never exposed to arbitrary strings governed by an attacker locally), the risk factor is essentially null to the end user. Will automatically resolve as `@next/eslint-plugin-next` and `@storybook/addon-docs` push patch version bumps in future root `pnpm update` sweeps.
 - **Action:** Annotated and bypassed.
 
-# Date: 2026-09-02
+## 2026-09-02
 
 ## High: Next.js (multiple CVEs — SSRF in Server Actions, DoS, unauthenticated Server Function endpoint disclosure)
 
 - **Path:** `apps/admin > next` (direct dependency)
 - **Severity:** High / Moderate (multiple advisories)
 - **Context:** `next` was declared as `^15.3.0` but the lockfile had resolved to `15.5.19`, which predates the fixed `15.5.21`. These are runtime, request-reachable issues in a production app.
-- **Resolution:** FIXED. Bumped the declared floor to `"next": "^15.5.25"` (still within the pre-existing `^15.x` range — no breaking-change risk) and refreshed the lockfile. Verified: `pnpm typecheck`, `pnpm lint`, `pnpm test`, and `pnpm build` all pass after the bump with no regressions.
+- **Resolution at that date:** Bumped the declared floor to `"next": "^15.5.25"` and refreshed the lockfile. The recorded checks are historical results; rerun them for the current tree.
 
 ## Moderate: `@opentelemetry/core` — Unbounded memory allocation in W3C Baggage propagation
 
 - **Path:** `apps/admin > @sentry/nextjs > @sentry/node > @opentelemetry/core` (runtime — Sentry's Node SDK, not just its build-time webpack plugin)
-- **Resolution:** FIXED. Bumped `@sentry/nextjs` from `^10.47.0` floor to `^10.73.0` (within the existing `^10.x` range), which resolves `@opentelemetry/core` to a patched version in lockstep with Sentry's own otel dependency graph (avoids forcing a mismatched override across otel packages, which are version-sensitive to each other and could not be verified end-to-end without a live Sentry DSN). Verified via typecheck/lint/test/build as above.
+- **Resolution at that date:** Bumped `@sentry/nextjs` to the recorded `^10.73.0` floor. The resolved graph and checks must be revalidated after future dependency changes; a live Sentry DSN was not part of this repository review.
 
 ## High/Moderate: `postcss`, `nanoid` (build-time only) / Low: `esbuild`
 

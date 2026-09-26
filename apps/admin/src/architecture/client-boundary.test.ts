@@ -87,6 +87,7 @@ const BROWSER_SAFE_MODULES = [
   'src/infrastructure/repos/access-rules.service.ts',
   'src/infrastructure/repos/audit.service.ts',
   'src/infrastructure/repos/user_location_logs.service.ts',
+  'src/infrastructure/repos/settings.service.ts',
   'src/infrastructure/stats-service.ts',
   'src/infrastructure/supabase/client.ts',
   'src/lib/env.client.ts',

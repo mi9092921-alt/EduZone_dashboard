@@ -16,10 +16,10 @@ Provide one of the following in JSON body:
 
 ## Output
 
-```json
-{ "allowed": true, "expires_at": "2026-12-01T00:00:00Z" }
-{ "allowed": true, "expires_at": null }
-{ "allowed": false, "expires_at": null }
+```text
+Allowed with expiry: { "allowed": true, "expires_at": "2026-12-01T00:00:00Z" }
+Allowed with lifetime access: { "allowed": true, "expires_at": null }
+Denied: { "allowed": false, "expires_at": null }
 ```
 
 ## Notes

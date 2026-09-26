@@ -1,13 +1,16 @@
 # Milestone Report — M17: Accessibility & UX Regression (§23 P2)
-**تاريخ التنفيذ:** 2026-09-04  
-**الفرع المستهدف:** main  
-**المنهجية المتبعة:** شوف → افحص → فكّر → عدّل → تأكد  
+
+> **Historical snapshot (2026-09-04):** this report records a point-in-time implementation check. Its counts and PASS/complete statements are not current release evidence; re-run the referenced checks against the current tree.
+> **تاريخ التنفيذ:** 2026-09-04
+> **الفرع المستهدف:** main
+> **المنهجية المتبعة:** شوف → افحص → فكّر → عدّل → تأكد
 
 ---
 
 ## 1. أهداف المرحلة (§23 من وثيقة الخطة المعمارية)
 
 التحقق من سلامة الواجهة وسلوك التفاعل للمسارات الحساسة بعد استقرار البنية التحتية، والتأكد من مطابقة المتطلبات التالية:
+
 - **Arabic / English / RTL**: دعم كامل لاتجاه الصفحة `dir="rtl"` للغة العربية و`dir="ltr"` للغة الإنجليزية دون كسر التنسيق أو تداخل العناصر.
 - **Keyboard & Focus**: إمكانية التنقل التسلسلي الكامل عبر لوحة المفاتيح (`Tab` / `Shift+Tab`) ومؤشرات التركيز الواضحة.
 - **Modal & Focus Trap**: حبس التركيز داخل النوافذ المنبثقة (`role="dialog"`, `aria-modal="true"`)، وإغلاقها بواسطة مفتاح `Escape` مع استعادة التركيز للعنصر المشغِّل (WCAG 2.4.3 / 2.1.2).
@@ -20,6 +23,7 @@
 ## 2. ما تم إنجازه في هذه المرحلة
 
 ### 2.1. اختبارات الوحدة المعمارية للواجهة (Unit Testing)
+
 1. **RTL / LTR Direction Mapping (`direction.test.ts`)**:
    - اختبار خريطة الاتجاهات `getDir(locale)` لتأكيد إرجاع `rtl` لـ `ar` و `ltr` لـ `en` والاحتياطي الافتراضي.
    - النتيجة: ✅ **3/3 اختبارات ناجحة**.
@@ -33,7 +37,9 @@
    - النتيجة: ✅ **5/5 اختبارات ناجحة**.
 
 ### 2.2. اختبارات الانحدار الشاملة للـE2E (`tests/e2e/ux-regression.spec.ts`)
+
 إضافة حزمة اختبارات Playwright موسعة تفحص متطلبات §23:
+
 - **Arabic Locale**: التحقق من صفات `dir="rtl"` و `lang="ar"` على وسم `<html>`.
 - **English Locale**: التحقق من صفات `dir="ltr"` و `lang="en"` على وسم `<html>`.
 - **Axe Accessibility Scan**: فحص صفحات الدخول وخلوها من مخالفات `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`.
@@ -46,16 +52,16 @@
 
 ## 3. التحقق المباشر (Verification Evidence)
 
-| الفحص | الأداة | النتيجة |
-|---|---|---|
-| فحص الأنواع | `pnpm typecheck` | ✅ **PASS** (4/4 packages) |
-| فحص الـLint | `pnpm lint` | ✅ **PASS** (`--max-warnings=0`) |
-| اختبارات الوحدة للـA11y/Direction | `vitest run` | ✅ **PASS** (8/8 اختبارات) |
-| إجمالي اختبارات المشروع | `vitest run` | ✅ **PASS** (1064/1064 اختبارات) |
-| بناء التطبيق للإنتاج | `pnpm build` | ✅ **PASS** (exit code 0) |
+| الفحص                             | الأداة           | النتيجة                          |
+| --------------------------------- | ---------------- | -------------------------------- |
+| فحص الأنواع                       | `pnpm typecheck` | ✅ **PASS** (4/4 packages)       |
+| فحص الـLint                       | `pnpm lint`      | ✅ **PASS** (`--max-warnings=0`) |
+| اختبارات الوحدة للـA11y/Direction | `vitest run`     | ✅ **PASS** (8/8 اختبارات)       |
+| إجمالي اختبارات المشروع           | `vitest run`     | ✅ **PASS** (1064/1064 اختبارات) |
+| بناء التطبيق للإنتاج              | `pnpm build`     | ✅ **PASS** (exit code 0)        |
 
 ---
 
 ## 4. الحالة المعمارية
 
-المرحلة M17 مكتملة وموثقة، والتطبيق جاهز للمرحلة الختامية: **M18 — §24 Final Production Architecture Certification**.
+المرحلة M17 موثقة كنقطة زمنية بتاريخ 2026-09-04، لكن اكتمالها التاريخي لا يثبت الحالة الحالية أو الجاهزية للإنتاج.

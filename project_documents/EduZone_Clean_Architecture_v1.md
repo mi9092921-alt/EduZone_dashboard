@@ -1,5 +1,7 @@
 # EduZone — Clean Architecture Specification
 
+> **Scope note:** This is an architectural target/reference reviewed against the current tree. It does not prove that every rule is enforced; the current visible enforcement is in ESLint and Vitest architecture tests.
+
 > **Version:** 1.0 | **Date:** 2026-03-17 | **Status:** APPROVED  
 > **Stack:** Next.js 15 · TypeScript 5 · Supabase · MUI v5 · React Query v5 · Zustand · Zod  
 > **Principles:** Clean Architecture (Robert C. Martin) · Ports & Adapters (Alistair Cockburn) · SOLID · DDD Tactical Patterns
@@ -12,13 +14,13 @@ The EduZone Admin Dashboard follows **Clean Architecture** — a software design
 
 ### 1.1 Core Rules
 
-| #   | Rule                                                                                                   | Enforcement                                                |
-| --- | ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
-| 1   | **Dependency Rule** — outer layers depend on inner; never the reverse                                  | ESLint `import/no-restricted-paths` + `dependency-cruiser` |
-| 2   | **Framework Isolation** — domain/application layers never import React, Next.js, MUI, or Supabase      | TypeScript path alias restrictions                         |
-| 3   | **Dependency Inversion** — application depends on port interfaces (`I*`), not concrete implementations | Constructor/parameter injection                            |
-| 4   | **Single Responsibility** — each module has one reason to change                                       | Code review checklist                                      |
-| 5   | **Interface Segregation** — ports are small, role-specific interfaces                                  | Max 5–7 methods per port                                   |
+| #   | Rule                                                                                                   | Enforcement                                                     |
+| --- | ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- |
+| 1   | **Dependency Rule** — outer layers depend on inner; never the reverse                                  | ESLint `import/no-restricted-paths` + Vitest architecture tests |
+| 2   | **Framework Isolation** — domain/application layers never import React, Next.js, MUI, or Supabase      | TypeScript path alias restrictions                              |
+| 3   | **Dependency Inversion** — application depends on port interfaces (`I*`), not concrete implementations | Constructor/parameter injection                                 |
+| 4   | **Single Responsibility** — each module has one reason to change                                       | Code review checklist                                           |
+| 5   | **Interface Segregation** — ports are small, role-specific interfaces                                  | Max 5–7 methods per port                                        |
 
 ### 1.2 Dependency Direction
 
@@ -232,7 +234,9 @@ src/infrastructure/
 
 ---
 
-### 2.4 Contracts Layer — `src/contracts/`
+### 2.4 Contracts Layer — target only
+
+The `src/contracts/` layer described below is a design target; it is not present in the current `apps/admin/src/` tree.
 
 > **Purpose:** Versioned API schemas that freeze the interface between client and server. Prevents breaking changes.
 

@@ -24,6 +24,7 @@ import { useState, useEffect } from 'react';
 import { SectionCard } from './curriculum-builder/SectionCard';
 
 import { useCreateSection, useReorderSections } from '@/adapters/mutations/courses.mutations';
+import { useToast } from '@/adapters/stores/toast.store';
 import type { Section } from '@/domain/types/course.types';
 import { formatVideoUrl } from '@/domain/video.utils';
 import { getCourseById } from '@/infrastructure/repos/courses.service';
@@ -46,6 +47,7 @@ export function CurriculumBuilder({ courseId, sections }: CurriculumBuilderProps
   const [isExporting, setIsExporting] = useState(false);
   const createSection = useCreateSection();
   const reorderSections = useReorderSections();
+  const { showToast } = useToast();
 
   const [localSections, setLocalSections] = useState(sections);
   useEffect(() => {
@@ -69,20 +71,30 @@ export function CurriculumBuilder({ courseId, sections }: CurriculumBuilderProps
     setLocalSections(newSections);
 
     const updates = newSections.map((s: Section, idx: number) => ({ id: s.id, order_index: idx }));
-    await reorderSections.mutateAsync({ courseId, updates });
+    try {
+      await reorderSections.mutateAsync({ courseId, updates });
+    } catch (err) {
+      // Revert the optimistic reorder — the server still holds the old order.
+      setLocalSections(sections);
+      showToast(err instanceof Error ? err.message : t('failed_to_save'), 'error');
+    }
   };
 
   const handleAddSection = async () => {
     if (!newSecTitle.trim()) return;
-    await createSection.mutateAsync({
-      courseId,
-      data: {
-        title: newSecTitle,
-        order_index: sections.length,
-      },
-    });
-    setNewSecTitle('');
-    setAddingSec(false);
+    try {
+      await createSection.mutateAsync({
+        courseId,
+        data: {
+          title: newSecTitle,
+          order_index: sections.length,
+        },
+      });
+      setNewSecTitle('');
+      setAddingSec(false);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : t('failed_to_save'), 'error');
+    }
   };
 
   const handleExportJSON = async () => {

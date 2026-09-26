@@ -98,7 +98,14 @@ test.describe('§23 UX & Accessibility Regression — Public & Auth Flows', () =
   test('Error & Disabled State: shows accessible error alert on invalid credentials', async ({ page }) => {
     await page.goto('/en/login');
 
-    await page.locator('input#email').fill('nonexistent@domain.com');
+    // Unique address per attempt: GoTrue throttles repeated failed
+    // sign-ins ("Too many sign-in attempts. Please try again in 15
+    // minutes.") and Playwright retries re-run this body with the same
+    // credentials, so a fixed address can land on the throttler's
+    // lockout message instead of the invalid-credentials error this
+    // test asserts. Only the error UI is under test, so a fresh
+    // mailbox per attempt keeps the throttler out of the way.
+    await page.locator('input#email').fill(`nonexistent-${Date.now()}@domain.com`);
     await page.locator('input#password').fill('WrongPassword123');
 
     const submitBtn = page.locator('button[type="submit"]');

@@ -317,17 +317,22 @@ function SendNotificationDialog({
     if (userQuery.length > 1) {
       // M9: project the search results onto the option shape the dialog needs,
       // instead of blind-casting the wider UserSearchResult[].
-      searchUsers(userQuery, 20, tenantId, allowedRecipientRoles).then((res) =>
-        setUserOptions(
-          res.map((u) => ({
-            id: u.id,
-            first_name: u.first_name,
-            last_name: u.last_name,
-            email: u.email,
-            primary_role: u.primary_role,
-          })),
-        ),
-      );
+      searchUsers(userQuery, 20, tenantId, allowedRecipientRoles)
+        .then((res) =>
+          setUserOptions(
+            res.map((u) => ({
+              id: u.id,
+              first_name: u.first_name,
+              last_name: u.last_name,
+              email: u.email,
+              primary_role: u.primary_role,
+            })),
+          ),
+        )
+        // Same silent-fallback convention as the sibling permissions effect
+        // above: a failed keystroke search must not become an unhandled
+        // rejection — the user just sees no options and can retry.
+        .catch(() => setUserOptions([]));
     } else {
       setUserOptions([]);
     }

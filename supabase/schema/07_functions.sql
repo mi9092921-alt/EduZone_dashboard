@@ -1271,8 +1271,11 @@ SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
 BEGIN
   PERFORM private.refresh_mv_resilient('private', 'mv_course_stats');
-  PERFORM private.refresh_mv_resilient('public', 'vw_student_progress_timeline');
-  PERFORM private.refresh_mv_resilient('public', 'vw_daily_revenue');
+  -- HARDENING-2026-09-25: the public vw_student_progress_timeline and
+  -- vw_daily_revenue matviews were removed (zero consumers; private twins
+  -- are the only analytics surfaces — see 06_views.sql). The private
+  -- student-progress twin is refreshed lazily on read by
+  -- private.refresh_dashboard_stats(), so no replacement line is needed here.
 END;
 $$;
 
@@ -2533,6 +2536,21 @@ BEGIN
     RAISE EXCEPTION 'PERMISSION_DENIED';
   END IF;
 
+  -- 2026-09-26 audit: the platform-wide app lock is super_admin-only by
+  -- design (the now-dead lock_app_for_all/unlock_app enforced
+  -- is_current_user_super_admin()). set_setting itself is only
+  -- settings.write-gated, and the admin role holds settings.write, so
+  -- without this pin any tenant admin could flip app_locked directly and
+  -- lock every account out of the student app (platform-wide DoS lever).
+  -- Maintenance-mode keys stay settings.write-gated, matching the dead
+  -- enable/disable_maintenance_mode checks.
+  IF p_key IN ('app_locked', 'app_lock_message')
+     AND pg_catalog.current_setting('role', true) IS DISTINCT FROM 'service_role'
+     AND auth.role() IS DISTINCT FROM 'service_role'
+     AND NOT public.is_current_user_super_admin() THEN
+    RAISE EXCEPTION 'PERMISSION_DENIED' USING ERRCODE = '42501';
+  END IF;
+
   SELECT * INTO v_def FROM public.setting_definitions WHERE key = p_key;
   IF FOUND THEN
     IF p_value IS NULL AND NOT v_def.is_nullable THEN
@@ -3323,6 +3341,90 @@ BEGIN
   RETURNING id INTO v_id;
 
   RETURN v_id;
+END;
+$$;
+
+-- ============================================================================
+-- TEACHER-STUDENT-DIRECTORY (2026-09-25): enrollment search for staff.
+--
+-- Problem: users_select_merged RLS only shows a teacher the students already
+-- enrolled in their own courses, so the dashboard's EnrollStudentDialog
+-- (which queries public.users directly) could never find a not-yet-enrolled
+-- student by name or email. Teachers hold courses.manage (seeded) and may
+-- call enroll_student(), but had no way to discover the student to enroll.
+--
+-- Contract: SECURITY DEFINER directory scoped to the CALLER's own tenant
+-- (get_current_tenant_id() — never a client-supplied tenant), students only,
+-- soft-deleted rows excluded, bounded to 50 rows, and reachable only by
+-- callers who hold courses.manage for that tenant with a valid, non-revoked
+-- session (same guard pair as enroll_student). No RLS policy is weakened:
+-- this is the same deliberate SECURITY DEFINER pattern enroll_student uses.
+-- Wildcard-safe: substring matching via strpos() (identical semantics to
+-- position(needle IN haystack), but callable as a qualified catalog
+-- function) so no LIKE/regex escaping can be injected through p_query.
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.search_tenant_students(
+  p_query text,
+  p_limit integer DEFAULT 20
+)
+RETURNS TABLE (
+  id uuid,
+  first_name text,
+  last_name text,
+  email text,
+  primary_role text,
+  avatar_url text,
+  last_login timestamptz
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_term text;
+  v_limit integer;
+BEGIN
+  -- Session/identity guard: anonymous callers, deleted users, suspended,
+  -- locked, banned accounts and revoked token versions all fail here.
+  IF NOT public.validate_user_session() THEN
+    RAISE EXCEPTION 'UNAUTHENTICATED';
+  END IF;
+
+  -- Permission gate identical to enroll_student(): only staff who may
+  -- actually enroll get directory access. (Students are never granted
+  -- courses.manage; the role check below is defense in depth.)
+  IF NOT public.user_has_permission(
+       auth.uid(), 'courses.manage', public.get_current_tenant_id()
+     )
+     OR NOT (
+       public.is_current_user_teacher()
+       OR public.is_current_user_admin_lite()
+       OR public.is_current_user_super_admin()
+     ) THEN
+    RAISE EXCEPTION 'PERMISSION_DENIED';
+  END IF;
+
+  v_term := pg_catalog.btrim(coalesce(p_query, ''));
+  -- Unqualified like every other least/greatest call in this file:
+  -- PostgreSQL 17 handles GREATEST/LEAST at parser level with no
+  -- pg_catalog entry, so the schema-qualified form fails with 42883.
+  v_limit := least(greatest(coalesce(p_limit, 20), 1), 50);
+
+  RETURN QUERY
+  SELECT u.id, u.first_name, u.last_name, u.email,
+         u.primary_role, u.avatar_url, u.last_login
+  FROM public.users u
+  WHERE u.deleted_at IS NULL
+    AND u.tenant_id = public.get_current_tenant_id()
+    AND u.primary_role = 'student'
+    AND (
+      v_term = ''
+      OR pg_catalog.strpos(pg_catalog.lower(u.first_name), pg_catalog.lower(v_term)) > 0
+      OR pg_catalog.strpos(pg_catalog.lower(u.last_name), pg_catalog.lower(v_term)) > 0
+      OR pg_catalog.strpos(pg_catalog.lower(u.email), pg_catalog.lower(v_term)) > 0
+    )
+  ORDER BY u.first_name, u.last_name, u.created_at
+  LIMIT v_limit;
 END;
 $$;
 
@@ -6302,6 +6404,105 @@ BEGIN
 END;
 $$;
 
+-- ============================================================================
+-- EXPORT-REPORT-BACKEND (2026-09-25): server-side CSV sources for the
+-- export-report Edge Function.
+--
+-- Problem: the Edge Function queried PostgREST names `mv_user_stats` and
+-- `mv_daily_activity` in the API-exposed `public` schema, but both objects
+-- live in `private` (PostgREST only exposes `public`), so the user_stats and
+-- activity report types always failed. These RPCs give the function a
+-- guarded read path instead of widening any grant on `private` tables.
+--
+-- Contract: returns a jsonb ARRAY of row objects (or NULL/empty array for no
+-- rows — the caller normalizes to []). Tenant is pinned to the caller's
+-- acting tenant unless the caller is super_admin (same override rule the
+-- Edge Function already enforces) or the trusted service_role backend.
+-- Guards: validate_user_session() + reports.read permission, mirroring the
+-- Edge Function's own requirePermission('reports.read').
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.admin_export_user_stats(
+  p_tenant_id uuid DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_tenant uuid;
+BEGIN
+  IF auth.role() IS DISTINCT FROM 'service_role' THEN
+    IF auth.uid() IS NULL OR NOT public.validate_user_session() THEN
+      RAISE EXCEPTION 'UNAUTHENTICATED';
+    END IF;
+    v_tenant := coalesce(p_tenant_id, public.get_current_tenant_id());
+    IF v_tenant IS NULL THEN
+      RAISE EXCEPTION 'TENANT_REQUIRED';
+    END IF;
+    IF v_tenant IS DISTINCT FROM public.get_current_tenant_id()
+       AND NOT public.is_current_user_super_admin() THEN
+      RAISE EXCEPTION 'TENANT_MISMATCH';
+    END IF;
+    IF NOT public.user_has_permission(auth.uid(), 'reports.read', v_tenant) THEN
+      RAISE EXCEPTION 'PERMISSION_DENIED';
+    END IF;
+  ELSE
+    v_tenant := p_tenant_id;
+    IF v_tenant IS NULL THEN
+      RAISE EXCEPTION 'TENANT_REQUIRED';
+    END IF;
+  END IF;
+
+  RETURN (
+    SELECT pg_catalog.jsonb_agg(to_jsonb(m))
+    FROM private.mv_user_stats m
+    WHERE m.tenant_id = v_tenant
+  );
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.admin_export_daily_activity(
+  p_tenant_id uuid DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_tenant uuid;
+BEGIN
+  IF auth.role() IS DISTINCT FROM 'service_role' THEN
+    IF auth.uid() IS NULL OR NOT public.validate_user_session() THEN
+      RAISE EXCEPTION 'UNAUTHENTICATED';
+    END IF;
+    v_tenant := coalesce(p_tenant_id, public.get_current_tenant_id());
+    IF v_tenant IS NULL THEN
+      RAISE EXCEPTION 'TENANT_REQUIRED';
+    END IF;
+    IF v_tenant IS DISTINCT FROM public.get_current_tenant_id()
+       AND NOT public.is_current_user_super_admin() THEN
+      RAISE EXCEPTION 'TENANT_MISMATCH';
+    END IF;
+    IF NOT public.user_has_permission(auth.uid(), 'reports.read', v_tenant) THEN
+      RAISE EXCEPTION 'PERMISSION_DENIED';
+    END IF;
+  ELSE
+    v_tenant := p_tenant_id;
+    IF v_tenant IS NULL THEN
+      RAISE EXCEPTION 'TENANT_REQUIRED';
+    END IF;
+  END IF;
+
+  RETURN (
+    SELECT pg_catalog.jsonb_agg(to_jsonb(m) ORDER BY m.activity_date DESC)
+    FROM private.mv_daily_activity_30d m
+    WHERE m.tenant_id = v_tenant
+  );
+END;
+$$;
+
 -- CRIT-02 REMEDIATION: Dedicated RPC for teachers to get student list safely.
 CREATE OR REPLACE FUNCTION public.get_my_students(p_course_id uuid DEFAULT NULL)
 RETURNS TABLE (
@@ -6686,6 +6887,13 @@ BEGIN
   PERFORM private.refresh_mv_resilient('private', 'mv_course_stats_tenant');
   PERFORM private.refresh_mv_resilient('private', 'mv_hourly_activity_48h');
   PERFORM private.refresh_mv_resilient('private', 'mv_daily_activity_30d');
+  -- HARDENING-2026-09-25: private.vw_student_progress_timeline (the only
+  -- remaining student-progress aggregate, read by get_student_progress_
+  -- timeline) previously had NO refresh caller — its dedicated
+  -- private.refresh_dashboard_stats() was never registered anywhere, so the
+  -- RPC served stale aggregates indefinitely. Refresh it on the same 5-minute
+  -- cron. The unique index on (student_id) satisfies REFRESH CONCURRENTLY.
+  PERFORM private.refresh_mv_resilient('private', 'vw_student_progress_timeline');
 END;
 $$;
 

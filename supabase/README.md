@@ -1,108 +1,37 @@
 # EduZone Supabase
 
-**Baseline:** `main` @ `9f1a31659d929fcf5bbcdec58429c146021b777d`  
-**Status:** **Database infrastructure present; production readiness requires runtime evidence**
+**Reviewed:** 2026-09-24
+**Status:** database source and deployment tooling are present; runtime and production readiness remain separately unverified.
 
-## 1. What this directory contains
+## Scope
 
 ```text
 supabase/
-├── schema/         # canonical ordered SQL inputs
-├── functions/      # Deno Edge Functions
-├── migrations/     # repository area; do not treat as a proven migration chain
+├── schema/       canonical ordered SQL inputs
+├── functions/    Deno Edge Function entrypoints
+├── migrations/   README only; no active SQL migration chain
 ├── config.toml
-└── deployment/validation tooling
+└── deployment and validation helpers
 ```
 
-## 2. Canonical schema
+## Canonical schema
 
-The current `config.toml` defines these ordered schema inputs:
+The active development-stage order is the explicit `schema_paths` list in `config.toml`, documented in [`schema/README.md`](schema/README.md). `12_seed_qa_demo.sql` is disposable QA/E2E data and is not part of that production-oriented list.
 
-```text
-01_extensions.sql
-02_types.sql
-03_tables.sql
-04_constraints.sql
-05_indexes.sql
-07_functions.sql
-06_views.sql
-08_triggers.sql
-09_rls.sql
-10_permissions.sql
-11_seed_reference.sql
-```
+The schema contains RLS, SECURITY DEFINER functions, grants/revokes, constraints, indexes, triggers, views, and validation SQL. These are source-level controls, not proof of deployed behavior.
 
-Ownership rules are documented in `schema/README.md`.
+## Local verification
 
-## 3. Security model
-
-The schema includes:
-
-```text
-RLS policies
-SECURITY DEFINER functions
-explicit grants/revokes
-constraints/indexes/triggers/views
-validation SQL
-```
-
-These are source-level controls. They are not by themselves evidence of a passing production security assessment.
-
-## 4. Shared database warning
-
-This Supabase project is shared by:
-
-```text
-EduZone_dashboard
-EduZone_App
-```
-
-Any shared-schema change must be evaluated against both repositories.
-
-## 5. Development verification
-
-Use the project's actual configuration and scripts. Typical local verification includes:
-
-```bash
+```powershell
 supabase start
 supabase status
-supabase db reset
+supabase\deploy.ps1 local
 ```
 
-and the repository's schema validation tooling where applicable.
+Review the target connection and deployment script before applying changes. A plain `supabase db reset` must not be reported as a successful application of this repository's ordered schema because the migrations directory contains no SQL chain.
 
-Do not run destructive commands against production without an explicit operational procedure and backup/restore plan.
+## Shared database and change policy
 
-## 6. Database change policy
+The repository documents the database as shared with `EduZone_App`. Before changing a table, RPC, function, policy, constraint, or trigger, inspect dashboard callers, the student-app callers where available, SQL dependencies, Edge Functions, tests, CI, and documentation. If the other repository cannot be inspected, mark cross-repository compatibility **UNVERIFIED**.
 
-Before changing a function, table, policy, constraint, index, or RPC:
-
-```text
-1. inspect canonical schema ownership
-2. find all callers
-3. check both repositories
-4. check tests and Edge Functions
-5. make the smallest safe change
-6. verify local/database behavior
-7. re-check references
-```
-
-Never weaken RLS or grants merely to make an application test pass.
-
-## 7. Runtime release gate
-
-Production database approval requires evidence for:
-
-```text
-schema deployment
-RLS tenant isolation
-function grants/search_path
-critical RPC behavior
-idempotency/concurrency
-backup/restore
-rollback or forward-fix procedure
-```
-
-## 8. Documentation rule
-
-Older files that state “Production Ready” without corresponding current evidence must be treated as stale documentation and updated rather than copied forward.
+Never weaken RLS or broaden grants to make an application test pass. Production approval requires executable evidence for schema deployment, tenant isolation, privileged RPC behavior, backup/restore, and rollback or forward-fix procedures.

@@ -1,10 +1,11 @@
 ﻿EduZone Testing Strategy v1.0 **| INTERNAL**
 
 > [!WARNING]
-> **This document is superseded and does not reflect the current stack or CI state (updated 2026-09-05).** It was written 2026-03-08 as a pre-implementation plan; parts of it (notably the Section 5 flow table below) never matched what was actually built — file names like `bulk-suspend.cy.ts`, `hash-chain.cy.ts`, `teacher/my-courses.cy.ts`, and `permissions/gate.cy.ts` do not exist in the repo. Separately, **RFC-012** (2026-03-08, `project_documents/RFC_DECISION_LOG.md`) mandates **Vitest + Playwright**, retiring Cypress — a decision this document predates and does not mention.
+> **This document is superseded and does not reflect the current stack or CI state.** It was written 2026-03-08 as a pre-implementation plan; parts of the Section 5 flow table never matched what was built. The current tree contains seven Playwright spec files and fifteen Cypress spec files, so Cypress has not disappeared from the repository. **RFC-012** is a decision record, not evidence that the remaining Cypress suite has been migrated.
 >
 > **For ground truth, use:**
-> - `project_documents/go-no-go-checklist.md` — current E2E tool split (Playwright: 4 spec files / 16 tests, verified green; Cypress: 15 spec files, still required — migration incomplete) and the actual Cypress flow list.
+>
+> - `project_documents/go-no-go-checklist.md` — historical checklist; re-check the current E2E result before relying on it.
 > - `apps/admin/cypress/e2e/` and `apps/admin/tests/e2e/` — real spec files, not the table below.
 > - `.github/workflows/e2e.yml` and `project_documents/milestone_reports/M15_ci_cd_production_gates_report.md` — actual CI gate behavior (E2E is a conditional, now-active gate; not an unconditional "PR blocked if red" as §1.2 below describes).
 >
@@ -39,15 +40,15 @@ _Version 1.0 | 2026-03-08_
 
 ## **1.2 CI Gate Policy**
 
-|           **Check**            |  **Threshold**   |                **Consequence if Fail**                |
-| :----------------------------: | :--------------: | :---------------------------------------------------: |
-|  **Vitest coverage — lines**   |    **≥ 80%**     |       PR blocked — must add tests before merge        |
-| **Vitest coverage — branches** |    **≥ 75%**     |     PR blocked — critical for RLS-dependent paths     |
-|    **Cypress smoke suite**     |  **0 failures**  |          PR blocked — all 13 flows must pass          |
-|   **Chromatic visual diff**    | **0 unreviewed** | PR blocked until designer approves or dismisses diff  |
-|     **TypeScript compile**     |   **0 errors**   |        PR blocked — strict mode, no ts-ignore         |
-|           **ESLint**           |   **0 errors**   |  PR blocked — warnings allowed for now, errors block  |
-|    **gitleaks secret scan**    |  **0 secrets**   | PR blocked — service_role key in code = instant block |
+|           **Check**            |   **Threshold**   |                    **Consequence if Fail**                     |
+| :----------------------------: | :---------------: | :------------------------------------------------------------: |
+|  **Vitest coverage — lines**   |     **≥ 80%**     |            PR blocked — must add tests before merge            |
+| **Vitest coverage — branches** |     **≥ 75%**     |         PR blocked — critical for RLS-dependent paths          |
+|    **Cypress smoke suite**     | Historical target | Current CI requirement must be verified from workflow settings |
+|   **Chromatic visual diff**    | **0 unreviewed**  |      PR blocked until designer approves or dismisses diff      |
+|     **TypeScript compile**     |   **0 errors**    |             PR blocked — strict mode, no ts-ignore             |
+|           **ESLint**           |   **0 errors**    |      PR blocked — warnings allowed for now, errors block       |
+|    **gitleaks secret scan**    |   **0 secrets**   |     PR blocked — service_role key in code = instant block      |
 
 **COVERAGE EXCEPTION:** Generated files (database.types.ts, theme.ts from Token Studio) are excluded from coverage via Vitest's coverage.exclude config. Third-party type declarations also excluded.
 
