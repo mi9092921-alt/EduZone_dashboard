@@ -85,6 +85,19 @@ serve(async (req) => {
       return jsonBody(req, { error: 'Unauthorized' }, 401);
     }
 
+    // Session-revocation consistency (2026-09-26 audit): every other
+    // user-facing function (create-user, video-info, bulk-action) additionally
+    // re-validates the caller's session server-side (account active +
+    // token_version match + session row). A revoked/stale caller should not
+    // keep writing audit rows. validate_user_session is SECURITY DEFINER and
+    // fails closed (granted to authenticated; returns false on any doubt).
+    const { data: sessionValid, error: sessionError } = await supabaseClient.rpc(
+      'validate_user_session',
+    );
+    if (sessionError || !sessionValid) {
+      return jsonBody(req, { error: 'Session invalid' }, 401);
+    }
+
     // Resolve course_id from lesson.
     // Tenant scoping is enforced by RLS (lessons_select policy, DB-
     // authoritative get_current_tenant_id()), not by a client-supplied

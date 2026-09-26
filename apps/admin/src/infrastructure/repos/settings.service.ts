@@ -1,3 +1,9 @@
+import {
+  disableMaintenanceModeAction,
+  enableMaintenanceModeAction,
+  lockAppAction,
+  unlockAppAction,
+} from '@/adapters/actions/settings.actions';
 import { container } from '@/container';
 import { mapDbError } from '@/domain/errors';
 import { InfrastructureError, NotFoundError, UnauthorizedError } from '@/domain/errors';
@@ -208,22 +214,29 @@ export async function deleteSetting(key: string): Promise<void> {
 // MAINTENANCE MODE
 // ══════════════════════════════════════════════════
 
+// 2026-09-26 security audit: these four privileged writes moved to server
+// actions (settings.actions.ts) because the direct SECURITY DEFINER RPCs
+// (`enable/disable_maintenance_mode`, `lock_app_for_all`, `unlock_app`) are
+// EXECUTE-granted to service_role only and their internal auth.uid()-based
+// permission checks can never pass from any client or service connection —
+// every call failed with PERMISSION_DENIED. The actions write through
+// `set_setting` under the caller's own session (DB-enforced settings.write)
+// and re-apply the stricter gates app-side (settings.write / super_admin).
+
+/** Thrown when a settings server action reports failure, keeping the
+ * generic-message + hidden-detail error contract of this module. */
+async function unwrapActionResult(result: { success: boolean; error?: string }): Promise<void> {
+  if (!result.success) {
+    throw new InfrastructureError(undefined, result.error ?? 'settings action failed');
+  }
+}
+
 export async function enableMaintenanceMode(params: MaintenanceModeParams): Promise<void> {
-  const { supabase } = container;
-  const { error } = await supabase.rpc('enable_maintenance_mode', {
-    p_message: params.message,
-    p_ends_at: params.ends_at,
-    p_exclude_roles: params.exclude_roles ?? ['super_admin', 'admin'],
-    p_exclude_users: params.exclude_users ?? [],
-  });
-  if (error) throw mapDbError(error, 'settings.service.ts');
+  await unwrapActionResult(await enableMaintenanceModeAction(params));
 }
 
 export async function disableMaintenanceMode(): Promise<void> {
-  const { supabase } = container;
-  const { error } = await supabase.rpc('disable_maintenance_mode');
-
-  if (error) throw mapDbError(error, 'settings.service.ts');
+  await unwrapActionResult(await disableMaintenanceModeAction());
 }
 
 // ══════════════════════════════════════════════════
@@ -231,14 +244,9 @@ export async function disableMaintenanceMode(): Promise<void> {
 // ══════════════════════════════════════════════════
 
 export async function lockApp(message: string): Promise<void> {
-  const { supabase } = container;
-  const { error } = await supabase.rpc('lock_app_for_all', { p_message: message });
-  if (error) throw mapDbError(error, 'settings.service.ts');
+  await unwrapActionResult(await lockAppAction(message));
 }
 
 export async function unlockApp(): Promise<void> {
-  const { supabase } = container;
-  const { error } = await supabase.rpc('unlock_app');
-
-  if (error) throw mapDbError(error, 'settings.service.ts');
+  await unwrapActionResult(await unlockAppAction());
 }

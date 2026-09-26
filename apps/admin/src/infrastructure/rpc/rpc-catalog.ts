@@ -381,6 +381,70 @@ export const RPC_CATALOG: readonly RpcDefinition[] = [
       'Launch-audit B11: read-only job-queue health snapshot (pending/processing/failed counts, ' +
       'oldest pending age) surfaced by the cron route for monitoring. service_role only.',
   },
+
+  // ── Settings / platform switches ─────────────────────────────────
+  {
+    name: 'set_setting',
+    classification: 'authenticated',
+    owner:
+      'infrastructure/repos/settings.service.ts (general settings) + ' +
+      'infrastructure/repos/settings-writes.ts (maintenance/app-lock, session client)',
+    requiredPermission: 'settings.write',
+    notes:
+      'SECURITY DEFINER. Granted to authenticated + service_role (10_permissions.sql). Enforces ' +
+      'user_has_permission(auth.uid(), settings.write, get_current_tenant_id()) internally, ' +
+      'validates the value against setting_definitions.expected_type, bumps the row version, ' +
+      'stamps settings_kv.updated_by = auth.uid() and queues cache invalidation. As of the ' +
+      '2026-09-26 audit the function also pins the app-lock keys (app_locked, ' +
+      'app_lock_message) to super_admin / service_role inside set_setting itself, restoring ' +
+      'the intent of the dead lock_app_for_all/unlock_app; the app-layer gates in ' +
+      'adapters/actions/settings.actions.ts mirror that (super_admin for app lock, ' +
+      'settings.write for maintenance).',
+  },
+  {
+    name: 'enable_maintenance_mode',
+    classification: 'privileged',
+    owner: 'none — dead for every caller (2026-09-26 audit); UI uses set_setting via settings.actions',
+    requiredPermission: 'settings.write',
+    notes:
+      'Service-role-granted (10_permissions.sql) but UNCALLABLE: its internal ' +
+      'user_has_permission(auth.uid(), …) check can never pass on a service connection ' +
+      '(auth.uid() is NULL) — PERMISSION_DENIED unconditionally. Classified privileged like ' +
+      'control_user_account (service-role entries require a live infrastructure owner). ' +
+      'Do not call; do not restore the old browser call site. The dashboard enable flow ' +
+      'writes the maintenance_* keys through set_setting (settings-writes.ts) with a ' +
+      'settings.write gate.',
+  },
+  {
+    name: 'disable_maintenance_mode',
+    classification: 'privileged',
+    owner: 'none — dead for every caller (2026-09-26 audit); UI uses set_setting via settings.actions',
+    requiredPermission: 'settings.write',
+    notes:
+      'Same grant/check contradiction as enable_maintenance_mode. The dashboard disable flow ' +
+      'sets maintenance_mode=false through set_setting (settings-writes.ts).',
+  },
+  {
+    name: 'lock_app_for_all',
+    classification: 'privileged',
+    owner: 'none — dead for every caller (2026-09-26 audit); UI uses set_setting via settings.actions',
+    requiredPermission: 'super_admin',
+    notes:
+      'Service-role-granted (10_permissions.sql) but UNCALLABLE: internal ' +
+      'is_current_user_super_admin() can never pass on a service connection (auth.uid() is ' +
+      'NULL). The dashboard lock flow writes app_lock_message + app_locked through ' +
+      'set_setting (settings-writes.ts) behind a requireSuperAdmin() server-action gate — ' +
+      'matching the intent of the dead RPC.',
+  },
+  {
+    name: 'unlock_app',
+    classification: 'privileged',
+    owner: 'none — dead for every caller (2026-09-26 audit); UI uses set_setting via settings.actions',
+    requiredPermission: 'super_admin',
+    notes:
+      'Same grant/check contradiction as lock_app_for_all. The dashboard unlock flow sets ' +
+      'app_locked=false through set_setting (settings-writes.ts) behind requireSuperAdmin().',
+  },
 ] as const;
 
 /** Fast lookup by RPC name. */

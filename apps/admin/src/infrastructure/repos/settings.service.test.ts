@@ -13,7 +13,25 @@ import {
   unlockApp,
 } from './settings.service';
 
+import {
+  disableMaintenanceModeAction,
+  enableMaintenanceModeAction,
+  lockAppAction,
+  unlockAppAction,
+} from '@/adapters/actions/settings.actions';
 import { container } from '@/container';
+
+// 2026-09-26 security audit: the four privileged writes no longer call the
+// (uncallable) service-role-only SECURITY DEFINER RPCs directly — they go
+// through the settings.actions server actions, which write via `set_setting`
+// under the caller's own session. Mocked here; the actions themselves are
+// covered by their boundary gates (requirePermission / requireSuperAdmin).
+vi.mock('@/adapters/actions/settings.actions', () => ({
+  enableMaintenanceModeAction: vi.fn().mockResolvedValue({ success: true }),
+  disableMaintenanceModeAction: vi.fn().mockResolvedValue({ success: true }),
+  lockAppAction: vi.fn().mockResolvedValue({ success: true }),
+  unlockAppAction: vi.fn().mockResolvedValue({ success: true }),
+}));
 
 vi.mock('@/container', () => ({
   container: {
@@ -113,29 +131,48 @@ describe('settings.service', () => {
     expect(q2.delete).toHaveBeenCalled();
   });
 
-  it('maintenance mode toggles', async () => {
+  it('maintenance mode toggles route through the server actions', async () => {
     mockAuth.mockResolvedValue({ data: { user: { id: 'u' } } });
-    await enableMaintenanceMode({
+    const params = {
       message: 'off',
       ends_at: 'now',
       exclude_roles: ['admin'],
       exclude_users: ['1'],
-    });
-    expect(mockRpc).toHaveBeenCalledWith('enable_maintenance_mode', expect.objectContaining({
-      p_message: 'off',
-      p_ends_at: 'now',
-    }));
+    };
+    await enableMaintenanceMode(params);
+    expect(enableMaintenanceModeAction).toHaveBeenCalledWith(params);
 
     await disableMaintenanceMode();
-    expect(mockRpc).toHaveBeenCalledWith('disable_maintenance_mode');
+    expect(disableMaintenanceModeAction).toHaveBeenCalled();
+    // The dead direct RPCs must never be called again.
+    expect(mockRpc).not.toHaveBeenCalledWith('enable_maintenance_mode', expect.anything());
+    expect(mockRpc).not.toHaveBeenCalledWith('disable_maintenance_mode');
   });
 
-  it('app locks', async () => {
+  it('app locks route through the server actions', async () => {
     mockAuth.mockResolvedValue({ data: { user: { id: 'u' } } });
     await lockApp('locked');
-    expect(mockRpc).toHaveBeenCalledWith('lock_app_for_all', { p_message: 'locked' });
+    expect(lockAppAction).toHaveBeenCalledWith('locked');
 
     await unlockApp();
-    expect(mockRpc).toHaveBeenCalledWith('unlock_app');
+    expect(unlockAppAction).toHaveBeenCalled();
+    expect(mockRpc).not.toHaveBeenCalledWith('lock_app_for_all', expect.anything());
+    expect(mockRpc).not.toHaveBeenCalledWith('unlock_app');
+  });
+
+  it('surfaces server-action failures as InfrastructureError with a generic message', async () => {
+    vi.mocked(enableMaintenanceModeAction).mockResolvedValueOnce({
+      success: false,
+      error: 'settings.write required',
+    });
+    await expect(enableMaintenanceMode({ message: 'x', ends_at: 'now' })).rejects.toThrow();
+    // The privileged reason must stay in internalDetail, not the user-facing message.
+    vi.mocked(enableMaintenanceModeAction).mockResolvedValueOnce({
+      success: false,
+      error: 'settings.write required',
+    });
+    await expect(enableMaintenanceMode({ message: 'x', ends_at: 'now' })).rejects.toMatchObject({
+      name: 'InfrastructureError',
+    });
   });
 });

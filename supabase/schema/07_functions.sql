@@ -2536,6 +2536,21 @@ BEGIN
     RAISE EXCEPTION 'PERMISSION_DENIED';
   END IF;
 
+  -- 2026-09-26 audit: the platform-wide app lock is super_admin-only by
+  -- design (the now-dead lock_app_for_all/unlock_app enforced
+  -- is_current_user_super_admin()). set_setting itself is only
+  -- settings.write-gated, and the admin role holds settings.write, so
+  -- without this pin any tenant admin could flip app_locked directly and
+  -- lock every account out of the student app (platform-wide DoS lever).
+  -- Maintenance-mode keys stay settings.write-gated, matching the dead
+  -- enable/disable_maintenance_mode checks.
+  IF p_key IN ('app_locked', 'app_lock_message')
+     AND pg_catalog.current_setting('role', true) IS DISTINCT FROM 'service_role'
+     AND auth.role() IS DISTINCT FROM 'service_role'
+     AND NOT public.is_current_user_super_admin() THEN
+    RAISE EXCEPTION 'PERMISSION_DENIED' USING ERRCODE = '42501';
+  END IF;
+
   SELECT * INTO v_def FROM public.setting_definitions WHERE key = p_key;
   IF FOUND THEN
     IF p_value IS NULL AND NOT v_def.is_nullable THEN
